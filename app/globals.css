@@ -1,0 +1,82 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-display: "Fraunces", serif;
+  --font-body: "Inter", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #FCFBF7;
+  color: #0B1220;
+}
+
+::selection {
+  background-color: #B08D57;
+  color: #FCFBF7;
+}
+
+/* Corner-bracket "spec plate" signature element */
+.plate {
+  position: relative;
+  border: 1px solid #E4E0D4;
+}
+.plate::before,
+.plate::after,
+.plate .br-tl,
+.plate .br-br {
+  content: "";
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border-color: #B08D57;
+  border-style: solid;
+}
+.plate::before {
+  top: -1px;
+  left: -1px;
+  border-width: 2px 0 0 2px;
+}
+.plate::after {
+  bottom: -1px;
+  right: -1px;
+  border-width: 0 2px 2px 0;
+}
+
+.plate-dark {
+  border-color: rgba(247,244,236,0.15);
+}
+.plate-dark::before,
+.plate-dark::after {
+  border-color: #C9A96E;
+}
+
+.eyebrow {
+  font-family: var(--font-mono);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+}
+
+.blueprint-bg {
+  background-color: #0B1220;
+  background-image: linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
+  background-size: 36px 36px;
+}
+
+/* visible keyboard focus */
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible {
+  outline: 2px solid #B08D57;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
