@@ -7,8 +7,8 @@
    Leave both empty to run in demo mode (saved in this browser only).
    ===================================================================== */
 window.PD_CONFIG = {
-  supabaseUrl:     "https://owuxnzonixpwooimaizm.supabase.co",
-  supabaseAnonKey: "sb_publishable_Lo4P1cqPXDotnAzArPq-UA_HXyio04I",
+  supabaseUrl:     "https://dehlcusptkzfhqvpfyjh.supabase.co",
+  supabaseAnonKey: "sb_publishable_ukWZLiTOXfUZsNAyn5BM7Q_YjSFcUus",
 
   appName:      "Process Documents",
   balloonUrl:   "balloon.html",           // link back to Balloon Inspector
