@@ -6,6 +6,9 @@
 <title>Process Documents</title>
 <meta name="description" content="PFD, PFMEA, Control Plan, SOP, inspection reports, SPC and MSA generated automatically from ballooned drawings.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%225%22 y=%223%22 width=%2222%22 height=%2226%22 rx=%223%22 fill=%22%231D5FD0%22/%3E%3Cpath d=%22M10 11h12M10 16h12M10 21h8%22 stroke=%22white%22 stroke-width=%222.2%22 stroke-linecap=%22round%22/%3E%3C/svg%3E">
+<script>/* show this company's logo as the tab icon straight away */
+(function(){ try{ var k=Object.keys(localStorage).filter(function(x){return x.indexOf("pd_brand")===0;}); var b=k.length?JSON.parse(localStorage.getItem(k[0])):null;
+  if(b&&b.logo){ var l=document.querySelector("link[rel=icon]"); if(l) l.href=b.logo; if(b.name) document.title="Process Documents – "+b.name; } }catch(e){} })();</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -80,6 +83,18 @@ a{color:var(--accent)}
 .nav button[aria-current="page"] .code{color:var(--accent);border-color:var(--accent)}
 .nav .ed{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
 .main{overflow:auto;min-width:0;padding:18px 22px 60px;scroll-padding-top:10px}
+.body{transition:grid-template-columns .18s}
+.sidetog{display:inline-grid}
+@media (min-width:901px){
+  body.side-min .body{grid-template-columns:62px minmax(0,1fr)}
+  body.side-min .side{padding:10px 6px 30px;overflow-x:hidden}
+  body.side-min .side h4{font-size:0;height:1px;margin:10px 6px;border-top:1px solid var(--line2)}
+  body.side-min .nav button{justify-content:center;padding:8px 2px;font-size:0;gap:0;position:relative}
+  body.side-min .nav .code{min-width:44px;font-size:11px}
+  body.side-min .nav .ed{position:absolute;top:4px;right:2px}
+  body.side-min .main{padding:14px 14px 60px}
+}
+@media (max-width:900px){ .sidetog{display:none} }
 .scrim{display:none}
 
 /* ---------- document paper ---------- */
@@ -111,7 +126,7 @@ a{color:var(--accent)}
 
 /* ---------- editable grid ---------- */
 .gridwrap{overflow:auto;border:1.5px solid var(--ink);border-radius:4px;max-height:calc(100dvh - 300px);min-height:220px;background:var(--surface);-webkit-overflow-scrolling:touch}
-.gridwrap.free{max-height:none}
+.gridwrap.free{max-height:none;min-height:0}
 table.g{border-collapse:separate;border-spacing:0;table-layout:fixed;font-size:12.5px;width:100%}
 table.g th{position:sticky;top:0;background:var(--head);color:var(--head-ink);font:600 12.5px/1.2 var(--display);letter-spacing:.02em;padding:6px 5px;text-align:left;border-right:1px solid rgba(255,255,255,.18);border-bottom:1px solid var(--ink);z-index:2;vertical-align:bottom;word-break:break-word}
 table.g thead tr.grp th{background:var(--sub);color:var(--ink);text-align:center;font-size:12px;letter-spacing:.06em;border-right:1px solid var(--line);top:0}
@@ -196,6 +211,21 @@ details.op .in{padding:12px}
 .fld input,.fld select,.fld textarea{border:1px solid var(--line);background:var(--field);border-radius:6px;padding:7px 9px;font-size:14px;color:var(--ink);width:100%}
 .frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
 
+/* consistent dropdowns & checkboxes */
+select{-webkit-appearance:none;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%235B6778' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center;background-size:14px;padding-right:28px!important;cursor:pointer}
+select:disabled{cursor:default;opacity:.8}
+.fld select{min-height:38px}
+.fld input[type=checkbox],.fld input[type=radio],input[type=checkbox]{width:18px!important;height:18px;min-width:18px;flex:none;margin:0;padding:0;accent-color:var(--accent);cursor:pointer}
+.checklist{border:1px solid var(--line);border-radius:6px;padding:4px;max-height:190px;overflow:auto;background:var(--field)}
+.checklist label{display:flex;gap:10px;align-items:flex-start;color:var(--ink);font-size:13.5px;padding:5px 6px;border-radius:5px;cursor:pointer;text-align:left}
+.checklist label:hover{background:var(--panel)}
+.checklist label input{margin-top:1px}
+.checklist .gid{font-weight:700;min-width:48px;flex:none}
+.rt.del{color:var(--ng)} .rt.del:hover{background:var(--ng-soft);color:var(--ng)}
+table.g td.deltools{width:40px;background:var(--panel);text-align:center;vertical-align:middle}
+pre.nc{margin:0;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre;overflow:auto}
+textarea.nc{width:100%;min-height:62vh;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,"Courier New",monospace;border:1.5px solid var(--ink);border-radius:4px;padding:10px 12px;background:var(--field);color:var(--ink);white-space:pre;overflow:auto;resize:vertical;tab-size:4}
+
 /* ---------- modal ---------- */
 .veil{position:fixed;inset:0;z-index:80;background:rgba(10,16,26,.45);display:grid;place-items:center;padding:16px;overflow:auto}
 .dlg{background:var(--surface);border:1px solid var(--line);border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.25);width:min(560px,100%);max-height:calc(100dvh - 32px);display:flex;flex-direction:column}
@@ -220,9 +250,10 @@ details.op .in{padding:12px}
 
 /* ---------- sign-in ---------- */
 .lg-wrap{position:fixed;inset:0;z-index:95;background:#fff;color:#15233B;display:grid;grid-template-columns:1fr 1fr;overflow:auto}
-.lg-vis{position:relative;background:linear-gradient(145deg,#0B1830 0%,#12305F 55%,#1D5FD0 100%);overflow:hidden;min-height:100vh}
-.lg-vis svg{position:absolute;inset:0;width:100%;height:100%}
-.lg-vis .cap{position:absolute;left:36px;bottom:34px;right:36px;color:#fff}
+.lg-vis{position:relative;background:linear-gradient(145deg,#0B1830 0%,#12305F 55%,#1D5FD0 100%);overflow:hidden;min-height:100vh;display:flex;flex-direction:column}
+.lg-vis .art{position:relative;flex:1;min-height:260px}
+.lg-vis .art svg{position:absolute;inset:0;width:100%;height:100%}
+.lg-vis .cap{position:relative;padding:0 36px 34px;color:#fff}
 .lg-vis .cap h2{font:700 38px/1.05 var(--display);margin:0 0 8px;letter-spacing:.01em}
 .lg-vis .cap p{margin:0;color:#C9D8F2;font-size:15px;max-width:520px}
 .lg-form{display:flex;flex-direction:column;justify-content:center;padding:40px clamp(24px,7vw,110px);min-height:100vh}
@@ -262,7 +293,7 @@ details.op .in{padding:12px}
   .sign{grid-template-columns:1fr} .sign label{border-right:none;border-bottom:1px solid var(--line)}
   .gridwrap{max-height:calc(100dvh - 220px)}
   .toolbar h2{font-size:22px}
-  .lg-wrap{grid-template-columns:1fr} .lg-vis{min-height:34vh} .lg-vis .cap h2{font-size:28px} .lg-form{min-height:auto;padding:28px 22px 40px}
+  .lg-wrap{display:flex;flex-direction:column} .lg-vis{min-height:auto;flex:none} .lg-vis .art{min-height:190px;flex:none;height:200px} .lg-vis .cap{padding:0 22px 22px} .lg-vis .cap h2{font-size:28px} .lg-form{min-height:auto;padding:28px 22px 40px}
 }
 @media (min-width:901px){ .only-m{display:none!important} }
 @media (max-width:640px){ .brand>div:last-child{display:none} .proj .chip{max-width:none;flex:1;min-width:0} #bProjects{display:none} }
@@ -273,6 +304,7 @@ details.op .in{padding:12px}
 <body>
 <div class="app" id="app">
   <header class="top">
+    <button class="icon-btn sidetog" id="bSide" aria-label="Hide or show the side panel" title="Hide / show side panel (Ctrl+B)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/><path id="sideArrow" d="M15 10l-2 2 2 2"/></svg></button>
     <button class="icon-btn only-m" id="bNav" aria-label="Open menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <div class="brand" id="brand"><div class="mark"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M7 8h10M7 12h10M7 16h6"/></svg></div><div><h1>Process Documents</h1><small id="brandSub">APQP · PPAP · IATF 16949</small></div></div>
     <div class="proj"><span class="chip" id="projChip" hidden></span><span class="status" id="projStatus" hidden></span></div>
@@ -296,6 +328,7 @@ details.op .in{padding:12px}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+<script src="company-config.js"></script>
 <script src="pd/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="pd/engine.js"></script>
@@ -303,6 +336,7 @@ details.op .in{padding:12px}
 <script src="pd/schema.js"></script>
 <script src="pd/sample.js"></script>
 <script src="pd/charts.js"></script>
+<script src="pd/cnc.js"></script>
 <script src="pd/ui.js"></script>
 <script src="pd/export.js"></script>
 <script src="pd/app.js"></script>
