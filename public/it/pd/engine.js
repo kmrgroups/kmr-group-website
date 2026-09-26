@@ -413,7 +413,7 @@ function toolsFor(op, chars, ctx){
 function paramsFor(op, ctx){
   const mc=ctx.matCls, vc=VC[mc]||VC.P, D=Math.max(10,ctx.maxOD||50), P=[];
   const rpm=(v,d)=>Math.round(1000*v/(Math.PI*d)/10)*10;
-  const add=(name,spec,method,freq,resp="Operator")=>P.push({name,spec,method,freq,resp});
+  const add=(name,spec,method,freq,resp="Operator")=>P.push({name,spec,method,freq,resp,kind:paramKind(name)});
   const k=op.key;
   if(k==="CUT") add("Cut length",`${fmt(r4((ctx.length||50)+3))} ±0.5 mm (finish length + 3 mm facing allowance)`,"Steel rule / vernier","First piece & every 50 pcs");
   if(k.startsWith("TURN")){ add("Cutting speed (Vc)",`${vc[0]}–${vc[1]} m/min (${MATCLS_TXT[mc]})`,"CNC program verification","Set-up");
@@ -446,6 +446,11 @@ function paramsFor(op, ctx){
   if(k==="CRACK") add("Magnetising current / ink concentration","As per MPI procedure","Ammeter / settling test","Start of shift");
   return P;
 }
+
+/* A parameter describes the PART (product characteristic) or the MACHINE / METHOD (process characteristic).
+   Used by the Control Plan to put each item in the right column. */
+const PRODUCT_PARAM_RX=/^(cut length|raw material size|material certificate|material grade|hardness|case depth|coating thickness|coating type|corrosion resistance|marking content|marking depth|quantity per box|label|burr|appearance|dimension|length|diameter|surface roughness|surface finish|core hardness|microstructure|cleanliness)/i;
+function paramKind(name){ return PRODUCT_PARAM_RX.test(String(name||"").trim())?"product":"process"; }
 
 /* ---------------- machine selection ---------------- */
 function pickMachine(op, machines, ctx){
@@ -580,5 +585,5 @@ function buildPlan(source, masters, settings){
 function norm(s){ return String(s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
 
 window.PDEngine = { normalizeSource, sourceFromCSV, parseCSV, buildPlan, specText, tolBand, limits, isInternal, parseThread, gaugeFor,
-  materialClass, DEFAULT_MACHINES, DEFAULT_CONSUMABLES, OPS, MFG_KEYS, MACH_KEYS, fmt, fmtTol, r4, num, today, addDays, pad, uniq, toolsFor, paramsFor, productionGauge };
+  materialClass, DEFAULT_MACHINES, DEFAULT_CONSUMABLES, OPS, MFG_KEYS, MACH_KEYS, fmt, fmtTol, r4, num, today, addDays, pad, uniq, toolsFor, paramsFor, paramKind, productionGauge, isInternal, parseThread, tapDrill, tolBand, VC, MATCLS_TXT };
 })();

@@ -63,19 +63,20 @@ function expandCols(cols, slots){
 function grid(host, o){
   // o: {cols, groups, rows, slots, derive(row), cellClass(row,col), onChange(row,k), rowsChanged(), newRow(), readonly, free, rowTools:true}
   const cols = expandCols(o.cols, o.slots), canEdit = A().S.canEdit && !o.readonly, tools = canEdit && o.rowTools!==false;
-  const total = cols.reduce((a,c)=>a+(c.w||8),0) + (tools?2.6:0);
+  const del = canEdit && o.delCol;
+  const total = cols.reduce((a,c)=>a+(c.w||8),0) + (tools?2.6:0) + (del?3:0);
   const minW = o.minW || Math.max(700, Math.round(total*11.5));
   const show = (c,v)=>{ if(v==null||v==="") return ""; if(c.type==="sel"&&c.opts&&Array.isArray(c.opts[0])){ const f=c.opts.find(x=>x[0]===v); return f?f[1]:v; } if(c.type==="num"&&typeof v==="number") return fmtN(v,4); return String(v); };
   const cellHTML=(r,row,c)=>{ const v=row[c.k]; let cls=(o.cellClass&&o.cellClass(row,c))||""; if(c.type==="ro") cls+=" ro"; if(c.k==="cls"&&v) cls+=" cls";
     if(c.flow) return `<td class="${cls}" data-k="${c.k}"><div class="flowcell">${flowSVG(v)}<div class="t" tabindex="${canEdit?0:-1}" data-r="${r}" data-k="${c.k}">${esc(FLOWSHORT[v]||v||"")}</div></div></td>`;
     return `<td class="${cls}" data-k="${c.k}"><div class="t" ${canEdit&&c.type!=="ro"?'tabindex="0"':""} data-r="${r}" data-k="${c.k}">${esc(show(c,v))}</div></td>`; };
   const rowHTML=(r)=>{ const row=o.rows[r]; if(o.derive) o.derive(row); const rc=(o.rowClass&&o.rowClass(row,r))||"";
-    return `<tr data-r="${r}" class="${rc}">${tools?`<td class="rowtools"><button class="rt" data-menu="${r}" aria-label="Row actions"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button></td>`:""}${cols.map(c=>cellHTML(r,row,c)).join("")}</tr>`; };
+    return `<tr data-r="${r}" class="${rc}">${tools?`<td class="rowtools"><button class="rt" data-menu="${r}" aria-label="Row actions"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/></svg></button></td>`:""}${cols.map(c=>cellHTML(r,row,c)).join("")}${del?`<td class="deltools"><button class="rt del" data-delrow="${r}" aria-label="Delete this row" title="Delete this row"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button></td>`:""}</tr>`; };
   const draw=()=>{
-    host.innerHTML = `<div class="gridwrap${o.free?" free":""}"><table class="g" style="min-width:${minW}px"><colgroup>${tools?`<col style="width:34px">`:""}${cols.map(c=>`<col style="width:${(c.w||8)/total*100}%">`).join("")}</colgroup>
+    host.innerHTML = `<div class="gridwrap${o.free?" free":""}"><table class="g" style="min-width:${minW}px"><colgroup>${tools?`<col style="width:34px">`:""}${cols.map(c=>`<col style="width:${(c.w||8)/total*100}%">`).join("")}${del?`<col style="width:40px">`:""}</colgroup>
       <thead>${o.groups?`<tr class="grp">${tools?"<th class='rowtools'></th>":""}${o.groups.map(g=>`<th colspan="${g[1]}">${esc(g[0])}</th>`).join("")}</tr>`:""}
-      <tr>${tools?`<th class="rowtools"></th>`:""}${cols.map(c=>`<th title="${esc(c.label)}">${esc(c.label)}</th>`).join("")}</tr></thead>
-      <tbody>${o.rows.map((_,r)=>rowHTML(r)).join("")}</tbody></table></div>
+      <tr>${tools?`<th class="rowtools"></th>`:""}${cols.map(c=>`<th title="${esc(c.label)}">${esc(c.label)}</th>`).join("")}${del?`<th title="Delete">Del.</th>`:""}</tr></thead>
+      <tbody>${o.rows.length?o.rows.map((_,r)=>rowHTML(r)).join(""):`<tr><td colspan="${cols.length+(tools?1:0)+(del?1:0)}" style="padding:12px;color:var(--muted);text-align:center;background:var(--panel)">No rows yet${canEdit&&o.newRow!==null?" – use + Add row":""}</td></tr>`}</tbody></table></div>
       ${canEdit&&o.newRow!==null?`<div class="addrow"><button class="btn small" data-add>+ Add row</button><span class="hintline">Tap any cell to edit · ⋮ for insert, move, duplicate or delete</span></div>`:""}`;
   };
   draw();
@@ -107,6 +108,7 @@ function grid(host, o){
   host.onclick = e=>{
     const t=e.target.closest(".t"); if(t&&!ed) { openEd(t); return; }
     const m=e.target.closest("[data-menu]"); if(m){ rowMenu(m, +m.dataset.menu); return; }
+    const dl=e.target.closest("[data-delrow]"); if(dl){ const r=+dl.dataset.delrow, row=o.rows[r]; const nm=row&&(row.name||row.id||row.key||"")||""; if(!confirm(`Delete ${nm?"“"+nm+"”":"this row"}?`)) return; o.rows.splice(r,1); if(o.rowsChanged) o.rowsChanged(); draw(); return; }
     if(e.target.closest("[data-add]")){ o.rows.push(o.newRow?o.newRow():{}); if(o.rowsChanged) o.rowsChanged(); draw(); const last=host.querySelector(`tr[data-r="${o.rows.length-1}"] .t[tabindex]`); if(last) last.focus(); }
   };
   const rowMenu=(btn,r)=>{
@@ -167,7 +169,7 @@ V.overview = (M)=>{
   </div>
   <div class="paper">
     <div class="box"><h3>Part & customer details</h3><div class="frm">${["partNo","partName","drawingNo","drawingRev","customer","customerCode","customerPartNo","material","model","annualVolume","phase","generalTol"].map(k=>`<label class="fld">${esc(HL[k]||k)}<input data-hh="${k}" value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}</div></div>
-    <div class="box"><h3>Team & approvals (appear on every document)</h3><div class="frm">${["supplier","supplierCode","plant","keyContact","coreTeam","preparedBy","reviewedBy","approvedBy","origDate","revDate","docRev"].map(k=>`<label class="fld">${esc(HL[k]||({preparedBy:"Prepared by",reviewedBy:"Reviewed by",approvedBy:"Approved by"})[k]||k)}<input data-hh="${k}" ${/Date/.test(k)?'type="date"':""} value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}</div></div>
+    <div class="box"><h3 style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Team & approvals (appear on every document)<span style="flex:1"></span>${ro()?"":`<button class="btn small" id="ovHdr" type="button">Fill from company defaults</button>`}</h3><div class="frm">${["supplier","supplierCode","plant","keyContact","coreTeam","preparedBy","reviewedBy","approvedBy","origDate","revDate","docRev"].map(k=>`<label class="fld">${esc(HL[k]||({preparedBy:"Prepared by",reviewedBy:"Reviewed by",approvedBy:"Approved by"})[k]||k)}<input data-hh="${k}" ${/Date/.test(k)?'type="date"':""} value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}</div></div>
     <div class="cols2">
       <div class="box"><h3>What the automation decided</h3><table class="stats">
         <tr><td>Part family</td><td>${esc(h.family==="rotational"?"Rotational (turned) part":"Prismatic (milled) part")}</td></tr>
@@ -187,6 +189,7 @@ V.overview = (M)=>{
   bindHead(M,"overview");
   const st=$("ovStatus"); if(st) st.onchange=()=>{ P.status=st.value; A().changed(null); A().refreshChip(); };
   [$("ovRerun"),$("ovRerun2")].forEach(b=>b&&(b.onclick=()=>A().rerun()));
+  if($("ovHdr")) $("ovHdr").onclick=()=>{ const n=A().applyHeaderDefaults(h,true); A().changed(null); render("overview"); A().toast(n?`${n} header field${n===1?"":"s"} filled from Admin → Document header.`:"Nothing to fill – set the defaults in Admin → Document header first.",6000); };
   if($("ovDismiss")) $("ovDismiss").onclick=()=>{ P.doc.sourceChanged=false; A().changed(null); render("overview"); };
 };
 
@@ -226,7 +229,7 @@ V.plan = (M)=>{
     <div class="in" data-in="${i}"></div></details>`; }).join("")}`;
   M.querySelectorAll("details.op").forEach(d=>d.addEventListener("toggle",()=>{ if(d.open) opBody(+d.dataset.i); }));
   $("plApply").onclick=()=>A().regenFromPlan();
-  $("plAdd").onclick=()=>{ const keys=Object.keys(E.OPS).filter(k=>k!=="TURN"); const k=prompt("Operation type:\n"+keys.map(k=>k+" – "+E.OPS[k].name).join("\n"),"VMC"); if(!k||!E.OPS[k.toUpperCase()]) return; const K=k.toUpperCase();
+  $("plAdd").onclick=async()=>{ const keys=Object.keys(E.OPS).filter(k=>k!=="TURN"); const K=await A().pick("Add operation",keys.map(k=>[k,E.OPS[k].name]),{label:"Operation type",value:"VMC",ok:"Add operation",hint:"The new operation is added at the end of the route. Move it with Move up / Move down."}); if(!K||!E.OPS[K]) return;
     const opNo=Math.max(0,...plan.ops.map(o=>+o.opNo||0))+10; const op={key:K,opNo,name:E.OPS[K].name,sym:E.OPS[K].sym,inHouse:E.OPS[K].inHouse,chars:[],machineId:"",machine:"",tools:[],consumables:(E.DEFAULT_CONSUMABLES[K]||[]).slice(),gauges:[],params:E.paramsFor({key:K},{matCls:"P",maxOD:plan.ctxInfo.maxOD,length:plan.ctxInfo.length,notes:plan.notes,header:plan.header})};
     plan.ops.push(op); plan.ops.sort((a,b)=>a.opNo-b.opNo); A().changed("_plan"); draw(); };
   };
@@ -242,10 +245,10 @@ V.plan = (M)=>{
       <label class="fld">Where<select data-f="inHouse" ${ro()?"disabled":""}><option value="1"${o.inHouse?" selected":""}>In-house</option><option value="0"${o.inHouse?"":" selected"}>Sub-contract</option></select></label></div>
     <p class="hintline" style="margin:10px 0 4px">Characteristics produced here: ${o.chars.length?o.chars.map(n=>{ const c=plan.chars.find(x=>x.no===n); return c?`<span class="pill ${c.cls==="CC"?"cc":c.cls?"sc":""}">#${n} ${esc(c.spec)}</span>`:""; }).join(" "):"none"} <span>(move them on the Characteristics screen)</span></p>
     <h4 style="font:600 15px var(--display);margin:14px 0 6px">Tools</h4><div data-g="tools"></div>
-    <h4 style="font:600 15px var(--display);margin:14px 0 6px">Process parameters</h4><div data-g="params"></div>
+    <h4 style="font:600 15px var(--display);margin:14px 0 6px">Process parameters & in-process checks <span class="hintline" style="font:400 13px var(--body)">– “Control plan column” decides whether it is listed as a product or a process characteristic</span></h4><div data-g="params"></div>
     <div class="cols2" style="margin-top:14px"><label class="fld">Consumables (one per line)<textarea data-f="consumables" rows="5" ${ro()}>${esc((o.consumables||[]).join("\n"))}</textarea></label>
-      <div class="fld">Gauges used at this operation<div style="border:1px solid var(--line);border-radius:6px;padding:6px 8px;max-height:170px;overflow:auto;background:var(--field)">${plan.gauges.map(g=>`<label style="display:flex;gap:8px;align-items:center;color:var(--ink);font-size:13.5px;padding:2px 0"><input type="checkbox" data-gauge="${esc(g.id)}" ${o.gauges.includes(g.id)?"checked":""} ${ro()?"disabled":""}> ${esc(g.id+" "+g.name+" "+(g.range||""))}</label>`).join("")}</div></div></div>
-    <div class="addrow"><button class="btn small" data-mv="-1" ${ro()?"disabled":""}>Move up</button><button class="btn small" data-mv="1" ${ro()?"disabled":""}>Move down</button><button class="btn small danger" data-del ${ro()?"disabled":""}>Delete operation</button></div>`;
+      <div class="fld">Gauges used at this operation<div class="checklist">${plan.gauges.length?plan.gauges.map(g=>`<label><input type="checkbox" data-gauge="${esc(g.id)}" ${o.gauges.includes(g.id)?"checked":""} ${ro()?"disabled":""}><span class="gid">${esc(g.id)}</span><span>${esc(g.name+" "+(g.range||""))}</span></label>`).join(""):`<span class="hintline" style="padding:6px">No gauges in this project.</span>`}</div></div></div>
+    <div class="addrow"><button class="btn small" data-mv="-1" ${ro()?"disabled":""}>Move up</button><button class="btn small" data-mv="1" ${ro()?"disabled":""}>Move down</button><button class="btn small danger" data-del ${ro()?"disabled":""}>Delete operation</button>${window.PDCNC&&PDCNC.isCNC(o)?`<span style="flex:1"></span><button class="btn small" data-cnc>CNC program for this operation →</button>`:""}</div>`;
     host.querySelectorAll("[data-f]").forEach(el=>el.addEventListener("change",()=>{ const f=el.dataset.f; let v=el.value;
       if(f==="opNo") v=+v||o.opNo; if(f==="inHouse") v=v==="1"; if(f==="consumables") v=v.split("\n").map(s=>s.trim()).filter(Boolean);
       if(f==="machineId"){ const m=machines.find(x=>x.id===v); if(m){ o.machine=m.name; host.querySelector('[data-f="machine"]').value=m.name; } }
@@ -253,12 +256,37 @@ V.plan = (M)=>{
     host.querySelectorAll("[data-gauge]").forEach(cb=>cb.addEventListener("change",()=>{ const id=cb.dataset.gauge; o.gauges=o.gauges.filter(x=>x!==id); if(cb.checked) o.gauges.push(id); const g=plan.gauges.find(x=>x.id===id); if(g){ g.ops=g.ops.filter(x=>x!==o.opNo); if(cb.checked) g.ops.push(o.opNo); } A().changed("_plan"); }));
     grid(host.querySelector('[data-g="tools"]'),{rows:o.tools,free:true,cols:[{k:"id",label:"Tool ID",w:5},{k:"desc",label:"Description",w:14},{k:"spec",label:"Insert / size",w:14},{k:"holder",label:"Holder",w:10},{k:"grade",label:"Grade",w:9},{k:"life",label:"Tool life",w:7},{k:"remarks",label:"Remarks",w:8}],
       onChange:()=>A().changed("_plan"), rowsChanged:()=>A().changed("_plan"), newRow:()=>({id:nextToolId(plan),desc:"",spec:"",holder:"",grade:"",life:"",remarks:""})});
-    grid(host.querySelector('[data-g="params"]'),{rows:o.params,free:true,cols:[{k:"name",label:"Parameter",w:12},{k:"spec",label:"Specification",w:18,type:"long"},{k:"method",label:"Method",w:10},{k:"freq",label:"Frequency",w:9},{k:"resp",label:"Responsibility",w:7}],
-      onChange:()=>A().changed("_plan"), rowsChanged:()=>A().changed("_plan"), newRow:()=>({name:"",spec:"",method:"",freq:"",resp:"Operator"})});
+    grid(host.querySelector('[data-g="params"]'),{rows:o.params,free:true,cols:[{k:"name",label:"Characteristic / parameter",w:12},{k:"kind",label:"Control plan column",w:8,type:"sel",opts:[["product","Product characteristic"],["process","Process characteristic"]]},{k:"spec",label:"Specification",w:18,type:"long"},{k:"method",label:"Method",w:10},{k:"freq",label:"Frequency",w:9},{k:"resp",label:"Responsibility",w:7}],
+      onChange:(r,k)=>{ if(k==="name"&&!r._kindSet) r.kind=E.paramKind(r.name); if(k==="kind") r._kindSet=true; A().changed("_plan"); }, rowsChanged:()=>A().changed("_plan"), newRow:()=>({name:"",kind:"process",spec:"",method:"",freq:"",resp:"Operator"})});
     host.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{ const j=i+(+b.dataset.mv); if(j<0||j>=plan.ops.length) return; [plan.ops[i],plan.ops[j]]=[plan.ops[j],plan.ops[i]]; const t=plan.ops[i].opNo; plan.ops[i].opNo=plan.ops[j].opNo; plan.ops[j].opNo=t; A().changed("_plan"); draw(); });
+    const cb=host.querySelector("[data-cnc]"); if(cb) cb.onclick=()=>{ V._cncOp=o.opNo; A().go("cnc"); };
     host.querySelector("[data-del]").onclick=()=>{ if(!confirm(`Delete operation ${o.opNo} ${o.name}? Its characteristics become unassigned.`)) return; plan.ops.splice(i,1); plan.chars.forEach(c=>{ if(o.chars.includes(c.no)) c.op=""; }); A().changed("_plan"); draw(); };
   };
   draw();
+};
+/* ---------- CNC programs ---------- */
+V.cnc = (M)=>{
+  const S=A().S, plan=S.plan, C=window.PDCNC, ops=plan.ops.filter(C.isCNC);
+  if(!ops.length){ M.innerHTML=`<div class="toolbar"><h2>CNC programs</h2></div><div class="paper"><p class="hintline">This project has no CNC turning, VMC or drilling operation. Add one on the Process plan screen.</p></div>`; return; }
+  const nums=C.progNumbers(plan,S.settings);
+  let cur=ops.find(o=>o.opNo===V._cncOp)||ops[0]; V._cncOp=cur.opNo;
+  const gen=(o,force)=>{ if(!o.cnc||force){ o.cnc={text:C.generate(o,plan,S.settings,nums[o.opNo]),at:new Date().toISOString(),edited:false,prog:nums[o.opNo]}; return true; } return false; };
+  if(gen(cur,false)) A().changed("_plan");
+  const fileName=o=>`O${String((o.cnc&&o.cnc.prog)||nums[o.opNo]).padStart(4,"0")}_${(plan.header.partNo||"PART").replace(/[^\w-]+/g,"_")}_OP${o.opNo}.nc`;
+  const dl=(name,text)=>{ const b=new Blob([text.replace(/\n/g,"\r\n")],{type:"text/plain"}), a=document.createElement("a"); a.href=URL.createObjectURL(b); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{ URL.revokeObjectURL(a.href); a.remove(); },500); };
+  M.innerHTML=`<div class="toolbar"><h2>CNC programs</h2><span class="grow"></span>
+      <button class="btn small" id="ncRe" ${ro()?"disabled":""}>Regenerate this program</button><button class="btn small" id="ncCopy">Copy</button><button class="btn small primary" id="ncDl">Download .nc</button><button class="btn small" id="ncAll">Download all</button></div>
+    <div class="banner warn"><b>Draft program – prove out before cutting.</b><span>Generated from the ballooned characteristics, the tools of this operation and Admin → CNC programs. Check every value marked in the variable list against the drawing, run it in simulation / dry run / single block, then change <code>#1=0</code> to <code>#1=1</code>. Until then the program stops with an alarm.</span></div>
+    <div class="optabs">${ops.map(o=>`<button data-op="${o.opNo}" aria-pressed="${o===cur}">Op ${o.opNo} · ${esc(o.name)}</button>`).join("")}</div>
+    <div class="meta"><label>Program number<input value="O${String((cur.cnc&&cur.cnc.prog)||nums[cur.opNo]).padStart(4,"0")}" readonly></label><label>Machine<input value="${esc(cur.machine||"—")}" readonly></label><label>Tools in this operation<input value="${cur.tools.length}" readonly></label><label>Characteristics<input value="${cur.chars.length}" readonly></label><label>Generated<input value="${esc(((cur.cnc&&cur.cnc.at)||"").replace("T"," ").slice(0,16))}${cur.cnc&&cur.cnc.edited?" · edited":""}" readonly></label></div>
+    <textarea class="nc" id="ncT" spellcheck="false" ${ro()}>${esc(cur.cnc.text)}</textarea>
+    <p class="hintline">You can edit the program here; changes are saved with the project. Tools, parameters and characteristics come from the Process plan – change them there and press <b>Regenerate this program</b>.</p>`;
+  M.querySelectorAll("[data-op]").forEach(b=>b.onclick=()=>{ V._cncOp=+b.dataset.op; render("cnc"); });
+  $("ncT").addEventListener("change",()=>{ cur.cnc.text=$("ncT").value; cur.cnc.edited=true; A().changed("_plan"); });
+  $("ncRe").onclick=()=>{ if(cur.cnc.edited&&!confirm("This program was edited on screen. Regenerate and replace your edits?")) return; gen(cur,true); A().changed("_plan"); render("cnc"); A().toast("Program regenerated."); };
+  $("ncCopy").onclick=async()=>{ try{ await navigator.clipboard.writeText($("ncT").value); A().toast("Program copied."); }catch(e){ $("ncT").select(); document.execCommand("copy"); A().toast("Program copied."); } };
+  $("ncDl").onclick=()=>dl(fileName(cur),$("ncT").value);
+  $("ncAll").onclick=()=>{ let n=0; ops.forEach((o,i)=>{ if(gen(o,false)) n++; setTimeout(()=>dl(fileName(o),o.cnc.text),i*400); }); if(n) A().changed("_plan"); A().toast(`Downloading ${ops.length} program file${ops.length===1?"":"s"}.`); };
 };
 function nextToolId(plan){ let n=0; plan.ops.forEach(o=>o.tools.forEach(t=>{ const m=/(\d+)$/.exec(t.id||""); if(m) n=Math.max(n,+m[1]); })); return "T-"+E.pad(n+1,3); }
 
@@ -387,7 +415,7 @@ V.d_spc = (M,id)=>{
   }
 };
 function resizeSpc(st){ const n=st.n||5, k=st.k||25; st.data=st.data||[]; while(st.data.length<k) st.data.push(Array(n).fill(null)); st.data.length=Math.max(k,0); st.data=st.data.map(g=>{ g=(g||[]).slice(0,n); while(g.length<n) g.push(null); return g; }); }
-function addSpc(){ const S=A().S, plan=S.plan; const opts=plan.chars.filter(c=>c.variable).map(c=>`#${c.no} ${c.label} ${c.spec}`); const pick=prompt("Balloon number of the characteristic to study:\n"+opts.join("\n")); if(!pick) return;
+async function addSpc(){ const S=A().S, plan=S.plan; const opts=plan.chars.filter(c=>c.variable).map(c=>[String(c.no),`#${c.no} ${c.label} ${c.spec}${c.cls?" ("+c.cls+")":""}`]); if(!opts.length){ A().toast("No characteristic with a tolerance to study."); return; } const pick=await A().pick("Add SPC study",opts,{label:"Characteristic (balloon)",ok:"Add study"}); if(!pick) return;
   const c=plan.chars.find(x=>String(x.no)===String(pick).replace("#","").trim()); if(!c){ A().toast("No characteristic with that balloon number."); return; }
   const g=plan.gauges.find(x=>x.id===c.gauge); S.docs.spc.studies.push({charNo:c.no,char:c.label,spec:c.spec,lsl:c.lsl,usl:c.usl,nominal:c.nominal,gauge:g?g.name+" "+(g.range||""):"",op:"",machine:"",cls:c.cls,n:5,k:25,data:Array.from({length:25},()=>Array(5).fill(null)),simulated:false,studyType:"Initial process study (PPAP)",period:""});
   secIdx.spc=S.docs.spc.studies.length-1; A().changed("spc"); render("spc"); }

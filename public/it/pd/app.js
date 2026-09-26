@@ -7,7 +7,8 @@
 const CFG=window.PD_CONFIG||{}, E=window.PDEngine, D=window.PDDocs, SC=window.PDSchema, UI=window.PDUI;
 const $=id=>document.getElementById(id);
 const esc=UI.esc;
-const LS={ get(k,d){ try{ const v=localStorage.getItem(k); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch(e){} } };
+const DBREF=((CFG.supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0])||"local";
+const LS={ key:k=>k+"@"+DBREF, get(k,d){ try{ const v=localStorage.getItem(LS.key(k)); return v==null?d:JSON.parse(v); }catch(e){ return d; } }, set(k,v){ try{ localStorage.setItem(LS.key(k),JSON.stringify(v)); }catch(e){} } };
 const CLOUD = !!(CFG.supabaseUrl && CFG.supabaseAnonKey && window.supabase);
 const sb = CLOUD ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
 
@@ -26,6 +27,22 @@ document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".menu")) hide
 function menu(btn, pop, items){ $(btn).onclick=()=>{ const p=$(pop), open=p.hidden; hideMenus(); if(!open) return; p.innerHTML=items().map(i=>i==="-"?"<hr>":`<button data-i="${i.id}" ${i.disabled?"disabled":""}>${i.icon||""}<span>${esc(i.label)}${i.sub?`<small>${esc(i.sub)}</small>`:""}</span></button>`).join(""); p.hidden=false;
   p.onclick=e=>{ const b=e.target.closest("[data-i]"); if(!b) return; hideMenus(); const it=items().find(x=>x.id===b.dataset.i); if(it&&it.run) it.run(); }; }; }
 
+function setFavicon(href){ if(!href) return; document.querySelectorAll("link[rel~=icon]").forEach(l=>l.remove()); const l=document.createElement("link"); l.rel="icon"; l.href=href; document.head.appendChild(l); }
+/* pick one option from a list – replaces the browser's plain prompt() boxes */
+function pick(title, options, opts={}){ return new Promise(res=>{
+  const v=dialog(title,`${opts.hint?`<p class="hintline" style="margin-top:0">${esc(opts.hint)}</p>`:""}<label class="fld">${esc(opts.label||"Choose")}<select id="pkS" size="1">${options.map(o=>`<option value="${esc(o[0])}"${o[0]===opts.value?" selected":""}>${esc(o[1])}</option>`).join("")}</select></label>`,
+    `<button class="btn" id="pkC">Cancel</button><button class="btn primary" id="pkO">${esc(opts.ok||"OK")}</button>`);
+  let done=false; const fin=x=>{ if(done) return; done=true; closeDialog(); res(x); };
+  $("pkO").onclick=()=>fin($("pkS").value); $("pkC").onclick=()=>fin(null); $("dlgX").onclick=()=>fin(null);
+  new MutationObserver((m,o)=>{ if(!document.body.contains(v)){ o.disconnect(); fin(null); } }).observe(document.body,{childList:true});
+  $("pkS").focus(); }); }
+
+/* ---------------- side panel: hide / show ---------------- */
+function applySide(min){ document.body.classList.toggle("side-min",!!min); const a=document.getElementById("sideArrow"); if(a) a.setAttribute("d",min?"M13 10l2 2-2 2":"M15 10l-2 2 2 2"); }
+applySide(LS.get("pd_side_min",false));
+document.getElementById("bSide").onclick=()=>{ const n=!document.body.classList.contains("side-min"); LS.set("pd_side_min",n); applySide(n); };
+document.addEventListener("keydown",e=>{ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="b"&&!e.target.closest("input,textarea,select")){ e.preventDefault(); document.getElementById("bSide").click(); } });
+
 /* ---------------- theme ---------------- */
 function applyTheme(t){ if(t) document.documentElement.setAttribute("data-theme",t); else document.documentElement.removeAttribute("data-theme"); }
 applyTheme(LS.get("pd_theme",null));
@@ -36,7 +53,7 @@ applyTheme(LS.get("pd_theme",null));
 function loginArt(){
   const nodes=[["Drawing",90,120],["Balloons",250,70],["Process",410,130],["PFD",150,270],["PFMEA",320,250],["Control Plan",470,300],["SOP",110,420],["Reports",280,410],["SPC · MSA",450,450]];
   const links=[[0,1],[1,2],[2,4],[1,3],[3,4],[4,5],[5,8],[3,6],[6,7],[7,8],[2,5]];
-  return `<svg viewBox="0 0 560 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><defs><pattern id="gr" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="rgba(255,255,255,.07)"/></pattern>
+  return `<svg viewBox="0 0 560 560" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><defs><pattern id="gr" width="28" height="28" patternUnits="userSpaceOnUse"><path d="M28 0H0V28" fill="none" stroke="rgba(255,255,255,.07)"/></pattern>
     <radialGradient id="gl" cx="50%" cy="45%" r="60%"><stop offset="0" stop-color="#3B7BEA" stop-opacity=".45"/><stop offset="1" stop-color="#0B1830" stop-opacity="0"/></radialGradient></defs>
     <rect width="560" height="560" fill="url(#gr)"/><rect width="560" height="560" fill="url(#gl)"/>
     ${links.map(([a,b],i)=>`<line x1="${nodes[a][1]}" y1="${nodes[a][2]}" x2="${nodes[b][1]}" y2="${nodes[b][2]}" stroke="#8FB3F5" stroke-opacity=".55" stroke-width="1.6" stroke-dasharray="5 7"><animate attributeName="stroke-dashoffset" from="24" to="0" dur="${1.4+i%3*0.4}s" repeatCount="indefinite"/></line>`).join("")}
@@ -49,15 +66,15 @@ async function brandForLogin(){ let b=LS.get("pd_brand",null);
   return b; }
 async function loginScreen(msg){
   let w=$("lg"); if(!w){ w=document.createElement("div"); w.id="lg"; w.className="lg-wrap"; document.body.appendChild(w); }
-  const pw=CFG.poweredBy||{name:"KMR Group of Companies",url:"https://www.kmr-groups.com"};
-  w.innerHTML=`<div class="lg-vis">${loginArt()}<div class="cap"><h2>From ballooned drawing to a complete PPAP document set</h2><p>PFD, PFMEA, Control Plan, SOP, inspection reports, SPC and MSA, built for IATF 16949 and the AIAG core tools.</p></div></div>
+  const pw=CFG.poweredBy||null;
+  w.innerHTML=`<div class="lg-vis"><div class="art">${loginArt()}</div><div class="cap"><h2>From ballooned drawing to a complete PPAP document set</h2><p>PFD, PFMEA, Control Plan, SOP, inspection reports, SPC and MSA, built for IATF 16949 and the AIAG core tools.</p></div></div>
   <form class="lg-form" id="lgF" autocomplete="on"><div class="co" id="lgCo"></div><h1>${esc(CFG.appName||"Process Documents")}</h1><p class="sub">Sign in with the account your company admin created for you.</p>
     <label>E-mail<input id="lgE" type="email" autocomplete="username" required></label>
     <label>Password<div class="pw"><input id="lgP" type="password" autocomplete="current-password" required><button type="button" class="eye" id="lgEye" aria-label="Show password" aria-pressed="false"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button></div></label>
     <div class="err" id="lgErr">${esc(msg||"")}</div><button class="go" type="submit">Sign in</button>
     <div style="display:flex;justify-content:space-between;margin-top:8px"><button type="button" class="lnk" id="lgForgot">Forgot password?</button>${CFG.balloonUrl?`<a class="lnk" href="${esc(CFG.balloonUrl)}" style="text-decoration:none">Balloon Inspector →</a>`:""}</div>
-    <div class="pow">Powered by <a href="${esc(pw.url)}" target="_blank" rel="noopener">${esc(pw.name)}</a></div></form>`;
-  const b=await brandForLogin(); if(b){ $("lgCo").innerHTML=b.logo?`<img src="${b.logo}" alt="${esc(b.name||"")} logo">`:`<b style="font:700 20px var(--display)">${esc(b.name||"")}</b>`; }
+    ${pw?`<div class="pow">Powered by <a href="${esc(pw.url||"#")}" target="_blank" rel="noopener">${esc(pw.name||"")}</a></div>`:""}</form>`;
+  const b=await brandForLogin(); if(b&&b.logo) setFavicon(b.logo); if(b&&b.name) document.title=(CFG.appName||"Process Documents")+" – "+b.name; if(b){ $("lgCo").innerHTML=b.logo?`<img src="${b.logo}" alt="${esc(b.name||"")} logo">`:`<b style="font:700 20px var(--display)">${esc(b.name||"")}</b>`; }
   $("lgEye").onclick=()=>{ const p=$("lgP"), s=p.type==="password"; p.type=s?"text":"password"; $("lgEye").setAttribute("aria-pressed",String(s)); };
   $("lgF").onsubmit=async e=>{ e.preventDefault(); $("lgErr").textContent=""; const {error}=await sb.auth.signInWithPassword({email:$("lgE").value.trim(),password:$("lgP").value}); if(error){ $("lgErr").textContent=/Invalid login/i.test(error.message)?"Wrong e-mail or password.":error.message; return; } w.remove(); start(); };
   $("lgForgot").onclick=async()=>{ const em=$("lgE").value.trim(); if(!em){ $("lgErr").textContent="Type your e-mail first."; return; } const {error}=await sb.auth.resetPasswordForEmail(em,{redirectTo:location.href.split("#")[0].split("?")[0]}); $("lgErr").textContent=error?error.message:"If that e-mail has an account, a reset link is on its way."; };
@@ -104,7 +121,7 @@ async function signOut(){ if(S.dirty) await flushSave(); if(CLOUD) await sb.auth
 function brand(){
   const o=S.org, b=$("brand");
   b.innerHTML=`${o&&o.logo?`<img class="logo" src="${o.logo}" alt="">`:`<div class="mark"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M7 8h10M7 12h10M7 16h6"/></svg></div>`}<div><h1>${esc(CFG.appName||"Process Documents")}</h1><small>${esc(o?o.name:"APQP · PPAP · IATF 16949")}</small></div>`;
-  if(o&&o.logo){ let l=document.querySelector("link[rel=icon]"); if(l) l.href=o.logo; }
+  if(o&&o.logo) setFavicon(o.logo); document.title=(CFG.appName||"Process Documents")+(o?" – "+o.name:"");
 }
 function refreshChip(){
   const c=$("projChip"), st=$("projStatus");
@@ -119,8 +136,8 @@ function nav(){
   else {
     const ed=S.prj.doc.edited||{};
     const groups={}; D.DOCS.forEach(d=>(groups[d.group]=groups[d.group]||[]).push(d));
-    side.innerHTML=`<h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"]].map(x=>`<button data-go="${x[0]}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</button>`).join("")}</div>
-      ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<button data-go="${d.id}" ${S.view===d.id?'aria-current="page"':""}><span class="code">${d.code}</span>${esc(d.title)}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</button>`).join("")}</div>`).join("")}`;
+    side.innerHTML=`<h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"],["cnc","CNC","CNC programs"]].map(x=>`<button data-go="${x[0]}" title="${esc(x[2])}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</button>`).join("")}</div>
+      ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<button data-go="${d.id}" title="${esc(d.title)}" ${S.view===d.id?'aria-current="page"':""}><span class="code">${d.code}</span>${esc(d.title)}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</button>`).join("")}</div>`).join("")}`;
   }
   side.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; document.body.classList.remove("nav-open"); const g=b.dataset.go; if(g==="projects") return projectsDialog(); if(g==="home") return; go(g); };
 }
@@ -191,11 +208,25 @@ async function openProject(id){
     P.doc=P.doc||{};
     S.prj=P; S.dirty=false;
     if(!P.doc.plan||!P.doc.docs){ generate(P); busy(null); toast(`Generated ${D.DOCS.length} documents from ${S.plan.chars.length} ballooned characteristics.`,6000); if(S.canEdit) await save(); }
-    else { S.plan=P.doc.plan; S.docs=P.doc.docs; ensureDocs(); }
+    else { S.plan=P.doc.plan; S.docs=P.doc.docs; ensureDocs(); migrate(); }
     try{ history.replaceState(null,"",location.pathname+"?project="+P.id); }catch(e){}
     refreshChip(); go(P.doc.sourceChanged?"overview":S.view&&S.view!=="home"?S.view:"overview");
   }catch(e){ toast("Couldn't open: "+e.message,7000); } finally{ busy(null); }
 }
+/* bring projects saved by older versions up to date (no data is lost) */
+function migrate(){
+  (S.plan.ops||[]).forEach(o=>(o.params||[]).forEach(p=>{ if(!p.kind) p.kind=E.paramKind(p.name); }));
+  const pf=S.docs.pfmea; if(pf&&pf.rows) pf.rows.forEach(r=>{ if(r.fe) r.fe=D.fmtFE(r.fe); });
+  const cp=S.docs.cp; if(cp&&cp.rows) cp.rows.forEach(r=>{ if(!r.product&&r.process&&!r.charNo&&E.paramKind(r.process)==="product"){ r.product=r.process; r.process=""; } });
+  applyHeaderDefaults(S.plan.header,false);
+}
+/* company-wide document header defaults (Admin → Document header) */
+const HEADER_KEYS=[["supplierCode","Supplier / vendor code"],["plant","Plant / location"],["keyContact","Key contact / phone"],["coreTeam","Core team (CFT)"],["preparedBy","Prepared by"],["reviewedBy","Reviewed by"],["approvedBy","Approved by"],["model","Model / vehicle (default)"],["docRev","Document revision (default)"]];
+function applyHeaderDefaults(h, overwrite){ const st=S.settings||{}; let n=0;
+  if(st.companyName&&(overwrite||!h.supplier)){ h.supplier=st.companyName; }
+  HEADER_KEYS.forEach(([k])=>{ const v=(st[k]||"").trim(); if(v&&(overwrite||!String(h[k]||"").trim())){ if(h[k]!==v) n++; h[k]=v; } });
+  if(st.phase&&(overwrite||!h.phase)) h.phase=st.phase;
+  return n; }
 function ensureDocs(){ D.DOCS.forEach(d=>{ if(!S.docs[d.id]) S.docs[d.id]=D.genOne(d.id,S.plan,genSettings()); }); }
 function uuid(){ return (crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{ const r=Math.random()*16|0; return (c==="x"?r:(r&3|8)).toString(16); })); }
 async function newFromSource(src, biReportId){
@@ -224,7 +255,8 @@ function generate(P, keepHeader){
   const s=Object.assign({},S.settings,{companyName:S.settings.companyName||(S.org&&S.org.name)});
   const plan=E.buildPlan(P.source, S.masters, s);
   if(keepHeader) ["preparedBy","reviewedBy","approvedBy","keyContact","coreTeam","model","annualVolume","customerCode","phase","docRev","origDate","supplierCode","plant","customerPartNo"].forEach(k=>{ if(keepHeader[k]) plan.header[k]=keepHeader[k]; });
-  S.plan=plan; applyCustomer(plan);
+  const oldPlan=P.doc&&P.doc.plan; if(oldPlan&&oldPlan.ops) plan.ops.forEach(o=>{ const po=oldPlan.ops.find(x=>x.opNo===o.opNo&&x.key===o.key); if(po&&po.cnc&&po.cnc.edited) o.cnc=po.cnc; });
+  S.plan=plan; applyCustomer(plan); applyHeaderDefaults(plan.header,false);
   const docs=D.genAll(plan, genSettings());
   const old=P.doc&&P.doc.docs; if(old) preserve(old, docs, D.DOCS.map(d=>d.id));
   P.doc={plan, docs, edited:{}, generatedAt:new Date().toISOString(), sourceChanged:false};
@@ -317,7 +349,7 @@ function shrinkLogo(f, max=420){ return new Promise((res,rej)=>{ const r=new Fil
 function suggestPw(){ const a="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789", r=new Uint32Array(10); crypto.getRandomValues(r); return Array.from(r,x=>a[x%a.length]).join("").replace(/^(.{5})/,"$1-"); }
 function openAdmin(tab){
   if(!(S.role==="admin"||S.platform)){ toast("Only company admins can open Admin."); return; }
-  const tabs=[]; if(S.org&&(S.role==="admin"||!CLOUD)) tabs.push(["company","Company"],["documents","Document settings"],["machines","Machines"],["gauges","Gauges"],["customers","Customers"],["consumables","Consumables"]);
+  const tabs=[]; if(S.org&&(S.role==="admin"||!CLOUD)) tabs.push(["company","Company"],["header","Document header"],["documents","Document settings"],["cnc","CNC programs"],["machines","Machines"],["gauges","Gauges"],["customers","Customers"],["consumables","Consumables"]);
   if(CLOUD&&S.role==="admin") tabs.push(["users","Users"],["integration","Balloon Inspector link"]); if(CLOUD&&S.platform) tabs.push(["workspaces","Company workspaces"]);
   if(!tabs.find(t=>t[0]===tab)) tab=tabs[0]&&tabs[0][0];
   dialog("Admin",`<div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" data-t="${t[0]}" aria-selected="${t[0]===tab}">${t[1]}</button>`).join("")}</div><div id="adP"></div>`,"",true);
@@ -346,12 +378,35 @@ async function pane(t){
       ${CLOUD&&S.platform?`<label style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="aLb" ${st.login_brand?"checked":""}> Show this logo on the sign-in page for everyone</label>`:""}
       ${CLOUD?`<label class="fld" style="margin-top:10px">Sign-in link with this company's logo<input readonly value="${esc(location.origin+location.pathname+"?c="+S.org.id)}"></label>`:""}
     </div><div class="frm" style="align-content:start">
-      ${[["address","Address"],["phone","Phone"],["email","E-mail"],["supplierCode","Supplier / vendor code"],["plant","Plant / location"],["keyContact","Key contact / phone"],["coreTeam","Core team (CFT)"],["preparedBy","Prepared by (default)"],["reviewedBy","Reviewed by (default)"],["approvedBy","Approved by (default)"]].map(f=>`<label class="fld">${f[1]}<input data-s="${f[0]}" value="${esc(st[f[0]]||"")}"></label>`).join("")}
+      ${[["address","Address"],["phone","Phone"],["email","E-mail"]].map(f=>`<label class="fld">${f[1]}<input data-s="${f[0]}" value="${esc(st[f[0]]||"")}"></label>`).join("")}
     </div></div><div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save company settings</button></div>`;
     $("aLogo").onchange=async e=>{ const f=e.target.files[0]; if(!f) return; logo=await shrinkLogo(f); $("aPrev").src=logo; $("aPrev").hidden=false; $("aRm").hidden=false; };
     $("aRm").onclick=()=>{ logo=null; $("aPrev").hidden=true; $("aRm").hidden=true; };
     $("aSave").onclick=async()=>{ const s=Object.assign({},S.org.settings||{}); P.querySelectorAll("[data-s]").forEach(i=>s[i.dataset.s]=i.value.trim()); if($("aLb")) s.login_brand=$("aLb").checked; s.companyName=$("aName").value.trim()||S.org.name;
       try{ await saveOrg({name:s.companyName,logo,settings:s}); msg(true,"Saved. New documents and exports use these details."); }catch(e){ msg(false,e.message); } };
+  }
+  if(t==="header"){
+    P.innerHTML=`<p class="hintline" style="margin-top:0">These values fill the header boxes of every document (PFD, PFMEA, Control Plan, reports…) for all projects of <b>${esc(S.org.name)}</b>. Fill them once here instead of on every document.</p>
+      <div class="frm">${HEADER_KEYS.map(f=>`<label class="fld">${esc(f[1])}${f[0]==="coreTeam"?`<textarea data-s="${f[0]}" rows="2">${esc(st[f[0]]||"")}</textarea>`:`<input data-s="${f[0]}" value="${esc(st[f[0]]||"")}">`}</label>`).join("")}
+        <label class="fld">Control plan type (default)<select data-s="phase">${["","Prototype","Pre-launch","Production","Safe launch"].map(v=>`<option value="${v}"${(st.phase||"")===v?" selected":""}>${v||"— as generated —"}</option>`).join("")}</select></label></div>
+      <div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save header defaults</button>${S.prj&&S.canEdit?`<button class="btn" id="aApply">Save & apply to the open project</button>`:""}<span class="hintline">New projects get these automatically. Existing projects: open them and use “Apply” or the button on the Overview.</span></div>`;
+    const collect=()=>{ const s=Object.assign({},S.org.settings||{}); P.querySelectorAll("[data-s]").forEach(i=>s[i.dataset.s]=i.value.trim()); return s; };
+    $("aSave").onclick=async()=>{ try{ await saveOrg({settings:collect()}); msg(true,"Saved."); }catch(e){ msg(false,e.message); } };
+    if($("aApply")) $("aApply").onclick=async()=>{ try{ await saveOrg({settings:collect()}); const n=applyHeaderDefaults(S.plan.header,true); changed(null); UI.render(S.view); msg(true,`Saved and applied to ${S.plan.header.partNo||"this project"} (${n} field${n===1?"":"s"} updated).`); }catch(e){ msg(false,e.message); } };
+  }
+  if(t==="cnc"){
+    P.innerHTML=`<p class="hintline" style="margin-top:0">Settings used when CNC programs are generated for this company's machines. Programs are <b>drafts</b>: always prove them out with a dry run / single block before cutting.</p><div class="frm">
+      <label class="fld">Control<input value="Fanuc-compatible G-code (Fanuc 0i / 31i, Haas, Mitsubishi and most Fanuc-style controls with Macro B)" readonly></label>
+      <label class="fld">First program number<input data-s="cncProgStart" type="number" min="1" max="9999" value="${esc(st.cncProgStart||1000)}"></label>
+      <label class="fld">Lathe spindle speed limit (rpm)<input data-s="cncMaxRpmLathe" type="number" value="${esc(st.cncMaxRpmLathe||3000)}"></label>
+      <label class="fld">VMC spindle speed limit (rpm)<input data-s="cncMaxRpmMill" type="number" value="${esc(st.cncMaxRpmMill||8000)}"></label>
+      <label class="fld">VMC work offset<select data-s="cncWcs">${["G54","G55","G56","G57"].map(v=>`<option${(st.cncWcs||"G54")===v?" selected":""}>${v}</option>`).join("")}</select></label>
+      <label class="fld">VMC safe Z (mm above part)<input data-s="cncSafeZ" type="number" step="0.5" value="${esc(st.cncSafeZ||50)}"></label>
+      <label class="fld">Coolant on<select data-s="cncCoolant">${[["M08","M08 flood"],["M07","M07 mist"],["M88","M88 through-spindle"]].map(v=>`<option value="${v[0]}"${(st.cncCoolant||"M08")===v[0]?" selected":""}>${v[1]}</option>`).join("")}</select></label>
+      <label class="fld">Safety lock<select data-s="cncLock">${[["1","On – program alarms until the programmer marks it verified"],["0","Off"]].map(v=>`<option value="${v[0]}"${String(st.cncLock??"1")===v[0]?" selected":""}>${v[1]}</option>`).join("")}</select></label>
+      <label class="fld" style="grid-column:1/-1">Program header comment (optional)<input data-s="cncHeader" value="${esc(st.cncHeader||"")}" placeholder="e.g. company name / programmer"></label></div>
+      <div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save CNC settings</button></div>`;
+    $("aSave").onclick=async()=>{ const s=Object.assign({},S.org.settings||{}); P.querySelectorAll("[data-s]").forEach(i=>s[i.dataset.s]=i.value.trim()); try{ await saveOrg({settings:s}); msg(true,"Saved. Regenerate programs on the CNC programs screen to use them."); }catch(e){ msg(false,e.message); } };
   }
   if(t==="documents"){
     P.innerHTML=`<div class="frm">
@@ -378,9 +433,9 @@ async function pane(t){
     if(t==="consumables"&&!S.masters.consumables.length) S.masters.consumables=Object.keys(E.DEFAULT_CONSUMABLES).map(k=>({key:k,items:E.DEFAULT_CONSUMABLES[k].join("\n")}));
     const rows=S.masters[t];
     if(t==="machines") rows.forEach(r=>{ if(Array.isArray(r.keys)) r.keys=r.keys.join(", "); });
-    P.innerHTML=`<p class="hintline" style="margin-top:0">${esc(info)}</p><div id="mg"></div><div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save ${t}</button>${t==="machines"?`<button class="btn small" id="aReset">Reset to defaults</button>`:""}</div>`;
+    P.innerHTML=`<p class="hintline" style="margin-top:0">${esc(info)}</p><div id="mg"></div><div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save ${t}</button>${t==="machines"?`<button class="btn small" id="aReset">Reset to defaults</button>`:""}<span class="hintline">Use the red bin to delete a row, then Save.</span></div>`;
     const cols=SC.MASTER_COLS[t].map(c=>c.k==="key"?Object.assign({},c,{opts:Object.keys(SC.KEY_NAMES).map(k=>[k,k+" – "+SC.KEY_NAMES[k]])}):c.type==="keys"?Object.assign({},c,{type:"text"}):c);
-    UI.grid($("mg"),{rows,cols,free:true,onChange:()=>{},rowsChanged:()=>{},newRow:()=>({})});
+    UI.grid($("mg"),{rows,cols,free:true,delCol:true,onChange:()=>{},rowsChanged:()=>{},newRow:()=>({})});
     $("aSave").onclick=async()=>{ const out=S.masters[t].filter(r=>Object.values(r).some(v=>String(v??"").trim()));
       if(t==="machines") out.forEach(r=>{ r.keys=String(r.keys||"").split(/[,\s]+/).map(s=>s.trim().toUpperCase()).filter(Boolean); r.maxDia=+r.maxDia||9999; r.cap=+r.cap||0.01; });
       S.masters[t]=out;
@@ -426,7 +481,7 @@ async function pane(t){
 }
 
 /* ---------------- boot ---------------- */
-window.PDApp = { S, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
+window.PDApp = { S, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
 if(CLOUD){
   sb.auth.onAuthStateChange(ev=>{ if(ev==="PASSWORD_RECOVERY") newPasswordScreen(); });
   (async()=>{ const {data:{session}}=await sb.auth.getSession(); if(!session) loginScreen(); else start(); })();

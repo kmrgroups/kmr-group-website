@@ -164,18 +164,20 @@ GEN.pfd = (plan, x) => ({ rows: plan.ops.map(o=>{
   const ch = o.chars.map(n=>x.byNo[n]).filter(Boolean);
   const src = o.key==="RMI"?"Material variation, supplier":o.key.startsWith("TURN")||o.key==="VMC"?"Tool wear, offsets, clamping, coolant, thermal":o.key.includes("GRIND")||o.key==="HONE"?"Wheel wear, dressing, coolant, temperature":o.key==="HT"?"Furnace temperature, quench, load pattern":o.key==="SURF"?"Bath chemistry, time, current":o.key==="PACK"?"Handling, RP oil, packing material":"—";
   return { opNo:o.opNo, sym:o.sym, name:o.name, desc:(OPDESC[o.key]||"")+(o.note?". "+o.note:""), machine:o.machine||"",
-    product: ch.map(c=>`#${c.no} ${c.label}: ${c.spec}`).join("\n") || (o.verify?`All characteristics (${o.verify.length}) verified`:"—"),
-    process: (o.params||[]).map(p=>`${p.name}: ${p.spec}`).join("\n") || "—",
+    product: ch.map(c=>`#${c.no} ${c.label}: ${c.spec}`).concat((o.params||[]).filter(p=>(p.kind||E.paramKind(p.name))==="product").map(p=>`${p.name}: ${p.spec}`)).join("\n") || (o.verify?`All characteristics (${o.verify.length}) verified`:"—"),
+    process: (o.params||[]).filter(p=>(p.kind||E.paramKind(p.name))!=="product").map(p=>`${p.name}: ${p.spec}`).join("\n") || "—",
     cls: uniq(ch.map(c=>c.cls)).join(", "), src, remarks: o.inHouse?"In-house":"Sub-contract" }; }) });
 
 /* ---------- PFMEA ---------- */
+/* failure effects: one line each for Your plant / Ship-to plant (customer) / End user (field) */
+function fmtFE(t){ return String(t||"").replace(/\s*\n?\s*(Ship-to plant:|Customer:|End user:|Field:)/g,"\n$1").replace(/^\n+/,"").trim(); }
 GEN.pfmea = (plan, x) => {
   const rows=[], item=`${plan.header.partName||"Part"} (${plan.header.partNo||"—"})`, due=addDays(today(),30);
   const push = (o, we, funcStep, funcWE, fe, s, fm, fc, pc, oo, dc, d, cls) => {
     const ap = AP(s,oo,d);
     const act = ap==="H" || (ap==="M" && s>=7);
     rows.push({ opNo:o.opNo, item, step:opLabel(o), we, funcItem:`Produce ${plan.header.partName||"part"} to drawing ${plan.header.drawingNo||""} rev ${plan.header.drawingRev||""}`.trim(),
-      funcStep, funcWE, fe, s, fm, fc, pc, o:oo, dc, d, ap, cls:cls||"",
+      funcStep, funcWE, fe:fmtFE(fe), s, fm, fc, pc, o:oo, dc, d, ap, cls:cls||"",
       actPrev: act ? (/wear|dressing/i.test(fc)?"Introduce in-process gauging / probe compensation; reduce tool-change interval":/offset|program/i.test(fc)?"Add probe-based offset verification after tool change":/clamp/i.test(fc)?"Add part-seating air sensor on fixture (poka-yoke)":"Review process capability; add error-proofing") : "",
       actDet: act ? (s>=9?"Introduce 100% automatic / poka-yoke detection at station":"Increase SPC frequency; add 100% GO/NO-GO check") : "",
       resp: act ? (x.s.pfmeaOwner||"Process Engineering") : "", target: act ? due : "", status: act ? "Open" : "", taken:"", done:"", s2:"", o2:"", d2:"", ap2:"", remarks:"" });
@@ -237,7 +239,7 @@ GEN.cp = (plan, x) => {
         freq: cc?"Each part + 5 pcs / 2 hrs":sc?"Every 2 hrs":inspOp?"Each lot":"First-off, every 2 hrs, last-off",
         method: cc?"Poka-yoke / 100% gauging; X̄-R chart; setup approval":sc?"X̄-R chart; setup approval report":inspOp?(o.key==="RMI"?"Incoming inspection report":"Inspection report"):"Setup approval, self & patrol inspection reports",
         react: react(c), resp: inspOp?"QA inspector":"Operator / setter" }); });
-    (o.params||[]).forEach(p=>rows.push({opNo:o.opNo, name:o.name, machine:mach, charNo:"", product:"", process:p.name, cls:"", spec:p.spec, tech:p.method, size:"1", freq:p.freq,
+    (o.params||[]).forEach(p=>rows.push({opNo:o.opNo, name:o.name, machine:mach, charNo:"", product:(p.kind||E.paramKind(p.name))==="product"?p.name:"", process:(p.kind||E.paramKind(p.name))==="product"?"":p.name, cls:"", spec:p.spec, tech:p.method, size:"1", freq:p.freq,
       method: /program|recipe/i.test(p.method)?"Program / recipe lock; setup approval":"Check sheet / setup approval", react:"Adjust to specification; verify parts produced since last check; inform supervisor", resp:p.resp||"Operator"}));
     if(!ch.length && !(o.params||[]).length){
       const t = {RMSTORE:["Identification & FIFO","Heat / lot tag on every bundle","Visual"],FGSTORE:["Identification & FIFO","Part-wise location, FIFO card","Visual"],DISPATCH:["Correct part & quantity","As per invoice & label","Label vs invoice check"],
@@ -399,5 +401,5 @@ function pullReadings(docs, charNo, n){
 }
 function judge(v, lsl, usl){ if(v===""||v==null) return ""; const t=String(v).trim().toUpperCase(); if(["OK","NG","NOT OK","ACC","REJ"].includes(t)) return t==="OK"||t==="ACC"?"ok":"ng"; const x=+v; if(isNaN(x)) return ""; if((lsl!=null&&x<lsl-1e-12)||(usl!=null&&x>usl+1e-12)) return "ng"; return "ok"; }
 
-window.PDDocs = { DOCS, AP, genAll, genOne, spcStats, msaStats, simulateSPC, simulateMSA, pullReadings, judge, SPC_CONST:C };
+window.PDDocs = { DOCS, fmtFE, AP, genAll, genOne, spcStats, msaStats, simulateSPC, simulateMSA, pullReadings, judge, SPC_CONST:C };
 })();
