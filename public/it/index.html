@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>KMR Groups – IT Tools</title>
+<meta name="description" content="Balloon Inspector and Process Documents – ballooned drawings to a complete APQP / PPAP document set.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%225%22 y=%223%22 width=%2222%22 height=%2226%22 rx=%223%22 fill=%22%231D5FD0%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.4%22/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#EEF1F5;--surface:#fff;--ink:#15233B;--muted:#5B6778;--line:#D5DCE4;--blue:#1D5FD0;--red:#C8102E;
+  --display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;--body:"Barlow","Segoe UI",Roboto,Arial,sans-serif;color-scheme:light}
+@media (prefers-color-scheme:dark){:root{--bg:#0E131A;--surface:#161E29;--ink:#E6EAF0;--muted:#98A3B3;--line:#2C3847;--blue:#6FA3FF;--red:#FF5A6B;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:16px/1.5 var(--body);display:flex;flex-direction:column}
+main{flex:1;width:100%;max-width:1040px;margin:0 auto;padding:48px 16px}
+h1{font:700 clamp(32px,5vw,48px)/1.05 var(--display);margin:0 0 10px;text-wrap:balance}
+.lead{color:var(--muted);max-width:640px;margin:0 0 34px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+a.card{display:flex;flex-direction:column;gap:10px;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:24px;text-decoration:none;color:inherit;transition:border-color .15s,transform .15s}
+a.card:hover{border-color:var(--blue);transform:translateY(-2px)}
+a.card:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+.ic{width:46px;height:46px;border-radius:10px;display:grid;place-items:center}
+.card h2{font:700 26px/1.1 var(--display);margin:0}
+.card p{margin:0;color:var(--muted)}
+.card .go{margin-top:auto;font:600 16px var(--display);color:var(--blue);letter-spacing:.02em}
+.flow{margin-top:34px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;color:var(--muted);font:600 15px var(--display);letter-spacing:.03em}
+.flow span.b{border:1px solid var(--line);border-radius:999px;padding:4px 12px;background:var(--surface);color:var(--ink)}
+footer{padding:18px 16px;text-align:center;font-size:13px;color:var(--muted)}
+footer a{color:var(--ink);font-weight:600;text-decoration:none}
+@media (prefers-reduced-motion:reduce){a.card{transition:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>KMR IT Tools</h1>
+  <p class="lead">Balloon an engineering drawing, then generate the full APQP / PPAP document set from it automatically. Both tools share one sign-in.</p>
+  <div class="grid">
+    <a class="card" href="balloon.html">
+      <div class="ic" style="background:color-mix(in srgb,var(--red) 14%,transparent)"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--red)"><circle cx="10" cy="10" r="6"/><path d="M14.5 14.5 20 20"/><text x="10" y="13" font-size="8" text-anchor="middle" fill="currentColor" stroke="none" font-family="Arial" font-weight="700">1</text></svg></div>
+      <h2>Balloon Inspector</h2>
+      <p>Open PDF, DXF, DWG, STEP or photos. Balloons every characteristic with tolerances, SC/CC class and gauge, and builds the inspection report.</p>
+      <span class="go">Open Balloon Inspector →</span>
+    </a>
+    <a class="card" href="pd.html">
+      <div class="ic" style="background:color-mix(in srgb,var(--blue) 14%,transparent)"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--blue)"><rect x="5" y="3" width="14" height="18" rx="2"/><path d="M8.5 8h7M8.5 12h7M8.5 16h4"/></svg></div>
+      <h2>Process Documents</h2>
+      <p>PFD, PFMEA, Control Plan, SOP, setup / patrol / self / PDI reports, SPC, MSA, charts and master lists, generated from the ballooning data.</p>
+      <span class="go">Open Process Documents →</span>
+    </a>
+  </div>
+  <div class="flow" aria-label="Workflow"><span class="b">Drawing</span>→<span class="b">Balloons</span>→<span class="b">Process plan</span>→<span class="b">PFMEA · Control Plan · Reports</span>→<span class="b">PDF / Excel</span></div>
+</main>
+<footer>Powered by <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></footer>
+</body>
+</html>

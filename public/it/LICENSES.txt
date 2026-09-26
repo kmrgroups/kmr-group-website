@@ -1,0 +1,13 @@
+Third-party components shipped in balloon/engines/ or loaded from public CDNs:
+
+- LibreDWG (via @mlightcad/libredwg-web) – GNU GPL v3. DWG → DXF conversion.
+  If you SELL or DISTRIBUTE this tool to third parties, GPL obligations apply
+  (you must offer the source code of the combined work). Hosting it as a web
+  page for your own and your customers' use is the common interpretation of
+  "not distributing", but check with a lawyer before selling licences.
+  To remove it: delete libredwg-web.* from balloon/engines/ – DWG upload will
+  then show the free-converter advice instead.
+- OpenCascade (via occt-import-js) – LGPL 2.1. STEP reading.
+- Tesseract OCR (via tesseract.js-core) + English model – Apache 2.0.
+- pdf.js (Mozilla) – Apache 2.0.   jsPDF + jspdf-autotable – MIT.
+- supabase-js – MIT.   Barlow / Barlow Condensed fonts – SIL OFL.
