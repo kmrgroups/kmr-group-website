@@ -157,7 +157,7 @@ function eyeify(input){ if(!input||input.dataset.eye) return; input.dataset.eye=
   input.after(b); }
 function pwField(id,ph,ac){ return `<div class="pw"><input id="${id}" type="password" placeholder="${ph||""}" autocomplete="${ac||"new-password"}"></div>`; }
 function suggestPw(){ const a="ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789", r=new Uint32Array(10); crypto.getRandomValues(r); return Array.from(r,x=>a[x%a.length]).join("").replace(/^(.{5})/,"$1-"); }
-function lastBrand(){ try{ return JSON.parse(localStorage.getItem("bi_brand")||"null"); }catch(e){ return null; } }
+function lastBrand(){ try{ return JSON.parse(localStorage.getItem("bi_brand"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"))||"null"); }catch(e){ return null; } }
 function rpcMsg(e){ const m=String(e&&e.message||e); if(/bi_admin_save_user|PGRST202|schema cache/i.test(m)) return "The database needs the v2 upgrade: run supabase/upgrade-v2.sql in the Supabase SQL Editor."; return m; }
 function setFavicon(dataUrl){ let l=document.querySelector("link[rel=icon]"); if(!l){ l=document.createElement("link"); l.rel="icon"; document.head.append(l); } l.href=dataUrl; }
 function brand(){ const o=C.org; const h1=document.querySelector(".brand h1"), sm=document.querySelector(".brand small"), mark=document.querySelector(".brand .mark");
@@ -165,7 +165,7 @@ function brand(){ const o=C.org; const h1=document.querySelector(".brand h1"), s
   if (o && o.logo){ mark.innerHTML=`<img src="${o.logo}" alt="" style="width:34px;height:34px;object-fit:contain;border-radius:6px;background:#fff">`; mark.style.border="none"; mark.style.setProperty("--x","none"); mark.classList.add("haslogo"); setFavicon(o.logo); }
   else { mark.textContent="1"; mark.style.border=""; mark.classList.remove("haslogo"); }
   document.title = (o ? o.name + " – " : "") + APP;
-  if (o) try{ localStorage.setItem("bi_brand", JSON.stringify({name:o.name, logo:o.logo||null})); }catch(e){}
+  if (o) try{ localStorage.setItem("bi_brand"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"), JSON.stringify({name:o.name, logo:o.logo||null})); }catch(e){}
   BI.S.logo = o && o.logo || null; if (BI.S.logo){ const im=new Image(); im.onload=()=>BI.S.logoRatio=im.width/im.height; im.src=BI.S.logo; }
 }
 const hideMarkLine = document.createElement("style"); hideMarkLine.textContent=".mark.haslogo::after{display:none}"; document.head.append(hideMarkLine);
@@ -238,7 +238,7 @@ function loginShell(inner){
        ${inner}
      </div>
      <footer class="lg-foot"><span>© ${new Date().getFullYear()} ${esc(APP)}</span>
-       <a href="https://www.kmr-groups.com" target="_blank" rel="noopener"><span>Powered by</span> <b>KMR Group of Companies</b></a></footer>
+       ${(window.BI_CONFIG&&window.BI_CONFIG.poweredBy)?`<a href="${esc(window.BI_CONFIG.poweredBy.url||"#")}" target="_blank" rel="noopener"><span>Powered by</span> <b>${esc(window.BI_CONFIG.poweredBy.name||"")}</b></a>`:""}</footer>
    </section>
   </div>`;
   document.body.append(v); showLoginBrand(); start3D($("lgVis")); return v;
@@ -420,7 +420,7 @@ function buildScene(host){
 }
 /* company logo on the sign-in card – comes from Admin → Company.
    Order: ?c=<workspace id> in the link → this device's last workspace → the logo the owner chose for the sign-in page */
-function paintBrand(b){ const el=$("lgCo"); if(!el) return;
+function paintBrand(b){ if(b&&b.logo) setFavicon(b.logo); const el=$("lgCo"); if(!el) return;
   const nm=b&&b.name?`<div>${esc(b.name)}<small>Inspection workspace</small></div>`:`<div>${esc(APP)}<small>Inspection workspace</small></div>`;
   el.innerHTML = b&&b.logo ? `<img class="lg-logo" src="${b.logo}" alt="${esc(b.name||"")} logo">${b.name?nm:""}` : `<div class="lg-logo-fallback">1</div>${nm}`; }
 async function showLoginBrand(){
@@ -501,12 +501,12 @@ async function start0(){
   closeVeil();
   const sel=$("clOrg"); sel.innerHTML=C.memberships.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
   sel.hidden=C.memberships.length<2; sel.onchange=()=>chooseOrg(sel.value);
-  const last=localStorage.getItem("bi_org"); const pick=C.memberships.find(m=>m.id===last)||C.memberships[0];
+  const last=localStorage.getItem("bi_org"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local")); const pick=C.memberships.find(m=>m.id===last)||C.memberships[0];
   if(pick) chooseOrg(pick.id); else { C.org=null; C.role=null; brand(); applyRole(); openAdmin("companies"); }
 }
 function chooseOrg(id){
   if(C.dirty && !confirm("You have unsaved changes. Switch workspace anyway?")){ $("clOrg").value=C.org.id; return; }
-  const m=C.memberships.find(x=>x.id===id); C.org=m; C.role=m.role; try{localStorage.setItem("bi_org",id);}catch(e){}
+  const m=C.memberships.find(x=>x.id===id); C.org=m; C.role=m.role; try{localStorage.setItem("bi_org"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"),id);}catch(e){}
   $("clOrg").value=id; brand(); applyRole(); resetReport(); applyOrgDefaults();
 }
 function applyOrgDefaults(){ const s=(C.org&&C.org.settings)||{};
