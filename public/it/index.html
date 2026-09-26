@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>KMR Groups – IT Tools</title>
+<title>Quality Suite</title>
 <meta name="description" content="Balloon Inspector and Process Documents – ballooned drawings to a complete APQP / PPAP document set.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22%3E%3Crect x=%225%22 y=%223%22 width=%2222%22 height=%2226%22 rx=%223%22 fill=%22%231D5FD0%22/%3E%3Ccircle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22none%22 stroke=%22white%22 stroke-width=%222.4%22/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,7 +35,7 @@ footer a{color:var(--ink);font-weight:600;text-decoration:none}
 </head>
 <body>
 <main>
-  <h1>KMR IT Tools</h1>
+  <h1 id="suiteTitle">Quality Suite</h1>
   <p class="lead">Balloon an engineering drawing, then generate the full APQP / PPAP document set from it automatically. Both tools share one sign-in.</p>
   <div class="grid">
     <a class="card" href="balloon.html">
@@ -53,6 +53,12 @@ footer a{color:var(--ink);font-weight:600;text-decoration:none}
   </div>
   <div class="flow" aria-label="Workflow"><span class="b">Drawing</span>→<span class="b">Balloons</span>→<span class="b">Process plan</span>→<span class="b">PFMEA · Control Plan · Reports</span>→<span class="b">PDF / Excel</span></div>
 </main>
-<footer>Powered by <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></footer>
+<footer id="pow"></footer>
+<script src="company-config.js"></script>
+<script>(function(){ var C=window.COMPANY_CONFIG||{}; var e=function(t){return String(t||"").replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c];});};
+  if(C.suiteTitle){ document.getElementById("suiteTitle").textContent=C.suiteTitle; document.title=C.suiteTitle; }
+  var b=null; try{ var ref=(C.supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"; b=JSON.parse(localStorage.getItem("pd_brand@"+ref)||localStorage.getItem("bi_brand@"+ref)||"null"); }catch(x){}
+  if(b&&b.logo){ var l=document.querySelector("link[rel=icon]"); if(l) l.href=b.logo; }
+  if(C.poweredBy) document.getElementById("pow").innerHTML='Powered by <a href="'+e(C.poweredBy.url||"#")+'" target="_blank" rel="noopener">'+e(C.poweredBy.name)+'</a>'; })();</script>
 </body>
 </html>
