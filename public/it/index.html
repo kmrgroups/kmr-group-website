@@ -31,6 +31,15 @@ a.card:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 footer{padding:18px 16px;text-align:center;font-size:13px;color:var(--muted)}
 footer a{color:var(--ink);font-weight:600;text-decoration:none}
 @media (prefers-reduced-motion:reduce){a.card{transition:none}}
+.pilot{margin-top:48px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:28px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:28px}
+.pilot h2{font:700 30px/1.1 var(--display);margin:0 0 8px}.pilot p{color:var(--muted);margin:0}
+.pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}.pf-grid label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+.pf-grid input,.pf-grid textarea{border:1px solid var(--line);border-radius:8px;padding:10px;font:inherit;background:var(--bg);color:var(--ink)}
+.pf-grid .full,.pf-grid fieldset{grid-column:1/-1}.pf-grid fieldset{border:1px solid var(--line);border-radius:8px;display:flex;gap:18px;flex-wrap:wrap;font-size:14px}
+.pf-grid .chk{flex-direction:row;align-items:center;gap:6px;color:var(--ink)}.hp{position:absolute;left:-9999px}
+.pf-btn{margin-top:14px;border:0;border-radius:10px;padding:12px 22px;font:600 16px var(--display);letter-spacing:.03em;color:#1a1305;background:linear-gradient(180deg,#ffe08a,#f3c55a 45%,#c9962b);cursor:pointer}
+.pf-msg{margin-top:10px!important;font-size:14px}.pf-msg.ok{color:#0f8a5f}.pf-msg.err{color:var(--red)}
+@media (max-width:760px){.pilot{grid-template-columns:1fr}.pf-grid{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -58,6 +67,30 @@ footer a{color:var(--ink);font-weight:600;text-decoration:none}
     </a>
   </div>
   <div class="flow" aria-label="Workflow"><span class="b">Drawing</span>→<span class="b">Balloons</span>→<span class="b">Process plan</span>→<span class="b">PFMEA · Control Plan · Reports</span>→<span class="b">PDF / Excel</span></div>
+  <section class="pilot" id="pilot" aria-labelledby="pilotH">
+    <div>
+      <h2 id="pilotH">Request a free pilot</h2>
+      <p>Tell us which apps you'd like to try. We'll set up your company's own workspace and walk your team through it.</p>
+    </div>
+    <form id="pilotForm" novalidate>
+      <div class="pf-grid">
+        <label>Your name<input name="name" required maxlength="100" autocomplete="name"></label>
+        <label>Company<input name="company" required maxlength="150" autocomplete="organization"></label>
+        <label>Work email<input name="email" type="email" required maxlength="150" autocomplete="email"></label>
+        <label>Phone<input name="phone" maxlength="30" autocomplete="tel"></label>
+        <label>Country<input name="country" maxlength="60" autocomplete="country-name" placeholder="India"></label>
+        <fieldset><legend>Interested in</legend>
+          <label class="chk"><input type="checkbox" name="products" value="hrm"> HRM Suite</label>
+          <label class="chk"><input type="checkbox" name="products" value="balloon"> Balloon Inspector</label>
+          <label class="chk"><input type="checkbox" name="products" value="pd"> Process Documents</label>
+        </fieldset>
+        <label class="full">Anything we should know?<textarea name="message" rows="3" maxlength="1500" placeholder="Number of employees, plants, the problem you want to solve…"></textarea></label>
+        <input name="website" tabindex="-1" autocomplete="off" class="hp" aria-hidden="true">
+      </div>
+      <button type="submit" class="pf-btn">Request my pilot</button>
+      <p class="pf-msg" id="pilotMsg" role="status"></p>
+    </form>
+  </section>
 </main>
 <footer id="pow"></footer>
 <script src="company-config.js"></script>
@@ -66,5 +99,13 @@ footer a{color:var(--ink);font-weight:600;text-decoration:none}
   var b=null; try{ var ref=(C.supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"; b=JSON.parse(localStorage.getItem("pd_brand@"+ref)||localStorage.getItem("bi_brand@"+ref)||"null"); }catch(x){}
   if(b&&b.logo){ var l=document.querySelector("link[rel=icon]"); if(l) l.href=b.logo; }
   if(C.poweredBy) document.getElementById("pow").innerHTML='Powered by <a href="'+e(C.poweredBy.url||"#")+'" target="_blank" rel="noopener">'+e(C.poweredBy.name)+'</a>'; })();</script>
+<script>(function(){ var f=document.getElementById("pilotForm"), m=document.getElementById("pilotMsg");
+  f.addEventListener("submit", async function(e){ e.preventDefault(); var d=new FormData(f), b={}; d.forEach(function(v,k){ if(k!=="products") b[k]=v; }); b.products=d.getAll("products");
+    if(!b.name||!b.company||!b.email){ m.className="pf-msg err"; m.textContent="Please fill in your name, company and email."; return; }
+    var btn=f.querySelector("button"); btn.disabled=true; m.className="pf-msg"; m.textContent="Sending…";
+    try{ var r=await fetch("/api/pilot-request",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(b)}); var j=await r.json();
+      if(r.ok){ f.reset(); m.className="pf-msg ok"; m.textContent="Thank you! Our team will contact you within one working day."; } else { m.className="pf-msg err"; m.textContent=j.error||"Something went wrong."; } }
+    catch(x){ m.className="pf-msg err"; m.textContent="Could not send. Please email info@kmr-groups.com."; }
+    btn.disabled=false; }); })();</script>
 </body>
 </html>
