@@ -12,6 +12,6 @@ window.COMPANY_CONFIG = {
   supabaseUrl:     "https://dehlcusptkzfhqvpfyjh.supabase.co",
   supabaseAnonKey: "sb_publishable_ukWZLiTOXfUZsNAyn5BM7Q_YjSFcUus",
 
-  suiteTitle: "Quality Suite",            // heading on the tools home page (index.html)
+  suiteTitle: "KMR Apps",            // heading on the tools home page (index.html)
   poweredBy:  { name: "KMR Group of Companies", url: "https://www.kmr-groups.com" }   // footer text; set to null to hide
 };

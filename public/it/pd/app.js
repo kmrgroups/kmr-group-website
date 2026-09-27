@@ -94,6 +94,16 @@ async function start(){
   const [{data:mem,error:e1},{data:pa}]=await Promise.all([ sb.from("pd_members").select("org_id,role,pd_orgs(id,name,logo,settings)").eq("email",email), sb.from("pd_platform_admins").select("user_id").eq("user_id",user.id) ]);
   if(e1){ loginScreen("Couldn't reach the database: "+e1.message+". Has supabase/pd-schema.sql been run?"); return; }
   S.platform=!!(pa&&pa.length); S.memberships=(mem||[]).filter(m=>m.pd_orgs).map(m=>({role:m.role,...m.pd_orgs}));
+  // KMR Console licence: keep only workspaces whose licence is valid (the database enforces this too)
+  const acc=await sb.rpc("kmr_access",{p_product:"pd"});
+  if(!acc.error && !S.platform){
+    const okIds=new Set((acc.data||[]).filter(a=>a.ok).map(a=>a.org_id));
+    const paused=S.memberships.filter(m=>!okIds.has(m.id));
+    S.memberships=S.memberships.filter(m=>okIds.has(m.id));
+    if(!S.memberships.length && paused.length){
+      const a=(acc.data||[]).find(x=>x.org_id===paused[0].id)||{};
+      dialog("Access paused",`<p>${esc(a.message||"Your company's access is paused.")}</p><p>Your company's documents are safe and will be available again as soon as the licence is renewed. Please contact KMR Group of Companies — <a href="https://www.kmr-groups.com/contact" target="_blank" rel="noopener">www.kmr-groups.com/contact</a>.</p>`,`<button class="btn" id="noOut2">Sign out</button>`); $("noOut2").onclick=signOut; return; }
+  }
   if(!S.memberships.length && !S.platform){ dialog("No workspace yet",`<p>You're signed in as <b>${esc(email)}</b>, but no Process Documents workspace has added this e-mail yet. Ask your company admin to add you under Admin → Users.</p>`,`<button class="btn" id="noOut">Sign out</button>`); $("noOut").onclick=signOut; return; }
   const last=LS.get("pd_org",null); const pick=S.memberships.find(m=>m.id===last)||S.memberships[0];
   if(pick) await chooseOrg(pick.id); else { S.org=null; S.role=null; brand(); nav(); bindTop(); openAdmin("workspaces"); return; }

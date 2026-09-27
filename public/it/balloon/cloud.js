@@ -495,6 +495,17 @@ async function start0(){
   if(e1){ loginScreen("Couldn't reach the database: "+e1.message+". Has supabase/schema.sql been run?"); return; }
   C.platform = !!(pa&&pa.length);
   C.memberships = (mem||[]).filter(m=>m.bi_orgs).map(m=>({role:m.role,...m.bi_orgs}));
+  // KMR Console licence: keep only workspaces whose licence is valid (the database enforces this too)
+  const acc = await sb.rpc("kmr_access",{p_product:"balloon"});
+  if(!acc.error && !C.platform){
+    const okIds=new Set((acc.data||[]).filter(a=>a.ok).map(a=>a.org_id));
+    const paused=C.memberships.filter(m=>!okIds.has(m.id));
+    C.memberships=C.memberships.filter(m=>okIds.has(m.id));
+    if(!C.memberships.length && paused.length){
+      const a=(acc.data||[]).find(x=>x.org_id===paused[0].id)||{};
+      veil(`<h2>Access paused</h2><p class="sub">${esc(a.message||"Your company's access is paused.")}</p><p>Your company's drawings and reports are safe and will be available again as soon as the licence is renewed. Please contact KMR Group of Companies — <a href="https://www.kmr-groups.com/contact" target="_blank" rel="noopener">www.kmr-groups.com/contact</a>.</p>
+      <button class="btn" id="clOut3">Sign out</button>`); $("clOut3").onclick=signOut; return; }
+  }
   if(!C.memberships.length && !C.platform){
     veil(`<h2>No workspace yet</h2><p class="sub">You're signed in as <b>${esc(email)}</b>, but no company workspace has added this e-mail. Ask your company admin to add you under Admin → Users, then sign in again.</p>
     <button class="btn" id="clOut2">Sign out</button>`); $("clOut2").onclick=signOut; return; }
