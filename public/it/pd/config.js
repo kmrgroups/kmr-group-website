@@ -5,9 +5,11 @@
    ===================================================================== */
 (function(){
   var C = window.COMPANY_CONFIG || {};
+  // ?demo=1 (from the KMR Apps portal, for apps not in the customer's plan): sample data only, nothing saved online
+  var DEMO = /[?&]demo=1(&|$)/.test(location.search);
   window.PD_CONFIG = {
-    supabaseUrl:     C.supabaseUrl || "",      // empty = demo mode (saved in this browser only)
-    supabaseAnonKey: C.supabaseAnonKey || "",
+    supabaseUrl:     DEMO ? "" : (C.supabaseUrl || ""),      // empty = demo mode (saved in this browser only)
+    supabaseAnonKey: DEMO ? "" : (C.supabaseAnonKey || ""),
     poweredBy:       C.poweredBy === undefined ? null : C.poweredBy,
 
     appName:    "Process Documents",

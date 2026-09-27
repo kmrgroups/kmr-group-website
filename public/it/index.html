@@ -100,6 +100,7 @@ footer a{color:var(--ink);font-weight:600;text-decoration:none}
   if(b&&b.logo){ var l=document.querySelector("link[rel=icon]"); if(l) l.href=b.logo; }
   if(C.poweredBy) document.getElementById("pow").innerHTML='Powered by <a href="'+e(C.poweredBy.url||"#")+'" target="_blank" rel="noopener">'+e(C.poweredBy.name)+'</a>'; })();</script>
 <script>(function(){ var f=document.getElementById("pilotForm"), m=document.getElementById("pilotMsg");
+  var buy=(location.search.match(/[?&]buy=([a-z0-9-]+)/)||[])[1]; if(buy){ var cb=f.querySelector('input[name=products][value="'+buy+'"]'); if(cb) cb.checked=true; f.message.value=cb?"":"Interested in: "+buy; document.getElementById("pilot").scrollIntoView(); }
   f.addEventListener("submit", async function(e){ e.preventDefault(); var d=new FormData(f), b={}; d.forEach(function(v,k){ if(k!=="products") b[k]=v; }); b.products=d.getAll("products");
     if(!b.name||!b.company||!b.email){ m.className="pf-msg err"; m.textContent="Please fill in your name, company and email."; return; }
     var btn=f.querySelector("button"); btn.disabled=true; m.className="pf-msg"; m.textContent="Sending…";

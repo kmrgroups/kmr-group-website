@@ -17,6 +17,8 @@ const nextConfig = {
       beforeFiles: [
         { source: "/it/hrm", destination: `${HRM_ORIGIN}/it/hrm` },
         { source: "/it/hrm/:path*", destination: `${HRM_ORIGIN}/it/hrm/:path*` },
+        // one link per customer: www.kmr-groups.com/it/app/<customer> → the KMR Apps portal page
+        { source: "/it/app/:customer", destination: "/it/apps.html" },
         { source: "/it/console", destination: `${CONSOLE_ORIGIN}/it/console` },
         { source: "/it/console/:path*", destination: `${CONSOLE_ORIGIN}/it/console/:path*` },
       ],

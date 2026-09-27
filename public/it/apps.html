@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>KMR Apps</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%237C3AED'/%3E%3Ctext x='16' y='22' font-size='16' font-family='Arial' font-weight='700' text-anchor='middle' fill='white'%3EK%3C/text%3E%3C/svg%3E">
+<style>
+:root{--ink:#16233A;--muted:#5E6B7E;--line:#E3E8EF;--violet:#7C3AED;--bg:#F5F7FB}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 "Segoe UI",Roboto,Arial,sans-serif;color:var(--ink);background:var(--bg);min-height:100vh;display:flex;flex-direction:column}
+.split{flex:1;display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);min-height:calc(100vh - 44px)}
+.vis{position:relative;overflow:hidden;background:#0A0720;isolation:isolate}
+.aur{position:absolute;inset:-20%;filter:blur(60px) saturate(1.3);animation:hue 26s linear infinite}
+.aur i{position:absolute;border-radius:50%;opacity:.7;mix-blend-mode:screen}
+.aur i:nth-child(1){width:60%;height:60%;left:5%;top:8%;background:radial-gradient(circle,#7C3AED,transparent 65%);animation:a1 22s ease-in-out infinite}
+.aur i:nth-child(2){width:55%;height:55%;right:0;top:25%;background:radial-gradient(circle,#06B6D4,transparent 65%);animation:a2 26s ease-in-out infinite}
+.aur i:nth-child(3){width:50%;height:50%;left:20%;bottom:0;background:radial-gradient(circle,#EC4899,transparent 65%);animation:a1 30s ease-in-out infinite reverse}
+.aur i:nth-child(4){width:35%;height:35%;right:15%;bottom:12%;background:radial-gradient(circle,#F59E0B,transparent 65%);opacity:.45;animation:a2 34s ease-in-out infinite reverse}
+.vis::after{content:"";position:absolute;inset:0;z-index:1;pointer-events:none;background:radial-gradient(95% 75% at 50% 45%,transparent 50%,rgba(5,3,20,.7) 100%)}
+.vis canvas{position:absolute;inset:0;z-index:1;width:100%;height:100%;opacity:0;transition:opacity 1.4s}.vis.ready canvas{opacity:1}
+.chip{position:absolute;top:26px;left:34px;z-index:2;display:inline-flex;align-items:center;gap:10px;padding:8px 16px 8px 9px;border-radius:999px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(10px);color:#fff;font:700 13px/1 "Segoe UI",Arial;letter-spacing:.16em;text-transform:uppercase}
+.chip b{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:linear-gradient(135deg,#22D3EE,#A855F7 55%,#EC4899);box-shadow:0 0 16px rgba(168,85,247,.7);letter-spacing:0}
+.cap{position:absolute;left:34px;right:34px;bottom:28px;z-index:2;pointer-events:none}
+.cap h2{margin:0;color:#fff;font:800 clamp(24px,2.6vw,34px)/1.08 "Segoe UI",Arial;text-shadow:0 2px 20px rgba(0,0,0,.4)}
+.cap h2 em{font-style:normal;background:linear-gradient(90deg,#22D3EE,#A855F7,#F472B6,#FBBF24);background-size:200% 100%;-webkit-background-clip:text;background-clip:text;color:transparent;animation:shine 8s linear infinite}
+.cap p{margin:6px 0 0;color:rgba(226,232,255,.8);font-size:13.5px}
+.panel{position:relative;display:flex;background:#fff;border-left:1px solid var(--line);padding:36px 60px}
+.panel::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;background:linear-gradient(90deg,#22D3EE,#7C3AED,#EC4899,#F59E0B);background-size:200% 100%;animation:shine 10s linear infinite}
+.form{width:100%;max-width:410px;margin:auto}
+.co{display:flex;align-items:center;gap:14px;margin-bottom:32px;min-height:60px}
+.co img{height:60px;max-width:200px;object-fit:contain}.co .fb{width:56px;height:56px;border-radius:16px;display:grid;place-items:center;color:#fff;font:800 22px Arial;background:linear-gradient(135deg,#22D3EE,#7C3AED 55%,#EC4899)}
+.co div{font:700 18px/1.2 "Segoe UI",Arial}.co small{display:block;font:600 11.5px Arial;letter-spacing:.1em;text-transform:uppercase;color:#8A96A8;margin-top:4px}
+h1{font:800 34px/1.05 "Segoe UI",Arial;margin:0 0 8px;letter-spacing:-.01em}.sub{color:var(--muted);margin:0 0 26px}
+label.f{display:block;margin-bottom:16px;font:600 12px Arial;letter-spacing:.09em;text-transform:uppercase;color:#6B788C}
+.in{position:relative;margin-top:8px}.in input{width:100%;height:52px;border-radius:12px;border:1px solid #D3DBE6;background:#F9FBFD;padding:0 48px 0 16px;font-size:16px;color:var(--ink)}
+.in input:focus{outline:none;background:#fff;border-color:var(--violet);box-shadow:0 0 0 4px rgba(124,58,237,.14)}
+.eye{position:absolute;right:8px;top:7px;width:38px;height:38px;border:0;background:none;border-radius:8px;cursor:pointer;color:#7A879A}.eye:hover{background:#EEF2F7}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border:0;border-radius:12px;font:700 15px "Segoe UI",Arial;cursor:pointer;color:#fff;background:linear-gradient(90deg,#7C3AED,#DB2777,#F59E0B);background-size:200% 100%;box-shadow:0 14px 30px -10px rgba(219,39,119,.55);transition:background-position .5s;text-decoration:none}
+.btn:hover{background-position:100% 0}.btn.block{width:100%;height:54px;font-size:16px}.btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line);box-shadow:none}
+.msg{min-height:22px;margin:10px 0;font-size:14px;color:#B00E28}.msg.ok{color:#1E7B4A}
+.links{margin-top:14px;text-align:center}.links button{border:0;background:none;color:var(--violet);font:600 14px Arial;cursor:pointer}
+footer{height:44px;display:flex;align-items:center;justify-content:center;border-top:1px solid var(--line);background:#fff;font-size:13px;color:#6B788C}
+footer a{color:#0b2a6f;font-weight:700;text-decoration:none;margin-left:4px}
+/* app view */
+.app{flex:1;display:grid;grid-template-columns:260px minmax(0,1fr);min-height:calc(100vh - 44px)}
+.side{background:linear-gradient(180deg,#140f3a,#07051a);color:#fff;padding:22px 14px;display:flex;flex-direction:column;gap:4px}
+.side .who{display:flex;gap:12px;align-items:center;padding:4px 8px 18px;border-bottom:1px solid rgba(255,255,255,.1);margin-bottom:12px}
+.side .who img{height:40px;max-width:120px;object-fit:contain;background:#fff;border-radius:8px;padding:3px}.side .who .fb{width:40px;height:40px;font-size:16px;border-radius:12px}
+.side .who b{display:block;font-size:14.5px;line-height:1.2}.side .who small{color:rgba(255,255,255,.6);font-size:12px}
+.side h4{margin:14px 8px 6px;font:700 11px Arial;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)}
+.side button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;color:rgba(255,255,255,.85);padding:9px 10px;border-radius:10px;font:500 14px "Segoe UI",Arial;cursor:pointer}
+.side button:hover{background:rgba(255,255,255,.08);color:#fff}.side button i{width:9px;height:9px;border-radius:50%;flex:none}
+.side button .lock{margin-left:auto;font-size:11px;color:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.2);border-radius:999px;padding:1px 8px}
+.side .out{margin-top:auto;color:#F3C55A}
+.main{padding:32px 36px;overflow:auto}.main h1{font-size:30px}
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px;margin-top:18px}
+.card{position:relative;background:#fff;border:1px solid var(--line);border-radius:16px;padding:20px;box-shadow:0 8px 28px rgba(20,30,70,.06);display:flex;flex-direction:column;gap:10px;overflow:hidden}
+.card::before{content:"";position:absolute;left:0;top:0;right:0;height:4px;background:var(--c)}
+.card h3{margin:0;font-size:18px}.card p{margin:0;color:var(--muted);font-size:14px}.card .st{font-size:12.5px;font-weight:600}
+.card .btn{margin-top:auto;align-self:flex-start;height:42px}.card.locked{background:#FAFBFD}.card.locked h3{color:#4a5568}
+.pill{display:inline-block;font:700 11px Arial;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;background:#EEF2FF;color:#4338CA}
+.pill.ok{background:#E7F8EF;color:#1E7B4A}.pill.warn{background:#FFF4E0;color:#9A5B00}.pill.off{background:#F1F3F7;color:#6B788C}
+.veil{position:fixed;inset:0;background:rgba(10,7,32,.55);backdrop-filter:blur(4px);display:grid;place-items:center;padding:20px;z-index:50}
+.dlg{background:#fff;border-radius:18px;max-width:440px;width:100%;padding:28px;box-shadow:0 30px 80px rgba(0,0,0,.35);position:relative}
+.dlg::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,#22D3EE,#7C3AED,#EC4899,#F59E0B)}
+.dlg h3{margin:4px 0 8px;font-size:22px}.dlg p{color:var(--muted);margin:0 0 18px}.dlg .row{display:flex;gap:10px;flex-wrap:wrap}
+@keyframes shine{to{background-position:200% 0}}@keyframes hue{to{filter:blur(60px) saturate(1.3) hue-rotate(360deg)}}
+@keyframes a1{50%{transform:translate(12%,8%) scale(1.15)}}@keyframes a2{50%{transform:translate(-10%,-6%) scale(.9)}}
+@media (prefers-reduced-motion:reduce){.aur,.aur i,.cap h2 em,.panel::before{animation:none!important}}
+@media (max-width:900px){.split{grid-template-columns:1fr}.vis{min-height:48vh}.panel{padding:26px 20px}.app{grid-template-columns:1fr}.side{flex-direction:row;flex-wrap:wrap}.side h4,.side .who{width:100%}.side button{width:auto}.main{padding:22px 18px}}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<footer>Powered By :<a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></footer>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="/it/company-config.js"></script>
+<script src="/it/apps/scene.js"></script>
+<script src="/it/apps/portal.js"></script>
+</body>
+</html>
