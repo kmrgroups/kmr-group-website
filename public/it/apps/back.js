@@ -5,7 +5,7 @@
   "use strict";
   let portal = null; try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {}
   const demo = /[?&]demo=1(&|$)/.test(location.search);
-  const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : "";
+  const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : "";
   const css = document.createElement("style");
   css.textContent = `.kmr-back{position:fixed;left:14px;bottom:14px;z-index:9000;display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:linear-gradient(90deg,#7C3AED,#DB2777);color:#fff;font:700 13.5px "Segoe UI",Arial;text-decoration:none;box-shadow:0 10px 26px -8px rgba(124,58,237,.6)}
   .kmr-demo{position:sticky;top:0;z-index:8999;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:8px 14px;background:linear-gradient(90deg,#1e1b4b,#4c1d95);color:#fff;font:600 13.5px "Segoe UI",Arial}

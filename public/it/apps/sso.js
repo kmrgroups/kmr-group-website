@@ -5,7 +5,7 @@
   "use strict";
   var q = location.search;
   var demo = /[?&]demo=1(&|$)/.test(q), direct = /[?&]direct=1(&|$)/.test(q), fromPortal = /[?&]kmr=1(&|$)/.test(q);
-  var tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : "tool";
+  var tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : "tool";
   function portal() { var p = null; try { p = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {} return p; }
   function portalUrl() { var p = portal(); return (p && p.slug ? "/it/app/" + encodeURIComponent(p.slug) : "/it/apps.html") + "?open=" + tool; }
   function hasSession() {

@@ -3,7 +3,7 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
 // Pilot / demo requests from www.kmr-groups.com/it (KMR Apps page) → KMR Console "Pilot requests".
 // Server-side only: validates the fields, ignores bots (hidden field) and limits repeats per email.
-const PRODUCTS = ["hrm", "balloon", "pd"];
+const PRODUCTS = ["hrm", "balloon", "pd", "capacity"];
 
 export async function POST(req: NextRequest) {
   let b: Record<string, unknown>;
