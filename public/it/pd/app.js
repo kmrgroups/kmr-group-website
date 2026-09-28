@@ -155,12 +155,17 @@ function nav(){
   else {
     const ed=S.prj.doc.edited||{};
     const groups={}; D.DOCS.forEach(d=>(groups[d.group]=groups[d.group]||[]).push(d));
-    side.innerHTML=`<h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"],["cnc","CNC","CNC programs"]].map(x=>`<button data-go="${x[0]}" title="${esc(x[2])}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</button>`).join("")}</div>
+    side.innerHTML=`<h4>Start</h4><div class="nav"><button data-go="home" title="Back to the welcome screen and all projects"><span class="code">HOME</span>Welcome · all projects</button></div><h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"],["cnc","CNC","CNC programs"]].map(x=>`<button data-go="${x[0]}" title="${esc(x[2])}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</button>`).join("")}</div>
       ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<button data-go="${d.id}" title="${esc(d.title)}" ${S.view===d.id?'aria-current="page"':""}><span class="code">${d.code}</span>${esc(d.title)}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</button>`).join("")}</div>`).join("")}`;
   }
-  side.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; document.body.classList.remove("nav-open"); const g=b.dataset.go; if(g==="projects") return projectsDialog(); if(g==="home") return; go(g); };
+  side.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; document.body.classList.remove("nav-open"); const g=b.dataset.go; if(g==="projects") return projectsDialog(); if(g==="home"){ if(!S.prj) return; closeProject(); return; } go(g); };
 }
 function go(view){ S.view=view; nav(); UI.render(view); }
+/* Back to the welcome screen (closes the open project; asks first when there are unsaved changes) */
+function closeProject(){
+  const sb=$("bSave"); if(sb&&/•/.test(sb.textContent||"")&&!confirm("This project has unsaved changes. Leave it anyway?")) return;
+  S.prj=null; S.plan=null; S.docs=null; S.view="home"; refreshChip(); nav(); UI.render("overview");
+}
 $("bNav").onclick=()=>document.body.classList.add("nav-open"); $("scrim").onclick=()=>document.body.classList.remove("nav-open");
 
 /* ---------------- top bar ---------------- */
