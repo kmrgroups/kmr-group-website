@@ -3,7 +3,7 @@
 <head>
 <script src="/it/company-config.js"></script>
 <script src="/it/apps/sso.js"></script>
-<script>if (window.KMR_SSO && window.KMR_SSO.active) document.write('<style>.kmr-company{display:none!important}</style>');</script>
+<script>window.KMR_PLATFORM = true; document.write('<style>.kmr-company{display:none!important}</style>');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -1284,7 +1284,7 @@ const PAGES = [
   { id: 'schedule', group: 'Analyse', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
   { id: 'balance', group: 'Analyse', label: 'Load Balancer', title: 'Load Balancer', desc: 'Move or split work from overloaded machines to machines with spare days.' },
   { id: 'masters', group: 'Setup', label: 'Masters', title: 'Machines & Routings', desc: 'Machines, parts, operations, cycle times, plant standards and working calendar.' },
-  { id: 'settings', group: 'Setup', label: 'Settings', title: 'Settings', desc: 'Company, cloud connection, users & access, and data backup. Admins only.' },
+  { id: 'settings', group: 'Setup', label: 'Settings', title: 'Settings', desc: window.KMR_PLATFORM ? 'Appearance and data backup for this plan. Company details and users are managed in KMR Apps › Administration.' : 'Company, cloud connection, users & access, and data backup. Admins only.' },
   { id: 'help', group: 'Setup', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' }
 ];
 
@@ -2215,6 +2215,7 @@ function standardsTab() {
 Pages.settings = () => {
   const tab = ui.settingsTab || 'general';
   const tabs = `<section class="card"><div class="subtabs" role="tablist" style="border-bottom:0"><button data-stab="general" class="${tab === 'general' ? 'on' : ''}">General</button><button data-stab="deploy" class="${tab === 'deploy' ? 'on' : ''}">Deployment guide · new customer</button></div></section>`;
+  if (window.KMR_PLATFORM) return settingsGeneral();
   if (tab === 'deploy') return tabs + deployGuide();
   return tabs + settingsGeneral();
 };
@@ -2247,16 +2248,16 @@ function settingsGeneral() {
     ${ui.hist ? (ui.hist.length ? `<div class="tbl-wrap" id="tw-hist"><table class="tbl"><thead><tr><th class="stick">Replaced at</th><th>Saved by</th><th></th></tr></thead><tbody>${ui.hist.map(v => `<tr><td class="stick">${h(new Date(v.saved_at).toLocaleString())}</td><td>${h(v.saved_by || '')}</td><td class="r"><button class="btn sm" data-act="restoreVersion" data-id="${v.id}">Restore</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="card-b muted">No earlier versions yet.</div>') : '<div class="card-b small muted">The list loads on request.</div>'}
   </section></div>`;
   }
-  if (window.KMR_SSO && window.KMR_SSO.active) usersBlock = '';   // users are managed in KMR Apps › Administration only
+  if (window.KMR_PLATFORM) usersBlock = '';   // users are managed in KMR Apps › Administration only
   return `
   <div class="grid-2e">
-    <section class="card"><div class="card-h"><div><h2>${window.KMR_SSO && window.KMR_SSO.active ? "Appearance" : "Company & branding"}</h2><div class="sub">${window.KMR_SSO && window.KMR_SSO.active ? "Light or dark screens on this device." : "Shown in the sidebar, sign-in screen, reports and Excel exports."}</div></div></div>
+    <section class="card"><div class="card-h"><div><h2>${window.KMR_PLATFORM ? "Appearance" : "Company & branding"}</h2><div class="sub">${window.KMR_PLATFORM ? "Light or dark screens on this device." : "Shown in the sidebar, sign-in screen, reports and Excel exports."}</div></div></div>
       <div class="card-b" style="display:flex;flex-direction:column;gap:14px">
         <div class="form-grid kmr-company"><div class="field"><label for="sName">Company name</label><input class="inp" id="sName" data-setting="companyName" value="${h(s.companyName)}" ${window.KMR_SSO && window.KMR_SSO.active ? "disabled title=\"Managed in KMR Apps › Administration\"" : ""}></div>
         <div class="field"><label for="sSub">Plant / division</label><input class="inp" id="sSub" data-setting="subtitle" value="${h(s.subtitle)}"></div></div>
         <div class="kmr-company" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="logo" style="width:56px;height:56px;border-color:var(--line)">${s.logo ? `<img src="${h(s.logo)}" alt="Company logo">` : h((s.companyName || 'C').slice(0, 2).toUpperCase())}</div>
-          ${window.KMR_SSO && window.KMR_SSO.active ? '<span class="small muted">Company name and logo come from <b>KMR Apps › Administration</b> — change them there once for all your apps.</span>' : `<button class="btn" data-act="uploadLogo">${icon('upload')}Upload logo</button>${s.logo ? '<button class="btn ghost" data-act="removeLogo">Remove</button>' : ''}<span class="small muted">PNG, JPG or SVG</span>`}</div>
-        }<div class="field"><label>Appearance</label><div class="seg"><button data-theme-set="system" class="${theme === 'system' ? 'on' : ''}">System</button><button data-theme-set="light" class="${theme === 'light' ? 'on' : ''}">Light</button><button data-theme-set="dark" class="${theme === 'dark' ? 'on' : ''}">Dark</button></div></div>
+          ${window.KMR_PLATFORM ? '<span class="small muted">Company name and logo come from <b>KMR Apps › Administration</b> — change them there once for all your apps.</span>' : `<button class="btn" data-act="uploadLogo">${icon('upload')}Upload logo</button>${s.logo ? '<button class="btn ghost" data-act="removeLogo">Remove</button>' : ''}<span class="small muted">PNG, JPG or SVG</span>`}</div>
+        <div class="field"><label>Appearance</label><div class="seg"><button data-theme-set="system" class="${theme === 'system' ? 'on' : ''}">System</button><button data-theme-set="light" class="${theme === 'light' ? 'on' : ''}">Light</button><button data-theme-set="dark" class="${theme === 'dark' ? 'on' : ''}">Dark</button></div></div>
       </div></section>
 
     
@@ -2594,7 +2595,7 @@ const Actions = {
   },
   accountMenu() {
     const ses = Cloud.session() || {};
-    if (window.KMR_SSO && window.KMR_SSO.active) {   // one KMR login: password and users are managed in KMR Apps
+    if (window.KMR_PLATFORM) {   // one KMR login: password and users are managed in KMR Apps
       let kp = null; try { kp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); } catch (e) {}
       const home = kp && kp.slug ? '/it/app/' + encodeURIComponent(kp.slug) : '/it/apps.html';
       modal({ title: 'Your KMR login', body: `<div class="acct-card"><span class="acct">${h((ses.email || '?').slice(0, 2).toUpperCase())}</span><div><b>${h(ses.email)}</b><div class="small muted">${h(roleLabel())} in the Capacity Planner</div></div></div>

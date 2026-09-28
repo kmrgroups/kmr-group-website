@@ -375,7 +375,7 @@ function openAdmin(tab){
   if(!(S.role==="admin"||S.platform)){ toast("Only company admins can open Admin."); return; }
   const tabs=[]; if(S.org&&(S.role==="admin"||!CLOUD)) tabs.push(["company","Company"],["header","Document header"],["documents","Document settings"],["cnc","CNC programs"],["machines","Machines"],["gauges","Gauges"],["customers","Customers"],["consumables","Consumables"]);
   if(CLOUD&&S.role==="admin") tabs.push(["users","Users"],["integration","Balloon Inspector link"]); if(CLOUD&&S.platform) tabs.push(["workspaces","Company workspaces"]);
-  const KMR=window.KMR_SSO&&window.KMR_SSO.active&&!S.platform;
+  const KMR=!!window.KMR_SSO&&!S.platform;   // on the KMR platform (also in sample mode): company, users and workspaces live in KMR Apps
   if(KMR){ for(let i=tabs.length-1;i>=0;i--) if(["company","users","workspaces"].includes(tabs[i][0])) tabs.splice(i,1); }
   if(!tabs.find(t=>t[0]===tab)) tab=tabs[0]&&tabs[0][0];
   const kp=(()=>{ try{ return JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){ return null; } })();

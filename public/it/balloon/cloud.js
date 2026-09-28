@@ -534,7 +534,7 @@ function applyOrgDefaults(){ const s=(C.org&&C.org.settings)||{};
   if(s.cols){ BI.S.set.cols=+s.cols; $("sCols").value=s.cols; } if(s.rows){ BI.S.set.rows=+s.rows; $("sRows").value=s.rows; } }
 function applyRole(){
   $("clRole").textContent = C.role ? C.role : (C.platform?"owner":"");
-  $("clAdmin").hidden = !(C.platform || (C.role==="admin" && !(window.KMR_SSO && window.KMR_SSO.active)));
+  $("clAdmin").hidden = !(C.platform || (C.role==="admin" && !window.KMR_SSO));   // on the KMR platform company and users live in KMR Apps
   BI.setReadonly(C.role==="viewer"); updateSaveBtn();
   if(AIFN && BI.useAI) BI.useAI((C.role==="admin"||C.role==="editor") ? aiProvider : null);
 }
@@ -634,7 +634,7 @@ $("file").addEventListener("change",()=>{ C.reportId=null; C.filePath=null; setT
 /* ---------- admin: company, users, workspaces, guide ---------- */
 $("clAdmin").onclick=()=>{
   // Company details and users are managed once for all KMR apps (KMR Apps › Administration)
-  if (window.KMR_SSO && window.KMR_SSO.active && !C.platform) { let kp=null; try{ kp=JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){} location.href = kp&&kp.slug ? "/it/app/"+encodeURIComponent(kp.slug)+"#admin" : "/it/apps.html"; return; }
+  if (window.KMR_SSO && !C.platform) { let kp=null; try{ kp=JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){} location.href = kp&&kp.slug ? "/it/app/"+encodeURIComponent(kp.slug)+"#admin" : "/it/apps.html"; return; }
   openAdmin(C.role==="admin"?"company":"companies");
 };
 async function openAdmin(tab){
