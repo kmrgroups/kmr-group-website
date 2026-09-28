@@ -65,6 +65,7 @@ async function brandForLogin(){ let b=LS.get("pd_brand",null);
   if(CLOUD){ try{ const qc=new URLSearchParams(location.search).get("c"); const {data}=await sb.rpc("pd_public_brand",qc&&/^[0-9a-f-]{36}$/i.test(qc)?{p_org:qc}:{}); if(data&&data[0]&&(data[0].logo||data[0].name)) b=data[0]; }catch(e){} }
   return b; }
 async function loginScreen(msg){
+  if (window.KMR_SSO && window.KMR_SSO.active) return window.KMR_SSO.toPortal(msg);   // one login: the KMR Apps page
   let w=$("lg"); if(!w){ w=document.createElement("div"); w.id="lg"; w.className="lg-wrap"; document.body.appendChild(w); }
   const pw=CFG.poweredBy||null;
   w.innerHTML=`<div class="lg-vis"><div class="art">${loginArt()}</div><div class="cap"><h2>From ballooned drawing to a complete PPAP document set</h2><p>PFD, PFMEA, Control Plan, SOP, inspection reports, SPC and MSA, built for IATF 16949 and the AIAG core tools.</p></div></div>

@@ -432,6 +432,7 @@ async function showLoginBrand(){
   if(!(cached&&cached.logo)) paintBrand(cached);
 }
 function loginScreen(msg){
+  if (window.KMR_SSO && window.KMR_SSO.active) return window.KMR_SSO.toPortal(msg);   // one login: the KMR Apps page
   loginShell(`<h2 id="lgTitle">Welcome back</h2>
   <p class="lg-sub">Sign in with the e-mail and password your company admin gave you.</p>
   <label class="lg-f"><span>E-mail</span><div class="lg-in">${ICON_MAIL}<input id="clEmail" type="email" autocomplete="username" placeholder="name@company.com"></div></label>

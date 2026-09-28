@@ -9,6 +9,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const m = location.pathname.match(/\/it\/app\/([a-z0-9-]{2,61})/i) || location.search.match(/[?&]c=([a-z0-9-]{2,61})/i);
   const SLUG = m && !/^(undefined|null)$/i.test(m[1]) ? m[1].toLowerCase() : "";
+  const OPEN = (location.search.match(/[?&]open=([a-z0-9-]+)/i) || [])[1] || "";   // a tool sent the person here to sign in
   const META = {
     hrm: { color: "#0EA5E9", desc: "Employees, onboarding, ID cards, biometric attendance, shifts and leave.", demo: "/it/hrm/api/auth/demo" },
     balloon: { color: "#A855F7", desc: "Balloon any drawing and build the inspection report.", demo: "/it/balloon.html?demo=1" },
@@ -34,7 +35,7 @@
         <div class="cap"><h2>Agentic AI · <em>Intelligent Digital Manufacturing Systems</em></h2><p>HR, quality, planning and plant operations — one sign-in, one platform.</p></div></section>
       <section class="panel"><div class="form">
         <div class="co">${logo(brand)}<div>${esc(brand.name)}<small>${SLUG ? "Your KMR apps" : "KMR Group of Companies"}</small></div></div>
-        <h1>Welcome</h1><p class="sub">${SLUG ? "Sign in to open your company's apps." : "Please use the link sent to you by KMR to open your company's apps."}</p>
+        <h1>Welcome</h1><p class="sub">Sign in once — the same login opens every app your company uses.</p>
         <form id="lf">
           <label class="f">Email<div class="in"><input name="email" type="email" autocomplete="username" required></div></label>
           <label class="f">Password<div class="in"><input name="password" type="password" autocomplete="current-password" required><button type="button" class="eye" aria-label="Show password">👁</button></div></label>
@@ -79,7 +80,7 @@
       [["access_token", session.access_token], ["refresh_token", session.refresh_token], ["co", r.product_slug || ""]].forEach(([k, v]) => { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; fm.append(i); });
       document.body.append(fm); fm.submit(); return;
     }
-    location.href = r.app_path;
+    location.href = r.app_path + (r.app_path.includes("?") ? "&" : "?") + "kmr=1";
   }
 
   function appView() {
@@ -118,7 +119,13 @@
 
   async function start() {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session || !SLUG) return loginView();
+    if (!session) return loginView();
+    if (!SLUG) {   // signed in at the general address: go to this person's own company page
+      const { data } = await sb.rpc("kmr_my_portals");
+      if (data && data.length === 1) { location.replace(`/it/app/${data[0].slug}${OPEN ? "?open=" + OPEN : ""}`); return; }
+      if (data && data.length > 1) { $("#root").innerHTML = `<div class="split" style="grid-template-columns:1fr"><section class="panel" style="border:0"><div class="form"><h1>Choose your company</h1><p class="sub">Your login belongs to more than one company.</p>${data.map((d) => `<p><a class="btn block" href="/it/app/${esc(d.slug)}${OPEN ? "?open=" + esc(OPEN) : ""}">${esc(d.name)}</a></p>`).join("")}</div></section></div>`; return; }
+      await sb.auth.signOut(); return loginView("This login is not linked to any company's KMR Apps. Please use the link and login sent to you by KMR.");
+    }
     user = session.user;
     const { data, error } = await sb.rpc("kmr_portal", { p_slug: SLUG });
     if (error) return loginView("Could not load your apps right now. Please try again.");
@@ -127,6 +134,7 @@
     try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: brand.name })); } catch (e) {}
     const st = await sb.rpc("kmr_portal_stats", { p_slug: SLUG }); stats = (st && st.data) || {};
     appView();
+    if (OPEN && rows.some((r) => r.product_code === OPEN)) { history.replaceState(null, "", location.pathname); open(OPEN); }
   }
 
   (async () => {
