@@ -75,7 +75,7 @@
       return;
     }
     if (!r.has_access) {
-      if (!r.is_contact) return dialog(`No access to ${r.product_name} yet`, "Your company has this app, but your login has not been added to it. Please ask your company's administrator to add you.", "");
+      if (!r.is_contact && !isAdmin) return dialog(`No access to ${r.product_name}`, "Your company has this app, but you have not been given access to it. Your company administrator can add it under Administration › Users & access.", "");
       const j = await sb.rpc("kmr_portal_join", { p_slug: SLUG, p_product: code });
       if (j.error) return dialog(`Could not open ${r.product_name}`, esc(j.error.message), "");
       r.has_access = true;
@@ -105,7 +105,7 @@
       </aside>
       <main class="main">
         <h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p>
-        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div><button class="btn" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</button></div>`).join("")}</div>
+        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div>${r.ok && !r.has_access && !r.is_contact && !isAdmin ? `<span class="pill off">No access — ask your administrator</span>` : `<button class="btn" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</button>`}</div>`).join("")}</div>
         <h2 style="margin:34px 0 0;font-size:18px">Try more of the platform</h2>
         <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><button class="btn ghost" data-open="${r.product_code}">Try with sample data</button></div>`).join("")}</div>
       </main></div>`;
