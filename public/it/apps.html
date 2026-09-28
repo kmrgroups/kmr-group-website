@@ -34,6 +34,8 @@
 h1{font:800 34px/1.05 "Segoe UI",Arial;margin:0 0 8px;letter-spacing:-.01em}.sub{color:var(--muted);margin:0 0 26px}
 label.f{display:block;margin-bottom:16px;font:600 12px Arial;letter-spacing:.09em;text-transform:uppercase;color:#6B788C}
 .in{position:relative;margin-top:8px}.in input{width:100%;height:52px;border-radius:12px;border:1px solid #D3DBE6;background:#F9FBFD;padding:0 48px 0 16px;font-size:16px;color:var(--ink)}
+.in select,.f>select{width:100%;height:52px;border-radius:12px;border:1px solid #D3DBE6;background:#F9FBFD;padding:0 14px;font-size:16px;color:var(--ink);margin-top:8px;font-family:inherit}
+.in select:focus,.f>select:focus{outline:none;background:#fff;border-color:var(--violet);box-shadow:0 0 0 4px rgba(124,58,237,.14)}
 .in input:focus{outline:none;background:#fff;border-color:var(--violet);box-shadow:0 0 0 4px rgba(124,58,237,.14)}
 .eye{position:absolute;right:8px;top:7px;width:38px;height:38px;border:0;background:none;border-radius:8px;cursor:pointer;color:#7A879A}.eye:hover{background:#EEF2F7}
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:48px;padding:0 22px;border:0;border-radius:12px;font:700 15px "Segoe UI",Arial;cursor:pointer;color:#fff;background:linear-gradient(90deg,#7C3AED,#DB2777,#F59E0B);background-size:200% 100%;box-shadow:0 14px 30px -10px rgba(219,39,119,.55);transition:background-position .5s;text-decoration:none}
@@ -78,6 +80,7 @@ footer a{color:#0b2a6f;font-weight:700;text-decoration:none;margin-left:4px}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="/it/company-config.js"></script>
 <script src="/it/apps/scene.js"></script>
+<script src="/it/apps/ops.js"></script>
 <script src="/it/apps/portal.js"></script>
 </body>
 </html>

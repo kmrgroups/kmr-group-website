@@ -17,7 +17,7 @@
     capacity: { color: "#10B981", desc: "Capacity plan, takt time and machine loading for every plant, with version history.", demo: "/it/capacity.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["maint", "Maintenance"], ["proc", "Procurement"], ["crm", "CRM & RFQ"], ["mmd", "MMD"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["apqp", "APQP & PPAP"], ["fmea", "AIAG-VDA FMEA"], ["spc", "SPC & MSA"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
-  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home";
+  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null;
 
   const logo = (b, cls) => b.logo_url ? `<img src="${esc(b.logo_url)}" alt="${esc(b.name)}">` : `<span class="fb ${cls || ""}">${esc((b.name || "K").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())}</span>`;
   function setIcon(url) {
@@ -97,6 +97,7 @@
       <aside class="side">
         <div class="who">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></div>
         <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
+        ${ops ? `<h4>Masters</h4><button data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</button>` : ""}
         ${isAdmin ? `<h4>Administration</h4><button data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</button><button data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</button>` : ""}
         <h4>More KMR apps</h4>${others.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></button>`).join("")}
         ${SOON.map(([k, n]) => `<button data-soon="${k}" data-name="${esc(n)}"><i style="background:#64748b"></i>${esc(n)}<span class="lock">Soon</span></button>`).join("")}
@@ -111,6 +112,7 @@
       </main></div>`;
     document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => open(b.dataset.open)));
     document.querySelectorAll("[data-admin]").forEach((b) => b.addEventListener("click", () => (b.dataset.admin === "company" ? companyView() : usersView())));
+    document.querySelectorAll("[data-ops]").forEach((b) => b.addEventListener("click", () => window.KMR_OPS && window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id })));
     const home = document.querySelector(".side .who"); if (home) { home.style.cursor = "pointer"; home.title = "Your apps"; home.onclick = () => appView(); }
     document.querySelectorAll("[data-soon]").forEach((b) => b.addEventListener("click", () => dialog(`${b.dataset.name} — coming soon`, "This module of the KMR Intelligent Digital Manufacturing platform is on its way. Register your interest and we'll invite you to the pilot.", `<a class="btn" href="${buyUrl(b.dataset.soon)}">Register interest</a>`)));
     $("#out").onclick = async () => { await sb.auth.signOut(); try { localStorage.removeItem("kmr-portal"); } catch (e) {} loginView(); };
@@ -183,7 +185,7 @@
     const m = mainEl(); m.innerHTML = adminHead("Users & access", "One list for all your KMR apps. Choose what each person may do in each app.") + `<p class="msg">Loading…</p>`; bindBack();
     const [{ data: list, error }, { data: c }] = await Promise.all([sb.rpc("kmr_admin_users", { p_slug: SLUG }), sb.rpc("kmr_admin_company", { p_slug: SLUG })]);
     if (error) { m.querySelector(".msg").textContent = error.message; return; }
-    const tools = (c && c.tools) || [];
+    const tools = [...((c && c.tools) || []), { code: "ops", name: "Operations Master" }];
     const label = (code, v) => ((code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).find((o) => o[0] === v) || ["", "—"])[1];
     m.innerHTML = adminHead("Users & access", "One list for all your KMR apps. Choose what each person may do in each app.") + `
       ${note ? `<div class="card" style="border-color:#1E7B4A;background:#E7F8EF;margin-bottom:14px">${note}</div>` : ""}
@@ -201,7 +203,7 @@
       dialog(isNew ? "Add a person" : `Edit ${u.name || u.email}`, `
         <label class="f">Email<div class="in"><input id="uE" type="email" value="${esc(u.email)}" ${isNew ? "" : "readonly"}></div></label>
         <label class="f">Name<div class="in"><input id="uN" value="${esc(u.name || "")}"></div></label>
-        ${tools.map((t) => `<label class="f">${esc(t.name)}<div class="in"><select id="uR_${t.code}" style="width:100%;height:46px;border-radius:12px;border:1px solid #D3DBE6;padding:0 12px">${(t.code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).map((o) => `<option value="${o[0]}" ${((u.roles || {})[t.code] || "") === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></div></label>`).join("")}
+        ${tools.map((t) => `<label class="f">${esc(t.name)}<div class="in"><select id="uR_${t.code}">${(t.code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).map((o) => `<option value="${o[0]}" ${((u.roles || {})[t.code] || "") === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></div></label>`).join("")}
         <label style="display:flex;gap:8px;align-items:center;margin:4px 0 12px"><input type="checkbox" id="uA" ${u.is_admin ? "checked" : ""}> Company administrator (Administration pages, users, company details)</label>
         ${isNew ? `<label class="f">Password for a new login<div class="in"><input id="uP" type="text" placeholder="At least 8 characters — only if this email has no KMR login yet"></div></label>` : (u.login_owned ? `<label class="f">New password (optional)<div class="in"><input id="uP" type="text" placeholder="Leave empty to keep the current password"></div></label>` : "")}
         <span class="msg" id="uM"></span>`,
@@ -246,6 +248,7 @@
     setIcon(brand.logo_url);
     const st = await sb.rpc("kmr_portal_stats", { p_slug: SLUG }); stats = (st && st.data) || {};
     const ar = await sb.rpc("kmr_admin_role", { p_slug: SLUG }); isAdmin = !ar.error && ar.data === "admin";
+    const oc = await sb.rpc("kmr_ops_context", { p_slug: SLUG }); ops = !oc.error && oc.data ? oc.data : null;
     appView();
     if (OPEN && rows.some((r) => r.product_code === OPEN)) { history.replaceState(null, "", location.pathname); open(OPEN); }
     else if (location.hash === "#admin" && isAdmin) { history.replaceState(null, "", location.pathname); usersView(); }
