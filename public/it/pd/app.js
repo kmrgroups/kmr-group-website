@@ -95,6 +95,14 @@ async function start(){
   const [{data:mem,error:e1},{data:pa}]=await Promise.all([ sb.from("pd_members").select("org_id,role,pd_orgs(id,name,logo,settings)").eq("email",email), sb.from("pd_platform_admins").select("user_id").eq("user_id",user.id) ]);
   if(e1){ loginScreen("Couldn't reach the database: "+e1.message+". Has supabase/pd-schema.sql been run?"); return; }
   S.platform=!!(pa&&pa.length); S.memberships=(mem||[]).filter(m=>m.pd_orgs).map(m=>({role:m.role,...m.pd_orgs}));
+  // Opened from a customer's KMR Apps page: show ONLY that customer's workspace
+  try {
+    const kp=JSON.parse(localStorage.getItem("kmr-portal")||"null");
+    if(kp&&kp.slug&&/[?&]kmr=1(&|$)/.test(location.search)){
+      const ws=await sb.rpc("kmr_portal_workspace",{p_slug:kp.slug,p_product:"pd"});
+      if(!ws.error&&ws.data) S.memberships=S.memberships.filter(m=>m.id===ws.data);
+    }
+  } catch(e){}
   // KMR Console licence: keep only workspaces whose licence is valid (the database enforces this too)
   const acc=await sb.rpc("kmr_access",{p_product:"pd"});
   if(!acc.error && !S.platform){
