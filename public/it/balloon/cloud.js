@@ -632,7 +632,11 @@ async function openReport(id){
 $("file").addEventListener("change",()=>{ C.reportId=null; C.filePath=null; setTimeout(()=>{ C.dirty=true; updateSaveBtn(); },300); },true);
 
 /* ---------- admin: company, users, workspaces, guide ---------- */
-$("clAdmin").onclick=()=>openAdmin(C.role==="admin"?"company":"companies");
+$("clAdmin").onclick=()=>{
+  // Company details and users are managed once for all KMR apps (KMR Apps › Administration)
+  if (window.KMR_SSO && window.KMR_SSO.active && !C.platform) { let kp=null; try{ kp=JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){} location.href = kp&&kp.slug ? "/it/app/"+encodeURIComponent(kp.slug)+"#admin" : "/it/apps.html"; return; }
+  openAdmin(C.role==="admin"?"company":"companies");
+};
 async function openAdmin(tab){
   if(!(C.role==="admin"||C.platform)){ BI.toast("Only company admins can open Admin."); return; }
   const tabs=[]; if(C.role==="admin") tabs.push(["company","Company"],["users","Users"]); if(C.platform) tabs.push(["companies","Customer workspaces"],["guide","Setup guide"]);

@@ -375,8 +375,11 @@ function openAdmin(tab){
   if(!(S.role==="admin"||S.platform)){ toast("Only company admins can open Admin."); return; }
   const tabs=[]; if(S.org&&(S.role==="admin"||!CLOUD)) tabs.push(["company","Company"],["header","Document header"],["documents","Document settings"],["cnc","CNC programs"],["machines","Machines"],["gauges","Gauges"],["customers","Customers"],["consumables","Consumables"]);
   if(CLOUD&&S.role==="admin") tabs.push(["users","Users"],["integration","Balloon Inspector link"]); if(CLOUD&&S.platform) tabs.push(["workspaces","Company workspaces"]);
+  const KMR=window.KMR_SSO&&window.KMR_SSO.active&&!S.platform;
+  if(KMR){ for(let i=tabs.length-1;i>=0;i--) if(["company","users","workspaces"].includes(tabs[i][0])) tabs.splice(i,1); }
   if(!tabs.find(t=>t[0]===tab)) tab=tabs[0]&&tabs[0][0];
-  dialog("Admin",`<div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" data-t="${t[0]}" aria-selected="${t[0]===tab}">${t[1]}</button>`).join("")}</div><div id="adP"></div>`,"",true);
+  const kp=(()=>{ try{ return JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){ return null; } })();
+  dialog("Admin",`${KMR?`<p style="margin:0 0 10px;font-size:13.5px;color:#5E6B7E">Company details, logo and users are managed for all your KMR apps in <a href="${kp&&kp.slug?"/it/app/"+encodeURIComponent(kp.slug)+"#admin":"/it/apps.html"}"><b>KMR Apps › Administration</b></a>.</p>`:""}<div class="tabs" role="tablist">${tabs.map(t=>`<button role="tab" data-t="${t[0]}" aria-selected="${t[0]===tab}">${t[1]}</button>`).join("")}</div><div id="adP"></div>`,"",true);
   document.querySelectorAll("#dlg [data-t]").forEach(b=>b.onclick=()=>{ document.querySelectorAll("#dlg [data-t]").forEach(x=>x.setAttribute("aria-selected",x===b)); pane(b.dataset.t); });
   pane(tab);
 }

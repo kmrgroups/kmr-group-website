@@ -1407,6 +1407,10 @@ async function cloudBoot() {
     if (r && r.data) { adoptRemote(r.data); cloud.stamp = r.updated_at; setSync('on', 'Synced · ' + timeAgo(r.updated_at)); }
     else if (can('editor')) { cloud.savedHash = null; cloud.firstPublish = true; }
     else { setSync('err', 'No shared plan published yet'); }
+    try {   // company name and logo come from the customer's KMR Apps Administration
+      const b = await Cloud._fetch('/rest/v1/rpc/kmr_workspace_brand', { method: 'POST', body: JSON.stringify({ p_product: 'capacity', p_org: Cloud.org }) });
+      if (b && b.name) { state.settings.companyName = b.name; if (b.logo) state.settings.logo = b.logo; }
+    } catch (e) { /* keep the plan's own name */ }
     hideGate(); render(); startPoll();
     if (cloud.firstPublish) { cloud.firstPublish = false; firstPublishModal(); }
   } catch (e) {
@@ -2230,14 +2234,18 @@ function settingsGeneral() {
     ${ui.hist ? (ui.hist.length ? `<div class="tbl-wrap" id="tw-hist"><table class="tbl"><thead><tr><th class="stick">Replaced at</th><th>Saved by</th><th></th></tr></thead><tbody>${ui.hist.map(v => `<tr><td class="stick">${h(new Date(v.saved_at).toLocaleString())}</td><td>${h(v.saved_by || '')}</td><td class="r"><button class="btn sm" data-act="restoreVersion" data-id="${v.id}">Restore</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="card-b muted">No earlier versions yet.</div>') : '<div class="card-b small muted">The list loads on request.</div>'}
   </section></div>`;
   }
+  if (window.KMR_SSO && window.KMR_SSO.active) {
+    let kp = null; try { kp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); } catch (e) {}
+    usersBlock = `<section class="card"><div class="card-h"><div><h2>Users & access</h2><div class="sub">Managed for all your KMR apps in one place</div></div></div><div class="card-b"><p>Add people and choose what they may do in the Capacity Planner under <b>KMR Apps › Administration › Users & access</b>.</p><a class="btn" href="${kp && kp.slug ? '/it/app/' + encodeURIComponent(kp.slug) + '#admin' : '/it/apps.html'}">Open Users & access</a></div></section>`;
+  }
   return `
   <div class="grid-2e">
     <section class="card"><div class="card-h"><div><h2>Company & branding</h2><div class="sub">Shown in the sidebar, sign-in screen, reports and Excel exports.</div></div></div>
       <div class="card-b" style="display:flex;flex-direction:column;gap:14px">
-        <div class="form-grid"><div class="field"><label for="sName">Company name</label><input class="inp" id="sName" data-setting="companyName" value="${h(s.companyName)}"></div>
+        <div class="form-grid"><div class="field"><label for="sName">Company name</label><input class="inp" id="sName" data-setting="companyName" value="${h(s.companyName)}" ${window.KMR_SSO && window.KMR_SSO.active ? "disabled title=\"Managed in KMR Apps › Administration\"" : ""}></div>
         <div class="field"><label for="sSub">Plant / division</label><input class="inp" id="sSub" data-setting="subtitle" value="${h(s.subtitle)}"></div></div>
         <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="logo" style="width:56px;height:56px;border-color:var(--line)">${s.logo ? `<img src="${h(s.logo)}" alt="Company logo">` : h((s.companyName || 'C').slice(0, 2).toUpperCase())}</div>
-          <button class="btn" data-act="uploadLogo">${icon('upload')}Upload logo</button>${s.logo ? '<button class="btn ghost" data-act="removeLogo">Remove</button>' : ''}<span class="small muted">PNG, JPG or SVG</span></div>
+          ${window.KMR_SSO && window.KMR_SSO.active ? '<span class="small muted">Company name and logo come from <b>KMR Apps › Administration</b> — change them there once for all your apps.</span>' : `<button class="btn" data-act="uploadLogo">${icon('upload')}Upload logo</button>${s.logo ? '<button class="btn ghost" data-act="removeLogo">Remove</button>' : ''}<span class="small muted">PNG, JPG or SVG</span>`}</div>
         <div class="field"><label>Appearance</label><div class="seg"><button data-theme-set="system" class="${theme === 'system' ? 'on' : ''}">System</button><button data-theme-set="light" class="${theme === 'light' ? 'on' : ''}">Light</button><button data-theme-set="dark" class="${theme === 'dark' ? 'on' : ''}">Dark</button></div></div>
       </div></section>
 
