@@ -67,6 +67,12 @@
       location.href = meta.demo + (meta.demo.includes("?") ? "&" : "?") + "from=" + encodeURIComponent(SLUG);
       return;
     }
+    if (!r.has_access) {
+      if (!r.is_contact) return dialog(`No access to ${r.product_name} yet`, "Your company has this app, but your login has not been added to it. Please ask your company's administrator to add you.", "");
+      const j = await sb.rpc("kmr_portal_join", { p_slug: SLUG, p_product: code });
+      if (j.error) return dialog(`Could not open ${r.product_name}`, esc(j.error.message), "");
+      r.has_access = true;
+    }
     if (code === "hrm") {
       const { data: { session } } = await sb.auth.getSession(); if (!session) return loginView("Please sign in again.");
       const fm = document.createElement("form"); fm.method = "POST"; fm.action = "/it/hrm/api/auth/handoff";
@@ -85,6 +91,7 @@
         <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
         <h4>More KMR apps</h4>${others.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></button>`).join("")}
         ${SOON.map(([k, n]) => `<button data-soon="${k}" data-name="${esc(n)}"><i style="background:#64748b"></i>${esc(n)}<span class="lock">Soon</span></button>`).join("")}
+        <button id="pw">Change password</button>
         <button class="out" id="out">Sign out</button>
       </aside>
       <main class="main">
@@ -95,7 +102,18 @@
       </main></div>`;
     document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => open(b.dataset.open)));
     document.querySelectorAll("[data-soon]").forEach((b) => b.addEventListener("click", () => dialog(`${b.dataset.name} — coming soon`, "This module of the KMR Intelligent Digital Manufacturing platform is on its way. Register your interest and we'll invite you to the pilot.", `<a class="btn" href="${buyUrl(b.dataset.soon)}">Register interest</a>`)));
-    $("#out").onclick = async () => { await sb.auth.signOut(); loginView(); };
+    $("#out").onclick = async () => { await sb.auth.signOut(); try { localStorage.removeItem("kmr-portal"); } catch (e) {} loginView(); };
+    $("#pw").onclick = () => {
+      dialog("Change password", `<label class="f">New password<div class="in"><input id="np1" type="password" minlength="8" autocomplete="new-password"></div></label><label class="f">Repeat new password<div class="in"><input id="np2" type="password" minlength="8" autocomplete="new-password"></div></label><span class="msg" id="npm"></span>`,
+        `<button class="btn" id="npSave">Save password</button>`);
+      $("#npSave").onclick = async () => {
+        const a = $("#np1").value, b = $("#np2").value, m = $("#npm");
+        if (a.length < 8) { m.textContent = "Use at least 8 characters."; return; }
+        if (a !== b) { m.textContent = "The two passwords do not match."; return; }
+        const { error } = await sb.auth.updateUser({ password: a });
+        m.className = error ? "msg" : "msg ok"; m.textContent = error ? error.message : "Password changed. Use it for every KMR app.";
+      };
+    };
   }
 
   async function start() {

@@ -22,16 +22,42 @@
       a.textContent = "← " + (portal.name ? portal.name + " · " : "") + "KMR Apps"; document.body.append(a);
     }
     if (demo) {
+      // Sample-data mode: explore the sample only; real work (own files, import, export, new work) needs a subscription
+      const ALLOW = /sample|keep exploring|close|kmr apps|use my company|fit|zoom|^[-+−]$|drawing \+ table|side by side|^table$|^drawing$|settings|report details|find dimensions|renumber|mark sc|german|english|next|back|previous|welcome|help/i;
+      const BLOCK = /open drawing|choose file|upload|import|export|pdf|csv|excel|save|^new\b|\+ ?new|send to|open a project|^projects$|delete|rename|share|print|download|add balloon|sign in|log ?in/i;
+      const gate = (e) => {
+        const el = e.target.closest && e.target.closest("button, a, label, [role=button], input[type=file]");
+        if (!el || el.closest(".kmr-demo, .kmr-veil, .kmr-back")) return;
+        const txt = (el.innerText || el.value || el.getAttribute("aria-label") || el.title || "").trim().replace(/\s+/g, " ");
+        if (["bOpen", "bNew", "bProjects", "bSave", "bExport"].includes(el.id)) { e.preventDefault(); e.stopImmediatePropagation(); subscribe(); return; }
+        const isFile = el.matches("input[type=file], label") && (el.matches("input[type=file]") || el.querySelector("input[type=file]"));
+        if (isFile || (BLOCK.test(txt) && !ALLOW.test(txt))) { e.preventDefault(); e.stopImmediatePropagation(); subscribe(); }
+      };
+      document.addEventListener("click", gate, true);
+      document.addEventListener("change", (e) => { if (e.target.matches && e.target.matches("input[type=file]")) { e.target.value = ""; e.stopImmediatePropagation(); subscribe(); } }, true);
+      ["dragover", "drop"].forEach((ev) => document.addEventListener(ev, (e) => { if (e.dataTransfer && [...(e.dataTransfer.types || [])].includes("Files")) { e.preventDefault(); e.stopImmediatePropagation(); if (ev === "drop") subscribe(); } }, true));
+      document.addEventListener("keydown", (e) => { if ((e.ctrlKey || e.metaKey) && /^[sop]$/i.test(e.key)) { e.preventDefault(); subscribe(); } }, true);
+      // hide the tools' internal "offline / demo mode" notes — the banner explains sample mode
+      const hideNotes = () => document.querySelectorAll("span, div, small, p, em, b").forEach((n) => {
+        const t = (n.textContent || "").trim();
+        if (t.length < 140 && /^(offline mode|demo mode)\b/i.test(t) && !n.closest(".kmr-demo")) n.style.display = "none";
+      });
+      const hs = document.createElement("style"); hs.textContent = ".cl-offline{display:none!important}"; document.head.append(hs);
+      hideNotes(); new MutationObserver(hideNotes).observe(document.body, { childList: true, subtree: true });
       const b = document.createElement("div"); b.className = "kmr-demo";
-      b.innerHTML = '<span>Sample data only — nothing you do here is saved for your company.</span><button type="button">Use my company\'s data</button>';
-      b.querySelector("button").onclick = function () {
+      b.innerHTML = '<span>Sample data only — explore the sample; your own drawings, imports and exports need a subscription.</span><button type="button">Use my company\'s data</button>';
+      b.querySelector("button").onclick = subscribe;
+      document.body.prepend(b);
+    }
+    function subscribe() {
+      if (document.querySelector(".kmr-veil")) return;
+      {
         const v = document.createElement("div"); v.className = "kmr-veil";
         const buy = "/it/?buy=" + tool + (portal && portal.slug ? "&c=" + encodeURIComponent(portal.slug) : "") + "#pilot";
         v.innerHTML = '<div class="kmr-dlg"><h3>Subscription needed</h3><p>To work with your company\'s real data in this app, take a subscription. Your team gets its own secure workspace.</p><a class="go" href="' + buy + '">Buy subscription</a><button type="button">Keep exploring</button></div>';
         v.onclick = function (e) { if (e.target === v || e.target.tagName === "BUTTON") v.remove(); };
         document.body.append(v);
-      };
-      document.body.prepend(b);
+      }
     }
   });
 })();
