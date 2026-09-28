@@ -15,7 +15,7 @@
     pd: { color: "#F59E0B", desc: "PFD, PFMEA, Control Plan, SOP, SPC, MSA and reports from the ballooned drawing.", demo: "/it/pd.html?demo=1&sample=1" },
   };
   const SOON = [["ppc", "Production Planning & Control"], ["qms", "QMS"], ["maint", "Maintenance"], ["proc", "Procurement"], ["crm", "CRM & RFQ"], ["mmd", "MMD"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["apqp", "APQP & PPAP"], ["fmea", "AIAG-VDA FMEA"], ["spc", "SPC & MSA"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
-  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null;
+  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {};
 
   const logo = (b, cls) => b.logo_url ? `<img src="${esc(b.logo_url)}" alt="${esc(b.name)}">` : `<span class="fb ${cls || ""}">${esc((b.name || "K").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())}</span>`;
   const buyUrl = (code) => `/it/?buy=${encodeURIComponent(code)}${SLUG ? "&c=" + SLUG : ""}#pilot`;
@@ -61,17 +61,16 @@
 
   async function open(code) {
     const r = rows.find((x) => x.product_code === code);
-    if (!r || !r.purchased) {
+    if (!r || !r.purchased || !r.ok) {
       const meta = META[code];
-      return dialog(`${r ? r.product_name : code} isn't in your plan`,
-        `You can try it with <b>sample data only</b> — nothing you enter there is kept. To use it with your company's real data, take a subscription.`,
-        `${meta ? `<a class="btn" href="${meta.demo}" target="_blank" rel="noopener">Try with sample data</a>` : ""}<a class="btn ghost" href="${buyUrl(code)}">Buy subscription</a>`);
+      if (!meta) return;
+      location.href = meta.demo + (meta.demo.includes("?") ? "&" : "?") + "from=" + encodeURIComponent(SLUG);
+      return;
     }
-    if (!r.ok) return dialog(`${r.product_name}: access paused`, esc(r.message || "Your licence is not active.") + " Your data is safe and returns as soon as the subscription is renewed.", `<a class="btn" href="${buyUrl(code)}">Renew subscription</a>`);
     if (code === "hrm") {
       const { data: { session } } = await sb.auth.getSession(); if (!session) return loginView("Please sign in again.");
       const fm = document.createElement("form"); fm.method = "POST"; fm.action = "/it/hrm/api/auth/handoff";
-      [["access_token", session.access_token], ["refresh_token", session.refresh_token]].forEach(([k, v]) => { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; fm.append(i); });
+      [["access_token", session.access_token], ["refresh_token", session.refresh_token], ["co", r.product_slug || ""]].forEach(([k, v]) => { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; fm.append(i); });
       document.body.append(fm); fm.submit(); return;
     }
     location.href = r.app_path;
@@ -83,14 +82,14 @@
     $("#root").innerHTML = `<div class="app">
       <aside class="side">
         <div class="who">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></div>
-        <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
+        <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
         <h4>More KMR apps</h4>${others.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></button>`).join("")}
         ${SOON.map(([k, n]) => `<button data-soon="${k}" data-name="${esc(n)}"><i style="background:#64748b"></i>${esc(n)}<span class="lock">Soon</span></button>`).join("")}
         <button class="out" id="out">Sign out</button>
       </aside>
       <main class="main">
         <h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p>
-        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st">${pill(r)}</div><button class="btn" data-open="${r.product_code}">Open ${esc(r.product_name)}</button></div>`).join("")}</div>
+        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div><button class="btn" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</button></div>`).join("")}</div>
         <h2 style="margin:34px 0 0;font-size:18px">Try more of the platform</h2>
         <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><button class="btn ghost" data-open="${r.product_code}">Try with sample data</button></div>`).join("")}</div>
       </main></div>`;
@@ -107,6 +106,8 @@
     if (error) return loginView("Could not load your apps right now. Please try again.");
     if (!data || !data.length) { await sb.auth.signOut(); return loginView(`This login does not belong to ${brand.name}. Use the email your company's apps were set up with.`); }
     rows = data; brand = { name: data[0].customer_name, logo_url: data[0].logo_url };
+    try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: brand.name })); } catch (e) {}
+    const st = await sb.rpc("kmr_portal_stats", { p_slug: SLUG }); stats = (st && st.data) || {};
     appView();
   }
 
