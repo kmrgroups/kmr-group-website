@@ -9,8 +9,9 @@
   const css = document.createElement("style");
   css.textContent = `body{padding-bottom:30px}
   .kmr-foot{position:fixed;left:0;right:0;bottom:0;z-index:8998;height:30px;display:flex;align-items:center;justify-content:center;gap:5px;background:rgba(255,255,255,.96);border-top:1px solid #E3E8EF;font:500 12.5px "Segoe UI",Arial,sans-serif;color:#6B788C}
+  .kmr-foot{justify-content:space-between;padding:0 12px}.kmr-foot .kmr-slot{flex:1 1 0;min-width:0;display:flex}
   .kmr-foot a{color:#0B2A6F;font-weight:700;text-decoration:none}.kmr-foot a:hover{text-decoration:underline}
-  .kmr-back{position:fixed;left:14px;bottom:42px;z-index:9000;display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:linear-gradient(90deg,#7C3AED,#DB2777);color:#fff;font:700 13.5px "Segoe UI",Arial;text-decoration:none;box-shadow:0 10px 26px -8px rgba(124,58,237,.6)}
+  .kmr-foot a.kmr-back{position:static;color:#fff;padding:3px 12px;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;box-shadow:none;z-index:9000;display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:linear-gradient(90deg,#7C3AED,#DB2777);color:#fff;font:700 13.5px "Segoe UI",Arial;text-decoration:none;box-shadow:0 10px 26px -8px rgba(124,58,237,.6)}
   .kmr-demo{position:sticky;top:0;z-index:8999;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:8px 14px;background:linear-gradient(90deg,#1e1b4b,#4c1d95);color:#fff;font:600 13.5px "Segoe UI",Arial}
   .kmr-demo button{border:0;border-radius:999px;padding:6px 14px;font:700 13px "Segoe UI",Arial;cursor:pointer;color:#1a1305;background:linear-gradient(180deg,#ffe08a,#f3c55a 45%,#c9962b)}
   .kmr-veil{position:fixed;inset:0;z-index:9100;background:rgba(10,7,32,.55);display:grid;place-items:center;padding:20px}
@@ -34,12 +35,9 @@
     // the standard KMR footer on every tool
     if (!document.querySelector(".kmr-foot")) {
       const f = document.createElement("div"); f.className = "kmr-foot";
-      f.innerHTML = 'Powered By :<a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a>';
+      const back = portal && portal.slug ? '<a class="kmr-back" href="/it/app/' + encodeURIComponent(portal.slug) + '">← ' + (portal.name ? String(portal.name).replace(/[<>&]/g, "") + " · " : "") + 'KMR Apps</a>' : "";
+      f.innerHTML = '<span class="kmr-slot">' + back + '</span><span>Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></span><span class="kmr-slot"></span>';
       document.body.append(f);
-    }
-    if (portal && portal.slug) {
-      const a = document.createElement("a"); a.className = "kmr-back"; a.href = "/it/app/" + encodeURIComponent(portal.slug);
-      a.textContent = "← " + (portal.name ? portal.name + " · " : "") + "KMR Apps"; document.body.append(a);
     }
     if (demo) {
       // Sample-data mode: explore the sample only; real work (own files, import, export, new work) needs a subscription

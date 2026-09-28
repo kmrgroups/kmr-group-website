@@ -2594,6 +2594,14 @@ const Actions = {
   },
   accountMenu() {
     const ses = Cloud.session() || {};
+    if (window.KMR_SSO && window.KMR_SSO.active) {   // one KMR login: password and users are managed in KMR Apps
+      let kp = null; try { kp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); } catch (e) {}
+      const home = kp && kp.slug ? '/it/app/' + encodeURIComponent(kp.slug) : '/it/apps.html';
+      modal({ title: 'Your KMR login', body: `<div class="acct-card"><span class="acct">${h((ses.email || '?').slice(0, 2).toUpperCase())}</span><div><b>${h(ses.email)}</b><div class="small muted">${h(roleLabel())} in the Capacity Planner</div></div></div>
+        <p class="small muted" style="margin:12px 0">Your password, and who may use this app, are managed once for all your KMR apps in KMR Apps.</p>
+        <div style="display:flex;flex-direction:column;gap:8px"><a class="btn" style="justify-content:flex-start;height:42px;text-decoration:none" href="${home}">← Open KMR Apps</a><button class="btn" style="justify-content:flex-start;height:42px" data-act="signOut">${icon('logout')}Sign out of all KMR apps</button></div>` });
+      return;
+    }
     modal({ title: 'My account', body: `<div class="acct-card"><span class="acct">${h((ses.email || '?').slice(0, 2).toUpperCase())}</span><div><b>${h(ses.email)}</b><div class="small muted">${h(roleLabel())} · ${h(ROLE_INFO[cloud.role] ? ROLE_INFO[cloud.role].text : '')}</div></div></div>
       <div style="display:flex;flex-direction:column;gap:8px"><button class="btn" style="justify-content:flex-start;height:42px" data-act="changePassword">${icon('lock')}Change my password</button>${can('admin') ? `<button class="btn" style="justify-content:flex-start;height:42px" data-nav="settings">${icon('settings')}Settings & users</button>` : ''}<button class="btn danger" style="justify-content:flex-start;height:42px" data-act="signOut">${icon('logout')}Sign out</button></div>`, buttons: [], cancel: 'Close' });
   },
