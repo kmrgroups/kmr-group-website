@@ -3,6 +3,8 @@
 <head>
 <script src="/it/company-config.js"></script>
 <script src="/it/apps/sso.js"></script>
+<script>if (window.KMR_SSO && window.KMR_SSO.active) document.write('<style>.kmr-company{display:none!important}</style>');</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Capacity Planner</title>
@@ -1095,7 +1097,14 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       const c = this.config();
       opt = opt || {};
       const headers = Object.assign({ apikey: c.key, 'Content-Type': 'application/json' }, opt.headers || {});
-      const s = this.session();
+      let s = this.session();
+      if (!opt.anon && window.supabase && c.url) {   // fresh token from the shared KMR sign-in (renewed automatically)
+        try {
+          if (!window.KMR_SB) window.KMR_SB = window.supabase.createClient(c.url, c.key);
+          const { data } = await window.KMR_SB.auth.getSession();
+          if (data && data.session) s = { access_token: data.session.access_token, refresh_token: data.session.refresh_token, email: data.session.user && data.session.user.email };
+        } catch (e) { /* fall back to the stored session */ }
+      }
       if (s && s.access_token && !opt.anon) headers.Authorization = 'Bearer ' + s.access_token;
       let res;
       try { res = await fetch(c.url + path, Object.assign({}, opt, { headers })); }
@@ -1149,15 +1158,17 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       if (!b || !b.access_token) throw lastErr || new Error('The code is not valid.');
       LS.set(K_SES, { access_token: b.access_token, refresh_token: b.refresh_token, email: (b.user && b.user.email) || email });
     },
-    async refresh() {
-      const s = this.session(); if (!s) throw new Error('Please sign in again.');
+    async refresh() {   // renewed by the shared KMR sign-in library; if it cannot, go to KMR Apps to sign in again
       try {
-        const b = await this._fetch('/auth/v1/token?grant_type=refresh_token', { method: 'POST', anon: true, _retried: true, body: JSON.stringify({ refresh_token: s.refresh_token }) });
-        const k = this._sbKey(), v = LS.get(k) || {};
-        LS.set(k, Object.assign({}, v, { access_token: b.access_token, refresh_token: b.refresh_token, expires_in: b.expires_in, expires_at: b.expires_at, user: b.user || v.user }));
-      } catch (e) { throw new Error('Your session expired. Please sign in again.'); }
+        if (!window.KMR_SB) { const c = this.config(); window.KMR_SB = window.supabase.createClient(c.url, c.key); }
+        const { data, error } = await window.KMR_SB.auth.refreshSession();
+        if (error || !data || !data.session) throw error || new Error('no session');
+      } catch (e) {
+        if (window.KMR_SSO && window.KMR_SSO.active) { window.KMR_SSO.toPortal(null, { signin: true }); }
+        throw new Error('Please sign in again from KMR Apps.');
+      }
     },
-    signOut() { const k = this._sbKey(); if (k) LS.del(k); },
+    signOut() { try { window.KMR_SB && window.KMR_SB.auth.signOut(); } catch (e) {} const k = this._sbKey(); if (k) LS.del(k); },
     // The customer's workspace: from their KMR Apps page, otherwise their own (first) workspace
     async resolveOrg() {
       let kp = null; try { kp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); } catch (e) {}
@@ -1505,6 +1516,8 @@ function firstPublishModal() {
 /* ---------- sign-in gate (cloud mode) ---------- */
 let resendTimer = null;
 function showGate(kind, msg, okMsg) {
+  // KMR platform: no login screen of its own — sign-in is always the customer's KMR Apps page
+  if (window.KMR_SSO && window.KMR_SSO.active && !/^(noaccess|error)$/.test(kind)) { window.KMR_SSO.toPortal(msg, { signin: kind === 'signin' }); return; }
   let g = $('#gate');
   if (!g) { g = document.createElement('div'); g.id = 'gate'; g.className = 'gate'; document.body.appendChild(g); }
   const s = state ? state.settings : {}, c = Cloud.config(), ses = Cloud.session();
@@ -1538,7 +1551,7 @@ function showGate(kind, msg, okMsg) {
       </form>
       <div class="gate-actions"><button class="btn ghost sm" data-act="gateForgot">Forgot password?</button></div>`;
   }
-  g.innerHTML = `<div class="gate-card"><div class="gate-brand"><div class="logo">${logo}</div><div><div class="gate-co">${h(s.companyName || 'Capacity Planner')}</div><div class="small muted">${h(s.subtitle || 'Capacity Planner')}</div></div></div><h1>${h(title)}</h1>${body}<p class="small muted gate-foot">Powered by KMR Group of Companies<br><span style="font-size:10.5px">Cloud: ${h((c.url || 'not connected').replace(/^https?:\/\//, ''))}</span></p></div>`;
+  g.innerHTML = `<div class="gate-card"><div class="gate-brand"><div class="logo">${logo}</div><div><div class="gate-co">${h(s.companyName || 'Capacity Planner')}</div><div class="small muted">${h(s.subtitle || 'Capacity Planner')}</div></div></div><h1>${h(title)}</h1>${body}<p class="small muted gate-foot">Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></p></div>`;
   g.hidden = false;
   document.body.classList.add('gated');
   gateKind = kind;
@@ -2234,19 +2247,16 @@ function settingsGeneral() {
     ${ui.hist ? (ui.hist.length ? `<div class="tbl-wrap" id="tw-hist"><table class="tbl"><thead><tr><th class="stick">Replaced at</th><th>Saved by</th><th></th></tr></thead><tbody>${ui.hist.map(v => `<tr><td class="stick">${h(new Date(v.saved_at).toLocaleString())}</td><td>${h(v.saved_by || '')}</td><td class="r"><button class="btn sm" data-act="restoreVersion" data-id="${v.id}">Restore</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="card-b muted">No earlier versions yet.</div>') : '<div class="card-b small muted">The list loads on request.</div>'}
   </section></div>`;
   }
-  if (window.KMR_SSO && window.KMR_SSO.active) {
-    let kp = null; try { kp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); } catch (e) {}
-    usersBlock = `<section class="card"><div class="card-h"><div><h2>Users & access</h2><div class="sub">Managed for all your KMR apps in one place</div></div></div><div class="card-b"><p>Add people and choose what they may do in the Capacity Planner under <b>KMR Apps › Administration › Users & access</b>.</p><a class="btn" href="${kp && kp.slug ? '/it/app/' + encodeURIComponent(kp.slug) + '#admin' : '/it/apps.html'}">Open Users & access</a></div></section>`;
-  }
+  if (window.KMR_SSO && window.KMR_SSO.active) usersBlock = '';   // users are managed in KMR Apps › Administration only
   return `
   <div class="grid-2e">
-    <section class="card"><div class="card-h"><div><h2>Company & branding</h2><div class="sub">Shown in the sidebar, sign-in screen, reports and Excel exports.</div></div></div>
+    <section class="card"><div class="card-h"><div><h2>${window.KMR_SSO && window.KMR_SSO.active ? "Appearance" : "Company & branding"}</h2><div class="sub">${window.KMR_SSO && window.KMR_SSO.active ? "Light or dark screens on this device." : "Shown in the sidebar, sign-in screen, reports and Excel exports."}</div></div></div>
       <div class="card-b" style="display:flex;flex-direction:column;gap:14px">
-        <div class="form-grid"><div class="field"><label for="sName">Company name</label><input class="inp" id="sName" data-setting="companyName" value="${h(s.companyName)}" ${window.KMR_SSO && window.KMR_SSO.active ? "disabled title=\"Managed in KMR Apps › Administration\"" : ""}></div>
+        <div class="form-grid kmr-company"><div class="field"><label for="sName">Company name</label><input class="inp" id="sName" data-setting="companyName" value="${h(s.companyName)}" ${window.KMR_SSO && window.KMR_SSO.active ? "disabled title=\"Managed in KMR Apps › Administration\"" : ""}></div>
         <div class="field"><label for="sSub">Plant / division</label><input class="inp" id="sSub" data-setting="subtitle" value="${h(s.subtitle)}"></div></div>
-        <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="logo" style="width:56px;height:56px;border-color:var(--line)">${s.logo ? `<img src="${h(s.logo)}" alt="Company logo">` : h((s.companyName || 'C').slice(0, 2).toUpperCase())}</div>
+        <div class="kmr-company" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap"><div class="logo" style="width:56px;height:56px;border-color:var(--line)">${s.logo ? `<img src="${h(s.logo)}" alt="Company logo">` : h((s.companyName || 'C').slice(0, 2).toUpperCase())}</div>
           ${window.KMR_SSO && window.KMR_SSO.active ? '<span class="small muted">Company name and logo come from <b>KMR Apps › Administration</b> — change them there once for all your apps.</span>' : `<button class="btn" data-act="uploadLogo">${icon('upload')}Upload logo</button>${s.logo ? '<button class="btn ghost" data-act="removeLogo">Remove</button>' : ''}<span class="small muted">PNG, JPG or SVG</span>`}</div>
-        <div class="field"><label>Appearance</label><div class="seg"><button data-theme-set="system" class="${theme === 'system' ? 'on' : ''}">System</button><button data-theme-set="light" class="${theme === 'light' ? 'on' : ''}">Light</button><button data-theme-set="dark" class="${theme === 'dark' ? 'on' : ''}">Dark</button></div></div>
+        }<div class="field"><label>Appearance</label><div class="seg"><button data-theme-set="system" class="${theme === 'system' ? 'on' : ''}">System</button><button data-theme-set="light" class="${theme === 'light' ? 'on' : ''}">Light</button><button data-theme-set="dark" class="${theme === 'dark' ? 'on' : ''}">Dark</button></div></div>
       </div></section>
 
     

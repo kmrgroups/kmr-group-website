@@ -534,7 +534,7 @@ function applyOrgDefaults(){ const s=(C.org&&C.org.settings)||{};
   if(s.cols){ BI.S.set.cols=+s.cols; $("sCols").value=s.cols; } if(s.rows){ BI.S.set.rows=+s.rows; $("sRows").value=s.rows; } }
 function applyRole(){
   $("clRole").textContent = C.role ? C.role : (C.platform?"owner":"");
-  $("clAdmin").hidden = !(C.role==="admin"||C.platform);
+  $("clAdmin").hidden = !(C.platform || (C.role==="admin" && !(window.KMR_SSO && window.KMR_SSO.active)));
   BI.setReadonly(C.role==="viewer"); updateSaveBtn();
   if(AIFN && BI.useAI) BI.useAI((C.role==="admin"||C.role==="editor") ? aiProvider : null);
 }

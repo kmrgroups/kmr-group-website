@@ -7,7 +7,10 @@
   const demo = /[?&]demo=1(&|$)/.test(location.search);
   const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : "";
   const css = document.createElement("style");
-  css.textContent = `.kmr-back{position:fixed;left:14px;bottom:14px;z-index:9000;display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:linear-gradient(90deg,#7C3AED,#DB2777);color:#fff;font:700 13.5px "Segoe UI",Arial;text-decoration:none;box-shadow:0 10px 26px -8px rgba(124,58,237,.6)}
+  css.textContent = `body{padding-bottom:30px}
+  .kmr-foot{position:fixed;left:0;right:0;bottom:0;z-index:8998;height:30px;display:flex;align-items:center;justify-content:center;gap:5px;background:rgba(255,255,255,.96);border-top:1px solid #E3E8EF;font:500 12.5px "Segoe UI",Arial,sans-serif;color:#6B788C}
+  .kmr-foot a{color:#0B2A6F;font-weight:700;text-decoration:none}.kmr-foot a:hover{text-decoration:underline}
+  .kmr-back{position:fixed;left:14px;bottom:42px;z-index:9000;display:inline-flex;align-items:center;gap:8px;padding:9px 16px;border-radius:999px;background:linear-gradient(90deg,#7C3AED,#DB2777);color:#fff;font:700 13.5px "Segoe UI",Arial;text-decoration:none;box-shadow:0 10px 26px -8px rgba(124,58,237,.6)}
   .kmr-demo{position:sticky;top:0;z-index:8999;display:flex;align-items:center;justify-content:center;gap:14px;flex-wrap:wrap;padding:8px 14px;background:linear-gradient(90deg,#1e1b4b,#4c1d95);color:#fff;font:600 13.5px "Segoe UI",Arial}
   .kmr-demo button{border:0;border-radius:999px;padding:6px 14px;font:700 13px "Segoe UI",Arial;cursor:pointer;color:#1a1305;background:linear-gradient(180deg,#ffe08a,#f3c55a 45%,#c9962b)}
   .kmr-veil{position:fixed;inset:0;z-index:9100;background:rgba(10,7,32,.55);display:grid;place-items:center;padding:20px}
@@ -16,7 +19,24 @@
   .kmr-dlg a,.kmr-dlg button{display:inline-block;margin-right:8px;border-radius:12px;padding:11px 18px;font:700 14px "Segoe UI",Arial;text-decoration:none;cursor:pointer;border:1px solid #E3E8EF;background:#fff;color:#16233A}
   .kmr-dlg a.go{border:0;color:#fff;background:linear-gradient(90deg,#7C3AED,#DB2777,#F59E0B)}`;
   document.head.append(css);
+  // the customer's logo as the browser-tab icon (remembered by their KMR Apps page)
+  if (portal && portal.logo) {
+    const setIcon = () => {
+      const cur = document.querySelectorAll('link[rel~="icon"]');
+      if (cur.length === 1 && cur[0].href === portal.logo) return;
+      cur.forEach((l) => l.remove());
+      const ic = document.createElement("link"); ic.rel = "icon"; ic.href = portal.logo; document.head.append(ic);
+    };
+    setIcon();
+    new MutationObserver(setIcon).observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] });   // tools that set their own icon keep the customer's
+  }
   document.addEventListener("DOMContentLoaded", function () {
+    // the standard KMR footer on every tool
+    if (!document.querySelector(".kmr-foot")) {
+      const f = document.createElement("div"); f.className = "kmr-foot";
+      f.innerHTML = 'Powered By :<a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a>';
+      document.body.append(f);
+    }
     if (portal && portal.slug) {
       const a = document.createElement("a"); a.className = "kmr-back"; a.href = "/it/app/" + encodeURIComponent(portal.slug);
       a.textContent = "← " + (portal.name ? portal.name + " · " : "") + "KMR Apps"; document.body.append(a);

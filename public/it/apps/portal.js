@@ -20,6 +20,11 @@
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home";
 
   const logo = (b, cls) => b.logo_url ? `<img src="${esc(b.logo_url)}" alt="${esc(b.name)}">` : `<span class="fb ${cls || ""}">${esc((b.name || "K").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())}</span>`;
+  function setIcon(url) {
+    if (!url) return;
+    document.querySelectorAll('link[rel~="icon"]').forEach((l) => l.remove());
+    const ic = document.createElement("link"); ic.rel = "icon"; ic.href = url; document.head.append(ic);
+  }
   const buyUrl = (code) => `/it/?buy=${encodeURIComponent(code)}${SLUG ? "&c=" + SLUG : ""}#pilot`;
 
   function dialog(title, body, actions) {
@@ -169,7 +174,8 @@
       const r = await sb.rpc("kmr_admin_save_company", { p_slug: SLUG, p: d });
       if (r.error) { msg.textContent = r.error.message; return; }
       msg.className = "msg ok"; msg.textContent = "Saved. Every app now shows the new details.";
-      brand = { name: d.name, logo_url: logoUrl || brand.logo_url }; try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: d.name })); } catch (x) {}
+      brand = { name: d.name, logo_url: logoUrl || brand.logo_url }; try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: d.name, logo: brand.logo_url || null })); } catch (x) {}
+      setIcon(brand.logo_url);
     };
   }
 
@@ -236,7 +242,8 @@
     if (error) return loginView("Could not load your apps right now. Please try again.");
     if (!data || !data.length) { await sb.auth.signOut(); return loginView(`This login does not belong to ${brand.name}. Use the email your company's apps were set up with.`); }
     rows = data; brand = { name: data[0].customer_name, logo_url: data[0].logo_url };
-    try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: brand.name })); } catch (e) {}
+    try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: brand.name, logo: brand.logo_url || null })); } catch (e) {}
+    setIcon(brand.logo_url);
     const st = await sb.rpc("kmr_portal_stats", { p_slug: SLUG }); stats = (st && st.data) || {};
     const ar = await sb.rpc("kmr_admin_role", { p_slug: SLUG }); isAdmin = !ar.error && ar.data === "admin";
     appView();
@@ -246,6 +253,8 @@
 
   (async () => {
     if (SLUG) { const { data } = await sb.rpc("kmr_portal_brand", { p_slug: SLUG }); if (data && data[0]) brand = data[0]; }
+    if (brand.logo_url) setIcon(brand.logo_url);
+    else { const k = await sb.rpc("kmr_platform_brand"); if (k.data && k.data.logo_url) { setIcon(k.data.logo_url); if (!SLUG) brand = { name: brand.name, logo_url: k.data.logo_url }; } }
     document.title = `${brand.name} · KMR Apps`;
     start();
   })();

@@ -18,7 +18,12 @@
   window.KMR_SSO = {
     active: !demo && !direct,
     /** Called instead of the tool's own login screen */
-    toPortal: function (msg) {
+    toPortal: function (msg, opt) {
+      // an expired / invalid sign-in always goes to the KMR Apps sign-in (then straight back here)
+      if (opt && opt.signin) {
+        for (var i = localStorage.length - 1; i >= 0; i--) { var k = localStorage.key(i); if (/^sb-.+-auth-token$/.test(k)) localStorage.removeItem(k); }
+        location.replace(portalUrl()); return;
+      }
       if (fromPortal) {                       // came from the portal and still not signed in: explain, don't bounce back
         var p = portal();
         var v = document.createElement("div");
