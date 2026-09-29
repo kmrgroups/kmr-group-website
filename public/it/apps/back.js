@@ -8,6 +8,7 @@
   const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : "";
   const css = document.createElement("style");
   css.textContent = `body{padding-bottom:30px}
+  .side{height:calc(100vh - 30px)!important}
   .kmr-foot{position:fixed;left:0;right:0;bottom:0;z-index:8998;height:30px;display:flex;align-items:center;justify-content:center;gap:5px;background:rgba(255,255,255,.96);border-top:1px solid #E3E8EF;font:500 12.5px "Segoe UI",Arial,sans-serif;color:#6B788C}
   .kmr-foot{justify-content:space-between;padding:0 12px}.kmr-foot .kmr-slot{flex:1 1 0;min-width:0;display:flex}
   .kmr-foot a{color:#0B2A6F;font-weight:700;text-decoration:none}.kmr-foot a:hover{text-decoration:underline}

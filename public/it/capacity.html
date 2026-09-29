@@ -106,6 +106,7 @@ a { color: var(--focus); }
 .nav .badge { margin-left: auto; font: 600 10.5px/1 var(--mono); padding: 3px 6px; border-radius: 10px; background: #B42318; color: #fff; }
 .side-foot { padding: 14px 18px 18px; border-top: 1px solid rgba(255,255,255,.08); font-size: 11px; color: #7E8FA9; }
 .side-foot a { color: #C9A96E; text-decoration: none; }
+html.kmr-platform .side-foot .powered-line { display: none; }
 .sync-pill { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: #C9D3E3; margin-bottom: 8px; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: #6B7686; display: inline-block; }
 .dot.on { background: #3CC486; } .dot.busy { background: #F0B54A; } .dot.err { background: #FF6B5E; }
@@ -1283,7 +1284,7 @@ const PAGES = [
   { id: 'workout', group: 'Analyse', label: 'Capacity Workout', title: 'Capacity Workout', desc: 'Operation-level calculation — same as the Excel “Capacity-workout” sheet.' },
   { id: 'schedule', group: 'Analyse', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
   { id: 'balance', group: 'Analyse', label: 'Load Balancer', title: 'Load Balancer', desc: 'Move or split work from overloaded machines to machines with spare days.' },
-  { id: 'masters', group: 'Setup', label: 'Masters', title: 'Machines & Routings', desc: 'Machines, parts, operations, cycle times, plant standards and working calendar.' },
+  { id: 'masters', group: 'Setup', label: 'Masters', title: 'Machines & Routings', desc: window.KMR_PLATFORM ? 'Read from KMR Apps › Operations Master (machines, cycle times, plant standards) and your HRM holiday calendar.' : 'Machines, parts, operations, cycle times, plant standards and working calendar.' },
   { id: 'settings', group: 'Setup', label: 'Settings', title: 'Settings', desc: window.KMR_PLATFORM ? 'Appearance and data backup for this plan. Company details and users are managed in KMR Apps › Administration.' : 'Company, cloud connection, users & access, and data backup. Admins only.' },
   { id: 'help', group: 'Setup', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' }
 ];
@@ -1422,6 +1423,7 @@ async function cloudBoot() {
       const b = await Cloud._fetch('/rest/v1/rpc/kmr_workspace_brand', { method: 'POST', body: JSON.stringify({ p_product: 'capacity', p_org: Cloud.org }) });
       if (b && b.name) { state.settings.companyName = b.name; if (b.logo) state.settings.logo = b.logo; }
     } catch (e) { /* keep the plan's own name */ }
+    await applyOpsMasters();   // machines, parts, cycle times, plant standards and HRM holidays
     hideGate(); render(); startPoll();
     if (cloud.firstPublish) { cloud.firstPublish = false; firstPublishModal(); }
   } catch (e) {
@@ -1715,7 +1717,7 @@ function renderShell() {
   $('#side').innerHTML = `
     <div class="brand"><div class="logo">${logo}</div><div class="brand-text"><div class="brand-name">${h(s.companyName)}</div><div class="brand-sub">${h(s.subtitle || 'Capacity Planner')}</div></div></div>
     <nav class="nav" aria-label="Main">${nav}</nav>
-    <div class="side-foot">${cloudActive() ? `<div class="me-line hide-rail" title="${h((Cloud.session() || {}).email)}">${h((Cloud.session() || {}).email)}<span class="role-chip">${h(roleLabel())}</span></div>` : ''}<div class="sync-pill hide-rail" id="syncPill">${syncPillHtml()}</div>${cloudActive() ? `<button class="side-out" data-act="signOut" title="Sign out">${icon('logout')}<span class="lbl-t">Sign out</span></button>` : ''}<div class="hide-rail">Powered by <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></div></div>`;
+    <div class="side-foot">${cloudActive() ? `<div class="me-line hide-rail" title="${h((Cloud.session() || {}).email)}">${h((Cloud.session() || {}).email)}<span class="role-chip">${h(roleLabel())}</span></div>` : ''}<div class="sync-pill hide-rail" id="syncPill">${syncPillHtml()}</div>${cloudActive() ? `<button class="side-out" data-act="signOut" title="Sign out">${icon('logout')}<span class="lbl-t">Sign out</span></button>` : ''}${window.KMR_PLATFORM ? "" : `<div class="hide-rail">Powered by <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></div>`}</div>`;
 
   const y = state.year, years = []; for (let i = y - 3; i <= y + 4; i++) years.push(i);
   const sc = state.scenario, sun = model.sundaysAvailable;
@@ -2130,7 +2132,8 @@ Pages.plan = () => {
 };
 
 /* ---------------------------------------------------------------- MASTERS */
-Pages.masters = () => {
+Pages.masters = () => window.KMR_PLATFORM ? kmrMastersPage() : mastersOriginal();
+const mastersOriginal = () => {
   const tab = ui.mastersTab;
   const issues = dataIssues();
   const tabs = `<div class="subtabs" role="tablist"><button data-mtab="machines" class="${tab === 'machines' ? 'on' : ''}">Machines (${state.machines.length})</button><button data-mtab="routings" class="${tab === 'routings' ? 'on' : ''}">Parts & routings (${state.operations.length})</button><button data-mtab="standards" class="${tab === 'standards' ? 'on' : ''}">Plant standards & calendar</button><button data-mtab="check" class="${tab === 'check' ? 'on' : ''}">Data check${issues.length ? ` (${issues.length})` : ''}</button></div>`;
@@ -2408,7 +2411,67 @@ function editOp(id, f, el) {
 }
 
 /* ---------- actions ---------- */
+
+/* ---------- KMR platform: masters come from KMR Apps › Operations Master (machines, parts, cycle times, plant standards)
+   and working days from the HRM holiday calendar; the planner keeps only its monthly plans ---------- */
+const KMR_DAYS = { sunday: 0, monday: 1, tuesday: 2, wednesday: 3, thursday: 4, friday: 5, saturday: 6 };
+function kmrWeeklyOff(v) {
+  if (Array.isArray(v)) return v.map(Number).filter(n => n >= 0 && n <= 6);
+  const t = String(v || '').toLowerCase(); if (!t || t === 'none') return [];
+  return Object.keys(KMR_DAYS).filter(d => t.includes(d)).map(d => KMR_DAYS[d]);
+}
+function kmrPortalHome(hash) { let kp = null; try { kp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); } catch (e) {} return (kp && kp.slug ? '/it/app/' + encodeURIComponent(kp.slug) : '/it/apps.html') + (hash || ''); }
+async function applyOpsMasters() {
+  if (!window.KMR_PLATFORM || !Cloud.org) return;
+  const m = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_masters', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org }) }).catch(() => null);
+  if (!m) return;
+  cloud.ops = m;
+  cloud.opsEmpty = !(m.machines || []).length && !(m.operations || []).length;
+  if (cloud.opsEmpty) return;                                   // nothing in the Operations Master yet: keep the planner's own until moved
+  state.machines = m.machines.map(x => ({ code: x.code, cell: x.cell || '', availDays: x.availDays == null ? null : Number(x.availDays),
+    hoursPerDay: x.hoursPerDay == null ? null : Number(x.hoursPerDay), remarks: x.remarks || '', active: x.active !== false }));
+  state.operations = m.operations.map((o, i) => ({ id: i + 1, partNo: o.partNo || '', partName: o.partName || o.partNo || '', process: o.process || '',
+    machine: o.machine || '', cycleTime: Number(o.cycleTime) || 0, alternates: Array.isArray(o.alternates) ? o.alternates : [] }));
+  const st = m.standards || {}, s = state.settings;
+  ['oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours', 'lotSize', 'levelTargetPct'].forEach(k => { if (st[k] !== undefined && st[k] !== '' && !isNaN(Number(st[k]))) s[k] = Number(st[k]); });
+  if (st.weeklyOff !== undefined) s.weeklyOff = kmrWeeklyOff(st.weeklyOff);
+  if (m.has_hrm) { s.holidays = m.holidays || []; s.holidayNames = m.holidayNames || {}; }
+}
+function kmrMastersPage() {
+  const s = state.settings, off = (s.weeklyOff || []).map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ') || 'none';
+  const canMove = cloudActive() && cloud.opsEmpty && can('admin') && (state.machines.length || state.operations.length);
+  const hrm = cloud.ops && cloud.ops.has_hrm;
+  return `
+  <section class="card"><div class="card-h"><div><h2>Masters come from the Operations Master</h2><div class="sub">Machines, parts, cycle times and plant standards are kept once for your company in <b>KMR Apps › Operations Master</b> and used by every KMR app.</div></div>
+    <a class="btn primary" href="${kmrPortalHome('#ops')}">Open Operations Master</a></div>
+    <div class="card-b">
+      ${canMove ? `<div class="note warn">${icon('alert')}<div><b>This planner still has its own masters</b> (${state.machines.length} machines, ${state.operations.length} operations) and the Operations Master is empty. Move them once — nothing is lost, and from then on you maintain them in one place.<div style="margin-top:8px"><button class="btn primary" data-act="moveMasters">Move to Operations Master</button></div></div></div>` : ''}
+      <div class="form-grid" style="margin-top:8px">
+        <div class="field"><label>Machines</label><div><b>${state.machines.length}</b> — Operations Master › Machines</div></div>
+        <div class="field"><label>Parts & routings</label><div><b>${new Set(state.operations.map(o => o.partNo)).size}</b> parts · <b>${state.operations.length}</b> operations — Operations Master › Parts, Cycle times</div></div>
+        <div class="field"><label>Plant standards</label><div>OEE ${h(s.oee)} % · ${h(s.hoursPerDay)} h/day · weekly off ${h(off)} — Operations Master › Plant standards</div></div>
+        <div class="field"><label>Holidays / working days</label><div>${hrm ? `<b>${(s.holidays || []).length}</b> holidays from your <b>HRM holiday calendar</b>` : 'No HRM on your plan — working days use the weekly off only'}</div></div>
+      </div>
+    </div></section>
+  <section class="card"><div class="card-h"><div><h2>Machines</h2><div class="sub">Read-only here</div></div></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Machine</th><th>Cell / vendor</th><th class="num">Available days</th><th class="num">Hours per day</th><th>In use</th></tr></thead>
+    <tbody>${state.machines.map(x => `<tr><td><b>${h(x.code)}</b></td><td>${h(x.cell)}</td><td class="num">${x.availDays == null ? '<span class="muted">standard</span>' : h(x.availDays)}</td><td class="num">${x.hoursPerDay == null ? '<span class="muted">standard</span>' : h(x.hoursPerDay)}</td><td>${x.active === false ? 'No' : 'Yes'}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No machines yet — add them in the Operations Master.</td></tr>'}</tbody></table></div></section>
+  <section class="card"><div class="card-h"><div><h2>Parts & routings</h2><div class="sub">Read-only here</div></div></div>
+    <div class="tbl-wrap"><table class="tbl"><thead><tr><th>Part</th><th>Operation</th><th>Machine</th><th class="num">Cycle time (s)</th><th>Alternates</th></tr></thead>
+    <tbody>${state.operations.map(o => `<tr><td><b>${h(o.partNo)}</b> <span class="muted">${h(o.partName)}</span></td><td>${h(o.process)}</td><td>${h(o.machine)}</td><td class="num">${h(o.cycleTime)}</td><td>${h((o.alternates || []).join(', '))}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No routings yet — add cycle times in the Operations Master.</td></tr>'}</tbody></table></div></section>`;
+}
+
 const Actions = {
+  async moveMasters() {
+    const s = state.settings;
+    const standards = { oee: s.oee, hoursPerDay: s.hoursPerDay, daysPerMonth: s.daysPerMonth, warnPct: s.warnPct, transferLagHours: s.transferLagHours, lotSize: s.lotSize, levelTargetPct: s.levelTargetPct,
+      weeklyOff: (s.weeklyOff || []).map(d => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d]).join(' & ') || 'None' };
+    try {
+      const r = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_push_masters', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org, p: { machines: state.machines, operations: state.operations, standards } }) });
+      await applyOpsMasters(); render();
+      toast(`Moved to the Operations Master: ${r.machines} machines, ${r.parts} parts, ${r.cycle_times} cycle times.`);
+    } catch (e) { toast(e.message || 'Could not move the masters.'); }
+  },
   prevMonth() { const m = state.month === 0 ? 11 : state.month - 1; setPeriod(state.month === 0 ? state.year - 1 : state.year, m); },
   nextMonth() { const m = state.month === 11 ? 0 : state.month + 1; setPeriod(state.month === 11 ? state.year + 1 : state.year, m); },
   moreMenu() {

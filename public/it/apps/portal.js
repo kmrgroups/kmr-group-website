@@ -252,6 +252,7 @@
     appView();
     if (OPEN && rows.some((r) => r.product_code === OPEN)) { history.replaceState(null, "", location.pathname); open(OPEN); }
     else if (location.hash === "#admin" && isAdmin) { history.replaceState(null, "", location.pathname); usersView(); }
+    else if (location.hash === "#ops" && ops && window.KMR_OPS) { history.replaceState(null, "", location.pathname); window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id }); }
   }
 
   (async () => {
