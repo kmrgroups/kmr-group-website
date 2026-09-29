@@ -1517,7 +1517,9 @@ function firstPublishModal() {
 let resendTimer = null;
 function showGate(kind, msg, okMsg) {
   // KMR platform: no login screen of its own — sign-in is always the customer's KMR Apps page
-  if (window.KMR_SSO && window.KMR_SSO.active && !/^(noaccess|error)$/.test(kind)) { window.KMR_SSO.toPortal(msg, { signin: kind === 'signin' }); return; }
+  // KMR platform: only the planner's own SIGN-IN screens are replaced (by the KMR Apps sign-in); loading / no-access / error cards stay
+  if (window.KMR_SSO && window.KMR_SSO.active && /^(signin|otp|forgot|reset|setpw)$/.test(kind)) { window.KMR_SSO.toPortal(null, { signin: true }); return; }
+  if (window.KMR_SSO && window.KMR_SSO.active && kind === 'noaccess') { window.KMR_SSO.toPortal(null); return; }   // standard KMR route: repair access, else the standard message
   let g = $('#gate');
   if (!g) { g = document.createElement('div'); g.id = 'gate'; g.className = 'gate'; document.body.appendChild(g); }
   const s = state ? state.settings : {}, c = Cloud.config(), ses = Cloud.session();
