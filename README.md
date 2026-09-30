@@ -19,7 +19,8 @@ Run once in the SQL Editor, in this order (each is safe to re-run):
 5. `add-premium-site.sql` — founder, hero slides, highlight numbers, careers, any number of policies, hide / show
    everywhere, site settings and online payment (Razorpay)
 6. Optional, **permanent**: `drop-operations.sql` removes the old website Operations tables (customers, vendors,
-   items, warehouses, stock, employees). Export them first if you still need the data.
+   items, warehouses, stock) — only those nothing else uses. `employees` is kept while the HR module (attendance,
+   payroll, leave …) uses it. Export anything you still need first. Never re-run it with CASCADE.
 
 ## 2. Environment (`.env.local` and Vercel)
 
