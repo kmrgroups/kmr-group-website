@@ -18,7 +18,9 @@ Run once in the SQL Editor, in this order (each is safe to re-run):
 4. `add-multi-business.sql` (with the Console's `0021_website.sql`)
 5. `add-premium-site.sql` — founder, hero slides, highlight numbers, careers, any number of policies, hide / show
    everywhere, site settings and online payment (Razorpay)
-6. Optional, **permanent**: `drop-operations.sql` removes the old website Operations tables (customers, vendors,
+6. `add-cms-update.sql`, then `add-home-content.sql` — customer-first home page: who we serve, why KMR,
+   product benefits (productivity, quality, cost, delivery) and how it works, all edited in Website CMS › Home page
+7. Optional, **permanent**: `drop-operations.sql` removes the old website Operations tables (customers, vendors,
    items, warehouses, stock) — only those nothing else uses. `employees` is kept while the HR module (attendance,
    payroll, leave …) uses it. Export anything you still need first. Never re-run it with CASCADE.
 

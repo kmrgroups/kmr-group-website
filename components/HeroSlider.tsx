@@ -30,7 +30,7 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
             <div className="wrap relative flex min-h-[620px] items-center md:min-h-[680px]">
               <div key={k === i ? `on-${i}` : "off"} className="max-w-2xl pb-28 pt-12">
                 {s.eyebrow && <p className="eyebrow eyebrow-light mb-6 animate-fadeUp">{s.eyebrow}</p>}
-                <h1 className="h-display animate-fadeUp text-3xl [animation-delay:.1s] sm:text-4xl lg:text-[52px]">{s.title}</h1>
+                {(() => { const H = k === 0 ? "h1" : "h2"; return <H className="h-display animate-fadeUp text-3xl [animation-delay:.1s] sm:text-4xl lg:text-[52px]">{s.title}</H>; })()}
                 {s.subtitle && <p className="mt-5 max-w-2xl animate-fadeUp text-base leading-relaxed text-white/80 [animation-delay:.2s] md:text-lg">{s.subtitle}</p>}
                 <div className="mt-8 flex animate-fadeUp flex-wrap gap-4 [animation-delay:.3s]">
                   {s.cta_label && s.cta_link && <Link href={s.cta_link} className="btn-gold" tabIndex={k === i ? 0 : -1}>{s.cta_label}</Link>}
