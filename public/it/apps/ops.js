@@ -39,12 +39,36 @@
   window.KMR_OPS = {
     KINDS,
     /** ctx: { sb, slug, main, dialog, $, role, customerId } */
-    async overview(ctx) {
+    async overview(ctx, note) {
       const { data: counts, error } = await ctx.sb.rpc("kmr_ops_counts", { p_slug: ctx.slug });
+      const nSample = (counts && counts._sample) || 0, admin = ctx.role === "admin";
+      const sampleBar = error ? "" : admin
+        ? `<div class="card" style="flex-direction:row;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px;border-style:dashed;--c:transparent">
+            <div style="flex:1;min-width:240px"><b>Sample data</b><br><small style="color:var(--muted)">${nSample
+              ? `${nSample} sample records are loaded, marked <span class="pill">Sample</span> in the lists. Flush removes only these. Records you have edited or imported over are yours and stay.`
+              : "Try every list with one ready-made machining plant: 16 parts, 12 machines, 43 cycle times, plant standards, customers, suppliers, raw material, rate contracts, gauges, tools, consumables, CFT team and IATF 16949 documents. Nothing you already have is overwritten, and you can flush it all later."}</small></div>
+            ${nSample ? `<button class="btn ghost" id="opsFlush" style="height:42px;color:#B00E28;align-self:center;margin:0">Flush sample data</button>` : `<button class="btn" id="opsLoad" style="height:42px;align-self:center;margin:0">Load sample data</button>`}
+          </div>`
+        : nSample ? `<p class="sub" style="margin-top:-12px">Includes ${nSample} sample records, marked <span class="pill">Sample</span>.</p>` : "";
       ctx.main.innerHTML = `<h1>Operations Master</h1><p class="sub">One set of master data for your company, used by every KMR app. ${ctx.role === "viewer" ? "You can view it." : "You can add, change and import."}</p>
         ${error ? `<p class="msg">${esc(error.message)}</p>` : ""}
+        ${note ? `<div class="card" style="border-color:#1E7B4A;background:#E7F8EF;margin-bottom:12px">${note}</div>` : ""}
+        ${sampleBar}
         <div class="cards">${KINDS.map((K) => `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3><p><b style="font-size:22px;color:var(--ink)">${(counts && counts[K.kind]) || 0}</b> records</p></div>`).join("")}</div>`;
       ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = () => this.list(ctx, el.dataset.kind)));
+      const run = async (btn, rpc, done) => {
+        btn.disabled = true; btn.textContent = "Working…";
+        const res = await ctx.sb.rpc(rpc, { p_slug: ctx.slug });
+        if (res.error) { btn.disabled = false; alert(res.error.message); return this.overview(ctx); }
+        this.overview(ctx, done(res.data));
+      };
+      const load = ctx.main.querySelector("#opsLoad"), flush = ctx.main.querySelector("#opsFlush");
+      if (load) load.onclick = () => run(load, "kmr_ops_sample_load", (d) =>
+        `<b>Sample data loaded:</b> ${d.added} records added${d.skipped ? `, ${d.skipped} skipped because you already have them` : ""}. The Capacity Planner picks up the machines, routings and plant standards when it next opens.`);
+      if (flush) flush.onclick = () => {
+        if (!confirm(`Remove the ${nSample} sample records from every list? Your own records are not touched.`)) return;
+        run(flush, "kmr_ops_sample_flush", (n) => `<b>Sample data flushed:</b> ${n} records removed. Your own records are unchanged.`);
+      };
       window.scrollTo(0, 0);
     },
     async list(ctx, kind, note) {
@@ -70,7 +94,7 @@
       const val = (r, k) => (k === "code" ? r.code : k === "name" ? r.name : (r.data || {})[k]);
       const draw = (q) => {
         const f = rows.filter((r) => !q || JSON.stringify([r.code, r.name, r.data]).toLowerCase().includes(q.toLowerCase()));
-        body.innerHTML = f.map((r) => `<tr style="border-top:1px solid var(--line)${r.active === false ? ";opacity:.5" : ""}">${shown.map((c) => `<td style="padding:9px 12px">${c[0] === "code" ? `<b>${esc(val(r, c[0]))}</b>` : esc(val(r, c[0]) ?? "")}</td>`).join("")}
+        body.innerHTML = f.map((r) => `<tr style="border-top:1px solid var(--line)${r.active === false ? ";opacity:.5" : ""}">${shown.map((c) => `<td style="padding:9px 12px">${c[0] === "code" ? `<b>${esc(val(r, c[0]))}</b>${r.sample ? ' <span class="pill">Sample</span>' : ""}` : esc(val(r, c[0]) ?? "")}</td>`).join("")}
           ${K.file ? `<td style="padding:9px 12px">${r.data && r.data.file_path ? `<button class="btn ghost" data-file="${esc(r.data.file_path)}" style="height:32px">Open</button>` : '<small style="color:var(--muted)">—</small>'}</td>` : ""}
           <td style="padding:9px 12px;text-align:right"><button class="btn ghost" data-id="${r.id}" style="height:32px">${edit ? "Edit" : "View"}</button></td></tr>`).join("") || `<tr><td colspan="9" style="padding:18px;color:var(--muted)">${rows.length ? "No match." : "No records yet."}</td></tr>`;
         body.querySelectorAll("[data-id]").forEach((b) => (b.onclick = () => this.edit(ctx, K, rows.find((r) => r.id === b.dataset.id))));
@@ -110,7 +134,7 @@
           ${K.fields.map((f) => `<label class="f">${esc(f.l)}${input(f, (r.data || {})[f.k])}</label>`).join("")}
           ${K.file ? `<label class="f" style="grid-column:1/-1">File (PDF, Word, Excel — up to 25 MB)${r.data && r.data.file_path ? `<small style="display:block;color:var(--muted);text-transform:none;letter-spacing:0">Current: ${esc(r.data.file_name || "attached")}</small>` : ""}${edit ? '<input type="file" id="of_file" style="margin-top:6px">' : ""}</label>` : ""}
           <label style="display:flex;gap:8px;align-items:center;grid-column:1/-1;margin:4px 0 10px"><input type="checkbox" id="of_active" ${r.active !== false ? "checked" : ""} ${edit ? "" : "disabled"}> In use (untick to keep the record but hide it from new work)</label>
-        </div><span class="msg" id="ofM"></span>`,
+        </div>${r.sample && edit ? '<p style="font-size:13px;color:var(--muted);margin:0 0 8px">This is a sample record. Once you save it, it becomes your own record and <b>Flush sample data</b> leaves it alone.</p>' : ""}<span class="msg" id="ofM"></span>`,
         edit ? `<button class="btn" id="ofSave">Save</button>${isNew ? "" : '<button class="btn ghost" id="ofDel" style="color:#B00E28">Delete</button>'}` : "");
       const dlg = document.querySelector(".veil .dlg"); if (dlg) dlg.style.maxWidth = "760px";   // two-column master forms need room
       if (!edit) return;
