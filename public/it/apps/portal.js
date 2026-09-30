@@ -98,7 +98,7 @@
         <div class="who">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></div>
         <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
         ${ops ? `<h4>Masters</h4><button data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</button>` : ""}
-        ${isAdmin ? `<h4>Administration</h4><button data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</button><button data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</button>` : ""}
+        ${isAdmin ? `<h4>Administration</h4><button data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</button><button data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</button><button data-admin="invoices"><i style="background:#F3C55A"></i>Invoices &amp; payments</button>` : ""}
         <h4>More KMR apps</h4>${others.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></button>`).join("")}
         ${SOON.map(([k, n]) => `<button data-soon="${k}" data-name="${esc(n)}"><i style="background:#64748b"></i>${esc(n)}<span class="lock">Soon</span></button>`).join("")}
         <button id="pw">Change password</button>
@@ -111,7 +111,7 @@
         <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><button class="btn ghost" data-open="${r.product_code}">Try with sample data</button></div>`).join("")}</div>
       </main></div>`;
     document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => open(b.dataset.open)));
-    document.querySelectorAll("[data-admin]").forEach((b) => b.addEventListener("click", () => (b.dataset.admin === "company" ? companyView() : usersView())));
+    document.querySelectorAll("[data-admin]").forEach((b) => b.addEventListener("click", () => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView())));
     document.querySelectorAll("[data-ops]").forEach((b) => b.addEventListener("click", () => window.KMR_OPS && window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id })));
     const home = document.querySelector(".side .who"); if (home) { home.style.cursor = "pointer"; home.title = "Your apps"; home.onclick = () => appView(); }
     document.querySelectorAll("[data-soon]").forEach((b) => b.addEventListener("click", () => dialog(`${b.dataset.name} — coming soon`, "This module of the KMR Intelligent Digital Manufacturing platform is on its way. Register your interest and we'll invite you to the pilot.", `<a class="btn" href="${buyUrl(b.dataset.soon)}">Register interest</a>`)));
@@ -138,6 +138,26 @@
   const mainEl = () => document.querySelector(".main");
   function adminHead(title, sub) { window.scrollTo(0, 0); document.querySelector(".main")?.scrollTo?.(0, 0); return `<p><button class="btn ghost" id="backApps" style="height:36px">← Your apps</button></p><h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p>`; }
   function bindBack() { const b = $("#backApps"); if (b) b.onclick = () => appView(); }
+
+  async function invoicesView() {
+    const head = adminHead("Invoices & payments", "Invoices from KMR for your subscriptions. Open one to view, print or pay it.");
+    const m = mainEl(); m.innerHTML = head + `<p class="msg">Loading…</p>`; bindBack();
+    const { data, error } = await sb.rpc("kmr_portal_invoices", { p_slug: SLUG });
+    if (error) { m.querySelector(".msg").textContent = error.message; return; }
+    const today = new Date().toISOString().slice(0, 10);
+    const money = (v, c) => (c === "INR" ? "₹" : c === "USD" ? "$" : c === "EUR" ? "€" : c + " ") + Number(v).toLocaleString(c === "INR" ? "en-IN" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    const date = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
+    const tag = (r) => r.status === "paid" ? '<span class="pill ok">Paid</span>' : r.status === "cancelled" ? '<span class="pill off">Cancelled</span>'
+      : r.due_date && r.due_date < today ? '<span class="pill warn">Overdue</span>' : '<span class="pill">Due ' + esc(date(r.due_date)) + "</span>";
+    const rows = data || [];
+    m.innerHTML = head + `<div class="card" style="padding:0;overflow:auto;max-width:900px"><table style="width:100%;border-collapse:collapse;font-size:14px">
+      <thead><tr style="background:#F5F7FB;text-align:left"><th style="padding:10px 14px">Invoice</th><th style="padding:10px 14px">Date</th><th style="padding:10px 14px;text-align:right">Amount</th><th style="padding:10px 14px">Status</th><th></th></tr></thead>
+      <tbody>${rows.map((r) => `<tr style="border-top:1px solid var(--line)"><td style="padding:10px 14px"><b>${esc(r.number)}</b></td><td style="padding:10px 14px">${esc(date(r.issue_date))}</td>
+        <td style="padding:10px 14px;text-align:right;white-space:nowrap">${esc(money(r.total, r.currency))}</td><td style="padding:10px 14px">${tag(r)}</td>
+        <td style="padding:10px 14px;text-align:right"><a class="btn ${r.status === "issued" ? "" : "ghost"}" style="height:34px" href="/it/console/pay/${encodeURIComponent(r.pay_token)}" target="_blank" rel="noopener">${r.status === "issued" ? "View &amp; pay" : "View"}</a></td></tr>`).join("")
+        || '<tr><td colspan="5" style="padding:18px;color:var(--muted)">No invoices yet.</td></tr>'}</tbody></table></div>`;
+    bindBack();
+  }
 
   async function companyView() {
     const m = mainEl(); m.innerHTML = adminHead("Company details & logo", "Shown in every KMR app your company uses — change it once here.") + `<p class="msg">Loading…</p>`; bindBack();
