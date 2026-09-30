@@ -148,13 +148,13 @@
     const money = (v, c) => (c === "INR" ? "₹" : c === "USD" ? "$" : c === "EUR" ? "€" : c + " ") + Number(v).toLocaleString(c === "INR" ? "en-IN" : "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     const date = (d) => (d ? new Date(d + "T00:00:00").toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—");
     const tag = (r) => r.status === "paid" ? '<span class="pill ok">Paid</span>' : r.status === "cancelled" ? '<span class="pill off">Cancelled</span>'
-      : r.due_date && r.due_date < today ? '<span class="pill warn">Overdue</span>' : '<span class="pill">Due ' + esc(date(r.due_date)) + "</span>";
+      : r.reported ? '<span class="pill">Confirming payment</span>' : r.due_date && r.due_date < today ? '<span class="pill warn">Overdue</span>' : '<span class="pill">Due ' + esc(date(r.due_date)) + "</span>";
     const rows = data || [];
     m.innerHTML = head + `<div class="card" style="padding:0;overflow:auto;max-width:900px"><table style="width:100%;border-collapse:collapse;font-size:14px">
       <thead><tr style="background:#F5F7FB;text-align:left"><th style="padding:10px 14px">Invoice</th><th style="padding:10px 14px">Date</th><th style="padding:10px 14px;text-align:right">Amount</th><th style="padding:10px 14px">Status</th><th></th></tr></thead>
       <tbody>${rows.map((r) => `<tr style="border-top:1px solid var(--line)"><td style="padding:10px 14px"><b>${esc(r.number)}</b></td><td style="padding:10px 14px">${esc(date(r.issue_date))}</td>
         <td style="padding:10px 14px;text-align:right;white-space:nowrap">${esc(money(r.total, r.currency))}</td><td style="padding:10px 14px">${tag(r)}</td>
-        <td style="padding:10px 14px;text-align:right"><a class="btn ${r.status === "issued" ? "" : "ghost"}" style="height:34px" href="/it/console/pay/${encodeURIComponent(r.pay_token)}" target="_blank" rel="noopener">${r.status === "issued" ? "View &amp; pay" : "View"}</a></td></tr>`).join("")
+        <td style="padding:10px 14px;text-align:right"><a class="btn ${r.status === "issued" ? "" : "ghost"}" style="height:34px" href="/it/console/pay/${encodeURIComponent(r.pay_token)}" target="_blank" rel="noopener">${r.status === "issued" && !r.reported ? "View &amp; pay" : "View"}</a></td></tr>`).join("")
         || '<tr><td colspan="5" style="padding:18px;color:var(--muted)">No invoices yet.</td></tr>'}</tbody></table></div>`;
     bindBack();
   }
