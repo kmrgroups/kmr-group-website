@@ -47,14 +47,18 @@ export function SectionHead({ eyebrow, title, intro, center, light, action }: {
 
 /** Long text from the CMS: blank line = paragraph, "# " = heading, "- " = bullet. */
 export function RichText({ text, className = "" }: { text?: string | null; className?: string }) {
+  // blank line = new block; "# " = heading; lines starting "- " = bullet list (a heading may be followed by bullets or text)
   const blocks = (text ?? "").replace(/\r/g, "").split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const isBullet = (l: string) => /^[-•*]\s+/.test(l.trim());
+  const body = (ls: string[], key: string) => ls.length === 0 ? null : ls.every(isBullet)
+    ? <ul key={key}>{ls.map((l, j) => <li key={j}>{l.trim().replace(/^[-•*]\s+/, "")}</li>)}</ul>
+    : <p key={key} className="whitespace-pre-line">{ls.join("\n")}</p>;
   return (
     <div className={`prose-kmr ${className}`}>
       {blocks.map((b, i) => {
         const ls = b.split("\n");
-        if (ls.every((l) => /^[-•*]\s+/.test(l.trim()))) return <ul key={i}>{ls.map((l, j) => <li key={j}>{l.trim().replace(/^[-•*]\s+/, "")}</li>)}</ul>;
-        if (/^#{1,3}\s+/.test(ls[0])) return <div key={i}><h2>{ls[0].replace(/^#{1,3}\s+/, "")}</h2>{ls.length > 1 && <p className="whitespace-pre-line">{ls.slice(1).join("\n")}</p>}</div>;
-        return <p key={i} className="whitespace-pre-line">{b}</p>;
+        if (/^#{1,3}\s+/.test(ls[0])) return <div key={i}><h2>{ls[0].replace(/^#{1,3}\s+/, "")}</h2>{body(ls.slice(1), "b")}</div>;
+        return body(ls, String(i));
       })}
     </div>
   );

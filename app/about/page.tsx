@@ -28,14 +28,14 @@ export default async function AboutPage() {
 
   return (
     <>
-      <PageHero eyebrow="About us" title={name} crumbs={[["About us"]]} intro={c.tagline ? `${c.tagline}. ${c.short_about ?? ""}` : c.short_about} />
+      <PageHero eyebrow="About us" title={name} crumbs={[["About us"]]} intro={c.short_about} />
 
       {/* Story */}
       <section className="py-16">
         <div className="wrap grid gap-16 lg:grid-cols-[1.1fr_1fr]">
           <div>
             <p className="eyebrow mb-4">Our story</p>
-            <h2 className="h-display mb-6 text-2xl text-navy md:text-[32px]">{c.slogan || "One vision, many solutions"}</h2>
+            <h2 className="h-display mb-6 text-2xl text-navy md:text-[32px]">From the shop floor to your business</h2>
             {c.about_story ? <RichText text={c.about_story} /> : <p className="lead">{c.short_about}</p>}
           </div>
           <div className="space-y-6">
@@ -67,18 +67,14 @@ export default async function AboutPage() {
       {/* Founder */}
       {message.length > 0 && (
         <section id="founder" className="scroll-mt-24 py-16">
-          <div className="wrap grid items-start gap-14 lg:grid-cols-[360px_1fr]">
-            <div className="lg:sticky lg:top-28">
-              <div className="corner">
-                <div className="aspect-[4/5] overflow-hidden bg-navy">
-                  {c.founder_photo_url
-                    ? <FitImage src={c.founder_photo_url} alt={c.founder_name || "Founder"} className="h-full w-full" />
-                    : <div className="pattern-navy grid h-full place-items-center font-display text-6xl text-gold/60">{(c.founder_name || "K").slice(0, 1)}</div>}
-                </div>
+          <div className={`wrap grid items-start gap-14 ${c.founder_photo_url ? "lg:grid-cols-[340px_1fr]" : "max-w-4xl"}`}>
+            {c.founder_photo_url && (
+              <div className="lg:sticky lg:top-28">
+                <div className="corner"><FitImage src={c.founder_photo_url} alt={c.founder_name || "Founder"} className="aspect-[4/5] w-full" /></div>
+                <p className="mt-6 font-display text-xl text-navy">{c.founder_name || c.proprietor_name}</p>
+                <p className="text-sm text-muted">{c.founder_title || c.proprietor_title}</p>
               </div>
-              <p className="mt-8 font-display text-2xl text-navy">{c.founder_name || c.proprietor_name}</p>
-              <p className="text-sm text-muted">{c.founder_title || c.proprietor_title}</p>
-            </div>
+            )}
             <div>
               <p className="eyebrow mb-4">Founder’s message</p>
               <IconQuote className="h-12 w-12 text-gold" />
@@ -89,6 +85,7 @@ export default async function AboutPage() {
                 <img src={c.founder_signature_url} alt="" className="mt-6 h-16 w-auto" />
               )}
               <p className="mt-2 font-display text-lg text-navy">{c.founder_name || c.proprietor_name}</p>
+              <p className="text-sm text-muted">{c.founder_title || c.proprietor_title}</p>
             </div>
           </div>
         </section>
@@ -143,7 +140,7 @@ export default async function AboutPage() {
         </section>
       )}
 
-      <CtaBand title="Want to know more about us?" text="Visit the gallery or get in touch — we are happy to talk." primary={["Contact us", "/contact"]} secondary={["Gallery", "/gallery"]} />
+      <CtaBand title="Let’s work together" text="Tell us what you need — a clear quote within one working day." primary={["Get a quote", "/contact"]} secondary={["Our businesses", "/businesses"]} />
     </>
   );
 }

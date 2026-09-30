@@ -32,7 +32,7 @@ export default function EnquiryForm({ business, productName, productCode, askQua
   );
   const fld = dark ? "field border-white/15 bg-white/[0.06] text-white placeholder:text-white/45" : "field";
   return (
-    <form onSubmit={submit} className={`${box} grid gap-4 sm:grid-cols-2`}>
+    <form onSubmit={submit} className={`${box} grid content-start gap-4 sm:grid-cols-2`}>
       {title && <h3 className={`font-display text-2xl font-semibold sm:col-span-2 ${dark ? "text-white" : "text-navy"}`}>{title}</h3>}
       {intro && <p className={`-mt-2 text-sm sm:col-span-2 ${dark ? "text-white/65" : "text-muted"}`}>{intro}</p>}
       {productName && <p className={`text-sm sm:col-span-2 ${dark ? "text-white/70" : "text-muted"}`}>About: <b className={dark ? "text-gold-light" : "text-navy"}>{productName}</b></p>}
@@ -41,7 +41,7 @@ export default function EnquiryForm({ business, productName, productCode, askQua
       <input className={fld} type="email" placeholder="Email *" required value={f.email} onChange={set("email")} aria-label="Email" />
       <input className={fld} placeholder="Phone / WhatsApp" value={f.phone} onChange={set("phone")} aria-label="Phone" />
       <input className={fld} placeholder="Country" value={f.country} onChange={set("country")} aria-label="Country" />
-      {askQuantity && <input className={fld} placeholder="Quantity (e.g. 5 tonnes, 200 pcs)" value={f.quantity} onChange={set("quantity")} aria-label="Quantity" />}
+      {askQuantity && <input className={fld} placeholder={business === "training" ? "Number of participants" : "Quantity (e.g. 5 tonnes, 200 pcs)"} value={f.quantity} onChange={set("quantity")} aria-label="Quantity" />}
       <textarea className={`${fld} sm:col-span-2`} rows={4} placeholder={business === "import_export" ? "What you need, destination / origin, delivery terms (FOB / CIF)…" : "How can we help?"} value={f.message} onChange={set("message")} aria-label="Message" />
       <input tabIndex={-1} autoComplete="off" className="hidden" value={f.website} onChange={set("website")} aria-hidden="true" />
       <div className="flex flex-wrap items-center gap-4 sm:col-span-2">

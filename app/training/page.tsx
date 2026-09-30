@@ -1,5 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
-import ProductCard from "@/components/ProductCard";
+import ProductRow from "@/components/ProductRow";
 import EnquiryForm from "@/components/EnquiryForm";
 import { PageHero, SectionHead } from "@/components/Blocks";
 import { IconCap, IconCheck, IconUsers, IconShield } from "@/components/Icons";
@@ -9,7 +9,7 @@ export const revalidate = 30;
 export const metadata = { title: "Training & development", description: "Practical programmes on quality, core tools and digital manufacturing — public courses and in-house training." };
 
 const WAYS = [
-  { icon: IconCap, t: "Public programmes", d: "Scheduled courses — enrol online and pay securely." },
+  { icon: IconCap, t: "Open programmes", d: "Scheduled batches for individuals — ask for the next date and fee." },
   { icon: IconUsers, t: "In-house training", d: "At your plant, on your dates, with examples from your own parts and processes." },
   { icon: IconShield, t: "Certification support", d: "IATF 16949, ISO 9001 and customer-specific requirements — prepared, not just explained." },
 ];
@@ -30,11 +30,11 @@ export default async function TrainingPage() {
       </section>
       <section className="py-14">
         <div className="wrap">
-          <SectionHead eyebrow="Programmes" title={courses.length ? "Upcoming programmes" : "Programme calendar coming soon"} intro={courses.length ? "Enrol online, or ask us to run any programme for your team." : "Tell us what your team needs and we will plan it with you."} />
-          {courses.length > 0 && <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{courses.map((p) => <ProductCard key={p.id} p={p} />)}</div>}
+          <SectionHead eyebrow="Programmes" title={courses.length ? "Our programmes" : "Programme calendar coming soon"} intro={courses.length ? "Run at your plant for your team, or online. Ask for dates and fees." : "Tell us what your team needs and we will plan it with you."} />
+          {courses.length > 0 && <div className="grid gap-4 lg:grid-cols-2">{courses.map((p) => <ProductRow key={p.id} p={p} />)}</div>}
         </div>
       </section>
-      <section className="pattern-navy py-14 text-white">
+      <section id="plan" className="pattern-navy scroll-mt-24 py-14 text-white">
         <div className="wrap grid items-start gap-12 lg:grid-cols-2">
           <div>
             <p className="eyebrow eyebrow-light mb-4">Corporate training</p>

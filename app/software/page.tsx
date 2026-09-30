@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import EnquiryForm from "@/components/EnquiryForm";
-import ProductCard from "@/components/ProductCard";
+import ProductRow from "@/components/ProductRow";
 import { PageHero, SectionHead } from "@/components/Blocks";
 import { IconCheck, IconCode, IconGlobe, IconLock, IconUsers } from "@/components/Icons";
 import type { Product } from "@/lib/types";
@@ -75,7 +75,7 @@ export default async function SoftwarePage() {
         <section className="bg-white py-14">
           <div className="wrap">
             <SectionHead eyebrow="Solutions & services" title="Custom software for your business" intro="From ERP set-up to automation and AI — scoped, priced and delivered by our team." />
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{solutions.map((p) => <ProductCard key={p.id} p={p} />)}</div>
+            <div className="grid gap-4 lg:grid-cols-2">{solutions.map((p) => <ProductRow key={p.id} p={p} />)}</div>
           </div>
         </section>
       )}

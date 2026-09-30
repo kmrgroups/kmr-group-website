@@ -62,7 +62,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
             <div className="aspect-square overflow-hidden bg-white shadow-card">
               {product.image_url
                 ? <FitImage src={product.image_url} alt={product.name} className="h-full w-full" fill="plain" imgClassName="p-4" eager />
-                : <div className="pattern-navy grid h-full w-full place-items-center"><Fallback className="h-24 w-24 text-gold/60" /></div>}
+                : <div className="grid h-full w-full place-items-center bg-ivory"><span className="flex flex-col items-center gap-3 text-muted/70"><Fallback className="h-16 w-16 text-gold/60" /><span className="text-xs uppercase tracking-widest">Photo coming soon</span></span></div>}
             </div>
           </div>
 

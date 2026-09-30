@@ -1,11 +1,13 @@
 "use client";
-import FitImage from "@/components/FitImage";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import type { HeroSlide } from "@/lib/types";
 
-/** Full-width rotating banner. Pauses on hover; arrows and dots; respects reduced motion. */
-export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
+/**
+ * Home banner. Text sits on its own navy panel (always readable); the slide's photo is shown whole beside it,
+ * never behind the text and never cropped. Pauses on hover; arrows and dots; respects reduced motion.
+ */
+export default function HeroSlider({ slides, fallback }: { slides: HeroSlide[]; fallback?: React.ReactNode }) {
   const [i, setI] = useState(0);
   const [paused, setPaused] = useState(false);
   const n = slides.length;
@@ -16,45 +18,45 @@ export default function HeroSlider({ slides }: { slides: HeroSlide[] }) {
     return () => clearInterval(t);
   }, [n, paused, go]);
   if (!n) return null;
+  const s = slides[i];
 
   return (
-    <section className="relative isolate overflow-hidden bg-navy-950 text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-roledescription="carousel">
-      <div className="relative min-h-[440px] md:min-h-[540px]">
-        {slides.map((s, k) => (
-          <div key={s.id} className={`absolute inset-0 transition-opacity duration-1000 ${k === i ? "opacity-100" : "pointer-events-none opacity-0"}`} aria-hidden={k !== i}>
-            {s.image_url
-              ? <FitImage src={s.image_url} className="absolute inset-0" eager={k === 0} />
-              : <div className="pattern-navy absolute inset-0" />}
-            <div className="absolute inset-0 bg-gradient-to-r from-navy-950/95 via-navy-950/75 to-navy-950/20" />
-            <div className="absolute inset-0 bg-gradient-to-t from-navy-950/70 via-transparent to-transparent" />
-            <div className="wrap relative flex min-h-[620px] items-center md:min-h-[680px]">
-              <div key={k === i ? `on-${i}` : "off"} className="max-w-2xl pb-28 pt-12">
-                {s.eyebrow && <p className="eyebrow eyebrow-light mb-6 animate-fadeUp">{s.eyebrow}</p>}
-                {(() => { const H = k === 0 ? "h1" : "h2"; return <H className="h-display animate-fadeUp text-3xl [animation-delay:.1s] sm:text-4xl lg:text-[52px]">{s.title}</H>; })()}
-                {s.subtitle && <p className="mt-5 max-w-2xl animate-fadeUp text-base leading-relaxed text-white/80 [animation-delay:.2s] md:text-lg">{s.subtitle}</p>}
-                <div className="mt-8 flex animate-fadeUp flex-wrap gap-4 [animation-delay:.3s]">
-                  {s.cta_label && s.cta_link && <Link href={s.cta_link} className="btn-gold" tabIndex={k === i ? 0 : -1}>{s.cta_label}</Link>}
-                  {s.cta2_label && s.cta2_link && <Link href={s.cta2_link} className="btn-outline-light" tabIndex={k === i ? 0 : -1}>{s.cta2_label}</Link>}
-                </div>
+    <section className="pattern-navy text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-roledescription="carousel">
+      <div className="wrap grid items-center gap-10 py-12 lg:min-h-[500px] lg:grid-cols-[1fr_1.05fr] lg:py-14">
+        <div key={`t-${i}`} className="animate-fadeUp">
+          {s.eyebrow && <p className="eyebrow eyebrow-light mb-5">{s.eyebrow}</p>}
+          {i === 0
+            ? <h1 className="h-display text-[30px] leading-[1.12] sm:text-4xl lg:text-[44px]">{s.title}</h1>
+            : <h2 className="h-display text-[30px] leading-[1.12] sm:text-4xl lg:text-[44px]">{s.title}</h2>}
+          {s.subtitle && <p className="mt-5 max-w-xl text-[15.5px] leading-relaxed text-white/75">{s.subtitle}</p>}
+          <div className="mt-8 flex flex-wrap gap-3">
+            {s.cta_label && s.cta_link && <Link href={s.cta_link} className="btn-gold">{s.cta_label}</Link>}
+            {s.cta2_label && s.cta2_link && <Link href={s.cta2_link} className="btn-outline-light">{s.cta2_label}</Link>}
+          </div>
+          {n > 1 && (
+            <div className="mt-10 flex items-center gap-4">
+              <button onClick={() => go(-1)} aria-label="Previous slide" className="grid h-9 w-9 place-items-center border border-white/25 text-white/80 transition hover:border-gold hover:text-gold-light">‹</button>
+              <div className="flex gap-2">
+                {slides.map((x, k) => (
+                  <button key={x.id} onClick={() => setI(k)} aria-label={`Slide ${k + 1}: ${x.title}`} aria-current={k === i}
+                    className={`h-[3px] transition-all duration-500 ${k === i ? "w-10 bg-gold" : "w-5 bg-white/30 hover:bg-white/60"}`} />
+                ))}
               </div>
+              <button onClick={() => go(1)} aria-label="Next slide" className="grid h-9 w-9 place-items-center border border-white/25 text-white/80 transition hover:border-gold hover:text-gold-light">›</button>
             </div>
-          </div>
-        ))}
-      </div>
-      {n > 1 && (
-        <div className="wrap absolute inset-x-0 bottom-20 flex items-center justify-end gap-6">
-          <div className="flex gap-2">
-            {slides.map((s, k) => (
-              <button key={s.id} onClick={() => setI(k)} aria-label={`Slide ${k + 1}`} aria-current={k === i}
-                className={`h-[3px] transition-all duration-500 ${k === i ? "w-12 bg-gold" : "w-6 bg-white/35 hover:bg-white/60"}`} />
-            ))}
-          </div>
-          <div className="flex gap-2">
-            <button onClick={() => go(-1)} aria-label="Previous slide" className="grid h-11 w-11 place-items-center border border-white/25 text-white/80 transition hover:border-gold hover:text-gold-light">‹</button>
-            <button onClick={() => go(1)} aria-label="Next slide" className="grid h-11 w-11 place-items-center border border-white/25 text-white/80 transition hover:border-gold hover:text-gold-light">›</button>
-          </div>
+          )}
         </div>
-      )}
+        <div key={`p-${i}`} className="animate-fadeUp [animation-delay:.1s]">
+          {s.image_url ? (
+            <div className="rounded-sm bg-white/[0.04] p-2 ring-1 ring-white/10">
+              {/\.(mp4|webm)(\?|$)/i.test(s.image_url)
+                ? <video src={s.image_url} className="mx-auto max-h-[420px] w-full object-contain" muted autoPlay loop playsInline />
+                // eslint-disable-next-line @next/next/no-img-element
+                : <img src={s.image_url} alt="" className="mx-auto max-h-[420px] w-full object-contain" loading={i === 0 ? "eager" : "lazy"} />}
+            </div>
+          ) : fallback}
+        </div>
+      </div>
     </section>
   );
 }

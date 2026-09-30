@@ -4,7 +4,7 @@ import SocialLinks from "./SocialLinks";
 import { IconClock, IconMail, IconPhone, IconPin } from "./Icons";
 
 export default async function Footer() {
-  const { company: c, verticals, policies } = await getSite();
+  const { company: c, verticals, policies, has } = await getSite();
   const name = companyName(c);
   const footerPolicies = policies.filter((p) => p.show_in_footer !== false);
   const addr = fullAddress(c);
@@ -37,8 +37,8 @@ export default async function Footer() {
         <div>
           <p className={head}>Company</p>
           <ul className="space-y-3 text-sm">
-            {[["/about", "About us"], ["/about#founder", "Founder’s message"], ["/leadership", "Leadership"], ["/careers", "Careers"], ["/gallery", "Gallery"], ["/policies", "Policies"], ["/contact", "Contact"]]
-              .map(([h, l]) => <li key={h}><Link href={h} className={link}>{l}</Link></li>)}
+            {([["/about", "About us"], ["/about#founder", "Founder’s message"], has.leaders && ["/leadership", "Leadership"], ["/careers", "Careers"], has.gallery && ["/gallery", "Gallery"], ["/policies", "Policies"], ["/contact", "Contact"]]
+              .filter(Boolean) as string[][]).map(([h, l]) => <li key={h}><Link href={h} className={link}>{l}</Link></li>)}
           </ul>
         </div>
 

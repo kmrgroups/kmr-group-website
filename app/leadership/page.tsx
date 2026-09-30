@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { supabase } from "@/lib/supabaseClient";
 import FitImage from "@/components/FitImage";
 import { PageHero, CtaBand } from "@/components/Blocks";
@@ -10,12 +11,12 @@ export const metadata = { title: "Leadership" };
 export default async function LeadershipPage() {
   const { data } = await supabase.from("leaders").select("*").order("sort_order");
   const leaders = ((data as (Leader & { is_active?: boolean })[]) || []).filter((l) => l.is_active !== false);
+  if (!leaders.length) redirect("/about#founder");
   return (
     <>
       <PageHero eyebrow="Leadership" title="The people behind KMR" intro="Experience from the shop floor to the boardroom, focused on doing things right." crumbs={[["About", "/about"], ["Leadership"]]} />
       <section className="py-14">
         <div className="wrap space-y-10">
-          {leaders.length === 0 && <p className="text-muted">Profiles are coming soon.</p>}
           {leaders.map((l, i) => (
             <article key={l.id} className={`card grid items-stretch overflow-hidden ${i % 2 ? "md:grid-cols-[1fr_320px]" : "md:grid-cols-[320px_1fr]"}`}>
               <div className={`aspect-[4/5] bg-sand md:aspect-auto ${i % 2 ? "md:order-2" : ""}`}>

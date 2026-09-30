@@ -14,18 +14,18 @@ export default function ProductCard({ p }: { p: Product }) {
   const off = p.mrp && p.mrp > p.price ? Math.round((1 - p.price / p.mrp) * 100) : 0;
   return (
     <Link href={`/products/${p.id}`} className="card-hover group flex flex-col overflow-hidden">
-      <div className="relative aspect-[4/3] overflow-hidden bg-sand">
+      <div className="relative aspect-[4/3] overflow-hidden border-b border-line bg-white">
         {p.image_url
-          ? <FitImage src={p.image_url} alt={p.name} className="h-full w-full" fill="plain" imgClassName="p-3 transition-transform duration-500 group-hover:scale-[1.03]" />
-          : <div className="pattern-navy grid h-full w-full place-items-center"><Fallback className="h-12 w-12 text-gold/70" /></div>}
+          ? <FitImage src={p.image_url} alt={p.name} className="h-full w-full" fill="plain" imgClassName="p-1.5 transition-transform duration-500 group-hover:scale-[1.03]" />
+          : <div className="grid h-full w-full place-items-center bg-ivory"><span className="flex flex-col items-center gap-2 text-muted/70"><Fallback className="h-10 w-10 text-gold/60" /><span className="text-[11px] uppercase tracking-widest">Photo coming soon</span></span></div>}
         {off > 0 && buy && <span className="absolute left-3 top-3 bg-gold px-2 py-1 text-[11px] font-bold text-navy-950">{off}% OFF</span>}
         {p.featured && <span className="absolute right-3 top-3 bg-navy/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-gold-light">Featured</span>}
       </div>
-      <div className="flex flex-1 flex-col p-5">
+      <div className="flex flex-1 flex-col p-4">
         <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-dark">{p.category || (p.kind === "course" ? "Programme" : p.business === "software" ? "Solution" : "Product")}</p>
-        <h3 className="font-display text-[19px] font-semibold leading-snug text-navy">{p.name}</h3>
+        <h3 className="font-display text-[17px] font-semibold leading-snug text-navy">{p.name}</h3>
         {p.details?.duration && <p className="mt-1 text-sm text-muted">{p.details.duration}{p.details.mode ? ` · ${p.details.mode}` : ""}</p>}
-        <div className="mt-auto flex items-end justify-between gap-3 pt-5">
+        <div className="mt-auto flex items-end justify-between gap-3 pt-4">
           {buy ? (
             <div>
               <div className="flex items-baseline gap-2">
@@ -35,7 +35,7 @@ export default function ProductCard({ p }: { p: Product }) {
               {p.kind === "goods" && <span className={`text-xs font-medium ${p.stock_quantity > 0 ? "text-success" : "text-danger"}`}>{p.stock_quantity > 0 ? "In stock" : "Out of stock"}</span>}
             </div>
           ) : <span className="text-sm font-semibold text-gold-dark">{Number(p.price) > 0 ? `From ${inr(p.price)}` : "Price on request"}</span>}
-          <span className="grid h-10 w-10 shrink-0 place-items-center border border-line text-navy transition-colors group-hover:border-gold group-hover:bg-gold group-hover:text-navy-950"><IconArrow className="h-4 w-4" /></span>
+          <span className="grid h-9 w-9 shrink-0 place-items-center border border-line text-navy transition-colors group-hover:border-gold group-hover:bg-gold group-hover:text-navy-950"><IconArrow className="h-4 w-4" /></span>
         </div>
       </div>
     </Link>

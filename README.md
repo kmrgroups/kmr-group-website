@@ -20,7 +20,10 @@ Run once in the SQL Editor, in this order (each is safe to re-run):
    everywhere, site settings and online payment (Razorpay)
 6. `add-cms-update.sql`, then `add-home-content.sql` — customer-first home page: who we serve, why KMR,
    product benefits (productivity, quality, cost, delivery) and how it works, all edited in Website CMS › Home page
-7. Optional, **permanent**: `drop-operations.sql` removes the old website Operations tables (customers, vendors,
+7. `KMR_live_content.sql` — go-live content: removes all sample content and fills the company profile,
+   business verticals, banner text, numbers, home page sections, training programmes, software services and the
+   Terms / Privacy / Refund / Shipping policies (only where the placeholder text is still there)
+8. Optional, **permanent**: `drop-operations.sql` removes the old website Operations tables (customers, vendors,
    items, warehouses, stock) — only those nothing else uses. `employees` is kept while the HR module (attendance,
    payroll, leave …) uses it. Export anything you still need first. Never re-run it with CASCADE.
 

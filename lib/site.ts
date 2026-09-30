@@ -7,21 +7,26 @@ export type Site = {
   settings: Partial<SiteSettings>;
   verticals: Vertical[];
   policies: Pick<LegalPage, "slug" | "title" | "show_in_footer">[];
+  has: { leaders: boolean; gallery: boolean; jobs: boolean };
 };
 
 /** Company profile, settings, businesses and policies — used by the header, footer and most pages (one fetch per request). */
 export const getSite = cache(async (): Promise<Site> => {
-  const [{ data: company }, { data: settings }, { data: verticals }, { data: policies }] = await Promise.all([
+  const [{ data: company }, { data: settings }, { data: verticals }, { data: policies }, { count: leaders }, { count: gallery }, { count: jobs }] = await Promise.all([
     supabase.from("company_info").select("*").limit(1).maybeSingle(),
     supabase.from("site_settings").select("*").maybeSingle(),
     supabase.from("verticals").select("*").order("sort_order"),
     supabase.from("legal_pages").select("slug,title,show_in_footer,is_active,sort_order").order("sort_order"),
+    supabase.from("leaders").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabase.from("gallery_items").select("id", { count: "exact", head: true }).eq("is_active", true),
+    supabase.from("job_openings").select("id", { count: "exact", head: true }),
   ]);
   return {
     company: (company ?? {}) as Partial<CompanyInfo>,
     settings: (settings ?? {}) as Partial<SiteSettings>,
     verticals: ((verticals ?? []) as Vertical[]).filter((v) => v.is_active !== false),
     policies: ((policies ?? []) as (LegalPage & { is_active?: boolean })[]).filter((p) => p.is_active !== false),
+    has: { leaders: (leaders ?? 0) > 0, gallery: (gallery ?? 0) > 0, jobs: (jobs ?? 0) > 0 },
   };
 });
 

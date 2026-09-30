@@ -3,6 +3,7 @@ import { supabase } from "@/lib/supabaseClient";
 import { getSite, companyName, verticalHref, inr, telHref } from "@/lib/site";
 import HeroSlider from "@/components/HeroSlider";
 import ProductCard from "@/components/ProductCard";
+import ProductRow from "@/components/ProductRow";
 import FitImage from "@/components/FitImage";
 import BenefitTabs, { type Benefit } from "@/components/BenefitTabs";
 import { SectionHead } from "@/components/Blocks";
@@ -36,7 +37,7 @@ export default async function HomePage() {
     supabase.from("hero_content").select("*").limit(1).maybeSingle(),
     supabase.from("site_stats").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("products").select("*").eq("is_active", true).eq("business", "shop").order("featured", { ascending: false }).order("sort_order").limit(4),
-    supabase.from("products").select("*").eq("is_active", true).eq("business", "training").order("featured", { ascending: false }).order("sort_order").limit(3),
+    supabase.from("products").select("*").eq("is_active", true).eq("business", "training").order("featured", { ascending: false }).order("sort_order").limit(4),
     supabase.rpc("kmr_software_catalog"),
     supabase.from("home_points").select("*").eq("is_active", true).order("sort_order"),
     supabase.from("product_benefits").select("*").eq("is_active", true).order("sort_order"),
@@ -66,20 +67,29 @@ export default async function HomePage() {
   return (
     <>
       {/* 1 · What we offer you */}
-      <HeroSlider slides={heroSlides} />
+      <HeroSlider slides={heroSlides} fallback={
+        <div className="grid grid-cols-2 gap-px bg-white/10 ring-1 ring-white/10">
+          {site.verticals.slice(0, 6).map((v) => {
+            const Icon = VICON[v.slug ?? ""] ?? IconBriefcase;
+            return (
+              <Link key={v.id} href={verticalHref(v)} className="group flex items-center gap-3 bg-navy/80 p-4 transition-colors hover:bg-navy-700 sm:p-5">
+                <span className="grid h-10 w-10 shrink-0 place-items-center border border-gold/40 text-gold-light group-hover:bg-gold group-hover:text-navy-950"><Icon className="h-5 w-5" /></span>
+                <span className="text-sm font-semibold leading-snug text-white">{v.title}</span>
+              </Link>
+            );
+          })}
+        </div>} />
 
       {/* proof in numbers */}
       {(stats as SiteStat[])?.length ? (
-        <section className="relative z-10 -mt-14">
-          <div className="wrap">
-            <div className="grid grid-cols-2 bg-white shadow-lift md:grid-cols-4">
-              {(stats as SiteStat[]).slice(0, 4).map((s, i) => (
-                <div key={s.id} className={`border-line px-5 py-6 text-center ${i % 2 ? "border-l" : ""} ${i > 1 ? "border-t md:border-t-0" : ""} ${i === 2 ? "md:border-l" : ""}`}>
-                  <p className="font-display text-3xl font-semibold text-navy md:text-4xl">{s.value}</p>
-                  <p className="mt-1.5 text-[13px] leading-snug text-muted">{s.label}</p>
-                </div>
-              ))}
-            </div>
+        <section className="border-b border-line bg-white">
+          <div className="wrap grid grid-cols-2 divide-line md:grid-cols-4 md:divide-x">
+            {(stats as SiteStat[]).slice(0, 4).map((s) => (
+              <div key={s.id} className="px-4 py-6 text-center">
+                <p className="font-display text-2xl font-semibold text-navy md:text-[28px]">{s.value}</p>
+                <p className="mt-1 text-[13px] leading-snug text-muted">{s.label}</p>
+              </div>
+            ))}
           </div>
         </section>
       ) : null}
@@ -89,15 +99,10 @@ export default async function HomePage() {
         <div className="wrap grid items-center gap-10 lg:grid-cols-[1.25fr_1fr]">
           <div>
             <p className="eyebrow mb-3">Welcome to {name}</p>
-            <h2 className="h-display text-2xl text-navy md:text-[32px]">{c.tagline ? `${c.tagline}` : "One group for supply, software, skills and trade"}</h2>
+            <h2 className="h-display text-2xl text-navy md:text-[32px]">One group. Many ways to help your business grow.</h2>
             <p className="lead mt-4 max-w-2xl">{c.short_about || "A multi-business group bringing manufacturing discipline to e-commerce, software, training and trade — with clear prices, GST invoices and secure payment."}</p>
-            <div className="mt-6 flex flex-wrap gap-2">
-              {[["Shop online", "/shop"], ["Software", "/software"], ["Training", "/training"], ["Import & export", "/trade"]].map(([l, hr]) => (
-                <Link key={hr} href={hr} className="border border-line bg-white px-4 py-2 text-sm font-medium text-navy transition-colors hover:border-gold hover:text-gold-dark">{l} →</Link>
-              ))}
-            </div>
           </div>
-          {c.about_image_url
+          {c.about_image_url && !heroSlides.some((x) => x.image_url === c.about_image_url)
             ? <FitImage src={c.about_image_url} alt={name} className="card aspect-[16/10] w-full" />
             : (
               <ul className="card grid gap-4 p-6 sm:grid-cols-2">
@@ -164,7 +169,7 @@ export default async function HomePage() {
             {programmes.length > 0 && (
               <div>
                 <div className="mb-5 flex items-end justify-between"><h3 className="font-display text-xl font-semibold text-navy">Training programmes</h3><Link href="/training" className="link-gold text-sm">All programmes →</Link></div>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">{programmes.map((p) => <ProductCard key={p.id} p={p} />)}</div>
+                <div className="grid gap-4 lg:grid-cols-2">{programmes.map((p) => <ProductRow key={p.id} p={p} />)}</div>
               </div>
             )}
           </div>
@@ -253,15 +258,7 @@ export default async function HomePage() {
       {/* 9 · Can I trust you? + 10 · Let's talk */}
       <section className="py-14">
         <div className="wrap">
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {trust.map(([t, d]) => (
-              <div key={t} className="flex items-start gap-3 border border-line bg-white p-5">
-                <IconShield className="h-6 w-6 shrink-0 text-gold" />
-                <div><p className="text-sm font-semibold text-navy">{t}</p><p className={`mt-0.5 text-xs text-muted ${/GSTIN|UDYAM/i.test(d) ? "font-mono" : ""}`}>{d}</p></div>
-              </div>
-            ))}
-          </div>
-          <div className="pattern-navy mt-8 grid items-center gap-8 px-8 py-10 text-white md:grid-cols-[1.4fr_1fr] md:px-12">
+          <div className="pattern-navy grid items-center gap-8 px-8 py-10 text-white md:grid-cols-[1.4fr_1fr] md:px-12">
             <div>
               <h2 className="h-display text-2xl md:text-[30px]">Tell us what you need — we reply within one working day</h2>
               <p className="mt-3 text-white/70">Products, software, training or a trade enquiry. A clear quote with price, lead time and terms.</p>

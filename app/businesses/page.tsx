@@ -14,24 +14,25 @@ export default async function BusinessesPage() {
     <>
       <PageHero eyebrow="Our businesses" title="Business verticals" intro="Each business runs on its own strengths and shares the group’s standards: clear pricing, registered billing and people who answer." />
       <section className="py-14">
-        <div className="wrap space-y-8">
+        <div className="wrap grid gap-6 md:grid-cols-2">
           {verticals.length === 0 && <p className="text-muted">Coming soon.</p>}
           {verticals.map((v, i) => {
             const Icon = ICONS[v.slug ?? ""] ?? IconBriefcase;
+            const href = verticalHref(v);
             return (
-              <article key={v.id} className="card grid overflow-hidden md:grid-cols-2">
-                <div className={`relative min-h-[260px] bg-navy ${i % 2 ? "md:order-2" : ""}`}>
-                  {v.image_url
-                    ? <FitImage src={v.image_url} alt={v.title} className="absolute inset-0" />
-                    : <div className="pattern-navy absolute inset-0 grid place-items-center"><Icon className="h-20 w-20 text-gold/50" /></div>}
-                  <span className="absolute left-6 top-6 bg-gold px-3 py-1 font-display text-lg font-bold text-navy-950">0{i + 1}</span>
-                </div>
-                <div className="flex flex-col justify-center p-8 md:p-14">
-                  {v.code && <p className="eyebrow mb-3">{v.code}</p>}
-                  <h2 className="h-display text-2xl text-navy md:text-[30px]">{v.title}</h2>
-                  <p className="mt-4 leading-[1.8] text-ink/75">{v.description}</p>
-                  <Link href={verticalHref(v)} className="btn-navy mt-8 self-start">
-                    {verticalHref(v).startsWith("/trade") ? "Request a quote" : verticalHref(v) === "/shop" ? "Shop now" : verticalHref(v) === "/software" ? "Explore solutions" : verticalHref(v) === "/training" ? "View programmes" : "Talk to us"} <IconArrow className="h-4 w-4" />
+              <article key={v.id} className="card flex flex-col overflow-hidden">
+                {v.image_url && <FitImage src={v.image_url} alt={v.title} className="aspect-[16/9] w-full border-b border-line" />}
+                <div className="flex flex-1 flex-col p-6 md:p-8">
+                  <div className="flex items-center gap-4">
+                    <span className="grid h-12 w-12 shrink-0 place-items-center bg-navy text-gold-light"><Icon className="h-6 w-6" /></span>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-gold-dark">{String(i + 1).padStart(2, "0")} · {v.code || "Business"}</p>
+                      <h2 className="font-display text-xl font-semibold text-navy md:text-2xl">{v.title}</h2>
+                    </div>
+                  </div>
+                  <p className="mt-4 flex-1 leading-relaxed text-ink/75">{v.description}</p>
+                  <Link href={href} className="btn-navy mt-6 self-start">
+                    {href.startsWith("/trade") ? "Request a quote" : href === "/shop" ? "Shop now" : href === "/software" ? "Explore solutions" : href === "/training" ? "View programmes" : "Talk to us"} <IconArrow className="h-4 w-4" />
                   </Link>
                 </div>
               </article>

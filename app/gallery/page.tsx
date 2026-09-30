@@ -13,7 +13,7 @@ export default async function GalleryPage() {
       <PageHero eyebrow="Gallery" title="Moments & milestones" intro="Our people, facilities, events and work — in pictures." />
       <section className="py-14">
         <div className="wrap">
-          {items.length === 0 ? <p className="text-muted">Photos and videos are coming soon.</p> : (
+          {items.length === 0 ? <p className="text-muted">Photos of our work, events and facilities will appear here soon. Meanwhile, see <a href="/about" className="link-gold">About us</a>.</p> : (
             <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
               {items.map((g) => (
                 <figure key={g.id} className="group relative break-inside-avoid overflow-hidden bg-navy">
