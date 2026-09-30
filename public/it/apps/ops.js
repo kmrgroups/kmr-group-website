@@ -5,9 +5,9 @@
   const T = (k, l, extra) => Object.assign({ k, l }, extra || {});
   const KINDS = [
     { kind: "parts", label: "Parts", icon: "⚙", code: "Part number", name: "Part name", fields: [T("customer", "Customer"), T("drawing_no", "Drawing no."), T("revision", "Revision"), T("material", "Material"), T("weight_kg", "Weight (kg)", { type: "number" }), T("annual_volume", "Annual volume", { type: "number" }), T("status", "Status", { opts: ["Development", "PPAP", "Production", "Obsolete"] })] },
-    { kind: "customers", label: "Customers", icon: "🏭", code: "Customer code", name: "Customer name", fields: [T("gstin", "GSTIN / tax ID"), T("city", "City"), T("country", "Country"), T("contact", "Contact person"), T("email", "Email"), T("phone", "Phone"), T("payment_terms", "Payment terms")] },
+    { kind: "customers", label: "Customers", icon: "🏭", code: "Customer code", name: "Customer name", fields: [T("gstin", "GSTIN / tax ID"), T("city", "City"), T("country", "Country"), T("contact", "Contact person"), T("email", "Email"), T("phone", "Phone"), T("payment_terms", "Payment terms"), T("supplier_code", "Our supplier code (given by this customer)"), T("address", "Address"), T("cc_symbol", "Their CC symbol"), T("sc_symbol", "Their SC symbol"), T("approval", "Customer engineering approval")] },
     { kind: "suppliers", label: "Suppliers", icon: "🚚", code: "Supplier code", name: "Supplier name", fields: [T("category", "Category", { opts: ["Raw material", "Outsourced process", "Consumables", "Tooling", "Gauges & calibration", "Services"] }), T("gstin", "GSTIN / tax ID"), T("city", "City"), T("contact", "Contact person"), T("email", "Email"), T("phone", "Phone"), T("approved", "Approved supplier", { opts: ["Yes", "Conditional", "No"] }), T("rating", "Rating (%)", { type: "number" })] },
-    { kind: "machines", label: "Machines", icon: "🛠", code: "Machine code", name: "Machine name", fields: [T("type", "Type", { opts: ["CNC Turning", "VMC", "HMC", "Grinding", "Gear Hobbing", "Broaching", "Press", "Welding", "Assembly", "Inspection", "Other"] }), T("make", "Make"), T("model", "Model"), T("cell", "Cell / line"), T("available_days", "Available days / month (blank = plant standard)", { type: "number" }), T("hours_per_day", "Hours per day (blank = plant standard)", { type: "number" }), T("status", "Status", { opts: ["Running", "Breakdown", "Idle", "Scrapped"] }), T("remarks", "Remarks")] },
+    { kind: "machines", label: "Machines", icon: "🛠", code: "Machine code", name: "Machine name", fields: [T("type", "Type", { opts: ["CNC Turning", "VMC", "HMC", "Grinding", "Gear Hobbing", "Broaching", "Press", "Welding", "Assembly", "Inspection", "Other"] }), T("make", "Make"), T("model", "Model"), T("cell", "Cell / line"), T("available_days", "Available days / month (blank = plant standard)", { type: "number" }), T("hours_per_day", "Hours per day (blank = plant standard)", { type: "number" }), T("status", "Status", { opts: ["Running", "Breakdown", "Idle", "Scrapped"] }), T("capacity", "Capacity (e.g. swing Ø 350, L 300)"), T("processes", "Processes it can do (Process Documents codes, e.g. TURN1, TURN2, VMC)"), T("max_size_mm", "Max job size (mm)", { type: "number" }), T("capability_mm", "Capability ± mm", { type: "number" }), T("pm_frequency", "PM frequency", { opts: ["Weekly", "Monthly", "Quarterly", "Half-yearly", "Yearly"] }), T("remarks", "Remarks")] },
     { kind: "gauges", label: "Gauges", icon: "📏", code: "Gauge ID", name: "Gauge name", fields: [T("type", "Type", { opts: ["Vernier", "Micrometer", "Bore gauge", "Plug gauge", "Ring gauge", "Height gauge", "CMM", "Dial", "Other"] }), T("range", "Range"), T("least_count", "Least count"), T("make", "Make"), T("cal_freq_months", "Calibration every (months)", { type: "number" }), T("last_calibrated", "Last calibrated", { type: "date" }), T("next_due", "Next due", { type: "date" }), T("location", "Location")] },
     { kind: "tools", label: "Tools", icon: "🔩", code: "Tool code", name: "Tool name", fields: [T("type", "Type", { opts: ["Insert", "Drill", "Tap", "Reamer", "End mill", "Boring bar", "Fixture", "Die", "Other"] }), T("size", "Size / grade"), T("make", "Make"), T("tool_life", "Tool life (pcs)", { type: "number" }), T("cost", "Cost", { type: "number" }), T("stock", "In stock", { type: "number" })] },
     { kind: "consumables", label: "Consumables", icon: "🧴", code: "Item code", name: "Item name", fields: [T("uom", "Unit"), T("min_stock", "Minimum stock", { type: "number" }), T("rate", "Rate", { type: "number" }), T("supplier", "Supplier")] },
@@ -54,6 +54,11 @@
         ${error ? `<p class="msg">${esc(error.message)}</p>` : ""}
         ${note ? `<div class="card" style="border-color:#1E7B4A;background:#E7F8EF;margin-bottom:12px">${note}</div>` : ""}
         ${sampleBar}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
+          <button class="btn ghost" id="opsXlsxExp" style="height:42px">Download all (Excel)</button>
+          ${ctx.role === "admin" || ctx.role === "editor" ? `<label class="btn ghost" style="height:42px;cursor:pointer">Upload Excel workbook<input type="file" id="opsXlsxImp" accept=".xlsx" hidden></label>` : ""}
+          <small style="color:var(--muted);align-self:center">One sheet per list. Fill it in Excel and upload it back — existing codes are updated, new ones added, nothing is deleted.</small>
+        </div>
         <div class="cards">${KINDS.map((K) => `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3><p><b style="font-size:22px;color:var(--ink)">${(counts && counts[K.kind]) || 0}</b> records</p></div>`).join("")}</div>`;
       ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = () => this.list(ctx, el.dataset.kind)));
       const run = async (btn, rpc, done) => {
@@ -62,6 +67,9 @@
         if (res.error) { btn.disabled = false; alert(res.error.message); return this.overview(ctx); }
         this.overview(ctx, done(res.data));
       };
+      const xExp = ctx.main.querySelector("#opsXlsxExp"), xImp = ctx.main.querySelector("#opsXlsxImp");
+      if (xExp) xExp.onclick = () => this.exportWorkbook(ctx, xExp);
+      if (xImp) xImp.onchange = (e) => this.importWorkbook(ctx, e.target.files[0], xImp);
       const load = ctx.main.querySelector("#opsLoad"), flush = ctx.main.querySelector("#opsFlush");
       if (load) load.onclick = () => run(load, "kmr_ops_sample_load", (d) =>
         `<b>Sample data loaded:</b> ${d.added} records added${d.skipped ? `, ${d.skipped} skipped because you already have them` : ""}. The Capacity Planner picks up the machines, routings and plant standards when it next opens.`);
@@ -70,6 +78,68 @@
         run(flush, "kmr_ops_sample_flush", (n) => `<b>Sample data flushed:</b> ${n} records removed. Your own records are unchanged.`);
       };
       window.scrollTo(0, 0);
+    },
+    async excel() {
+      if (window.ExcelJS) return window.ExcelJS;
+      await new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"; sc.onload = res; sc.onerror = () => rej(new Error("Couldn't load the Excel engine — check the internet connection.")); document.head.appendChild(sc); });
+      return window.ExcelJS;
+    },
+    /** All lists in one workbook: one sheet per list; row 1 = column names, row 2 (hidden) = field keys used when uploading. */
+    async exportWorkbook(ctx, btn) {
+      const label = btn.textContent; btn.disabled = true; btn.textContent = "Preparing…";
+      try {
+        const X = await this.excel(), wbk = new X.Workbook(); wbk.creator = "KMR Apps — Operations Master"; wbk.created = new Date();
+        for (const K of KINDS) {
+          const { data, error } = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: K.kind });
+          if (error) throw error;
+          const cs = [...cols(K), ["active", "In use (Yes / No)"]];
+          const ws = wbk.addWorksheet(K.label.replace(/[\\/?*[\]:]/g, " ").slice(0, 31), { views: [{ state: "frozen", ySplit: 2 }] });
+          ws.addRow(cs.map((c) => c[1])); ws.addRow(cs.map((c) => c[0]));
+          ws.getRow(1).font = { bold: true, color: { argb: "FFFFFFFF" } };
+          ws.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FF0B1C3A" } };
+          ws.getRow(2).hidden = true;
+          (data || []).forEach((r) => ws.addRow(cs.map((c) => (c[0] === "code" ? r.code : c[0] === "name" ? r.name : c[0] === "active" ? (r.active === false ? "No" : "Yes") : (r.data || {})[c[0]] ?? ""))));
+          ws.columns.forEach((col, i) => { col.width = Math.min(40, Math.max(12, String(cs[i][1]).length + 2)); });
+        }
+        const buf = await wbk.xlsx.writeBuffer();
+        const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }));
+        a.download = `Operations-Master-${ctx.slug}-${new Date().toISOString().slice(0, 10)}.xlsx`; document.body.appendChild(a); a.click(); a.remove();
+      } catch (e) { alert(e.message || e); }
+      btn.disabled = false; btn.textContent = label;
+    },
+    async importWorkbook(ctx, file, input) {
+      if (!file) return;
+      try {
+        const X = await this.excel(), wbk = new X.Workbook(); await wbk.xlsx.load(await file.arrayBuffer());
+        const done = [], problems = [];
+        const text = (v) => { if (v == null) return ""; if (v instanceof Date) return v.toISOString().slice(0, 10); if (typeof v === "object") return String(v.text ?? v.result ?? (v.richText ? v.richText.map((t) => t.text).join("") : "")); return String(v); };
+        for (const ws of wbk.worksheets) {
+          const K = KINDS.find((k) => k.label.toLowerCase() === ws.name.trim().toLowerCase() || k.kind === ws.name.trim().toLowerCase());
+          if (!K) { problems.push(`sheet “${ws.name}” is not a list name — skipped`); continue; }
+          const cs = [...cols(K), ["active", "In use (Yes / No)"]];
+          const r1 = (ws.getRow(1).values || []).slice(1).map((v) => text(v).trim().toLowerCase()), r2 = (ws.getRow(2).values || []).slice(1).map((v) => text(v).trim());
+          const hasKeys = r2.includes("code");
+          const idx = cs.map((c) => { let i = hasKeys ? r2.indexOf(c[0]) : -1; if (i < 0) i = r1.indexOf(c[1].toLowerCase()); if (i < 0) i = r1.indexOf(c[0]); return i; });
+          if (idx[0] < 0) { problems.push(`${K.label}: no “${K.code}” column`); continue; }
+          const rows = [];
+          ws.eachRow((row, n) => {
+            if (n === 1 || (hasKeys && n === 2)) return;
+            const v = (row.values || []).slice(1).map(text);
+            const code = (v[idx[0]] || "").trim(); if (!code) return;
+            const rec = { code, name: idx[1] >= 0 ? (v[idx[1]] || "").trim() : "", data: {} };
+            cs.slice(2).forEach((c, j) => { const i = idx[j + 2]; if (i < 0) return; const val = (v[i] || "").trim(); if (c[0] === "active") { if (val) rec.active = !/^(no|n|false|0)$/i.test(val); } else if (val !== "") rec.data[c[0]] = val; });
+            rows.push(rec);
+          });
+          if (!rows.length) continue;
+          for (let i = 0; i < rows.length; i += 200) {
+            const res = await ctx.sb.rpc("kmr_ops_save", { p_slug: ctx.slug, p_kind: K.kind, p_rows: rows.slice(i, i + 200) });
+            if (res.error) throw new Error(`${K.label}: ${res.error.message}`);
+          }
+          done.push(`${K.label} ${rows.length}`);
+        }
+        this.overview(ctx, `<b>Workbook uploaded.</b> ${done.length ? done.join(" · ") + " records saved (existing codes updated, new ones added)." : "No rows found."}${problems.length ? `<br><small>${problems.map(esc).join("; ")}</small>` : ""}`);
+      } catch (e) { alert(e.message || e); }
+      if (input) input.value = "";
     },
     async list(ctx, kind, note) {
       const K = KINDS.find((x) => x.kind === kind); const edit = ctx.role === "admin" || ctx.role === "editor";

@@ -130,9 +130,27 @@ async function chooseOrg(id){
   S.settings=Object.assign({companyName:m.name},m.settings||{});
   const {data}=await sb.from("pd_masters").select("kind,items").eq("org_id",id);
   S.masters={machines:[],gauges:[],customers:[],consumables:[]}; (data||[]).forEach(r=>S.masters[r.kind]=r.items||[]);
+  await loadOpsMasters(id);
   S.machines=S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES;
   S.prj=null; S.plan=null; S.docs=null; LS.set("pd_brand",{name:m.name,logo:m.logo});
   brand(); nav(); bindTop(); UI.render("overview");
+}
+/* KMR platform: machines, gauges, customers and parts come from KMR Apps › Operations Master (kept once per company).
+   The workspace's own lists stay as a fallback for any list the Operations Master does not have yet. */
+async function loadOpsMasters(orgId){
+  S.ops=null; S.ownMasters=JSON.parse(JSON.stringify(S.masters));
+  try{
+    const r=await sb.rpc("kmr_pd_masters",{p_org:orgId});
+    if(r.error||!r.data) return;
+    S.ops={linked:true,parts:r.data.parts||[]};
+    ["machines","gauges","customers"].forEach(k=>{ if((r.data[k]||[]).length){ S.masters[k]=r.data[k]; S.ops[k]=true; } });
+  }catch(e){ S.ops=null; }
+}
+function opsPortalLink(){ let kp=null; try{ kp=JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){} return (kp&&kp.slug?"/it/app/"+encodeURIComponent(kp.slug):"/it/apps.html")+"#ops"; }
+function partFromOps(h){
+  const n=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+  const pt=S.ops&&S.ops.parts&&h.partNo?S.ops.parts.find(x=>n(x.partNo)===n(h.partNo)):null; if(!pt) return h;
+  return Object.assign({},h,{partName:h.partName||pt.partName,drawingNo:h.drawingNo||pt.drawingNo,rev:h.rev||pt.rev,material:h.material||pt.material,customer:h.customer||pt.customer});
 }
 async function signOut(){ if(S.dirty) await flushSave(); if(CLOUD) await sb.auth.signOut(); location.href=location.pathname; }
 
@@ -256,6 +274,7 @@ function uuid(){ return (crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4x
 async function newFromSource(src, biReportId){
   if(!S.canEdit){ toast("Viewers can't create projects."); return; }
   if(S.dirty) await flushSave();
+  if(src&&src.header) src.header=partFromOps(src.header);
   const h=(src&&src.header)||{};
   const P={id:null,org_id:S.org&&S.org.id,part_no:h.partNo||"",part_name:h.partName||"",rev:h.rev||"",drawing_no:h.drawingNo||"",customer:h.customer||"",status:"received",source:src,bi_report_id:biReportId||null,doc:{}};
   busy("Generating process plan and documents");
@@ -456,17 +475,35 @@ async function pane(t){
       gauges:"Your gauge inventory. When a generated gauge matches a name and range here, the documents use your gauge ID, calibration due date and location.",
       customers:"When the customer name on the drawing matches, the supplier code, address and customer's SC / CC symbols are filled in automatically.",
       consumables:"Consumables listed for each process. Leave empty to use the built-in defaults."}[t];
+    const LBL={machines:"machines",gauges:"gauges",customers:"customers"}[t];
+    if(S.ops&&S.ops[t]){
+      const cols=SC.MASTER_COLS[t], rows=S.masters[t]||[];
+      P.innerHTML=`<div class="banner"><b>These ${LBL} come from your company’s Operations Master</b> (KMR Apps), shared by every KMR app. Add or change them there; this list updates the next time you open the workspace.
+          <a class="btn small primary" href="${esc(opsPortalLink())}" target="_top">Open Operations Master</a></div>
+        <div class="gridwrap free"><table class="plist"><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead>
+        <tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(Array.isArray(r[c.k])?r[c.k].join(", "):(r[c.k]??""))}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">None yet.</td></tr>`}</tbody></table></div>`;
+      return;
+    }
+    const canMove=S.ops&&S.ops.linked&&t!=="consumables"&&(S.role==="admin"||S.platform)&&((S.ownMasters||{})[t]||[]).length;
     if(t==="machines"&&!S.masters.machines.length) S.masters.machines=JSON.parse(JSON.stringify(E.DEFAULT_MACHINES));
     if(t==="consumables"&&!S.masters.consumables.length) S.masters.consumables=Object.keys(E.DEFAULT_CONSUMABLES).map(k=>({key:k,items:E.DEFAULT_CONSUMABLES[k].join("\n")}));
     const rows=S.masters[t];
     if(t==="machines") rows.forEach(r=>{ if(Array.isArray(r.keys)) r.keys=r.keys.join(", "); });
-    P.innerHTML=`<p class="hintline" style="margin-top:0">${esc(info)}</p><div id="mg"></div><div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save ${t}</button>${t==="machines"?`<button class="btn small" id="aReset">Reset to defaults</button>`:""}<span class="hintline">Use the red bin to delete a row, then Save.</span></div>`;
+    P.innerHTML=`${canMove?`<div class="banner warn"><b>Your company’s Operations Master has no ${LBL} yet.</b> Move these ${S.ownMasters[t].length} there once — nothing is lost, and from then on every KMR app uses the same list.<button class="btn small primary" id="aMove">Move to Operations Master</button></div>`:""}<p class="hintline" style="margin-top:0">${esc(info)}</p><div id="mg"></div><div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save ${t}</button>${t==="machines"?`<button class="btn small" id="aReset">Reset to defaults</button>`:""}<span class="hintline">Use the red bin to delete a row, then Save.</span></div>`;
     const cols=SC.MASTER_COLS[t].map(c=>c.k==="key"?Object.assign({},c,{opts:Object.keys(SC.KEY_NAMES).map(k=>[k,k+" – "+SC.KEY_NAMES[k]])}):c.type==="keys"?Object.assign({},c,{type:"text"}):c);
     UI.grid($("mg"),{rows,cols,free:true,delCol:true,onChange:()=>{},rowsChanged:()=>{},newRow:()=>({})});
     $("aSave").onclick=async()=>{ const out=S.masters[t].filter(r=>Object.values(r).some(v=>String(v??"").trim()));
       if(t==="machines") out.forEach(r=>{ r.keys=String(r.keys||"").split(/[,\s]+/).map(s=>s.trim().toUpperCase()).filter(Boolean); r.maxDia=+r.maxDia||9999; r.cap=+r.cap||0.01; });
       S.masters[t]=out;
       try{ await saveMaster(t); msg(true,"Saved. Use “Re-run automation” on a project to apply it."); if(t==="machines") S.masters.machines.forEach(r=>{ if(Array.isArray(r.keys)) r.keys=r.keys.join(", "); }); }catch(e){ msg(false,e.message); } };
+    if($("aMove")) $("aMove").onclick=async()=>{
+      const b=$("aMove"); b.disabled=true; b.textContent="Moving…";
+      const payload={}; payload[t]=S.ownMasters[t];
+      const r=await sb.rpc("kmr_pd_push_masters",{p_org:S.org.id,p:payload});
+      if(r.error){ b.disabled=false; b.textContent="Move to Operations Master"; return msg(false,r.error.message); }
+      await loadOpsMasters(S.org.id); S.machines=S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES;
+      toast(`Moved ${r.data[t]||0} ${LBL} to the Operations Master.`); pane(t);
+    };
     if($("aReset")) $("aReset").onclick=()=>{ if(!confirm("Replace the machine list with the built-in defaults?")) return; S.masters.machines=JSON.parse(JSON.stringify(E.DEFAULT_MACHINES)); pane("machines"); };
   }
   if(t==="users"){
@@ -508,7 +545,7 @@ async function pane(t){
 }
 
 /* ---------------- boot ---------------- */
-window.PDApp = { S, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
+window.PDApp = { S, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
 if(CLOUD){
   sb.auth.onAuthStateChange(ev=>{ if(ev==="PASSWORD_RECOVERY") newPasswordScreen(); });
   (async()=>{ const {data:{session}}=await sb.auth.getSession(); if(!session) loginScreen(); else start(); })();
