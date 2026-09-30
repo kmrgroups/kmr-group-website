@@ -70,25 +70,26 @@
               ${admin ? b("dflush", "Flush data", own, true) : ""}
             </div>` : ""}</div>`;
         }).join("")}
-        ${counts && counts._has_balloon !== undefined ? `<div class="card" style="--c:#8B5CF6"><div style="font-size:26px;line-height:1">🎯</div><h3>Sample drawing</h3>
-          <p>${counts._has_balloon ? `A ready-made drawing (Mounting Plate EX-2040) in your <b>Balloon Inspector</b> — open it there under Reports; it is ballooned automatically.` : "Balloon Inspector is not in your company’s plan."}</p>
-          <p><b style="font-size:22px;color:var(--ink)">${counts._drawings || 0}</b> sample drawing${counts._drawings === 1 ? "" : "s"}</p>
-          ${admin && counts._has_balloon ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
-            <button class="btn ghost" data-drawing="load" style="height:32px;padding:0 10px;font-size:12.5px" ${counts._drawings ? "disabled" : ""}>Load sample drawing</button>
-            <button class="btn ghost" data-drawing="flush" style="height:32px;padding:0 10px;font-size:12.5px;color:#B00E28" ${counts._drawings ? "" : "disabled"}>Flush sample drawing</button>
-            <a class="btn ghost" href="/it/balloon.html" style="height:32px;padding:0 10px;font-size:12.5px;grid-column:1/-1">Open Balloon Inspector</a></div>` : ""}</div>` : ""}
+        ${counts && counts._has_balloon !== undefined ? (() => {
+          const nd = counts._drawings || 0, no = counts._own_drawings || 0, B = counts._has_balloon;
+          const bb = (act, label, on, red) => `<button class="btn ghost" data-drawing="${act}" style="height:32px;padding:0 10px;font-size:12.5px${red ? ";color:#B00E28" : ""}" ${on ? "" : "disabled"}>${label}</button>`;
+          return `<div class="card" style="--c:#8B5CF6"><div style="font-size:26px;line-height:1">🎯</div><h3>Balloon Inspector drawings</h3>
+          <p>${B ? `<b style="font-size:22px;color:var(--ink)">${nd + no}</b> report${nd + no === 1 ? "" : "s"}${nd ? ` · <span class="pill">${nd} sample</span>` : ""}${no ? ` · <span class="pill ok">${no} yours</span>` : ""}` : "Balloon Inspector is not in your company’s plan."}</p>
+          ${B ? `<p style="font-size:12.5px;color:var(--muted)">Load sample adds a ready-made drawing (Mounting Plate EX-2040) that is ballooned automatically when you open it in Balloon Inspector › Reports.</p>` : ""}
+          ${admin && B ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
+            ${bb("load", "Load sample", !nd)}${bb("flush", "Flush sample", nd, true)}
+            <label class="btn ghost" style="height:32px;padding:0 10px;font-size:12.5px;cursor:pointer">Load data<input type="file" accept=".json,application/json" id="biLoad" hidden></label>
+            ${bb("dflush", "Flush data", no, true)}
+            <a class="btn ghost" href="/it/balloon.html" style="height:32px;padding:0 10px;font-size:12.5px;grid-column:1/-1">Open Balloon Inspector</a></div>` : ""}</div>`;
+        })() : ""}
         </div>`;
       ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = (e) => { if (e.target.closest("[data-card],[data-dload],button,label,input")) return; this.list(ctx, el.dataset.kind); }));
       ctx.main.querySelectorAll("[data-card]").forEach((btn) => btn.addEventListener("click", (e) => e.stopPropagation()));
       ctx.main.querySelectorAll("button[data-card]").forEach((btn) => (btn.onclick = (e) => { e.stopPropagation(); this.cardAction(ctx, btn.dataset.card, btn.dataset.k, btn); }));
       ctx.main.querySelectorAll("[data-dload]").forEach((inp) => (inp.onchange = (e) => this.loadData(ctx, inp.dataset.dload, e.target.files[0], inp)));
-      ctx.main.querySelectorAll("[data-drawing]").forEach((btn) => (btn.onclick = async () => {
-        if (btn.dataset.drawing === "flush" && !confirm("Remove the sample drawing from Balloon Inspector?")) return;
-        btn.disabled = true; btn.textContent = "Working…";
-        const res = await ctx.sb.rpc("kmr_ops_sample_drawing", { p_slug: ctx.slug, p_action: btn.dataset.drawing });
-        if (res.error) { alert(res.error.message); return this.overview(ctx); }
-        this.overview(ctx, btn.dataset.drawing === "load" ? "<b>Sample drawing loaded.</b> Open Balloon Inspector › Reports › “Sample drawing — Mounting Plate”; it is ballooned automatically." : "<b>Sample drawing removed</b> from Balloon Inspector.");
-      }));
+      ctx.main.querySelectorAll("[data-drawing]").forEach((btn) => (btn.onclick = () => this.drawingAction(ctx, btn.dataset.drawing, btn)));
+      const biLoad = ctx.main.querySelector("#biLoad");
+      if (biLoad) biLoad.onchange = (e) => this.drawingLoad(ctx, e.target.files[0], biLoad);
       const run = async (btn, rpc, done) => {
         btn.disabled = true; btn.textContent = "Working…";
         const res = await ctx.sb.rpc(rpc, { p_slug: ctx.slug });
@@ -135,6 +136,40 @@
         if (res.error) return fail(`Backup downloaded (${file}), but the flush failed: ${res.error.message}`);
         return this.overview(ctx, `<b>Your ${esc(L)} flushed:</b> ${res.data} removed. Backup downloaded: <b>${esc(file)}</b> — use <b>Load data</b> on this card to bring them back.`);
       }
+    },
+    /** Balloon Inspector card: sample drawing load / flush, and flush of your own reports (JSON backup downloaded first) */
+    async drawingAction(ctx, act, btn) {
+      const label = btn.textContent;
+      const fail = (m) => { btn.disabled = false; btn.textContent = label; alert(m); };
+      if (act === "flush" && !confirm("Remove the sample drawing from Balloon Inspector? Your own reports are not touched.")) return;
+      if (act === "dflush" && !confirm("Flush YOUR Balloon Inspector reports (every report except the sample drawing)?\n\nA JSON backup of them is downloaded first. Drawing files are kept, so Load data with that file brings the reports back complete.")) return;
+      btn.disabled = true; btn.textContent = "Working…";
+      if (act === "dflush") {
+        const { data, error } = await ctx.sb.rpc("kmr_balloon_own_export", { p_slug: ctx.slug });
+        if (error) return fail(`Backup failed, nothing was removed: ${error.message}`);
+        const d = new Date(), z = (n) => String(n).padStart(2, "0");
+        const file = `${ctx.slug}-balloon-reports-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.json`;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([JSON.stringify(data)], { type: "application/json" }));
+        a.download = file; document.body.appendChild(a); a.click(); a.remove();
+        const res = await ctx.sb.rpc("kmr_balloon_own_flush", { p_slug: ctx.slug });
+        if (res.error) return fail(`Backup downloaded (${file}), but the flush failed: ${res.error.message}`);
+        return this.overview(ctx, `<b>Your Balloon Inspector reports flushed:</b> ${res.data} removed. Backup downloaded: <b>${esc(file)}</b> — use <b>Load data</b> on the Balloon Inspector card to bring them back.`);
+      }
+      const res = await ctx.sb.rpc("kmr_ops_sample_drawing", { p_slug: ctx.slug, p_action: act });
+      if (res.error) return fail(res.error.message);
+      this.overview(ctx, act === "load" ? "<b>Sample drawing loaded.</b> Open Balloon Inspector › Reports › “Sample drawing — Mounting Plate”; it is ballooned automatically." : "<b>Sample drawing removed</b> from Balloon Inspector.");
+    },
+    async drawingLoad(ctx, file, input) {
+      if (!file) return;
+      try {
+        let j; try { j = JSON.parse(await file.text()); } catch { throw new Error("That file is not valid JSON."); }
+        if (!j || j.format !== "kmr-app-data" || j.app !== "balloon") throw new Error("This is not a Balloon Inspector data file. Use the file downloaded by Flush data (or a Data Master Balloon backup).");
+        const { data, error } = await ctx.sb.rpc("kmr_balloon_own_load", { p_slug: ctx.slug, p_data: j });
+        if (error) throw new Error(error.message);
+        this.overview(ctx, `<b>Balloon Inspector reports loaded</b> from ${esc(file.name)}: ${data} reports.`);
+      } catch (e) { alert(e.message || e); }
+      if (input) input.value = "";
     },
     /** Load data: a JSON file from “Flush data” (or any list of {code, name, data}) — existing codes are updated, new ones added */
     async loadData(ctx, kind, file, input) {
