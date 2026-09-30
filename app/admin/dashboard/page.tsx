@@ -9,7 +9,7 @@ const cards: { href: string; title: string; desc: string; resource?: Resource; a
   { href: "/admin/verticals", title: "Verticals", desc: "Manage the business verticals shown on the site.", resource: "verticals" },
   { href: "/admin/gallery", title: "Gallery", desc: "Upload and manage photos and promo videos.", resource: "gallery_items" },
   { href: "/admin/products", title: "Products", desc: "Manage your product catalog, pricing and stock.", resource: "products" },
-  { href: "/admin/orders", title: "Orders", desc: "View orders placed and paid for through Razorpay checkout.", resource: "orders" },
+  { href: "/admin/orders", title: "Orders", desc: "Shop orders paid by bank transfer / UPI — confirm payments and track dispatch.", resource: "orders" },
   { href: "/admin/compliance", title: "Finance & Compliance", desc: "GST, Udyam, trademark, licenses and renewal reminders.", resource: "compliance_records" },
   { href: "/admin/operations/customers", title: "Customers", desc: "Customer master records for sales and invoicing.", resource: "customers" },
   { href: "/admin/operations/vendors", title: "Vendors", desc: "Supplier master records for purchasing.", resource: "vendors" },

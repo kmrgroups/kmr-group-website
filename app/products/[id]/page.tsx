@@ -5,8 +5,9 @@ import BuyNowButton from "@/components/BuyNowButton";
 
 export const revalidate = 30;
 
-export default async function ProductDetailPage({ params }: { params: { id: string } }) {
-  const { data } = await supabase.from("products").select("*").eq("id", params.id).maybeSingle();
+export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;   // Next.js 15+: params is a Promise
+  const { data } = await supabase.from("products").select("*").eq("id", id).maybeSingle();
   const product = data as Product | null;
   if (!product) return notFound();
 

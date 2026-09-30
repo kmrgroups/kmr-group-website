@@ -87,36 +87,25 @@ real content before accepting real orders:
 - **GSTIN / CIN** — display your real registration numbers in
   Admin → Company Info; they show on the About page and can be referenced
   in your footer/invoices.
-- **Payments** — real Razorpay checkout is now wired in (see "Set up Razorpay
-  payments" below). A WhatsApp "Ask on WhatsApp" button remains alongside it
-  for customers who prefer to enquire first.
+- **Payments** — customers pay by bank transfer / UPI straight into KMR's
+  account (see "Shop payments" below). A WhatsApp "Ask on WhatsApp" button
+  remains alongside it for customers who prefer to enquire first.
 
-## 7. Set up Razorpay payments
+## 7. Shop payments (bank transfer / UPI — no payment gateway)
 
-1. In your Razorpay Dashboard, go to Settings → API Keys and generate a
-   **Key ID** and **Key Secret**. Use **Test Mode** keys first to try a
-   full checkout without moving real money, then switch to **Live Mode**
-   keys when you're ready to accept real payments.
-2. In Supabase → Settings → API, copy your **service_role** key (different
-   from the anon key — keep this one secret).
-3. Add all of these to `.env.local` (and later to Vercel's Environment
-   Variables):
-   ```
-   SUPABASE_SERVICE_ROLE_KEY=...
-   RAZORPAY_KEY_ID=...
-   RAZORPAY_KEY_SECRET=...
-   ```
-4. Re-run `supabase/schema.sql` in the SQL Editor — it now also creates an
-   `orders` table (safe to re-run; existing tables are left untouched).
-5. Restart `npm run dev`. On any product page, "Buy Now" opens a Razorpay
-   checkout modal. After payment, the signature is verified server-side,
-   the order is marked "paid," and stock is automatically decremented.
-6. Check **Admin → Orders** to see every order and its status (created /
-   paid / failed), customer details, and shipping address.
-
-**Never** put `SUPABASE_SERVICE_ROLE_KEY` or `RAZORPAY_KEY_SECRET` in a
-`NEXT_PUBLIC_` variable — both must stay server-side only, which is how
-this code is already written.
+1. Run `supabase/add-bank-orders.sql` once in the SQL Editor (after `add-permissions-and-compliance.sql` and the
+   KMR Console's `0019_bank_payments.sql`).
+2. The bank account and UPI ID customers pay into are the ones in **KMR Console → Prices & invoices → Seller details**
+   — one place for invoices and the shop.
+3. Keep `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` / Vercel (server only, never `NEXT_PUBLIC_`). Razorpay keys are
+   no longer used — delete `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` from Vercel.
+4. **Buy Now** places the order (`KMR-SO-00001`, *awaiting payment*) and opens the order's own page: bank details with
+   copy buttons, a UPI QR with the amount and order number filled in, and **I've paid** for the UTR / reference.
+   The customer keeps that page's link to follow the order.
+5. **Admin → Orders**: *payment reported* orders show the UTR and amount — check your bank statement, then
+   **Confirm** (order paid, stock reduced) or **Reject** (the customer sees the reason and can send it again).
+   **Mark as paid** records a payment that arrived without a report (cheque, direct transfer); **Cancel order** for
+   unpaid orders. Stock is only reduced when an order is paid.
 
 ## 9. Set up department staff logins & permissions
 
@@ -190,12 +179,12 @@ is its own build on top of this foundation.
 ```
 app/              Public pages + admin panel + API routes (Next.js App Router)
 app/admin/operations/  Customers, Vendors, Items Master, Warehouses, Stock Ledger, Employees
-app/api/           create-order, verify-payment (Razorpay) + admin/create-staff, admin/delete-staff
+app/api/           create-order, report-payment (shop) + admin/create-staff, admin/delete-staff
 components/       Navbar, Footer, SpecPlate, ImageUploader, BuyNowButton, PermissionGate
 lib/              supabaseClient (browser), supabaseAdmin (server-only), AdminAccessContext, types, resources
 supabase/         schema.sql + add-orders-table.sql + add-logo-column.sql +
                   add-permissions-and-compliance.sql + add-phase1-operations.sql +
-                  add-legal-identity.sql
+                  add-legal-identity.sql + add-bank-orders.sql
 public/           manifest.json (PWA)
 ```
 

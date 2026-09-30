@@ -98,7 +98,8 @@ export type LegalPage = {
 
 export type Order = {
   id: string;
-  razorpay_order_id: string;
+  order_no?: string;
+  razorpay_order_id?: string;   // only on old orders placed through Razorpay
   razorpay_payment_id?: string;
   product_id: string;
   product_name: string;
@@ -109,7 +110,17 @@ export type Order = {
   customer_email?: string;
   customer_phone: string;
   shipping_address: string;
-  status: "created" | "paid" | "failed";
+  status: "created" | "awaiting_payment" | "payment_reported" | "paid" | "cancelled" | "failed";
+  pay_method?: string;
+  pay_reference?: string;
+  paid_on?: string;
+  paid_amount?: number;
+  payer_name?: string;
+  reported_at?: string;
+  confirmed_at?: string;
+  confirmed_by?: string;
+  reject_reason?: string;
+  admin_note?: string;
   created_at: string;
 };
 

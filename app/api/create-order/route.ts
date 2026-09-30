@@ -1,79 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
-import Razorpay from "razorpay";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
 
-// Creates a Razorpay order server-side (required — Razorpay does not allow
-// creating orders directly from the browser) and logs it in our own
-// `orders` table with status "created" before the customer even pays.
+// Places a shop order. The customer then pays by bank transfer / UPI into KMR's account using the details on
+// the order's own page, and reports the UTR there. Price and stock always come from the database.
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
-    const { productId, quantity, customerName, customerEmail, customerPhone, shippingAddress } = body;
-
+    const { productId, quantity, customerName, customerEmail, customerPhone, shippingAddress } = await req.json();
     if (!productId || !customerName || !customerPhone || !shippingAddress) {
-      return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+      return NextResponse.json({ error: "Please fill in your name, phone number and shipping address." }, { status: 400 });
     }
-
-    const admin = supabaseAdmin();
-
-    // Always re-fetch price/stock from the database — never trust a price
-    // sent from the browser.
-    const { data: product, error: productError } = await admin
-      .from("products")
-      .select("*")
-      .eq("id", productId)
-      .maybeSingle();
-
-    if (productError || !product) {
-      return NextResponse.json({ error: "Product not found." }, { status: 404 });
-    }
-    if (!product.is_active) {
-      return NextResponse.json({ error: "This product is not currently available." }, { status: 400 });
-    }
-    const qty = Math.max(1, Number(quantity) || 1);
-    if (product.stock_quantity < qty) {
-      return NextResponse.json({ error: "Not enough stock available." }, { status: 400 });
-    }
-
-    const amountInPaise = Math.round(Number(product.price) * qty * 100);
-
-    const razorpay = new Razorpay({
-      key_id: process.env.RAZORPAY_KEY_ID as string,
-      key_secret: process.env.RAZORPAY_KEY_SECRET as string
+    const { data, error } = await supabaseAdmin().rpc("shop_place_order", {
+      p_product: productId, p_qty: Number(quantity) || 1, p_name: String(customerName), p_email: String(customerEmail || ""),
+      p_phone: String(customerPhone), p_address: String(shippingAddress),
     });
-
-    const razorpayOrder = await razorpay.orders.create({
-      amount: amountInPaise,
-      currency: "INR",
-      receipt: `kmr_${Date.now()}`
-    });
-
-    const { error: insertError } = await admin.from("orders").insert({
-      razorpay_order_id: razorpayOrder.id,
-      product_id: product.id,
-      product_name: product.name,
-      quantity: qty,
-      amount: amountInPaise / 100,
-      currency: "INR",
-      customer_name: customerName,
-      customer_email: customerEmail || null,
-      customer_phone: customerPhone,
-      shipping_address: shippingAddress,
-      status: "created"
-    });
-
-    if (insertError) {
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
-    }
-
-    return NextResponse.json({
-      orderId: razorpayOrder.id,
-      amount: amountInPaise,
-      currency: "INR",
-      keyId: process.env.RAZORPAY_KEY_ID,
-      productName: product.name
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Something went wrong." }, { status: 500 });
+    if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    return NextResponse.json({ orderNo: data.order_no, token: data.token });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err as Error).message || "Something went wrong." }, { status: 500 });
   }
 }

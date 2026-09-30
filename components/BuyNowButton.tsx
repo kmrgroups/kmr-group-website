@@ -3,23 +3,6 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Product } from "@/lib/types";
 
-declare global {
-  interface Window {
-    Razorpay: any;
-  }
-}
-
-function loadRazorpayScript(): Promise<boolean> {
-  return new Promise((resolve) => {
-    if (window.Razorpay) return resolve(true);
-    const script = document.createElement("script");
-    script.src = "https://checkout.razorpay.com/v1/checkout.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.body.appendChild(script);
-  });
-}
-
 export default function BuyNowButton({ product }: { product: Product }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -27,21 +10,13 @@ export default function BuyNowButton({ product }: { product: Product }) {
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", quantity: 1 });
 
-  async function handlePay() {
+  async function handlePlaceOrder() {
     setError("");
     if (!form.name || !form.phone || !form.address) {
       setError("Please fill in your name, phone, and shipping address.");
       return;
     }
     setLoading(true);
-
-    const scriptOk = await loadRazorpayScript();
-    if (!scriptOk) {
-      setLoading(false);
-      setError("Could not load payment gateway. Check your internet connection.");
-      return;
-    }
-
     const res = await fetch("/api/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -54,47 +29,14 @@ export default function BuyNowButton({ product }: { product: Product }) {
         shippingAddress: form.address
       })
     });
-    const data = await res.json();
-    setLoading(false);
-
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setError(data.error || "Could not start checkout.");
+      setLoading(false);
+      setError(data.error || "Could not place the order.");
       return;
     }
-
-    const rzp = new window.Razorpay({
-      key: data.keyId,
-      amount: data.amount,
-      currency: data.currency,
-      name: "KMR Group of Companies",
-      description: data.productName,
-      order_id: data.orderId,
-      prefill: { name: form.name, email: form.email, contact: form.phone },
-      theme: { color: "#B5652D" },
-      handler: async function (response: any) {
-        const verifyRes = await fetch("/api/verify-payment", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            razorpay_order_id: response.razorpay_order_id,
-            razorpay_payment_id: response.razorpay_payment_id,
-            razorpay_signature: response.razorpay_signature
-          })
-        });
-        const verifyData = await verifyRes.json();
-        if (verifyRes.ok && verifyData.success) {
-          router.push(`/order-confirmation?order_id=${response.razorpay_order_id}`);
-        } else {
-          router.push(`/order-confirmation?order_id=${response.razorpay_order_id}&status=failed`);
-        }
-      },
-      modal: {
-        ondismiss: function () {
-          setLoading(false);
-        }
-      }
-    });
-    rzp.open();
+    // The order page shows how to pay (bank transfer / UPI) and where to report the payment
+    router.push(`/order/${data.token}`);
   }
 
   if (product.stock_quantity <= 0) {
@@ -153,14 +95,15 @@ export default function BuyNowButton({ product }: { product: Product }) {
               className="w-20 border border-line px-3 py-2 text-sm"
             />
           </div>
+          <p className="text-xs text-slate">After placing the order you pay by bank transfer (NEFT / IMPS / RTGS) or UPI. We dispatch once the payment reaches our account.</p>
           {error && <p className="text-sm text-red-600">{error}</p>}
           <div className="flex gap-3">
             <button
-              onClick={handlePay}
+              onClick={handlePlaceOrder}
               disabled={loading}
               className="bg-copper hover:bg-copper-light transition-colors text-ink font-medium px-5 py-2"
             >
-              {loading ? "Processing…" : `Pay ₹${(product.price * form.quantity).toLocaleString("en-IN")}`}
+              {loading ? "Placing order…" : `Place order · ₹${(product.price * form.quantity).toLocaleString("en-IN")}`}
             </button>
             <button onClick={() => setOpen(false)} className="text-sm text-slate underline">
               Cancel
