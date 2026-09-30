@@ -136,7 +136,7 @@ function mkCtx(plan, s){
   const byNo={}; plan.chars.forEach(c=>byNo[c.no]=c);
   const gById={}; plan.gauges.forEach(g=>gById[g.id]=g);
   const opOf={}; plan.ops.forEach(o=>o.chars.forEach(n=>opOf[n]=o));
-  const machines = (s.machines&&s.machines.length)?s.machines:E.DEFAULT_MACHINES;
+  const machines = s.strictMasters ? (s.machines||[]) : (s.machines&&s.machines.length)?s.machines:E.DEFAULT_MACHINES;
   const mById={}; machines.forEach(m=>mById[m.id]=m);
   const gName = id => gById[id] ? `${gById[id].name}${gById[id].range&&gById[id].range!=="—"?" "+gById[id].range:""}` : "";
   const freq = {cc:s.freqCC||"100% + 5 pcs / 2 hrs (SPC)", sc:s.freqSC||"5 pcs / 2 hrs", nor:s.freqNormal||"1 pc / 2 hrs", slots:+(s.patrolSlots||8)};

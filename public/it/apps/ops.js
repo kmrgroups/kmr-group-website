@@ -10,7 +10,7 @@
     { kind: "machines", label: "Machines", icon: "🛠", code: "Machine code", name: "Machine name", fields: [T("type", "Type", { opts: ["CNC Turning", "VMC", "HMC", "Grinding", "Gear Hobbing", "Broaching", "Press", "Welding", "Assembly", "Inspection", "Other"] }), T("make", "Make"), T("model", "Model"), T("cell", "Cell / line"), T("available_days", "Available days / month (blank = plant standard)", { type: "number" }), T("hours_per_day", "Hours per day (blank = plant standard)", { type: "number" }), T("status", "Status", { opts: ["Running", "Breakdown", "Idle", "Scrapped"] }), T("capacity", "Capacity (e.g. swing Ø 350, L 300)"), T("processes", "Processes it can do (Process Documents codes, e.g. TURN1, TURN2, VMC)"), T("max_size_mm", "Max job size (mm)", { type: "number" }), T("capability_mm", "Capability ± mm", { type: "number" }), T("pm_frequency", "PM frequency", { opts: ["Weekly", "Monthly", "Quarterly", "Half-yearly", "Yearly"] }), T("remarks", "Remarks")] },
     { kind: "gauges", label: "Gauges", icon: "📏", code: "Gauge ID", name: "Gauge name", fields: [T("type", "Type", { opts: ["Vernier", "Micrometer", "Bore gauge", "Plug gauge", "Ring gauge", "Height gauge", "CMM", "Dial", "Other"] }), T("range", "Range"), T("least_count", "Least count"), T("make", "Make"), T("cal_freq_months", "Calibration every (months)", { type: "number" }), T("last_calibrated", "Last calibrated", { type: "date" }), T("next_due", "Next due", { type: "date" }), T("location", "Location")] },
     { kind: "tools", label: "Tools", icon: "🔩", code: "Tool code", name: "Tool name", fields: [T("type", "Type", { opts: ["Insert", "Drill", "Tap", "Reamer", "End mill", "Boring bar", "Fixture", "Die", "Other"] }), T("size", "Size / grade"), T("make", "Make"), T("tool_life", "Tool life (pcs)", { type: "number" }), T("cost", "Cost", { type: "number" }), T("stock", "In stock", { type: "number" })] },
-    { kind: "consumables", label: "Consumables", icon: "🧴", code: "Item code", name: "Item name", fields: [T("uom", "Unit"), T("min_stock", "Minimum stock", { type: "number" }), T("rate", "Rate", { type: "number" }), T("supplier", "Supplier")] },
+    { kind: "consumables", label: "Consumables", icon: "🧴", code: "Item code", name: "Item name", fields: [T("processes", "Used in processes (Process Documents codes, e.g. TURN1, VMC, WASH)"), T("uom", "Unit"), T("min_stock", "Minimum stock", { type: "number" }), T("rate", "Rate", { type: "number" }), T("supplier", "Supplier")] },
     { kind: "raw_materials", label: "Raw material", icon: "🧱", code: "Material code", name: "Material name", fields: [T("grade", "Grade"), T("specification", "Specification"), T("form", "Form", { opts: ["Bar", "Forging", "Casting", "Sheet", "Tube", "Other"] }), T("size", "Size"), T("supplier", "Supplier"), T("rate_per_kg", "Rate per kg", { type: "number" })] },
     { kind: "rate_contracts", label: "Rate contracts", icon: "📄", code: "Contract no.", name: "Party", fields: [T("party_type", "Party type", { opts: ["Supplier", "Customer"] }), T("item", "Item / part"), T("rate", "Rate", { type: "number" }), T("currency", "Currency"), T("uom", "Unit"), T("valid_from", "Valid from", { type: "date" }), T("valid_to", "Valid to", { type: "date" }), T("terms", "Terms")] },
     { kind: "cycle_times", label: "Cycle times", icon: "⏱", code: "Part + operation", name: "Operation", fields: [T("part_no", "Part number"), T("machine", "Machine"), T("cycle_time_sec", "Cycle time (s)", { type: "number" }), T("alternates", "Alternate machines (comma-separated)"), T("setup_min", "Set-up (min)", { type: "number" }), T("parts_per_cycle", "Parts per cycle", { type: "number" })] },
@@ -59,7 +59,7 @@
           ${ctx.role === "admin" || ctx.role === "editor" ? `<label class="btn ghost" style="height:42px;cursor:pointer">Upload Excel workbook<input type="file" id="opsXlsxImp" accept=".xlsx" hidden></label>` : ""}
           <small style="color:var(--muted);align-self:center">One sheet per list. Fill it in Excel and upload it back — existing codes are updated, new ones added, nothing is deleted.</small>
         </div>
-        <div class="cards">${KINDS.map((K) => `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3><p><b style="font-size:22px;color:var(--ink)">${(counts && counts[K.kind]) || 0}</b> records</p></div>`).join("")}</div>`;
+        <div class="cards">${KINDS.map((K) => `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3><p><b style="font-size:22px;color:var(--ink)">${(counts && counts[K.kind]) || 0}</b> records${counts && counts["_sample_" + K.kind] ? ` · <span class="pill">${counts["_sample_" + K.kind]} sample</span>` : ""}</p></div>`).join("")}</div>`;
       ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = () => this.list(ctx, el.dataset.kind)));
       const run = async (btn, rpc, done) => {
         btn.disabled = true; btn.textContent = "Working…";
@@ -72,7 +72,7 @@
       if (xImp) xImp.onchange = (e) => this.importWorkbook(ctx, e.target.files[0], xImp);
       const load = ctx.main.querySelector("#opsLoad"), flush = ctx.main.querySelector("#opsFlush");
       if (load) load.onclick = () => run(load, "kmr_ops_sample_load", (d) =>
-        `<b>Sample data loaded:</b> ${d.added} records added${d.skipped ? `, ${d.skipped} skipped because you already have them` : ""}. The Capacity Planner picks up the machines, routings and plant standards when it next opens.`);
+        `<b>Sample data loaded:</b> ${d.added} records added${d.skipped ? `, ${d.skipped} skipped because you already have them` : ""}. Every KMR app (Process Documents, Capacity Planner) uses these lists the next time it opens.`);
       if (flush) flush.onclick = () => {
         if (!confirm(`Remove the ${nSample} sample records from every list? Your own records are not touched.`)) return;
         run(flush, "kmr_ops_sample_flush", (n) => `<b>Sample data flushed:</b> ${n} records removed. Your own records are unchanged.`);
@@ -156,6 +156,9 @@
           <input id="opsQ" placeholder="Search…" style="height:42px;border-radius:12px;border:1px solid #D3DBE6;padding:0 14px;min-width:240px;flex:1">
           ${edit ? `<button class="btn" id="opsAdd" style="height:42px">+ Add</button><label class="btn ghost" style="height:42px;cursor:pointer">Import CSV<input type="file" id="opsImp" accept=".csv,text/csv" hidden></label>` : ""}
           <button class="btn ghost" id="opsExp" style="height:42px">Export CSV</button>
+          ${ctx.role === "admin" ? `<span style="flex:1"></span>${rows.some((r) => r.sample)
+            ? `<button class="btn ghost" id="opsKFlush" style="height:42px;color:#B00E28">Flush sample ${esc(K.label.toLowerCase())} (${rows.filter((r) => r.sample).length})</button>`
+            : `<button class="btn ghost" id="opsKLoad" style="height:42px">Load sample ${esc(K.label.toLowerCase())}</button>`}` : ""}
         </div>
         <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
           <thead><tr style="background:#F5F7FB;text-align:left">${shown.map((c) => `<th style="padding:10px 12px;white-space:nowrap">${esc(c[1])}</th>`).join("")}${K.file ? '<th style="padding:10px 12px">File</th>' : ""}<th></th></tr></thead>
@@ -173,6 +176,18 @@
       draw("");
       ctx.main.querySelector("#opsQ").oninput = (e) => draw(e.target.value);
       ctx.main.querySelector("#opsBack").onclick = () => this.overview(ctx);
+      const kLoad = ctx.main.querySelector("#opsKLoad"), kFlush = ctx.main.querySelector("#opsKFlush");
+      const kRun = async (btn, rpc, done) => {
+        btn.disabled = true; btn.textContent = "Working…";
+        const res = await ctx.sb.rpc(rpc, { p_slug: ctx.slug, p_kind: K.kind });
+        if (res.error) { btn.disabled = false; alert(res.error.message); return this.list(ctx, K.kind); }
+        this.list(ctx, K.kind, done(res.data));
+      };
+      if (kLoad) kLoad.onclick = () => kRun(kLoad, "kmr_ops_sample_load", (d) => `<b>Sample ${esc(K.label.toLowerCase())} loaded:</b> ${d.added} added${d.skipped ? `, ${d.skipped} skipped because you already have those codes` : ""}. Only this list was changed — every KMR app now uses it.`);
+      if (kFlush) kFlush.onclick = () => {
+        if (!confirm(`Remove the sample records from ${K.label}? Records you added or changed are kept.`)) return;
+        kRun(kFlush, "kmr_ops_sample_flush", (n) => `<b>Sample ${esc(K.label.toLowerCase())} flushed:</b> ${n} removed. Records you added or changed are kept. Every KMR app now uses the rest.`);
+      };
       ctx.main.querySelector("#opsExp").onclick = () => {
         const cs = cols(K); const lines = [cs.map((c) => csvCell(c[1])).join(",")].concat(rows.map((r) => cs.map((c) => csvCell(val(r, c[0]))).join(",")));
         const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv" })); a.download = `${K.kind}.csv`; a.click();

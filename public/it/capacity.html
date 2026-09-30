@@ -1386,12 +1386,13 @@ function can(level) { if (!cloudActive()) return true; return (ROLE_RANK[cloud.r
 function roleLabel() { return cloud.role ? ROLE_INFO[cloud.role].label : ''; }
 
 // Month, year and scenario are personal view choices; everything else is the shared plan
-function sharedPart(s) { const c = Object.assign({}, s); delete c.year; delete c.month; delete c.scenario; return c; }
+function sharedPart(s) { const c = Object.assign({}, s); delete c.year; delete c.month; delete c.scenario; if (typeof cloud !== "undefined" && cloud.ops && cloud.own) { c.machines = cloud.own.machines; c.operations = cloud.own.operations; } return c; }
 function sharedHash() { return JSON.stringify(sharedPart(state)); }
 function adoptRemote(data) {
   const keep = state ? { year: state.year, month: state.month, scenario: state.scenario } : null;
   state = normalise(data);
   if (keep) Object.assign(state, keep);
+  if (typeof cloud !== "undefined" && cloud.ops) { cloud.own = null; applyOpsData(); }
   LS.set(K_STATE, state);
   cloud.savedHash = sharedHash();
 }
@@ -1844,6 +1845,7 @@ const scaleMax = () => Math.max(30, ...model.machines.map(m => Math.max(m.reqDay
 
 /* ---------------------------------------------------------------- OVERVIEW */
 Pages.overview = () => {
+  if (!state.machines.length && window.KMR_PLATFORM && cloud.ops) return `${note('warn', 'info', '<b>No machines in your Operations Master yet.</b> Add machines, parts, cycle times and plant standards in <b>KMR Apps › Operations Master</b> (or load its sample data there); this planner uses them straight away.')}<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn primary" href="${kmrPortalHome('#ops')}">Open Operations Master ${icon('arrow')}</a></div>`;
   if (!state.machines.length) return `${note('warn', 'info', '<b>No machines yet.</b> Start in <b>Masters</b>: add machines, then parts and routings, and set the plant standards. Or import a capacity workbook from <b>Monthly Plan › Import .xlsx</b>.')}<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-nav="masters">Open Masters ${icon('arrow')}</button><button class="btn" data-nav="plan">Open Monthly Plan</button></div>`;
   const t = model.totals, c = t.counts;
   const overN = (c.critical || 0) + (c.sunday || 0);
@@ -2424,13 +2426,19 @@ function kmrPortalHome(hash) { let kp = null; try { kp = JSON.parse(localStorage
 async function applyOpsMasters() {
   if (!window.KMR_PLATFORM || !Cloud.org) return;
   const m = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_masters', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org }) }).catch(() => null);
-  if (!m) return;
+  if (!m) return;                                                // not linked to a KMR customer: the planner keeps its own masters
   cloud.ops = m;
+  applyOpsData();
+}
+/* The Operations Master is the only source for a linked planner — an empty list there means an empty list here.
+   The planner's own earlier masters are kept aside (and stay in its saved file) only for the one-time "Move". */
+function applyOpsData() {
+  const m = cloud.ops; if (!m) return;
+  if (!cloud.own) cloud.own = { machines: JSON.parse(JSON.stringify(state.machines || [])), operations: JSON.parse(JSON.stringify(state.operations || [])) };
   cloud.opsEmpty = !(m.machines || []).length && !(m.operations || []).length;
-  if (cloud.opsEmpty) return;                                   // nothing in the Operations Master yet: keep the planner's own until moved
-  state.machines = m.machines.map(x => ({ code: x.code, cell: x.cell || '', availDays: x.availDays == null ? null : Number(x.availDays),
+  state.machines = (m.machines || []).map(x => ({ code: x.code, cell: x.cell || '', availDays: x.availDays == null ? null : Number(x.availDays),
     hoursPerDay: x.hoursPerDay == null ? null : Number(x.hoursPerDay), remarks: x.remarks || '', active: x.active !== false }));
-  state.operations = m.operations.map((o, i) => ({ id: i + 1, partNo: o.partNo || '', partName: o.partName || o.partNo || '', process: o.process || '',
+  state.operations = (m.operations || []).map((o, i) => ({ id: i + 1, partNo: o.partNo || '', partName: o.partName || o.partNo || '', process: o.process || '',
     machine: o.machine || '', cycleTime: Number(o.cycleTime) || 0, alternates: Array.isArray(o.alternates) ? o.alternates : [] }));
   const st = m.standards || {}, s = state.settings;
   ['oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours', 'lotSize', 'levelTargetPct'].forEach(k => { if (st[k] !== undefined && st[k] !== '' && !isNaN(Number(st[k]))) s[k] = Number(st[k]); });
@@ -2439,13 +2447,14 @@ async function applyOpsMasters() {
 }
 function kmrMastersPage() {
   const s = state.settings, off = (s.weeklyOff || []).map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ') || 'none';
-  const canMove = cloudActive() && cloud.opsEmpty && can('admin') && (state.machines.length || state.operations.length);
+  const own = cloud.own || { machines: [], operations: [] };
+  const canMove = cloudActive() && cloud.opsEmpty && can('admin') && (own.machines.length || own.operations.length);
   const hrm = cloud.ops && cloud.ops.has_hrm;
   return `
   <section class="card"><div class="card-h"><div><h2>Masters come from the Operations Master</h2><div class="sub">Machines, parts, cycle times and plant standards are kept once for your company in <b>KMR Apps › Operations Master</b> and used by every KMR app.</div></div>
     <a class="btn primary" href="${kmrPortalHome('#ops')}">Open Operations Master</a></div>
     <div class="card-b">
-      ${canMove ? `<div class="note warn">${icon('alert')}<div><b>This planner still has its own masters</b> (${state.machines.length} machines, ${state.operations.length} operations) and the Operations Master is empty. Move them once — nothing is lost, and from then on you maintain them in one place.<div style="margin-top:8px"><button class="btn primary" data-act="moveMasters">Move to Operations Master</button></div></div></div>` : ''}
+      ${canMove ? `<div class="note warn">${icon('alert')}<div><b>This planner still has its own earlier masters</b> (${own.machines.length} machines, ${own.operations.length} operations) and the Operations Master is empty, so nothing is being planned. Move them once — nothing is lost, and from then on you maintain them in one place.<div style="margin-top:8px"><button class="btn primary" data-act="moveMasters">Move to Operations Master</button></div></div></div>` : ''}
       <div class="form-grid" style="margin-top:8px">
         <div class="field"><label>Machines</label><div><b>${state.machines.length}</b> — Operations Master › Machines</div></div>
         <div class="field"><label>Parts & routings</label><div><b>${new Set(state.operations.map(o => o.partNo)).size}</b> parts · <b>${state.operations.length}</b> operations — Operations Master › Parts, Cycle times</div></div>
@@ -2467,7 +2476,7 @@ const Actions = {
     const standards = { oee: s.oee, hoursPerDay: s.hoursPerDay, daysPerMonth: s.daysPerMonth, warnPct: s.warnPct, transferLagHours: s.transferLagHours, lotSize: s.lotSize, levelTargetPct: s.levelTargetPct,
       weeklyOff: (s.weeklyOff || []).map(d => ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d]).join(' & ') || 'None' };
     try {
-      const r = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_push_masters', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org, p: { machines: state.machines, operations: state.operations, standards } }) });
+      const r = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_push_masters', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org, p: { machines: (cloud.own || state).machines, operations: (cloud.own || state).operations, standards } }) });
       await applyOpsMasters(); render();
       toast(`Moved to the Operations Master: ${r.machines} machines, ${r.parts} parts, ${r.cycle_times} cycle times.`);
     } catch (e) { toast(e.message || 'Could not move the masters.'); }

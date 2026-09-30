@@ -471,7 +471,8 @@ function pickMachine(op, machines, ctx){
 function buildPlan(source, masters, settings){
   masters = masters || {}; settings = settings || {};
   const src = normalizeSource(source), chars = src.chars, header = src.header;
-  const machines = (masters.machines && masters.machines.length) ? masters.machines : DEFAULT_MACHINES;
+  // strict = the lists come from the company's Operations Master: an empty list stays empty (no built-in defaults)
+  const machines = masters.strict ? (masters.machines || []) : (masters.machines && masters.machines.length) ? masters.machines : DEFAULT_MACHINES;
   const notes = readNotes(chars, header);
   const family = partFamily(chars, header);
   const matCls = materialClass(header.material + " " + chars.filter(c=>c.type==="Material").map(c=>c.text).join(" "));
@@ -524,7 +525,7 @@ function buildPlan(source, masters, settings){
   if(opByKey.PDI) opByKey.PDI.verify = chars.filter(c=>c.cls||c.type!=="Note").map(c=>c.no);
 
   // 3) resources for every operation
-  const cons = Object.assign({}, DEFAULT_CONSUMABLES); (masters.consumables||[]).forEach(r=>{ if(r&&r.key) cons[r.key]=String(r.items||"").split("\n").map(s=>s.trim()).filter(Boolean); });
+  const cons = masters.strict ? {} : Object.assign({}, DEFAULT_CONSUMABLES); (masters.consumables||[]).forEach(r=>{ if(r&&r.key) cons[r.key]=String(r.items||"").split("\n").map(s=>s.trim()).filter(Boolean); });
   ops.forEach(op=>{
     const oc = op.chars.map(no=>ctx.byNo[no]);
     const m = pickMachine(op, machines, ctx);

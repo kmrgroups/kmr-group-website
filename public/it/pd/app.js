@@ -120,7 +120,7 @@ async function start(){
 }
 function startLocal(){
   const L=LS.get("pd_local",null)||{}; S.settings=L.settings||{companyName:"My Company"}; S.masters=Object.assign({machines:[],gauges:[],customers:[],consumables:[]},L.masters||{});
-  S.machines=S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES; S.org={id:"local",name:S.settings.companyName||"My Company",logo:L.logo||null,settings:S.settings};
+  S.machines=machinesInUse(); S.org={id:"local",name:S.settings.companyName||"My Company",logo:L.logo||null,settings:S.settings};
   S.role="admin"; S.canEdit=true; S.list=LS.get("pd_projects",[]); $("demoTag").hidden=false; brand(); nav(); bindTop(); UI.render("overview");
   if(new URLSearchParams(location.search).get("sample")==="1") newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null);
 }
@@ -131,7 +131,7 @@ async function chooseOrg(id){
   const {data}=await sb.from("pd_masters").select("kind,items").eq("org_id",id);
   S.masters={machines:[],gauges:[],customers:[],consumables:[]}; (data||[]).forEach(r=>S.masters[r.kind]=r.items||[]);
   await loadOpsMasters(id);
-  S.machines=S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES;
+  S.machines=machinesInUse();
   S.prj=null; S.plan=null; S.docs=null; LS.set("pd_brand",{name:m.name,logo:m.logo});
   brand(); nav(); bindTop(); UI.render("overview");
 }
@@ -143,9 +143,11 @@ async function loadOpsMasters(orgId){
     const r=await sb.rpc("kmr_pd_masters",{p_org:orgId});
     if(r.error||!r.data) return;
     S.ops={linked:true,parts:r.data.parts||[]};
-    ["machines","gauges","customers"].forEach(k=>{ if((r.data[k]||[]).length){ S.masters[k]=r.data[k]; S.ops[k]=true; } });
+    ["machines","gauges","customers","consumables"].forEach(k=>{ S.masters[k]=r.data[k]||[]; S.ops[k]=true; });
+    S.masters.strict=true;
   }catch(e){ S.ops=null; }
 }
+function machinesInUse(){ return S.masters.strict ? (S.masters.machines||[]) : (S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES); }
 function opsPortalLink(){ let kp=null; try{ kp=JSON.parse(localStorage.getItem("kmr-portal")||"null"); }catch(e){} return (kp&&kp.slug?"/it/app/"+encodeURIComponent(kp.slug):"/it/apps.html")+"#ops"; }
 function partFromOps(h){
   const n=v=>String(v||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
@@ -287,7 +289,7 @@ async function newFromSource(src, biReportId){
 /* ======================================================================
    AUTOMATION PIPELINE
    ====================================================================== */
-function genSettings(){ const cust=S.plan&&S.plan._cust; return Object.assign({},S.settings,{machines:S.machines, symbols:cust?{CC:cust.ccSym||"◆",SC:cust.scSym||"▼",KC:"◇"}:S.settings.symbols}); }
+function genSettings(){ const cust=S.plan&&S.plan._cust; return Object.assign({},S.settings,{machines:S.machines, strictMasters:!!S.masters.strict, symbols:cust?{CC:cust.ccSym||"◆",SC:cust.scSym||"▼",KC:"◇"}:S.settings.symbols}); }
 function applyCustomer(plan){
   const list=S.masters.customers||[], name=(plan.header.customer||"").toLowerCase().trim(); if(!name||!list.length) return;
   const n=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -410,7 +412,15 @@ async function saveOrg(upd){
 async function saveMaster(kind){
   if(CLOUD){ const {error}=await sb.from("pd_masters").upsert({org_id:S.org.id,kind,items:S.masters[kind],updated_at:new Date().toISOString()}); if(error) throw error; }
   else { const L=LS.get("pd_local",{})||{}; L.masters=S.masters; L.settings=S.settings; LS.set("pd_local",L); }
-  if(kind==="machines") S.machines=S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES;
+  if(kind==="machines") S.machines=machinesInUse();
+}
+async function moveToOps(t){
+  const b=$("aMove"); if(b){ b.disabled=true; b.textContent="Moving…"; }
+  const payload={}; payload[t]=S.ownMasters[t];
+  const r=await sb.rpc("kmr_pd_push_masters",{p_org:S.org.id,p:payload});
+  if(r.error){ if(b){ b.disabled=false; b.textContent="Move to Operations Master"; } toast(r.error.message,7000); return; }
+  await loadOpsMasters(S.org.id); S.machines=machinesInUse();
+  toast(`Moved ${r.data[t]||0} ${t} to the Operations Master.`); pane(t);
 }
 async function pane(t){
   const P=$("adP"), st=S.settings;
@@ -475,13 +485,16 @@ async function pane(t){
       gauges:"Your gauge inventory. When a generated gauge matches a name and range here, the documents use your gauge ID, calibration due date and location.",
       customers:"When the customer name on the drawing matches, the supplier code, address and customer's SC / CC symbols are filled in automatically.",
       consumables:"Consumables listed for each process. Leave empty to use the built-in defaults."}[t];
-    const LBL={machines:"machines",gauges:"gauges",customers:"customers"}[t];
+    const LBL={machines:"machines",gauges:"gauges",customers:"customers",consumables:"consumables"}[t];
     if(S.ops&&S.ops[t]){
       const cols=SC.MASTER_COLS[t], rows=S.masters[t]||[];
-      P.innerHTML=`<div class="banner"><b>These ${LBL} come from your company’s Operations Master</b> (KMR Apps), shared by every KMR app. Add or change them there; this list updates the next time you open the workspace.
+      const own=((S.ownMasters||{})[t]||[]).length, admin=S.role==="admin"||S.platform;
+      P.innerHTML=`${!rows.length&&own&&admin&&t!=="consumables"?`<div class="banner warn"><b>Your company’s Operations Master has no ${LBL} yet, so none are used.</b> This workspace still has ${own} of its own from before — move them there once.<button class="btn small primary" id="aMove">Move to Operations Master</button></div>`:""}
+        <div class="banner"><b>${rows.length?`These ${LBL} come from`:`No ${LBL} in`} your company’s Operations Master</b> (KMR Apps), shared by every KMR app.${t==="consumables"?" Give each consumable its processes there (e.g. TURN1, VMC).":""} Add or change them there${rows.length?"":", or load its sample data"}; this list updates the next time you open the workspace.
           <a class="btn small primary" href="${esc(opsPortalLink())}" target="_top">Open Operations Master</a></div>
         <div class="gridwrap free"><table class="plist"><thead><tr>${cols.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead>
-        <tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td>${esc(Array.isArray(r[c.k])?r[c.k].join(", "):(r[c.k]??""))}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">None yet.</td></tr>`}</tbody></table></div>`;
+        <tbody>${rows.map(r=>`<tr>${cols.map(c=>`<td style="white-space:pre-line">${esc(Array.isArray(r[c.k])?r[c.k].join(", "):(r[c.k]??""))}</td>`).join("")}</tr>`).join("")||`<tr><td colspan="${cols.length}">None — the documents will show no ${LBL} until you add them in the Operations Master.</td></tr>`}</tbody></table></div>`;
+      if($("aMove")) $("aMove").onclick=()=>moveToOps(t);
       return;
     }
     const canMove=S.ops&&S.ops.linked&&t!=="consumables"&&(S.role==="admin"||S.platform)&&((S.ownMasters||{})[t]||[]).length;
@@ -496,14 +509,7 @@ async function pane(t){
       if(t==="machines") out.forEach(r=>{ r.keys=String(r.keys||"").split(/[,\s]+/).map(s=>s.trim().toUpperCase()).filter(Boolean); r.maxDia=+r.maxDia||9999; r.cap=+r.cap||0.01; });
       S.masters[t]=out;
       try{ await saveMaster(t); msg(true,"Saved. Use “Re-run automation” on a project to apply it."); if(t==="machines") S.masters.machines.forEach(r=>{ if(Array.isArray(r.keys)) r.keys=r.keys.join(", "); }); }catch(e){ msg(false,e.message); } };
-    if($("aMove")) $("aMove").onclick=async()=>{
-      const b=$("aMove"); b.disabled=true; b.textContent="Moving…";
-      const payload={}; payload[t]=S.ownMasters[t];
-      const r=await sb.rpc("kmr_pd_push_masters",{p_org:S.org.id,p:payload});
-      if(r.error){ b.disabled=false; b.textContent="Move to Operations Master"; return msg(false,r.error.message); }
-      await loadOpsMasters(S.org.id); S.machines=S.masters.machines.length?S.masters.machines:E.DEFAULT_MACHINES;
-      toast(`Moved ${r.data[t]||0} ${LBL} to the Operations Master.`); pane(t);
-    };
+    if($("aMove")) $("aMove").onclick=()=>moveToOps(t);
     if($("aReset")) $("aReset").onclick=()=>{ if(!confirm("Replace the machine list with the built-in defaults?")) return; S.masters.machines=JSON.parse(JSON.stringify(E.DEFAULT_MACHINES)); pane("machines"); };
   }
   if(t==="users"){
