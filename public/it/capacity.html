@@ -1360,6 +1360,7 @@ function loadLocal() {
       if (ops && ops.length) s = convertV3({ operations: ops, machines: JSON.parse(localStorage.getItem('kmr_v3_machines')), branding: JSON.parse(localStorage.getItem('kmr_v3_branding')), periodPlans: JSON.parse(localStorage.getItem('kmr_v3_period_plans')) });
     } catch (e) { s = null; }
   }
+  if (!s && window.KMR_PLATFORM && (window.CAPACITY_CLOUD_CONFIG || {}).url) return blankState();
   return normalise(s || defaultState());
 }
 
@@ -1393,6 +1394,7 @@ function adoptRemote(data) {
   state = normalise(data);
   if (keep) Object.assign(state, keep);
   if (typeof cloud !== "undefined" && cloud.ops) { cloud.own = null; applyOpsData(); }
+  if (typeof cloud !== "undefined" && cloud.brand) { state.settings.companyName = cloud.brand.name; if (cloud.brand.logo) state.settings.logo = cloud.brand.logo; }
   LS.set(K_STATE, state);
   cloud.savedHash = sharedHash();
 }
@@ -1422,7 +1424,7 @@ async function cloudBoot() {
     else { setSync('err', 'No shared plan published yet'); }
     try {   // company name and logo come from the customer's KMR Apps Administration
       const b = await Cloud._fetch('/rest/v1/rpc/kmr_workspace_brand', { method: 'POST', body: JSON.stringify({ p_product: 'capacity', p_org: Cloud.org }) });
-      if (b && b.name) { state.settings.companyName = b.name; if (b.logo) state.settings.logo = b.logo; }
+      if (b && b.name) { cloud.brand = b; state.settings.companyName = b.name; if (b.logo) state.settings.logo = b.logo; }
     } catch (e) { /* keep the plan's own name */ }
     await applyOpsMasters();   // machines, parts, cycle times, plant standards and HRM holidays
     hideGate(); render(); startPoll();
@@ -1751,7 +1753,7 @@ function renderShell() {
 
 /* ---------- lock controls the signed-in role may not use ---------- */
 const EDITOR_ACTS = ['addHoliday', 'delHoliday', 'pastePlan', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
-const ADMIN_ACTS = ['uploadLogo', 'removeLogo', 'importJson', 'resetAll', 'blankStart', 'connSave', 'connReset', 'connDownload'];
+const ADMIN_ACTS = ['uploadLogo', 'removeLogo', 'importJson', 'resetAll', 'blankStart', 'clearPlans', 'connSave', 'connReset', 'connDownload'];
 const EDITOR_SETTINGS = ['levelTargetPct', 'lotSize', 'levelAnyMachine', 'oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours'];
 function actNeeds(act) { return ADMIN_ACTS.includes(act) ? 'admin' : EDITOR_ACTS.includes(act) ? 'editor' : null; }
 function fieldNeeds(el) {
@@ -2273,7 +2275,7 @@ function settingsGeneral() {
   ${usersBlock}
 
   <section class="card"><div class="card-h"><div><h2>Data & backup</h2><div class="sub">Move data between PCs, keep monthly backups, or start again.</div></div></div>
-    <div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="exportJson">${icon('download')}Download backup (.json)</button><button class="btn" data-act="importJson">${icon('upload')}Restore from backup</button><button class="btn" data-act="importXlsx">${icon('excel')}Import Excel workbook</button><button class="btn" data-act="blankStart">${icon('plus')}Start a new company (empty)</button><button class="btn danger" data-act="resetAll">Reset to sample data</button></div></section>`;
+    <div class="card-b" style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="exportJson">${icon('download')}Download backup (.json)</button><button class="btn" data-act="importJson">${icon('upload')}Restore from backup</button>${window.KMR_PLATFORM ? `<button class="btn danger" data-act="clearPlans">Clear monthly plans</button>` : `<button class="btn" data-act="importXlsx">${icon('excel')}Import Excel workbook</button><button class="btn" data-act="blankStart">${icon('plus')}Start a new company (empty)</button><button class="btn danger" data-act="resetAll">Reset to sample data</button>`}</div></section>`;
 }
 
 /* ---------------------------------------------------------------- HELP */
@@ -3118,6 +3120,11 @@ Object.assign(Actions, {
       if (!c.url || !c.key) return toast('Connect first in Settings › General › Cloud connection.');
       return txt('capacity-config.json', JSON.stringify({ url: c.url, anonKey: c.key, workspace: c.workspace }, null, 2), 'application/json');
     }
+  },
+  clearPlans() {
+    confirmBox('Clear all monthly plans?', 'Every month’s part quantities, due dates, machine days and splits are removed. Machines, routings and plant standards stay in the Operations Master. Download a backup first if you may need them.', 'Clear plans', () => {
+      state.plans = {}; commit(); toast('Monthly plans cleared.'); render();
+    }, true);
   },
   blankStart() {
     confirmBox('Start a new company (empty)?', 'All company details, machines, routings and monthly plans will be removed so you can set up a new company from scratch. Plant standards keep their default values. Download a backup first if you may need the current data.', 'Start empty', () => {

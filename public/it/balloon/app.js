@@ -1189,7 +1189,8 @@ function sampleDxf(){
   P(0,"ENDSEC",0,"EOF");
   return o.join("\n");
 }
-$("bSample").onclick=()=>{ const f=new File([sampleDxf()],"EX-2040_sample.dxf",{type:"application/dxf"}); loadFile(f); };
+if((window.BI_CONFIG||{}).supabaseUrl){ const bs=$("bSample"); if(bs) bs.remove(); }
+if($("bSample")) $("bSample").onclick=()=>{ const f=new File([sampleDxf()],"EX-2040_sample.dxf",{type:"application/dxf"}); loadFile(f); };
 
 /* ---------- layout: drawing / drawing+table / side by side / table ---------- */
 const stacked=()=>$("work").classList.contains("m-stack")||matchMedia("(max-width:900px)").matches;

@@ -198,7 +198,7 @@ function bindTop(){
   menu("bNew","newMenu",()=>[
     {id:"bi",label:"From Balloon Inspector",sub:CLOUD?"Pick a saved ballooning report":"Needs the cloud version",run:biDialog,disabled:!CLOUD||!S.canEdit},
     {id:"csv",label:"Import ballooning file",sub:"Balloon Inspector CSV or JSON export",run:()=>$("fileCSV").click(),disabled:!S.canEdit},
-    {id:"sample",label:"Try the sample drawing",sub:"Drive flange DF-2040 – 24 characteristics",run:()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null),disabled:!S.canEdit},
+    ...(CLOUD?[]:[{id:"sample",label:"Try the sample drawing",sub:"Drive flange DF-2040 – 24 characteristics",run:()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null),disabled:!S.canEdit}]),
     "-",{id:"open",label:"Open Balloon Inspector",sub:"Balloon a new drawing, then Send to Process Documents",run:()=>window.open(CFG.balloonUrl||"balloon.html","_blank")}]);
   menu("bExport","expMenu",()=>{ const d=D.DOCS.find(x=>x.id===S.view); return [
     {id:"p1",label:"This document – PDF",sub:d?d.title:"Open a document first",disabled:!d,run:()=>exportDoc(S.view,"pdf")},
@@ -223,10 +223,10 @@ function bindTop(){
 function welcomeHTML(){
   return `<div class="empty"><div class="card"><h2>Create process documents from a ballooned drawing</h2>
     <p>Send a ballooned drawing from Balloon Inspector, or import its CSV. Everything else is automatic: process route, machines, tools, consumables, gauges and all ${D.DOCS.length} documents. You can edit any cell on screen and export to PDF or Excel.</p>
-    <div class="row">${CLOUD?`<button class="btn primary" id="wBI">From Balloon Inspector</button>`:""}<button class="btn" id="wCSV">Import CSV / JSON</button><button class="btn ${CLOUD?"":"primary"}" id="wSample">Try the sample drawing</button><button class="btn" id="wList">Open a project</button></div>
+    <div class="row">${CLOUD?`<button class="btn primary" id="wBI">From Balloon Inspector</button>`:""}<button class="btn" id="wCSV">Import CSV / JSON</button>${CLOUD?"":`<button class="btn primary" id="wSample">Try the sample drawing</button>`}<button class="btn" id="wList">Open a project</button></div>
     <div class="steps3"><div><b>1 · Balloon</b>Balloon Inspector reads the drawing and lists every characteristic with its tolerance, SC/CC class and gauge.</div><div><b>2 · Automate</b>This platform selects the process, machines, tools, consumables and gauges, then generates every document.</div><div><b>3 · Review & export</b>Edit on screen, approve, and export PDF / Excel with your logo.</div></div></div></div>`;
 }
-function bindWelcome(){ if($("wBI")) $("wBI").onclick=biDialog; $("wCSV").onclick=()=>$("fileCSV").click(); $("wSample").onclick=()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null); $("wList").onclick=projectsDialog;
+function bindWelcome(){ if($("wBI")) $("wBI").onclick=biDialog; $("wCSV").onclick=()=>$("fileCSV").click(); if($("wSample")) $("wSample").onclick=()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null); $("wList").onclick=projectsDialog;
   [$("wBI"),$("wCSV"),$("wSample")].forEach(b=>{ if(b&&!S.canEdit) b.disabled=true; }); }
 
 async function projectsDialog(){
