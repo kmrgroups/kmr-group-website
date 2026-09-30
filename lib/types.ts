@@ -17,6 +17,24 @@ export type CompanyInfo = {
   youtube_url?: string;
   twitter_url?: string;
   whatsapp_number?: string;
+  trade_name?: string;
+  constitution?: string;
+  proprietor_name?: string;
+  proprietor_title?: string;
+  udyam_number?: string;
+  msme_category?: string;
+  trademark_status?: string;
+  website_url?: string;
+  city?: string;
+  state?: string;
+  postal_code?: string;
+  tagline?: string;
+  slogan?: string;
+  short_about?: string;
+  vision?: string;
+  mission?: string;
+  logo_full_url?: string;
+  letterhead_url?: string;
 };
 
 export type HeroContent = {

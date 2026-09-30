@@ -194,6 +194,16 @@ app/api/           create-order, verify-payment (Razorpay) + admin/create-staff,
 components/       Navbar, Footer, SpecPlate, ImageUploader, BuyNowButton, PermissionGate
 lib/              supabaseClient (browser), supabaseAdmin (server-only), AdminAccessContext, types, resources
 supabase/         schema.sql + add-orders-table.sql + add-logo-column.sql +
-                  add-permissions-and-compliance.sql + add-phase1-operations.sql
+                  add-permissions-and-compliance.sql + add-phase1-operations.sql +
+                  add-legal-identity.sql
 public/           manifest.json (PWA)
 ```
+
+
+## Legal identity & brand (Company Info)
+
+Run `supabase/add-legal-identity.sql` once in the SQL Editor. Admin → Company Info then also holds the trade name,
+legal name, constitution, proprietor, Udyam number and MSME category, trademark status, full address (city, state,
+PIN), website, tagline, slogan, footer text, vision, mission, the logo with business verticals and the letterhead.
+They appear on About, Contact, the footer and the map. Company Info is public — never enter Aadhaar, PAN or bank
+account numbers there (invoices take those from the KMR Console).

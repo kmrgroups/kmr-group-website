@@ -43,6 +43,19 @@ function CompanyContent() {
     </div>
   );
 
+  const area = (key: keyof CompanyInfo, label: string, rows: number) => (
+    <div>
+      <label className="block text-sm font-medium mb-1">{label}</label>
+      <textarea
+        value={(form[key] as string) ?? ""}
+        onChange={(e) => setForm({ ...form, [key]: e.target.value })}
+        disabled={!canUpdate}
+        rows={rows}
+        className="w-full border border-line px-3 py-2 text-sm disabled:bg-warehouse"
+      />
+    </div>
+  );
+
   return (
     <div className="max-w-3xl">
       <p className="eyebrow text-steel mb-2">Legal & Contact</p>
@@ -60,29 +73,75 @@ function CompanyContent() {
             onUploaded={(url) => setForm({ ...form, logo_url: url })}
           />
         </div>
+        <p className="eyebrow text-steel pt-2">Identity</p>
         <div className="grid sm:grid-cols-2 gap-4">
-          {field("legal_name", "Legal Name")}
-          {field("brand_name", "Brand Name")}
+          {field("trade_name", "Trade Name (as on GST certificate)")}
+          {field("brand_name", "Brand Name (short, for the menu)")}
+          {field("legal_name", "Legal Name (as on GST certificate)")}
+          {field("constitution", "Constitution (Proprietorship, LLP, Pvt Ltd …)")}
+          {field("proprietor_name", "Proprietor / Director")}
+          {field("proprietor_title", "Their title (Proprietor, Director …)")}
           {field("founded_year", "Founded Year", "number")}
-          {field("gstin", "GSTIN")}
-          {field("cin", "CIN")}
-          {field("email", "Email")}
-          {field("phone", "Phone")}
-          {field("whatsapp_number", "WhatsApp Number (with country code, no +)")}
         </div>
+
+        <p className="eyebrow text-steel pt-2">Registrations</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {field("gstin", "GSTIN")}
+          {field("udyam_number", "Udyam Registration No. (MSME)")}
+          {field("msme_category", "MSME Category (Micro / Small / Medium)")}
+          {field("cin", "CIN (companies / LLPIN — leave empty for a proprietorship)")}
+        </div>
+        {field("trademark_status", "Trademark (e.g. TM application no., class and status)")}
+        <p className="text-xs text-slate">Keep full registration records and certificates under Admin → Finance &amp; Compliance. Never put Aadhaar, PAN or bank account numbers here — this information is public on the website.</p>
+
+        <p className="eyebrow text-steel pt-2">Address &amp; Contact</p>
         <div>
-          <label className="block text-sm font-medium mb-1">Registered Address</label>
+          <label className="block text-sm font-medium mb-1">Registered Address (street)</label>
           <textarea
             value={form.registered_address || ""}
             onChange={(e) => setForm({ ...form, registered_address: e.target.value })}
-            rows={3}
-            className="w-full border border-line px-3 py-2 text-sm"
+            disabled={!canUpdate}
+            rows={2}
+            className="w-full border border-line px-3 py-2 text-sm disabled:bg-warehouse"
           />
+        </div>
+        <div className="grid sm:grid-cols-3 gap-4">
+          {field("city", "City / Town")}
+          {field("state", "State")}
+          {field("postal_code", "PIN Code")}
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {field("email", "Email")}
+          {field("phone", "Phone")}
+          {field("whatsapp_number", "WhatsApp Number (with country code, no +)")}
+          {field("website_url", "Website")}
         </div>
         <div className="grid sm:grid-cols-2 gap-4">
           {field("map_lat", "Map Latitude", "number")}
           {field("map_lng", "Map Longitude", "number")}
         </div>
+
+        <p className="eyebrow text-steel pt-2">Brand &amp; About</p>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {field("tagline", "Tagline (under the logo)")}
+          {field("slogan", "Slogan")}
+        </div>
+        {area("short_about", "Short description (site footer)", 2)}
+        {area("vision", "Vision (About page)", 3)}
+        {area("mission", "Mission (About page)", 3)}
+        <div className="grid sm:grid-cols-2 gap-6">
+          <div>
+            <label className="block text-sm font-medium mb-1">Logo with business verticals</label>
+            <p className="text-xs text-slate mb-2">Shown on the About page.</p>
+            <ImageUploader folder="company" currentUrl={form.logo_full_url} onUploaded={(url) => setForm({ ...form, logo_full_url: url })} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">Letterhead</label>
+            <p className="text-xs text-slate mb-2">Blank letterhead for staff to download (image).</p>
+            <ImageUploader folder="company" currentUrl={form.letterhead_url} onUploaded={(url) => setForm({ ...form, letterhead_url: url })} />
+          </div>
+        </div>
+
         <p className="eyebrow text-steel pt-2">Social Links</p>
         <div className="grid sm:grid-cols-2 gap-4">
           {field("facebook_url", "Facebook URL")}

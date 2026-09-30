@@ -6,8 +6,9 @@ export const revalidate = 60;
 export default async function ContactPage() {
   const { data } = await supabase.from("company_info").select("*").limit(1).maybeSingle();
   const c = data as CompanyInfo | null;
-  const lat = c?.map_lat ?? 12.8452;
-  const lng = c?.map_lng ?? 77.6602; // Electronic City, Bengaluru default
+  const address = [c?.registered_address, [c?.city, c?.state].filter(Boolean).join(", "), c?.postal_code].filter(Boolean).join(", ");
+  // The map uses the coordinates from Admin → Company Info, or else finds the address itself
+  const mapQuery = c?.map_lat != null && c?.map_lng != null ? `${c.map_lat},${c.map_lng}` : encodeURIComponent(address || "Puducherry");
 
   const social = [
     { label: "Facebook", url: c?.facebook_url },
@@ -27,7 +28,7 @@ export default async function ContactPage() {
         <div className="plate bg-white p-7 space-y-5">
           <div>
             <p className="eyebrow text-steel mb-1">Registered Address</p>
-            <p className="text-slate">{c?.registered_address || "Add address from Admin → Company Info"}</p>
+            <p className="text-slate">{c?.trade_name && <><b className="text-ink">{c.trade_name}</b><br /></>}{address || "Add address from Admin → Company Info"}</p>
           </div>
           <div>
             <p className="eyebrow text-steel mb-1">Email</p>
@@ -37,6 +38,12 @@ export default async function ContactPage() {
             <p className="eyebrow text-steel mb-1">Phone</p>
             <p className="text-slate">{c?.phone || "Add phone from Admin → Company Info"}</p>
           </div>
+          {c?.gstin && (
+            <div>
+              <p className="eyebrow text-steel mb-1">GSTIN</p>
+              <p className="text-slate font-mono">{c.gstin}</p>
+            </div>
+          )}
           {social.length > 0 && (
             <div>
               <p className="eyebrow text-steel mb-2">Follow Us</p>
@@ -63,7 +70,7 @@ export default async function ContactPage() {
             className="w-full h-full min-h-[320px] border-0"
             loading="lazy"
             referrerPolicy="no-referrer-when-downgrade"
-            src={`https://www.google.com/maps?q=${lat},${lng}&z=15&output=embed`}
+            src={`https://www.google.com/maps?q=${mapQuery}&z=15&output=embed`}
           />
         </div>
       </div>

@@ -3,8 +3,9 @@ import { supabase } from "@/lib/supabaseClient";
 import type { CompanyInfo } from "@/lib/types";
 
 export default async function Footer() {
-  const { data } = await supabase.from("company_info").select("logo_url, brand_name").limit(1).maybeSingle();
-  const c = data as Pick<CompanyInfo, "logo_url" | "brand_name"> | null;
+  const { data } = await supabase.from("company_info").select("logo_url, brand_name, trade_name, tagline, slogan, short_about, gstin, udyam_number").limit(1).maybeSingle();
+  const c = data as Pick<CompanyInfo, "logo_url" | "brand_name" | "trade_name" | "tagline" | "slogan" | "short_about" | "gstin" | "udyam_number"> | null;
+  const name = c?.trade_name || "KMR Group of Companies";
 
   return (
     <footer className="blueprint-bg text-warehouse mt-24 border-t border-white/10">
@@ -18,9 +19,9 @@ export default async function Footer() {
               <span className="border border-copper/70 px-2 py-0.5 text-copper-light font-display text-2xl">KMR</span>
             )}
           </div>
-          <p className="text-sm text-slate-light max-w-xs">
-            A multi-vertical group of companies engineering reliable products and services
-            across manufacturing, trading and technology.
+          {c?.tagline && <p className="eyebrow text-copper-light mb-2">{c.tagline}</p>}
+          <p className="text-sm text-slate-light max-w-xs whitespace-pre-line">
+            {c?.short_about || "A multi-vertical group of companies delivering reliable products and services across trading, technology and training."}
           </p>
         </div>
 
@@ -53,8 +54,9 @@ export default async function Footer() {
           </ul>
         </div>
       </div>
-      <div className="border-t border-white/10 py-5 text-center text-xs text-slate font-mono">
-        © {new Date().getFullYear()} KMR Group of Companies. All rights reserved.
+      <div className="border-t border-white/10 py-5 text-center text-xs text-slate font-mono space-y-1 px-5">
+        {c?.slogan && <p className="text-copper-light">{c.slogan}</p>}
+        <p>© {new Date().getFullYear()} {name}. All rights reserved.{c?.gstin ? ` · GSTIN ${c.gstin}` : ""}{c?.udyam_number ? ` · ${c.udyam_number}` : ""}</p>
       </div>
     </footer>
   );
