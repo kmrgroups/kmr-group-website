@@ -56,11 +56,11 @@ export default async function SoftwarePage() {
                     <div className="mt-8 border-t border-line pt-6">
                       {m || y ? (
                         <p><span className="font-display text-3xl font-semibold text-navy">{inr((m ?? y)!.amount)}</span><span className="text-sm text-muted"> / {unit} / {m ? "month" : "year"} + GST</span>
-                          <span className="mt-1 block text-xs text-muted">{m && y ? `or ${inr(y.amount)} / ${unit} / year · ` : ""}minimum {(m ?? y)!.min} {a.seat_label}</span></p>
+                          <span className="mt-1 block text-xs text-muted">{[m && y ? `or ${inr(y.amount)} / ${unit} / year` : "", (m ?? y)!.min > 1 ? `minimum ${(m ?? y)!.min} ${a.seat_label}` : ""].filter(Boolean).join(" · ")}</span></p>
                       ) : <p className="text-sm font-semibold text-gold-dark">Pricing on request</p>}
                       <div className="mt-5 flex flex-wrap gap-3">
                         <a href="#demo" className="btn-gold">Book a free demo</a>
-                        <a href="/it/" className="btn-outline">Explore the app</a>
+                        <a href={({ hrm: "/it/hrm", balloon: "/it/balloon.html", pd: "/it/pd.html", capacity: "/it/capacity.html" } as Record<string, string>)[a.code] ?? "/it/"} className="btn-outline">Explore the app</a>
                       </div>
                     </div>
                   </div>

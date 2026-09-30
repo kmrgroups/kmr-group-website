@@ -51,7 +51,7 @@ end $$;
 -- Orders: courses have no stock; enquiry-only products cannot be bought online
 create or replace function public.shop_place_order(p_product uuid, p_qty int, p_name text, p_email text, p_phone text, p_address text) returns jsonb
 language plpgsql security definer set search_path = public as $$
-declare pr products; q int := greatest(1, coalesce(p_qty, 1)); tok text := encode(gen_random_bytes(18), 'hex'); no text;
+declare pr products; q int := greatest(1, coalesce(p_qty, 1)); tok text := replace(gen_random_uuid()::text, '-', '') || substr(md5(random()::text), 1, 4); no text;
 begin
   select * into pr from products where id = p_product;
   if pr.id is null or not pr.is_active then raise exception 'This product is not currently available.'; end if;
