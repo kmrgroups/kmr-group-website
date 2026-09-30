@@ -1420,7 +1420,11 @@ async function cloudBoot() {
     if (!cloud.role) { showGate('noaccess'); setSync('err', 'No access'); return; }
     const r = await Cloud.load();
     if (r && r.data) { adoptRemote(r.data); cloud.stamp = r.updated_at; setSync('on', 'Synced · ' + timeAgo(r.updated_at)); }
-    else if (can('editor')) { cloud.savedHash = null; cloud.firstPublish = true; }
+    else if (can('editor')) {
+      // KMR platform: an empty workspace (new, or flushed in Data Master) starts blank — never re-publishes an old copy from this browser
+      if (window.KMR_PLATFORM) { const keep = { year: state.year, month: state.month, scenario: state.scenario }; state = Object.assign(blankState(), keep); LS.set(K_STATE, state); }
+      cloud.savedHash = null; cloud.firstPublish = !window.KMR_PLATFORM;
+    }
     else { setSync('err', 'No shared plan published yet'); }
     try {   // company name and logo come from the customer's KMR Apps Administration
       const b = await Cloud._fetch('/rest/v1/rpc/kmr_workspace_brand', { method: 'POST', body: JSON.stringify({ p_product: 'capacity', p_org: Cloud.org }) });
