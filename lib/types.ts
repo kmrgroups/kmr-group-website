@@ -63,6 +63,9 @@ export type Vertical = {
   description: string;
   icon_url?: string;
   sort_order: number;
+  slug?: string;
+  link?: string;
+  is_active?: boolean;
 };
 
 export type GalleryItem = {
@@ -86,6 +89,14 @@ export type Product = {
   image_url: string;
   is_active: boolean;
   created_at: string;
+  business?: "shop" | "training" | "import_export" | "trading" | "distribution";
+  kind?: "goods" | "course" | "service";
+  featured?: boolean;
+  sort_order?: number;
+  unit?: string;
+  hsn_code?: string;
+  enquiry_only?: boolean;
+  details?: Record<string, string>;
 };
 
 export type LegalPage = {

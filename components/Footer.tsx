@@ -9,7 +9,7 @@ export default async function Footer() {
 
   return (
     <footer className="blueprint-bg text-warehouse mt-24 border-t border-white/10">
-      <div className="mx-auto max-w-7xl px-5 py-14 grid gap-10 md:grid-cols-4">
+      <div className="mx-auto max-w-7xl px-5 py-14 grid gap-10 md:grid-cols-5">
         <div>
           <div className="mb-3">
             {c?.logo_url ? (
@@ -26,11 +26,21 @@ export default async function Footer() {
         </div>
 
         <div>
+          <p className="eyebrow text-copper-light mb-4">Businesses</p>
+          <ul className="space-y-2 text-sm text-slate-light">
+            <li><Link href="/shop">Online Shop</Link></li>
+            <li><Link href="/software">Software (KMR Apps)</Link></li>
+            <li><Link href="/training">Training & Education</Link></li>
+            <li><Link href="/trade">Import, Export & Trading</Link></li>
+          </ul>
+        </div>
+
+        <div>
           <p className="eyebrow text-copper-light mb-4">Company</p>
           <ul className="space-y-2 text-sm text-slate-light">
             <li><Link href="/about">About Us</Link></li>
             <li><Link href="/leadership">Leadership</Link></li>
-            <li><Link href="/verticals">Business Verticals</Link></li>
+            <li><Link href="/verticals">Our Businesses</Link></li>
             <li><Link href="/gallery">Gallery</Link></li>
           </ul>
         </div>
@@ -50,7 +60,7 @@ export default async function Footer() {
           <p className="eyebrow text-copper-light mb-4">Contact</p>
           <ul className="space-y-2 text-sm text-slate-light">
             <li><Link href="/contact">Get in touch</Link></li>
-            <li><Link href="/admin/login" className="text-slate">Admin login</Link></li>
+            <li><Link href="/trade#distribution">Become a distributor</Link></li>
           </ul>
         </div>
       </div>

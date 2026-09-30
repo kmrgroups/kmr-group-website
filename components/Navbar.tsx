@@ -4,11 +4,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
 
 const links = [
+  { href: "/shop", label: "Shop" },
+  { href: "/software", label: "Software" },
+  { href: "/training", label: "Training" },
+  { href: "/trade", label: "Trade" },
   { href: "/about", label: "About" },
-  { href: "/leadership", label: "Leadership" },
-  { href: "/verticals", label: "Verticals" },
-  { href: "/products", label: "Shop" },
-  { href: "/gallery", label: "Gallery" },
   { href: "/contact", label: "Contact" }
 ];
 

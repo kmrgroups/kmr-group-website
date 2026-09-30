@@ -1,198 +1,78 @@
 # KMR Group of Companies — Website
 
-A full corporate + marketplace website: hero banner, leadership, business
-verticals, gallery, product catalog (Amazon/Flipkart-style), India-compliant
-legal pages, and a login-protected admin panel with add/edit/delete/upload
-for every section. Built with Next.js + Tailwind + Supabase, responsive on
-web, iPhone and Android, and installable as a home-screen app (PWA).
+The public website of KMR Group (www.kmr-groups.com), built for several businesses under one brand:
 
-## 1. Create your Supabase project (backend + database + storage)
+| Section | Page | How customers act |
+|---|---|---|
+| Online shop | `/shop` | Buy now → pay by bank transfer / UPI |
+| Software (KMR Apps) | `/software` | Plans & prices from the Console catalogue, free-trial request |
+| Training & Education | `/training` | Enrol → pay by bank transfer / UPI, or enquire for a team |
+| Import & Export, Trading, Distribution | `/trade` | Request a quote |
 
-1. Go to https://supabase.com → New project. Note your **Project URL** and
-   **anon public API key** (Settings → API).
-2. Open the SQL Editor → New query, paste the entire contents of
-   `supabase/schema.sql`, and run it. This creates every table, sets up
-   public read / admin-only write security, seeds the 5 legal pages, and
-   creates the `media` storage bucket for photos/videos.
-3. Create your admin login: Authentication → Users → Add user → enter your
-   email and a password. This is the ONLY login the admin panel accepts —
-   there is no public sign-up form, by design.
+Plus the group pages (home, about, leadership, our businesses, gallery, contact) and the India-compliant legal
+pages. Built with Next.js + Tailwind + Supabase; responsive and installable as a home-screen app (PWA).
 
-## 2. Configure the project locally
+**There is no admin panel on the website.** Every piece of content — products, courses, banner, businesses,
+leadership, gallery, legal pages, company info, compliance records — and every shop order and enquiry is managed in
+the **KMR Console → Website** (and **Operations** for customers, vendors, items, warehouses, stock and employees).
+
+## 1. Supabase
+
+Run once in the SQL Editor, in this order (each is safe to re-run):
+
+1. `supabase/schema.sql` — tables, public-read security, legal pages, the `media` bucket
+2. `add-orders-table.sql`, `add-logo-column.sql`, `add-permissions-and-compliance.sql`, `add-phase1-operations.sql`
+3. `add-legal-identity.sql`
+4. `add-bank-orders.sql` (after the Console's `0019_bank_payments.sql`)
+5. `add-multi-business.sql` — businesses on products (shop / training / import-export / trading / distribution),
+   enquiry-only items, links for the business cards, and lets Console staff manage the shop. Run it together with the
+   Console's `0021_website.sql` (either order).
+
+## 2. Configure and run
 
 ```bash
-cp .env.local.example .env.local
-```
-
-Edit `.env.local` and fill in your Supabase Project URL and anon key from
-step 1.
-
-## 3. Install and run
-
-```bash
+cp .env.local.example .env.local   # Supabase URL, anon key, SUPABASE_SERVICE_ROLE_KEY (server only)
 npm install
 npm run dev
 ```
 
-Open http://localhost:3000 for the public site, and
-http://localhost:3000/admin/login to sign in with the admin account you
-created in Supabase.
+## 3. Content and products (all in KMR Console)
 
-## 4. Add your real content
+- **Website → Products** — shop items, courses and trade items: business, name, photo, price, MRP, stock, unit,
+  HSN/SAC, *enquiry only*, *featured*, *show on the website*.
+- **Website → Publish from Operations Master** — pick parts from a company's Operations Master and they arrive in
+  Website → Products (hidden, priced from the customer rate contract). Add a photo, check price and stock, then tick
+  *Show on the website*. Publishing again refreshes the name and description only.
+- **Website → Banner, Businesses, Leadership, Gallery, Legal pages, Company info, Compliance.**
+- **Website → Shop orders** — confirm or reject reported bank / UPI payments; stock is reduced when an order is paid.
+- **Enquiries** — every form on the website (software trial, training, quotes, bulk orders, contact) lands here,
+  tagged with its business.
 
-Everything is editable from the admin panel — nothing is hardcoded once you
-save it once:
+## 4. Shop payments (bank transfer / UPI — no payment gateway)
 
-- **Admin → Hero Banner** — headline, subheadline, banner image, button
-- **Admin → Leadership** — add/edit/delete management team profiles + photos
-- **Admin → Verticals** — add/edit/delete your business verticals
-- **Admin → Gallery** — upload photos and promo videos
-- **Admin → Products** — add/edit/delete products with photo, price, MRP,
-  stock quantity, and a visible/hidden toggle — your Amazon/Flipkart-style
-  catalog
-- **Admin → Legal Pages** — edit Terms & Conditions, Privacy Policy,
-  Refund & Cancellation, Shipping & Delivery, and Grievance Redressal
-- **Admin → Company Info** — legal name, GSTIN, CIN, registered address,
-  map coordinates, email, phone, WhatsApp, all social media links, and
-  your company logo (shown in the navigation bar and footer)
+The bank account and UPI ID are the ones in **KMR Console → Prices & invoices → Seller details**. **Buy now** /
+**Enrol** places the order (`KMR-SO-00001`, *awaiting payment*) and opens the order's own page: bank details, a UPI
+QR with the amount and order number, and **I've paid** for the UTR. Staff confirm it in the Console.
 
-## 5. Deploy it live on your domain
+## 5. Deploy
 
-1. Push this folder to a GitHub repository.
-2. Go to https://vercel.com → New Project → import the repo.
-3. In Vercel → Settings → Environment Variables, add the same two variables
-   from your `.env.local`.
-4. Deploy. Then go to Vercel → Settings → Domains and add your own domain —
-   point your domain's DNS to Vercel as instructed there.
-
-The site is already responsive (mobile/tablet/desktop) and works as an
-installable web app on iPhone (Safari → Share → Add to Home Screen) and
-Android (Chrome → Add to Home Screen) — no app-store submission needed.
-If you later want true native iOS/Android apps in the App Store/Play
-Store, that is a separate build on top of this.
+Push to GitHub, import into Vercel, add the environment variables from `.env.local`, then add the domain under
+Vercel → Settings → Domains.
 
 ## 6. Before going live — legal checklist (India)
 
-The legal pages are pre-created but contain placeholder text — replace with
-real content before accepting real orders:
+- Terms, Privacy, Refund & Cancellation, Shipping & Delivery and Grievance Redressal (a named Grievance Officer under
+  the Consumer Protection (E-Commerce) Rules, 2020) — edit them in Console → Website → Legal pages.
+- Company info is public — never enter Aadhaar, PAN or bank account numbers there (invoices take those from the
+  Console).
 
-- **Terms & Conditions** and **Privacy Policy** — have these reviewed by a
-  lawyer or use a compliant generator; they must reflect your actual data
-  practices.
-- **Refund & Cancellation Policy** and **Shipping & Delivery Policy** —
-  required for any e-commerce/marketplace activity in India.
-- **Grievance Redressal** — under the Consumer Protection (E-Commerce)
-  Rules, 2020, you must name a Grievance Officer with contact details on
-  the site.
-- **GSTIN / CIN** — display your real registration numbers in
-  Admin → Company Info; they show on the About page and can be referenced
-  in your footer/invoices.
-- **Payments** — customers pay by bank transfer / UPI straight into KMR's
-  account (see "Shop payments" below). A WhatsApp "Ask on WhatsApp" button
-  remains alongside it for customers who prefer to enquire first.
-
-## 7. Shop payments (bank transfer / UPI — no payment gateway)
-
-1. Run `supabase/add-bank-orders.sql` once in the SQL Editor (after `add-permissions-and-compliance.sql` and the
-   KMR Console's `0019_bank_payments.sql`).
-2. The bank account and UPI ID customers pay into are the ones in **KMR Console → Prices & invoices → Seller details**
-   — one place for invoices and the shop.
-3. Keep `SUPABASE_SERVICE_ROLE_KEY` in `.env.local` / Vercel (server only, never `NEXT_PUBLIC_`). Razorpay keys are
-   no longer used — delete `RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET` from Vercel.
-4. **Buy Now** places the order (`KMR-SO-00001`, *awaiting payment*) and opens the order's own page: bank details with
-   copy buttons, a UPI QR with the amount and order number filled in, and **I've paid** for the UTR / reference.
-   The customer keeps that page's link to follow the order.
-5. **Admin → Orders**: *payment reported* orders show the UTR and amount — check your bank statement, then
-   **Confirm** (order paid, stock reduced) or **Reject** (the customer sees the reason and can send it again).
-   **Mark as paid** records a payment that arrived without a report (cheque, direct transfer); **Cancel order** for
-   unpaid orders. Stock is only reduced when an order is paid.
-
-## 9. Set up department staff logins & permissions
-
-1. Re-run `supabase/add-permissions-and-compliance.sql` in the SQL Editor
-   (safe alongside everything you've already run).
-2. **Bootstrap your own admin account**: in Supabase → Authentication →
-   Users, click your existing login and copy the **User UID**. Then run
-   this one-time SQL (also included as a comment at the top of that
-   file):
-   ```sql
-   insert into staff_profiles (id, full_name, email, department, is_admin)
-   values ('YOUR-AUTH-USER-ID', 'Rajavelu R', 'info@kmr-groups.com', 'admin', true)
-   on conflict (id) do update set is_admin = true;
-   ```
-3. Log in to `/admin/login` as usual, then go to **Admin → Staff &
-   Permissions** (only visible to admins).
-4. Click **Add a Department Login** — enter a name, email, password, and
-   department (Sales, Stores, Purchase, Top Management, Other), then check
-   exactly which sections that person can Create / Read / Update / Delete
-   in the permission grid. They'll only see the sections you grant them —
-   everything else is hidden from their sidebar and blocked at the
-   database level even if they try to access it directly.
-5. To revoke someone's access later, click **Deactivate** next to their
-   name — their login stops working immediately.
-
-## 10. Finance & Compliance dashboard
-
-Go to **Admin → Finance & Compliance** to track GST, Udyam registration,
-trademark filings, employee welfare compliance, pollution control
-consents, local body licenses, invoicing, and anything else — each record
-supports a reference number, issuing authority, issue/expiry dates, an
-uploaded document (certificate/license scan), and notes.
-
-The dashboard automatically flags anything **expiring soon** (based on
-the "remind me X days before" setting per record) or **already expired**
-in red/amber, with a summary count at the top. This is a tracking and
-alerting tool — it doesn't file anything with government portals for you,
-but gives you one place to see what needs renewal and when.
-
-## 12. Phase 1: Operations (Customers, Vendors, Items, Warehouses, Stock, Employees)
-
-This is the first phase of turning the site into an internal operations
-system alongside the public website — the foundation everything else
-(Sales Orders, Purchase Orders, Work Orders, full HRM) will build on next.
-
-1. Run `supabase/add-phase1-operations.sql` in the SQL Editor (after
-   `add-permissions-and-compliance.sql`).
-2. Go to **Admin → Staff & Permissions** and grant the relevant new
-   sections (Customers, Vendors, Items Master, Warehouses, Stock Ledger,
-   Employees) to whichever staff logins need them — e.g. give your
-   Purchase department read/write on Vendors and Items Master, your
-   Stores department read/write on Stock Ledger and Warehouses.
-3. Start by adding at least one **Warehouse** and a few **Items** — the
-   Stock Ledger needs both of those to exist before you can record any
-   stock movement.
-4. **Stock Ledger** works as a running log: every opening balance,
-   purchase receipt, sales dispatch, production consumption/output, or
-   manual adjustment is one row. Current stock on hand is calculated
-   automatically by summing all movements for each item/warehouse pair —
-   you never edit a "current stock" number directly, you always add a
-   new movement.
-
-**What's next (not built yet):** Purchase Order → Goods Receipt →
-Vendor Billing (Phase 2), Sales Order → Dispatch → GST Invoice (Phase 3),
-full HRM with attendance/PF (Phase 4), Work Orders/BOM for manufacturing
-(Phase 5), and Import/Export + full production planning (Phase 6). Each
-is its own build on top of this foundation.
-
-## 13. Project structure
+## 7. Project structure
 
 ```
-app/              Public pages + admin panel + API routes (Next.js App Router)
-app/admin/operations/  Customers, Vendors, Items Master, Warehouses, Stock Ledger, Employees
-app/api/           create-order, report-payment (shop) + admin/create-staff, admin/delete-staff
-components/       Navbar, Footer, SpecPlate, ImageUploader, BuyNowButton, PermissionGate
-lib/              supabaseClient (browser), supabaseAdmin (server-only), AdminAccessContext, types, resources
-supabase/         schema.sql + add-orders-table.sql + add-logo-column.sql +
-                  add-permissions-and-compliance.sql + add-phase1-operations.sql +
-                  add-legal-identity.sql + add-bank-orders.sql
-public/           manifest.json (PWA)
+app/              Public pages (home, shop, software, training, trade, products/[id], order/[token], legal, …)
+app/api/          create-order, report-payment (shop), enquiry (→ Console Enquiries)
+components/       Navbar, Footer, ProductCard, BuyNowButton, EnquiryForm, SpecPlate, …
+lib/              supabaseClient (browser), supabaseAdmin (server only), types
+supabase/         SQL migrations listed in step 1
+public/it/        KMR Apps (HRM, Balloon Inspector, Process Documents, Capacity Planner)
 ```
-
-
-## Legal identity & brand (Company Info)
-
-Run `supabase/add-legal-identity.sql` once in the SQL Editor. Admin → Company Info then also holds the trade name,
-legal name, constitution, proprietor, Udyam number and MSME category, trademark status, full address (city, state,
-PIN), website, tagline, slogan, footer text, vision, mission, the logo with business verticals and the letterhead.
-They appear on About, Contact, the footer and the map. Company Info is public — never enter Aadhaar, PAN or bank
-account numbers there (invoices take those from the KMR Console).
