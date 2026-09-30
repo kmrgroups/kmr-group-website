@@ -1,72 +1,77 @@
 import Link from "next/link";
-import { supabase } from "@/lib/supabaseClient";
-import type { CompanyInfo } from "@/lib/types";
+import { getSite, companyName, fullAddress, telHref, verticalHref } from "@/lib/site";
+import SocialLinks from "./SocialLinks";
+import { IconClock, IconMail, IconPhone, IconPin } from "./Icons";
 
 export default async function Footer() {
-  const { data } = await supabase.from("company_info").select("logo_url, brand_name, trade_name, tagline, slogan, short_about, gstin, udyam_number").limit(1).maybeSingle();
-  const c = data as Pick<CompanyInfo, "logo_url" | "brand_name" | "trade_name" | "tagline" | "slogan" | "short_about" | "gstin" | "udyam_number"> | null;
-  const name = c?.trade_name || "KMR Group of Companies";
+  const { company: c, verticals, policies } = await getSite();
+  const name = companyName(c);
+  const footerPolicies = policies.filter((p) => p.show_in_footer !== false);
+  const addr = fullAddress(c);
+  const head = "mb-5 text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-light";
+  const link = "text-white/70 transition-colors hover:text-gold-light";
 
   return (
-    <footer className="blueprint-bg text-warehouse mt-24 border-t border-white/10">
-      <div className="mx-auto max-w-7xl px-5 py-14 grid gap-10 md:grid-cols-5">
+    <footer className="pattern-navy mt-0 text-white">
+      <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]">
         <div>
-          <div className="mb-3">
-            {c?.logo_url ? (
+          <Link href="/" className="inline-block">
+            {c.logo_url
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.logo_url} alt={c.brand_name || "KMR Group"} className="h-10 w-auto object-contain" />
-            ) : (
-              <span className="border border-copper/70 px-2 py-0.5 text-copper-light font-display text-2xl">KMR</span>
-            )}
-          </div>
-          {c?.tagline && <p className="eyebrow text-copper-light mb-2">{c.tagline}</p>}
-          <p className="text-sm text-slate-light max-w-xs whitespace-pre-line">
-            {c?.short_about || "A multi-vertical group of companies delivering reliable products and services across trading, technology and training."}
-          </p>
+              ? <img src={c.logo_url} alt={name} className="h-14 w-auto max-w-[190px] rounded bg-white/95 object-contain p-1.5" />
+              : <span className="border-2 border-gold px-2.5 py-0.5 font-display text-3xl font-bold text-white">KMR</span>}
+          </Link>
+          <p className="mt-5 font-display text-xl text-white">{name}</p>
+          {c.tagline && <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-gold-light">{c.tagline}</p>}
+          <p className="mt-4 max-w-sm text-sm leading-relaxed text-white/65">{c.short_about || "A multi-business group in trading, software, training and industrial supply."}</p>
+          <SocialLinks c={c} className="mt-6" />
         </div>
 
         <div>
-          <p className="eyebrow text-copper-light mb-4">Businesses</p>
-          <ul className="space-y-2 text-sm text-slate-light">
-            <li><Link href="/shop">Online Shop</Link></li>
-            <li><Link href="/software">Software (KMR Apps)</Link></li>
-            <li><Link href="/training">Training & Education</Link></li>
-            <li><Link href="/trade">Import, Export & Trading</Link></li>
+          <p className={head}>Our businesses</p>
+          <ul className="space-y-3 text-sm">
+            {verticals.map((v) => <li key={v.id}><Link href={verticalHref(v)} className={link}>{v.title}</Link></li>)}
           </ul>
         </div>
 
         <div>
-          <p className="eyebrow text-copper-light mb-4">Company</p>
-          <ul className="space-y-2 text-sm text-slate-light">
-            <li><Link href="/about">About Us</Link></li>
-            <li><Link href="/leadership">Leadership</Link></li>
-            <li><Link href="/verticals">Our Businesses</Link></li>
-            <li><Link href="/gallery">Gallery</Link></li>
+          <p className={head}>Company</p>
+          <ul className="space-y-3 text-sm">
+            {[["/about", "About us"], ["/about#founder", "Founder’s message"], ["/leadership", "Leadership"], ["/careers", "Careers"], ["/gallery", "Gallery"], ["/policies", "Policies"], ["/contact", "Contact"]]
+              .map(([h, l]) => <li key={h}><Link href={h} className={link}>{l}</Link></li>)}
           </ul>
         </div>
 
         <div>
-          <p className="eyebrow text-copper-light mb-4">Legal</p>
-          <ul className="space-y-2 text-sm text-slate-light">
-            <li><Link href="/legal/terms">Terms & Conditions</Link></li>
-            <li><Link href="/legal/privacy">Privacy Policy</Link></li>
-            <li><Link href="/legal/refund">Refund & Cancellation</Link></li>
-            <li><Link href="/legal/shipping">Shipping & Delivery</Link></li>
-            <li><Link href="/legal/grievance">Grievance Redressal</Link></li>
-          </ul>
-        </div>
-
-        <div>
-          <p className="eyebrow text-copper-light mb-4">Contact</p>
-          <ul className="space-y-2 text-sm text-slate-light">
-            <li><Link href="/contact">Get in touch</Link></li>
-            <li><Link href="/trade#distribution">Become a distributor</Link></li>
+          <p className={head}>Get in touch</p>
+          <ul className="space-y-4 text-sm text-white/75">
+            {addr && <li className="flex gap-3"><IconPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><span>{addr}</span></li>}
+            {c.phone && <li className="flex gap-3"><IconPhone className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><a href={telHref(c.phone)} className={link}>{c.phone}</a>{c.alt_phone && <>&nbsp;·&nbsp;<a href={telHref(c.alt_phone)} className={link}>{c.alt_phone}</a></>}</li>}
+            {c.email && <li className="flex gap-3"><IconMail className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><a href={`mailto:${c.email}`} className={link}>{c.email}</a></li>}
+            {c.business_hours && <li className="flex gap-3"><IconClock className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><span>{c.business_hours}</span></li>}
           </ul>
         </div>
       </div>
-      <div className="border-t border-white/10 py-5 text-center text-xs text-slate font-mono space-y-1 px-5">
-        {c?.slogan && <p className="text-copper-light">{c.slogan}</p>}
-        <p>© {new Date().getFullYear()} {name}. All rights reserved.{c?.gstin ? ` · GSTIN ${c.gstin}` : ""}{c?.udyam_number ? ` · ${c.udyam_number}` : ""}</p>
+
+      {(c.gstin || c.udyam_number) && (
+        <div className="border-t border-white/10">
+          <div className="wrap flex flex-wrap gap-x-10 gap-y-2 py-5 text-[12.5px] text-white/60">
+            {c.gstin && <span>GSTIN <b className="font-mono font-medium text-white/85">{c.gstin}</b></span>}
+            {c.udyam_number && <span>Udyam <b className="font-mono font-medium text-white/85">{c.udyam_number}</b>{c.msme_category ? ` · ${c.msme_category} enterprise` : ""}</span>}
+            {c.cin && <span>CIN <b className="font-mono font-medium text-white/85">{c.cin}</b></span>}
+            {c.constitution && <span>{c.constitution}</span>}
+          </div>
+        </div>
+      )}
+
+      <div className="border-t border-white/10 bg-navy-950/60">
+        <div className="wrap flex flex-col gap-3 py-5 text-[12.5px] text-white/55 md:flex-row md:items-center md:justify-between">
+          <p>© {new Date().getFullYear()} {c.legal_name && c.legal_name !== name ? `${name} (${c.legal_name})` : name}. All rights reserved.</p>
+          <ul className="flex flex-wrap gap-x-5 gap-y-1">
+            {footerPolicies.map((p) => <li key={p.slug}><Link href={`/policies/${p.slug}`} className="hover:text-gold-light">{p.title}</Link></li>)}
+          </ul>
+        </div>
+        {c.slogan && <p className="pb-5 text-center text-[11px] font-semibold uppercase tracking-[0.3em] text-gold/80">{c.slogan}</p>}
       </div>
     </footer>
   );

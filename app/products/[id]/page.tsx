@@ -2,81 +2,125 @@ import { supabase } from "@/lib/supabaseClient";
 import type { Product } from "@/lib/types";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { getSite, inr } from "@/lib/site";
 import BuyNowButton from "@/components/BuyNowButton";
 import EnquiryForm from "@/components/EnquiryForm";
+import ProductCard, { canBuy } from "@/components/ProductCard";
+import { RichText } from "@/components/Blocks";
+import { IconBag, IconCap, IconCode, IconGlobe, IconLock, IconShield, IconTruck, IconWhatsApp } from "@/components/Icons";
 
 export const revalidate = 30;
 
 const SECTION: Record<string, [string, string]> = {
-  shop: ["Shop", "/shop"], training: ["Training", "/training"], import_export: ["Import & Export", "/trade#import_export"],
+  shop: ["Shop", "/shop"], software: ["Software", "/software"], training: ["Training", "/training"], import_export: ["Import & Export", "/trade#import_export"],
   trading: ["Trading", "/trade#trading"], distribution: ["Distribution", "/trade#distribution"],
 };
-const inr = (n: number) => `₹${Number(n).toLocaleString("en-IN")}`;
+
+async function load(id: string) {
+  if (!/^[0-9a-f-]{36}$/.test(id)) return null;
+  const { data } = await supabase.from("products").select("*").eq("id", id).eq("is_active", true).maybeSingle();
+  return data as Product | null;
+}
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }) {
+  const p = await load((await params).id);
+  return p ? { title: p.name, description: (p.description ?? "").slice(0, 160), openGraph: { images: p.image_url ? [{ url: p.image_url }] : undefined } } : { title: "Product" };
+}
 
 export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;   // Next.js 15+: params is a Promise
-  if (!/^[0-9a-f-]{36}$/.test(id)) return notFound();
-  const { data } = await supabase.from("products").select("*").eq("id", id).eq("is_active", true).maybeSingle();
-  const product = data as Product | null;
-  if (!product) return notFound();
+  const { id } = await params;
+  const product = await load(id);
+  if (!product) notFound();
+  const { company: c, settings } = await getSite();
   const business = product.business ?? "shop";
-  const enquiry = product.enquiry_only || !["shop", "training"].includes(business) || Number(product.price) <= 0;
+  const buy = canBuy(product);
   const course = product.kind === "course";
   const [sectionLabel, sectionHref] = SECTION[business] ?? SECTION.shop;
-  const waLink = `https://wa.me/?text=${encodeURIComponent(`Hi, I'm interested in ${product.name}${product.sku ? ` (${product.sku})` : ""} on the KMR Group website.`)}`;
+  const { data: rel } = await supabase.from("products").select("*").eq("is_active", true).eq("business", business).neq("id", product.id).order("sort_order").limit(4);
+  const related = (rel as Product[]) || [];
+  const wa = c.whatsapp_number ? `https://wa.me/${c.whatsapp_number.replace(/\D/g, "")}?text=${encodeURIComponent(`Hi, I'm interested in ${product.name}${product.sku ? ` (${product.sku})` : ""}.`)}` : null;
   const facts = ([
-    ["Duration", product.details?.duration], ["Mode", product.details?.mode], ["Next batch", product.details?.schedule],
+    ["Code", product.sku], ["Category", product.category], ["Duration", product.details?.duration], ["Mode", product.details?.mode], ["Next batch", product.details?.schedule],
     ["Unit", product.unit && !course ? product.unit : undefined], ["HSN / SAC", product.hsn_code],
   ] as [string, string | undefined][]).filter(([, v]) => v);
+  const off = product.mrp && product.mrp > product.price ? Math.round((1 - product.price / product.mrp) * 100) : 0;
+  const Fallback = business === "software" ? IconCode : course ? IconCap : business === "shop" ? IconBag : IconGlobe;
+  const pay = [settings.online_payment && "UPI / cards / net banking", settings.bank_transfer !== false && "bank transfer"].filter(Boolean).join(" or ");
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-16">
-      <p className="text-sm text-slate mb-6"><Link href={sectionHref} className="hover:text-copper">← {sectionLabel}</Link></p>
-      <div className="grid md:grid-cols-2 gap-10">
-        <div className="plate bg-white overflow-hidden aspect-square">
-          {product.image_url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-xs text-slate font-mono">{course ? "COURSE" : "NO IMAGE"}</div>
-          )}
-        </div>
-
-        <div>
-          <p className="font-mono text-xs text-slate mb-2">{[product.sku, product.category].filter(Boolean).join(" · ")}</p>
-          <h1 className="font-display text-4xl mb-4">{product.name}</h1>
-          {!enquiry ? (
-            <>
-              <div className="flex items-baseline gap-3 mb-2">
-                <p className="text-copper text-2xl font-semibold">{inr(product.price)}{course ? <span className="text-sm text-slate font-normal"> per participant</span> : null}</p>
-                {product.mrp && product.mrp > product.price && <p className="text-slate line-through">{inr(product.mrp)}</p>}
-              </div>
-              {!course && (
-                <p className={`text-sm mb-4 ${product.stock_quantity > 0 ? "text-signal" : "text-red-600"}`}>
-                  {product.stock_quantity > 0 ? `In stock (${product.stock_quantity} available)` : "Out of stock"}
-                </p>
-              )}
-            </>
-          ) : (
-            <p className="text-copper font-medium mb-4">{Number(product.price) > 0 ? `Indicative price ${inr(product.price)}${product.unit ? ` / ${product.unit}` : ""} · ` : ""}Priced on request</p>
-          )}
-          {facts.length > 0 && <dl className="grid grid-cols-2 gap-2 text-sm mb-4">{facts.map(([k, v]) => <div key={k}><dt className="text-slate">{k}</dt><dd>{v}</dd></div>)}</dl>}
-          <p className="text-slate leading-relaxed mb-8 whitespace-pre-line">{product.description}</p>
-
-          {!enquiry && (
-            <div className="flex flex-wrap items-start gap-4 mb-8">
-              <BuyNowButton product={product} mode={course ? "enrol" : "buy"} />
-              <a href={waLink} target="_blank" rel="noopener noreferrer" className="inline-block border border-line hover:border-copper hover:text-copper transition-colors font-medium px-6 py-3">Ask on WhatsApp</a>
+    <>
+      <div className="border-b border-line bg-white">
+        <nav className="wrap py-4 text-[13px] text-muted" aria-label="Breadcrumb">
+          <Link href="/" className="hover:text-gold-dark">Home</Link><span className="mx-2 text-gold">/</span>
+          <Link href={sectionHref} className="hover:text-gold-dark">{sectionLabel}</Link><span className="mx-2 text-gold">/</span>
+          <span className="text-navy">{product.name}</span>
+        </nav>
+      </div>
+      <section className="py-14">
+        <div className="wrap grid gap-12 lg:grid-cols-2">
+          <div className="corner">
+            <div className="aspect-square overflow-hidden bg-white shadow-card">
+              {product.image_url
+                // eslint-disable-next-line @next/next/no-img-element
+                ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                : <div className="pattern-navy grid h-full w-full place-items-center"><Fallback className="h-24 w-24 text-gold/60" /></div>}
             </div>
-          )}
-        </div>
-      </div>
+          </div>
 
-      <div className="max-w-3xl mt-12">
-        <EnquiryForm business={business as "shop"} productName={product.name} askQuantity={!course}
-          title={enquiry ? "Request a quote" : course ? "Questions, or training for your whole team?" : "Bulk order or a question?"}
-          submitLabel={enquiry ? "Request quote" : "Send enquiry"} />
-      </div>
-    </div>
+          <div>
+            {product.category && <p className="eyebrow mb-3">{product.category}</p>}
+            <h1 className="h-display text-4xl text-navy md:text-5xl">{product.name}</h1>
+            <div className="mt-6 border-y border-line py-5">
+              {buy ? (
+                <>
+                  <div className="flex flex-wrap items-baseline gap-3">
+                    <span className="font-display text-4xl font-semibold text-navy">{inr(product.price)}</span>
+                    {off > 0 && <><span className="text-lg text-muted line-through">{inr(product.mrp!)}</span><span className="bg-gold px-2 py-0.5 text-xs font-bold text-navy-950">{off}% OFF</span></>}
+                  </div>
+                  <p className="mt-1 text-sm text-muted">{course ? "per participant · " : ""}inclusive of GST</p>
+                  {product.kind === "goods" && <p className={`mt-3 text-sm font-semibold ${product.stock_quantity > 0 ? "text-success" : "text-danger"}`}>{product.stock_quantity > 0 ? `In stock — ${product.stock_quantity} available` : "Out of stock"}</p>}
+                </>
+              ) : <p className="font-display text-2xl text-gold-dark">{Number(product.price) > 0 ? `From ${inr(product.price)}${product.unit ? ` / ${product.unit}` : ""} · ` : ""}Price on request</p>}
+            </div>
+
+            {buy && (
+              <div className="mt-6 space-y-4">
+                <BuyNowButton product={product} mode={course ? "enrol" : "buy"} />
+                <p className="flex items-center gap-2 text-xs text-muted"><IconLock className="h-4 w-4 text-gold" />Pay by {pay || "bank transfer"} — straight to our company account.</p>
+              </div>
+            )}
+            {!buy && <a href="#enquiry" className="btn-gold mt-6">{business === "software" ? "Request a demo" : "Request a quote"}</a>}
+            {wa && <a href={wa} target="_blank" rel="noopener noreferrer" className="btn-outline ml-0 mt-3 sm:ml-3"><IconWhatsApp className="h-4 w-4" />Ask on WhatsApp</a>}
+
+            {facts.length > 0 && <dl className="mt-8 grid grid-cols-2 gap-px bg-line">{facts.map(([k, v]) => <div key={k} className="bg-white px-4 py-3"><dt className="text-[11px] font-semibold uppercase tracking-wider text-muted">{k}</dt><dd className="mt-0.5 text-sm text-navy">{v}</dd></div>)}</dl>}
+
+            <div className="mt-8 grid gap-3 text-sm text-navy sm:grid-cols-2">
+              <p className="flex items-center gap-2"><IconShield className="h-4 w-4 text-gold" />GST invoice{c.gstin ? ` (GSTIN ${c.gstin})` : ""}</p>
+              {business === "shop" && <p className="flex items-center gap-2"><IconTruck className="h-4 w-4 text-gold" />Dispatched after payment</p>}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {product.description && (
+        <section className="bg-white py-16">
+          <div className="wrap max-w-4xl"><h2 className="h-display mb-6 text-3xl text-navy">Details</h2><RichText text={product.description} /></div>
+        </section>
+      )}
+
+      <section id="enquiry" className="scroll-mt-24 py-16">
+        <div className="wrap max-w-4xl">
+          <EnquiryForm business={business as "shop"} productName={product.name} askQuantity={!course && business !== "software"}
+            title={!buy ? (business === "software" ? "Request a demo" : "Request a quote") : course ? "Training for your whole team?" : "Bulk order or a question?"}
+            submitLabel={!buy ? "Send request" : "Send enquiry"} />
+        </div>
+      </section>
+
+      {related.length > 0 && (
+        <section className="bg-sand/60 py-16">
+          <div className="wrap"><h2 className="h-display mb-8 text-3xl text-navy">You may also like</h2>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{related.map((p) => <ProductCard key={p.id} p={p} />)}</div></div>
+        </section>
+      )}
+    </>
   );
 }

@@ -1,36 +1,33 @@
 import { supabase } from "@/lib/supabaseClient";
+import { PageHero } from "@/components/Blocks";
 import type { GalleryItem } from "@/lib/types";
 
 export const revalidate = 60;
+export const metadata = { title: "Gallery" };
 
 export default async function GalleryPage() {
   const { data } = await supabase.from("gallery_items").select("*").order("sort_order");
-  const items = (data as GalleryItem[]) || [];
-
+  const items = ((data as (GalleryItem & { is_active?: boolean })[]) || []).filter((g) => g.is_active !== false);
   return (
-    <div className="mx-auto max-w-6xl px-5 py-20">
-      <p className="eyebrow text-steel mb-3">In the Field</p>
-      <h1 className="font-display text-5xl mb-12">Gallery</h1>
-
-      {items.length === 0 ? (
-        <p className="text-sm text-slate font-mono">No photos or videos added yet — add them from Admin → Gallery.</p>
-      ) : (
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {items.map((g) => (
-            <div key={g.id} className="plate bg-white overflow-hidden">
-              <div className="aspect-video bg-line/40">
-                {g.media_type === "video" ? (
-                  <video src={g.media_url} controls poster={g.thumbnail_url} className="w-full h-full object-cover" />
-                ) : (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={g.media_url} alt={g.title || "Gallery item"} className="w-full h-full object-cover" />
-                )}
-              </div>
-              {g.title && <p className="p-3 text-sm font-medium">{g.title}</p>}
+    <>
+      <PageHero eyebrow="Gallery" title="Moments & milestones" intro="Our people, facilities, events and work — in pictures." />
+      <section className="py-20">
+        <div className="wrap">
+          {items.length === 0 ? <p className="text-muted">Photos and videos are coming soon.</p> : (
+            <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
+              {items.map((g) => (
+                <figure key={g.id} className="group relative break-inside-avoid overflow-hidden bg-navy">
+                  {g.media_type === "video"
+                    ? <video src={g.media_url} controls poster={g.thumbnail_url} className="w-full" preload="metadata" />
+                    // eslint-disable-next-line @next/next/no-img-element
+                    : <img src={g.media_url} alt={g.title || "Gallery photo"} className="w-full transition duration-700 group-hover:scale-[1.03]" loading="lazy" />}
+                  {g.title && <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-navy-950/90 to-transparent px-5 pb-4 pt-10 text-sm font-medium text-white opacity-0 transition group-hover:opacity-100">{g.title}</figcaption>}
+                </figure>
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
-    </div>
+      </section>
+    </>
   );
 }

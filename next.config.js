@@ -28,6 +28,11 @@ const nextConfig = {
     return [
       { source: "/it/hrm.html", destination: "/it/hrm", permanent: false },
       { source: "/it/console.html", destination: "/it/console", permanent: false },
+      // older addresses of the website
+      { source: "/verticals", destination: "/businesses", permanent: true },
+      { source: "/products", destination: "/shop", permanent: true },
+      { source: "/legal/:slug", destination: "/policies/:slug", permanent: true },
+      { source: "/admin/:path*", destination: "/", permanent: false },
     ];
   },
 };

@@ -35,6 +35,37 @@ export type CompanyInfo = {
   mission?: string;
   logo_full_url?: string;
   letterhead_url?: string;
+  founder_name?: string;
+  founder_title?: string;
+  founder_photo_url?: string;
+  founder_message?: string;
+  founder_signature_url?: string;
+  about_story?: string;
+  core_values?: string;
+  business_hours?: string;
+  map_embed_url?: string;
+  careers_email?: string;
+  alt_phone?: string;
+};
+
+export type SiteSettings = {
+  online_payment: boolean;
+  bank_transfer: boolean;
+  announcement?: string | null;
+  announcement_link?: string | null;
+  header_cta_label?: string | null;
+  header_cta_link?: string | null;
+};
+
+export type HeroSlide = {
+  id: string; eyebrow?: string; title: string; subtitle?: string; image_url?: string;
+  cta_label?: string; cta_link?: string; cta2_label?: string; cta2_link?: string; sort_order: number;
+};
+export type SiteStat = { id: string; value: string; label: string };
+
+export type JobOpening = {
+  id: string; title: string; department?: string; location?: string; employment_type?: string; experience?: string; salary_range?: string;
+  summary?: string; description?: string; requirements?: string; posted_on: string; closes_on?: string;
 };
 
 export type HeroContent = {
@@ -62,6 +93,7 @@ export type Vertical = {
   code: string;
   description: string;
   icon_url?: string;
+  image_url?: string;
   sort_order: number;
   slug?: string;
   link?: string;
@@ -89,7 +121,7 @@ export type Product = {
   image_url: string;
   is_active: boolean;
   created_at: string;
-  business?: "shop" | "training" | "import_export" | "trading" | "distribution";
+  business?: "shop" | "software" | "training" | "import_export" | "trading" | "distribution";
   kind?: "goods" | "course" | "service";
   featured?: boolean;
   sort_order?: number;
@@ -101,9 +133,12 @@ export type Product = {
 
 export type LegalPage = {
   id: string;
-  slug: "terms" | "privacy" | "refund" | "shipping" | "grievance";
+  slug: string;
   title: string;
   content: string;
+  summary?: string;
+  show_in_footer?: boolean;
+  sort_order?: number;
   updated_at: string;
 };
 
@@ -135,124 +170,3 @@ export type Order = {
   created_at: string;
 };
 
-export type Department = "admin" | "sales" | "stores" | "purchase" | "top_management" | "other";
-
-export type StaffProfile = {
-  id: string;
-  full_name: string;
-  email?: string;
-  department: Department;
-  is_admin: boolean;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type Resource =
-  | "hero_content" | "leaders" | "verticals" | "gallery_items" | "products"
-  | "orders" | "legal_pages" | "company_info" | "compliance_records"
-  | "customers" | "vendors" | "inventory_items" | "warehouses"
-  | "stock_transactions" | "employees";
-
-export type PermissionSet = { create: boolean; read: boolean; update: boolean; delete: boolean };
-export type PermissionsMap = Record<Resource, PermissionSet>;
-
-export type ComplianceCategory =
-  | "gst" | "udyam" | "trademark" | "employee_welfare"
-  | "pollution_control" | "local_body_license" | "invoicing" | "other";
-
-export type ComplianceRecord = {
-  id: string;
-  category: ComplianceCategory;
-  title: string;
-  reference_number?: string;
-  issuing_authority?: string;
-  issue_date?: string;
-  expiry_date?: string;
-  document_url?: string;
-  notes?: string;
-  reminder_days_before: number;
-  created_at: string;
-  updated_at: string;
-};
-
-export type Customer = {
-  id: string;
-  name: string;
-  contact_person?: string;
-  email?: string;
-  phone?: string;
-  gstin?: string;
-  billing_address?: string;
-  shipping_address?: string;
-  notes?: string;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type Vendor = {
-  id: string;
-  name: string;
-  contact_person?: string;
-  email?: string;
-  phone?: string;
-  gstin?: string;
-  address?: string;
-  notes?: string;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type ItemType = "raw_material" | "finished_good" | "trading" | "service";
-
-export type InventoryItem = {
-  id: string;
-  item_code: string;
-  name: string;
-  item_type: ItemType;
-  category?: string;
-  unit_of_measure: string;
-  hsn_code?: string;
-  standard_cost: number;
-  selling_price: number;
-  reorder_level: number;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type Warehouse = {
-  id: string;
-  name: string;
-  address?: string;
-  is_active: boolean;
-  created_at: string;
-};
-
-export type StockTransactionType =
-  | "opening" | "purchase_receipt" | "sales_dispatch"
-  | "production_consumption" | "production_output" | "adjustment";
-
-export type StockTransaction = {
-  id: string;
-  item_id: string;
-  warehouse_id: string;
-  transaction_type: StockTransactionType;
-  quantity: number;
-  unit_cost?: number;
-  reference_note?: string;
-  transaction_date: string;
-  created_at: string;
-};
-
-export type Employee = {
-  id: string;
-  employee_code: string;
-  full_name: string;
-  department?: string;
-  designation?: string;
-  email?: string;
-  phone?: string;
-  date_of_joining?: string;
-  pf_number?: string;
-  is_active: boolean;
-  created_at: string;
-};

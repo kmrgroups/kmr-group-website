@@ -11,7 +11,7 @@ export default function BuyNowButton({ product, mode = "buy" }: { product: Produ
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [form, setForm] = useState({ name: "", email: "", phone: "", address: "", quantity: 1 });
-  const input = "w-full border border-line px-3 py-2 text-sm";
+  const input = "field";
 
   async function handlePlaceOrder() {
     setError("");
@@ -39,18 +39,18 @@ export default function BuyNowButton({ product, mode = "buy" }: { product: Produ
   }
 
   if (!enrol && product.stock_quantity <= 0) {
-    return <button disabled className="inline-block bg-slate-light text-white font-medium px-6 py-3 cursor-not-allowed">Out of Stock</button>;
+    return <button disabled className="btn bg-sand text-muted">Out of stock</button>;
   }
 
   return (
     <div>
       {!open ? (
-        <button onClick={() => setOpen(true)} className="inline-block bg-copper hover:bg-copper-light transition-colors text-ink font-medium px-6 py-3">
+        <button onClick={() => setOpen(true)} className="btn-gold px-10 py-4 text-base">
           {enrol ? "Enrol now" : "Buy Now"}
         </button>
       ) : (
-        <div className="plate bg-white p-5 max-w-sm space-y-3">
-          <h3 className="font-display text-xl mb-1">{enrol ? "Participant details" : "Shipping Details"}</h3>
+        <div className="card max-w-md space-y-3 p-6">
+          <h3 className="mb-1 font-display text-xl font-semibold text-navy">{enrol ? "Participant details" : "Shipping Details"}</h3>
           <input placeholder="Full name" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={input} />
           <input placeholder="Phone number" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={input} />
           <input placeholder="Email (optional)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={input} />
@@ -59,19 +59,19 @@ export default function BuyNowButton({ product, mode = "buy" }: { product: Produ
           <div className="flex items-center gap-2">
             <label className="text-sm">{enrol ? "Participants" : "Qty"}</label>
             <input type="number" min={1} max={enrol ? 50 : product.stock_quantity} value={form.quantity}
-              onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} className="w-20 border border-line px-3 py-2 text-sm" />
+              onChange={(e) => setForm({ ...form, quantity: Number(e.target.value) })} className="field w-24" />
           </div>
-          <p className="text-xs text-slate">
+          <p className="text-xs text-muted">
             {enrol
-              ? "After enrolling you pay the fee by bank transfer (NEFT / IMPS / RTGS) or UPI. Your seat is confirmed once the payment reaches our account."
-              : "After placing the order you pay by bank transfer (NEFT / IMPS / RTGS) or UPI. We dispatch once the payment reaches our account."}
+              ? "Next you pay the fee online or by bank transfer / UPI. Your seat is confirmed once the payment reaches our account."
+              : "Next you pay online or by bank transfer / UPI. We dispatch once the payment reaches our account."}
           </p>
-          {error && <p className="text-sm text-red-600">{error}</p>}
+          {error && <p className="text-sm text-danger">{error}</p>}
           <div className="flex gap-3">
-            <button onClick={handlePlaceOrder} disabled={loading} className="bg-copper hover:bg-copper-light transition-colors text-ink font-medium px-5 py-2">
-              {loading ? "Please wait…" : `${enrol ? "Enrol" : "Place order"} · ₹${(product.price * form.quantity).toLocaleString("en-IN")}`}
+            <button onClick={handlePlaceOrder} disabled={loading} className="btn-gold">
+              {loading ? "Please wait…" : `${enrol ? "Enrol & pay" : "Continue to payment"} · ₹${(product.price * form.quantity).toLocaleString("en-IN")}`}
             </button>
-            <button onClick={() => setOpen(false)} className="text-sm text-slate underline">Cancel</button>
+            <button onClick={() => setOpen(false)} className="text-sm text-muted underline">Cancel</button>
           </div>
         </div>
       )}

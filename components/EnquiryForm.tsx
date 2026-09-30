@@ -1,16 +1,16 @@
 "use client";
 import { useState } from "react";
+import { IconCheck } from "./Icons";
 
 type Business = "software" | "shop" | "training" | "import_export" | "trading" | "distribution" | "general";
 
 /** One enquiry / request-for-quote form for every business; it reaches KMR Console › Enquiries. */
-export default function EnquiryForm({ business, productName, productCode, askQuantity, askCompany = true, title, submitLabel = "Send enquiry" }: {
-  business: Business; productName?: string; productCode?: string; askQuantity?: boolean; askCompany?: boolean; title?: string; submitLabel?: string;
+export default function EnquiryForm({ business, productName, productCode, askQuantity, askCompany = true, title, intro, submitLabel = "Send enquiry", dark }: {
+  business: Business; productName?: string; productCode?: string; askQuantity?: boolean; askCompany?: boolean; title?: string; intro?: string; submitLabel?: string; dark?: boolean;
 }) {
   const [f, setF] = useState({ name: "", company: "", email: "", phone: "", country: "India", quantity: "", message: "", website: "" });
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ ok?: string; error?: string }>({});
-  const input = "w-full border border-line px-3 py-2 text-sm bg-white";
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setF({ ...f, [k]: e.target.value });
 
   async function submit(e: React.FormEvent) {
@@ -18,27 +18,35 @@ export default function EnquiryForm({ business, productName, productCode, askQua
     const r = await fetch("/api/enquiry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...f, business, productName, productCode }) });
     const j = await r.json().catch(() => ({}));
     setBusy(false);
-    if (!r.ok) { setMsg({ error: j.error || "Could not send. Please email info@kmr-groups.com." }); return; }
+    if (!r.ok) { setMsg({ error: j.error || "Could not send. Please email us instead." }); return; }
     setMsg({ ok: "Thank you — we have your enquiry and will get back to you within one working day." });
     setF({ ...f, quantity: "", message: "" });
   }
 
-  if (msg.ok) return <div className="plate bg-white p-5 text-sm text-signal">{msg.ok}</div>;
+  const box = dark ? "border border-white/10 bg-white/[0.04] p-6 md:p-8 text-white" : "card p-6 md:p-8";
+  if (msg.ok) return (
+    <div className={`${box} flex items-start gap-4`} role="status">
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-success/10 text-success"><IconCheck /></span>
+      <div><p className={`font-display text-xl ${dark ? "text-white" : "text-navy"}`}>Enquiry received</p><p className={`mt-1 text-sm ${dark ? "text-white/70" : "text-muted"}`}>{msg.ok}</p></div>
+    </div>
+  );
+  const fld = dark ? "field border-white/15 bg-white/[0.06] text-white placeholder:text-white/45" : "field";
   return (
-    <form onSubmit={submit} className="plate bg-white p-5 grid sm:grid-cols-2 gap-3">
-      {title && <h3 className="font-display text-xl sm:col-span-2">{title}</h3>}
-      {productName && <p className="sm:col-span-2 text-sm text-slate">About: <b className="text-ink">{productName}</b></p>}
-      <input className={input} placeholder="Your name *" required minLength={2} value={f.name} onChange={set("name")} />
-      {askCompany && <input className={input} placeholder="Company" value={f.company} onChange={set("company")} />}
-      <input className={input} type="email" placeholder="Email *" required value={f.email} onChange={set("email")} />
-      <input className={input} placeholder="Phone / WhatsApp" value={f.phone} onChange={set("phone")} />
-      <input className={input} placeholder="Country" value={f.country} onChange={set("country")} />
-      {askQuantity && <input className={input} placeholder="Quantity (e.g. 5 tonnes, 200 pcs)" value={f.quantity} onChange={set("quantity")} />}
-      <textarea className={`${input} sm:col-span-2`} rows={3} placeholder={business === "import_export" ? "What you need, destination / origin, delivery terms (FOB / CIF)…" : "Your requirement or question"} value={f.message} onChange={set("message")} />
+    <form onSubmit={submit} className={`${box} grid gap-4 sm:grid-cols-2`}>
+      {title && <h3 className={`font-display text-2xl font-semibold sm:col-span-2 ${dark ? "text-white" : "text-navy"}`}>{title}</h3>}
+      {intro && <p className={`-mt-2 text-sm sm:col-span-2 ${dark ? "text-white/65" : "text-muted"}`}>{intro}</p>}
+      {productName && <p className={`text-sm sm:col-span-2 ${dark ? "text-white/70" : "text-muted"}`}>About: <b className={dark ? "text-gold-light" : "text-navy"}>{productName}</b></p>}
+      <input className={fld} placeholder="Your name *" required minLength={2} value={f.name} onChange={set("name")} aria-label="Your name" />
+      {askCompany && <input className={fld} placeholder="Company" value={f.company} onChange={set("company")} aria-label="Company" />}
+      <input className={fld} type="email" placeholder="Email *" required value={f.email} onChange={set("email")} aria-label="Email" />
+      <input className={fld} placeholder="Phone / WhatsApp" value={f.phone} onChange={set("phone")} aria-label="Phone" />
+      <input className={fld} placeholder="Country" value={f.country} onChange={set("country")} aria-label="Country" />
+      {askQuantity && <input className={fld} placeholder="Quantity (e.g. 5 tonnes, 200 pcs)" value={f.quantity} onChange={set("quantity")} aria-label="Quantity" />}
+      <textarea className={`${fld} sm:col-span-2`} rows={4} placeholder={business === "import_export" ? "What you need, destination / origin, delivery terms (FOB / CIF)…" : "How can we help?"} value={f.message} onChange={set("message")} aria-label="Message" />
       <input tabIndex={-1} autoComplete="off" className="hidden" value={f.website} onChange={set("website")} aria-hidden="true" />
-      <div className="sm:col-span-2 flex items-center gap-3">
-        <button disabled={busy} className="bg-copper hover:bg-copper-light transition-colors text-ink font-medium px-5 py-2.5 disabled:opacity-60">{busy ? "Sending…" : submitLabel}</button>
-        {msg.error && <p className="text-sm text-red-600">{msg.error}</p>}
+      <div className="flex flex-wrap items-center gap-4 sm:col-span-2">
+        <button disabled={busy} className="btn-gold">{busy ? "Sending…" : submitLabel}</button>
+        {msg.error ? <p className="text-sm text-danger">{msg.error}</p> : <p className={`text-xs ${dark ? "text-white/50" : "text-muted"}`}>We reply within one working day.</p>}
       </div>
     </form>
   );

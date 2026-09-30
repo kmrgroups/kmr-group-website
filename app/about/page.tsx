@@ -1,63 +1,155 @@
+import Link from "next/link";
 import { supabase } from "@/lib/supabaseClient";
-import type { CompanyInfo } from "@/lib/types";
+import { getSite, companyName, fullAddress, paragraphs } from "@/lib/site";
+import { PageHero, RichText, SectionHead, CtaBand } from "@/components/Blocks";
+import { IconLinkedIn, IconQuote, IconShield } from "@/components/Icons";
+import type { Leader } from "@/lib/types";
 
 export const revalidate = 60;
+export const metadata = { title: "About us" };
 
 export default async function AboutPage() {
-  const { data } = await supabase.from("company_info").select("*").limit(1).maybeSingle();
-  const c = data as CompanyInfo | null;
-  const name = c?.trade_name || c?.brand_name || "KMR Group of Companies";
+  const { company: c } = await getSite();
+  const { data: people } = await supabase.from("leaders").select("*").order("sort_order");
+  const leaders = ((people as (Leader & { is_active?: boolean })[]) || []).filter((l) => l.is_active !== false);
+  const name = companyName(c);
+  const values = (c.core_values ?? "").split("\n").map((v) => v.trim()).filter(Boolean).map((v) => {
+    const [t, ...rest] = v.split(/\s[—–-]\s/); return [t, rest.join(" — ")] as const;
+  });
   const record = ([
-    ["Trade Name", c?.trade_name],
-    ["Legal Name", c?.legal_name],
-    ["Constitution", c?.constitution],
-    [c?.proprietor_title || "Proprietor", c?.proprietor_name],
-    ["GSTIN", c?.gstin],
-    ["Udyam (MSME)", c?.udyam_number ? `${c.udyam_number}${c.msme_category ? ` · ${c.msme_category}` : ""}` : null],
-    ["CIN", c?.cin],
-    ["Trademark", c?.trademark_status],
-    ["Founded", c?.founded_year ? String(c.founded_year) : null],
+    ["Trade name", c.trade_name], ["Legal name", c.legal_name], ["Constitution", c.constitution],
+    [c.proprietor_title || "Proprietor", c.proprietor_name], ["GSTIN", c.gstin],
+    ["Udyam registration", c.udyam_number ? `${c.udyam_number}${c.msme_category ? ` · ${c.msme_category} enterprise` : ""}` : null],
+    ["CIN / LLPIN", c.cin], ["Trademark", c.trademark_status], ["Established", c.founded_year ? String(c.founded_year) : null],
+    ["Registered office", fullAddress(c) || null],
   ] as [string, string | null | undefined][]).filter(([, v]) => v) as [string, string][];
+  const message = paragraphs(c.founder_message);
 
   return (
-    <div className="mx-auto max-w-5xl px-5 py-20">
-      <p className="eyebrow text-steel mb-3">About Us</p>
-      <h1 className="font-display text-5xl mb-10">
-        {name}
-      </h1>
-      {c?.tagline && <p className="eyebrow text-copper mb-10 -mt-6">{c.tagline}</p>}
+    <>
+      <PageHero eyebrow="About us" title={name} crumbs={[["About us"]]} intro={c.tagline ? `${c.tagline}. ${c.short_about ?? ""}` : c.short_about} />
 
-      {c?.logo_full_url && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={c.logo_full_url} alt={name} className="w-full max-w-md mx-auto mb-12 object-contain" />
+      {/* Story */}
+      <section className="py-24">
+        <div className="wrap grid gap-16 lg:grid-cols-[1.1fr_1fr]">
+          <div>
+            <p className="eyebrow mb-4">Our story</p>
+            <h2 className="h-display mb-8 text-3xl text-navy md:text-[44px]">{c.slogan || "One vision, many solutions"}</h2>
+            {c.about_story ? <RichText text={c.about_story} /> : <p className="lead">{c.short_about}</p>}
+          </div>
+          <div className="space-y-6">
+            {c.logo_full_url && (
+              <div className="card p-8">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={c.logo_full_url} alt={`${name} and its businesses`} className="mx-auto max-h-80 w-auto object-contain" />
+              </div>
+            )}
+            {c.vision && <div className="border-l-4 border-gold bg-white p-7 shadow-card"><p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-dark">Our vision</p><p className="mt-3 whitespace-pre-line font-display text-xl leading-relaxed text-navy">{c.vision}</p></div>}
+            {c.mission && <div className="pattern-navy p-7 text-white"><p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-gold-light">Our mission</p><p className="mt-3 whitespace-pre-line leading-relaxed text-white/85">{c.mission}</p></div>}
+          </div>
+        </div>
+      </section>
+
+      {/* Values */}
+      {values.length > 0 && (
+        <section className="bg-white py-24">
+          <div className="wrap">
+            <SectionHead eyebrow="What we stand for" title="Our core values" center />
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              {values.map(([t, d], i) => (
+                <div key={t} className="card-hover p-7">
+                  <div className="flex items-center justify-between"><IconShield className="h-9 w-9 text-gold" /><span className="font-display text-3xl text-line">0{i + 1}</span></div>
+                  <h3 className="mt-5 font-display text-xl font-semibold text-navy">{t}</h3>
+                  {d && <p className="mt-2 text-sm leading-relaxed text-muted">{d}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
       )}
 
-      <div className="grid md:grid-cols-2 gap-8 mb-16">
-        <div className="plate bg-white p-7">
-          <p className="eyebrow text-steel mb-3">Vision</p>
-          <p className="text-slate leading-relaxed whitespace-pre-line">
-            {c?.vision || "To be a trusted, multi-vertical group recognised for discipline, quality and long-term value delivered to every customer and partner we serve."}
-          </p>
-        </div>
-        <div className="plate bg-white p-7">
-          <p className="eyebrow text-steel mb-3">Mission</p>
-          <p className="text-slate leading-relaxed whitespace-pre-line">
-            {c?.mission || "To build and operate businesses across trading, technology and services with process rigour and customer focus — expanding responsibly, vertical by vertical."}
-          </p>
-        </div>
-      </div>
-
-      <div className="plate-dark blueprint-bg text-warehouse p-8">
-        <p className="eyebrow text-copper-light mb-3">Company Record</p>
-        <dl className="grid sm:grid-cols-2 gap-4 font-mono text-sm">
-          {record.map(([k, v]) => (
-            <div key={k}>
-              <dt className="text-slate-light">{k}</dt>
-              <dd>{v}</dd>
+      {/* Founder */}
+      {message.length > 0 && (
+        <section id="founder" className="scroll-mt-24 py-24">
+          <div className="wrap grid items-start gap-14 lg:grid-cols-[360px_1fr]">
+            <div className="lg:sticky lg:top-28">
+              <div className="corner">
+                <div className="aspect-[4/5] overflow-hidden bg-navy">
+                  {c.founder_photo_url
+                    // eslint-disable-next-line @next/next/no-img-element
+                    ? <img src={c.founder_photo_url} alt={c.founder_name || "Founder"} className="h-full w-full object-cover" />
+                    : <div className="pattern-navy grid h-full place-items-center font-display text-7xl text-gold/60">{(c.founder_name || "K").slice(0, 1)}</div>}
+                </div>
+              </div>
+              <p className="mt-8 font-display text-2xl text-navy">{c.founder_name || c.proprietor_name}</p>
+              <p className="text-sm text-muted">{c.founder_title || c.proprietor_title}</p>
             </div>
-          ))}
-        </dl>
-      </div>
-    </div>
+            <div>
+              <p className="eyebrow mb-4">Founder’s message</p>
+              <IconQuote className="h-12 w-12 text-gold" />
+              <p className="mt-4 font-display text-2xl leading-relaxed text-navy md:text-3xl">{message[0]}</p>
+              <div className="mt-8"><RichText text={message.slice(1).join("\n\n")} /></div>
+              {c.founder_signature_url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={c.founder_signature_url} alt="" className="mt-6 h-16 w-auto" />
+              )}
+              <p className="mt-2 font-display text-lg text-navy">{c.founder_name || c.proprietor_name}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Leadership */}
+      {leaders.length > 0 && (
+        <section className="bg-white py-24">
+          <div className="wrap">
+            <SectionHead eyebrow="Leadership" title="The team behind the group" center />
+            <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
+              {leaders.map((l) => (
+                <div key={l.id} className="group">
+                  <div className="aspect-[4/5] overflow-hidden bg-sand">
+                    {l.photo_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={l.photo_url} alt={l.name} className="h-full w-full object-cover grayscale transition duration-500 group-hover:grayscale-0" />
+                      : <div className="pattern-navy grid h-full place-items-center font-display text-5xl text-gold/60">{l.name.slice(0, 1)}</div>}
+                  </div>
+                  <div className="border-b-2 border-gold bg-white px-1 pt-5 pb-4">
+                    <div className="flex items-start justify-between gap-2">
+                      <div><h3 className="font-display text-xl font-semibold text-navy">{l.name}</h3><p className="text-sm text-gold-dark">{l.designation}</p></div>
+                      {l.linkedin_url && <a href={l.linkedin_url} target="_blank" rel="noopener noreferrer" aria-label={`${l.name} on LinkedIn`} className="text-navy hover:text-gold-dark"><IconLinkedIn className="h-5 w-5" /></a>}
+                    </div>
+                    {l.bio && <p className="mt-3 line-clamp-4 text-sm leading-relaxed text-muted">{l.bio}</p>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Corporate information */}
+      {record.length > 0 && (
+        <section className="py-24">
+          <div className="wrap grid gap-12 lg:grid-cols-[1fr_1.4fr]">
+            <div>
+              <p className="eyebrow mb-4">Corporate information</p>
+              <h2 className="h-display text-3xl text-navy md:text-4xl">Registered, compliant and accountable</h2>
+              <p className="lead mt-5">Our registrations are public so you can verify who you are dealing with. Invoices carry the same GSTIN and address.</p>
+              <Link href="/policies" className="btn-outline mt-8">Company policies</Link>
+            </div>
+            <dl className="card divide-y divide-line">
+              {record.map(([k, v]) => (
+                <div key={k} className="grid gap-1 px-6 py-4 sm:grid-cols-[200px_1fr]">
+                  <dt className="text-[12px] font-semibold uppercase tracking-wider text-muted">{k}</dt>
+                  <dd className={`text-sm text-navy ${/GSTIN|Udyam|CIN/.test(k) ? "font-mono" : ""}`}>{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        </section>
+      )}
+
+      <CtaBand title="Want to know more about us?" text="Visit the gallery or get in touch — we are happy to talk." primary={["Contact us", "/contact"]} secondary={["Gallery", "/gallery"]} />
+    </>
   );
 }
