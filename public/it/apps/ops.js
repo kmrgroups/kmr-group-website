@@ -41,7 +41,7 @@
     /** ctx: { sb, slug, main, dialog, $, role, customerId } */
     async overview(ctx, note) {
       const { data: counts, error } = await ctx.sb.rpc("kmr_ops_counts", { p_slug: ctx.slug });
-      const nSample = (counts && counts._sample) || 0, admin = ctx.role === "admin";
+      const nSample = (counts && counts._sample) || 0, admin = ctx.role === "admin", edit = ctx.role === "admin" || ctx.role === "editor";
       const sampleBar = error ? "" : admin
         ? `<div class="card" style="flex-direction:row;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:16px;border-style:dashed;--c:transparent">
             <div style="flex:1;min-width:240px"><b>Sample data</b><br><small style="color:var(--muted)">${nSample
@@ -59,8 +59,36 @@
           ${ctx.role === "admin" || ctx.role === "editor" ? `<label class="btn ghost" style="height:42px;cursor:pointer">Upload Excel workbook<input type="file" id="opsXlsxImp" accept=".xlsx" hidden></label>` : ""}
           <small style="color:var(--muted);align-self:center">One sheet per list. Fill it in Excel and upload it back — existing codes are updated, new ones added, nothing is deleted.</small>
         </div>
-        <div class="cards">${KINDS.map((K) => `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3><p><b style="font-size:22px;color:var(--ink)">${(counts && counts[K.kind]) || 0}</b> records${counts && counts["_sample_" + K.kind] ? ` · <span class="pill">${counts["_sample_" + K.kind]} sample</span>` : ""}</p></div>`).join("")}</div>`;
-      ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = () => this.list(ctx, el.dataset.kind)));
+        <div class="cards">${KINDS.map((K) => {
+          const all = (counts && counts[K.kind]) || 0, smp = (counts && counts["_sample_" + K.kind]) || 0, own = (counts && counts["_own_" + K.kind]) || 0;
+          const b = (act, label, on, red) => `<button class="btn ghost" data-card="${act}" data-k="${K.kind}" style="height:32px;padding:0 10px;font-size:12.5px${red ? ";color:#B00E28" : ""}" ${on ? "" : "disabled"}>${label}</button>`;
+          return `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3>
+            <p><b style="font-size:22px;color:var(--ink)">${all}</b> records${smp ? ` · <span class="pill">${smp} sample</span>` : ""}${own ? ` · <span class="pill ok">${own} yours</span>` : ""}</p>
+            ${admin || edit ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
+              ${admin ? b("sload", "Load sample", !smp) + b("sflush", "Flush sample", smp, true) : ""}
+              <label class="btn ghost" data-card="dload" style="height:32px;padding:0 10px;font-size:12.5px;cursor:pointer">Load data<input type="file" accept=".json,application/json" data-dload="${K.kind}" hidden></label>
+              ${admin ? b("dflush", "Flush data", own, true) : ""}
+            </div>` : ""}</div>`;
+        }).join("")}
+        ${counts && counts._has_balloon !== undefined ? `<div class="card" style="--c:#8B5CF6"><div style="font-size:26px;line-height:1">🎯</div><h3>Sample drawing</h3>
+          <p>${counts._has_balloon ? `A ready-made drawing (Mounting Plate EX-2040) in your <b>Balloon Inspector</b> — open it there under Reports; it is ballooned automatically.` : "Balloon Inspector is not in your company’s plan."}</p>
+          <p><b style="font-size:22px;color:var(--ink)">${counts._drawings || 0}</b> sample drawing${counts._drawings === 1 ? "" : "s"}</p>
+          ${admin && counts._has_balloon ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
+            <button class="btn ghost" data-drawing="load" style="height:32px;padding:0 10px;font-size:12.5px" ${counts._drawings ? "disabled" : ""}>Load sample drawing</button>
+            <button class="btn ghost" data-drawing="flush" style="height:32px;padding:0 10px;font-size:12.5px;color:#B00E28" ${counts._drawings ? "" : "disabled"}>Flush sample drawing</button>
+            <a class="btn ghost" href="/it/balloon.html" style="height:32px;padding:0 10px;font-size:12.5px;grid-column:1/-1">Open Balloon Inspector</a></div>` : ""}</div>` : ""}
+        </div>`;
+      ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = (e) => { if (e.target.closest("[data-card],[data-dload],button,label,input")) return; this.list(ctx, el.dataset.kind); }));
+      ctx.main.querySelectorAll("[data-card]").forEach((btn) => btn.addEventListener("click", (e) => e.stopPropagation()));
+      ctx.main.querySelectorAll("button[data-card]").forEach((btn) => (btn.onclick = (e) => { e.stopPropagation(); this.cardAction(ctx, btn.dataset.card, btn.dataset.k, btn); }));
+      ctx.main.querySelectorAll("[data-dload]").forEach((inp) => (inp.onchange = (e) => this.loadData(ctx, inp.dataset.dload, e.target.files[0], inp)));
+      ctx.main.querySelectorAll("[data-drawing]").forEach((btn) => (btn.onclick = async () => {
+        if (btn.dataset.drawing === "flush" && !confirm("Remove the sample drawing from Balloon Inspector?")) return;
+        btn.disabled = true; btn.textContent = "Working…";
+        const res = await ctx.sb.rpc("kmr_ops_sample_drawing", { p_slug: ctx.slug, p_action: btn.dataset.drawing });
+        if (res.error) { alert(res.error.message); return this.overview(ctx); }
+        this.overview(ctx, btn.dataset.drawing === "load" ? "<b>Sample drawing loaded.</b> Open Balloon Inspector › Reports › “Sample drawing — Mounting Plate”; it is ballooned automatically." : "<b>Sample drawing removed</b> from Balloon Inspector.");
+      }));
       const run = async (btn, rpc, done) => {
         btn.disabled = true; btn.textContent = "Working…";
         const res = await ctx.sb.rpc(rpc, { p_slug: ctx.slug });
@@ -78,6 +106,54 @@
         run(flush, "kmr_ops_sample_flush", (n) => `<b>Sample data flushed:</b> ${n} records removed. Your own records are unchanged.`);
       };
       window.scrollTo(0, 0);
+    },
+    /** per-card: load / flush sample, flush your own data (a JSON of it is downloaded first) */
+    async cardAction(ctx, act, kind, btn) {
+      const K = KINDS.find((k) => k.kind === kind), L = K.label.toLowerCase();
+      const label = btn.textContent;
+      const busy = () => { btn.disabled = true; btn.textContent = "Working…"; };
+      const fail = (m) => { btn.disabled = false; btn.textContent = label; alert(m); };
+      if (act === "sload" || act === "sflush") {
+        if (act === "sflush" && !confirm(`Remove the sample records from ${K.label}? Records you added or changed are kept.`)) return;
+        busy();
+        const res = await ctx.sb.rpc(act === "sload" ? "kmr_ops_sample_load" : "kmr_ops_sample_flush", { p_slug: ctx.slug, p_kind: kind });
+        if (res.error) return fail(res.error.message);
+        return this.overview(ctx, act === "sload" ? `<b>Sample ${esc(L)} loaded:</b> ${res.data.added} added${res.data.skipped ? `, ${res.data.skipped} skipped (codes you already have)` : ""}.` : `<b>Sample ${esc(L)} flushed:</b> ${res.data} removed.`);
+      }
+      if (act === "dflush") {
+        if (!confirm(`Flush YOUR ${K.label} (the records you added, changed or imported)?\n\nA JSON backup of them is downloaded first; sample records are not touched.`)) return;
+        busy();
+        const { data, error } = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: kind });
+        if (error) return fail(error.message);
+        const mine = (data || []).filter((r) => !r.sample).map((r) => ({ code: r.code, name: r.name, data: r.data, active: r.active }));
+        const d = new Date(), z = (n) => String(n).padStart(2, "0");
+        const file = `${ctx.slug}-${kind}-${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}.json`;
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(new Blob([JSON.stringify({ format: "kmr-ops-list", version: 1, kind, company: ctx.slug, exported_at: new Date().toISOString(), records: mine })], { type: "application/json" }));
+        a.download = file; document.body.appendChild(a); a.click(); a.remove();
+        const res = await ctx.sb.rpc("kmr_ops_flush_data", { p_slug: ctx.slug, p_kind: kind });
+        if (res.error) return fail(`Backup downloaded (${file}), but the flush failed: ${res.error.message}`);
+        return this.overview(ctx, `<b>Your ${esc(L)} flushed:</b> ${res.data} removed. Backup downloaded: <b>${esc(file)}</b> — use <b>Load data</b> on this card to bring them back.`);
+      }
+    },
+    /** Load data: a JSON file from “Flush data” (or any list of {code, name, data}) — existing codes are updated, new ones added */
+    async loadData(ctx, kind, file, input) {
+      if (!file) return;
+      const K = KINDS.find((k) => k.kind === kind);
+      try {
+        let j; try { j = JSON.parse(await file.text()); } catch { throw new Error("That file is not valid JSON."); }
+        let recs = Array.isArray(j) ? j : j.records;
+        if (j && j.format === "kmr-ops-list" && j.kind !== kind) throw new Error(`This file holds ${(KINDS.find((k) => k.kind === j.kind) || {}).label || j.kind}, not ${K.label}.`);
+        if (j && j.format === "kmr-app-data" && j.tables && j.tables.ops_records) recs = j.tables.ops_records.filter((r) => r.kind === kind);
+        if (!Array.isArray(recs) || !recs.length) throw new Error("No records found in the file for " + K.label + ".");
+        const rows = recs.filter((r) => r && String(r.code || "").trim()).map((r) => ({ code: String(r.code).trim(), name: r.name || "", data: r.data || {}, active: r.active !== false }));
+        for (let i = 0; i < rows.length; i += 200) {
+          const res = await ctx.sb.rpc("kmr_ops_save", { p_slug: ctx.slug, p_kind: kind, p_rows: rows.slice(i, i + 200) });
+          if (res.error) throw new Error(res.error.message);
+        }
+        this.overview(ctx, `<b>${esc(K.label)} loaded</b> from ${esc(file.name)}: ${rows.length} records (existing codes updated, new ones added).`);
+      } catch (e) { alert(e.message || e); }
+      if (input) input.value = "";
     },
     async excel() {
       if (window.ExcelJS) return window.ExcelJS;

@@ -620,10 +620,14 @@ async function openReport(id){
   try{
     const {data:r,error}=await sb.from("bi_reports").select("*").eq("id",id).single(); if(error) throw error;
     if(!r.file_path) throw new Error("this report has no drawing file stored");
-    const {data:blob,error:e2}=await sb.storage.from("bi-drawings").download(r.file_path); if(e2) throw e2;
-    const file=new File([blob],r.file_name||r.file_path.split("/").pop(),{type:blob.type});
-    C.loading=true; await BI.loadFile(file,{restore:r.data}); C.loading=false;
-    C.reportId=r.id; C.filePath=r.file_path; C.dirty=false; updateSaveBtn();
+    let blob;
+    if(r.file_path.startsWith("static:")){            // sample drawing loaded from KMR Apps › Operations Master
+      const res=await fetch(r.file_path.slice(7)); if(!res.ok) throw new Error("the sample drawing is not available"); blob=await res.blob();
+    } else { const {data,error:e2}=await sb.storage.from("bi-drawings").download(r.file_path); if(e2) throw e2; blob=data; }
+    const file=new File([blob],r.file_name||r.file_path.split("/").pop(),{type:blob.type||"application/dxf"});
+    const restore=r.data&&r.data.v?r.data:undefined;   // no saved balloons yet: balloon the drawing now
+    C.loading=true; await BI.loadFile(file,restore?{restore}:{}); C.loading=false;
+    C.reportId=r.id; C.filePath=r.file_path.startsWith("static:")?null:r.file_path; C.dirty=!restore; updateSaveBtn();
     BI.toast(`Opened ${r.part_no||r.title||"report"}.`);
   }catch(e){ C.loading=false; BI.toast("Couldn't open the report: "+(e.message||e),8000); }
   finally{ BI.busy(null); }
