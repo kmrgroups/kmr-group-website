@@ -1,4 +1,4 @@
-import { getSite, companyName, fullAddress, telHref } from "@/lib/site";
+import { getSite, companyName, fullAddress, mapLinks, telHref } from "@/lib/site";
 import { PageHero } from "@/components/Blocks";
 import EnquiryForm from "@/components/EnquiryForm";
 import SocialLinks from "@/components/SocialLinks";
@@ -10,10 +10,9 @@ export const metadata = { title: "Contact us" };
 export default async function ContactPage() {
   const { company: c } = await getSite();
   const address = fullAddress(c);
-  const q = c.map_lat != null && c.map_lng != null ? `${c.map_lat},${c.map_lng}` : encodeURIComponent(address || "Puducherry, India");
-  const map = c.map_embed_url || `https://www.google.com/maps?q=${q}&z=15&output=embed`;
+  const { embed: map, open: mapOpen } = mapLinks(c);
   const cards = [
-    { icon: IconPin, title: "Visit us", body: address, href: `https://www.google.com/maps/search/?api=1&query=${q}`, cta: "Get directions" },
+    { icon: IconPin, title: "Visit us", body: address, href: mapOpen, cta: "Open in Google Maps" },
     { icon: IconPhone, title: "Call us", body: [c.phone, c.alt_phone].filter(Boolean).join("  ·  "), href: telHref(c.phone), cta: "Call now" },
     { icon: IconMail, title: "Email us", body: c.email, href: c.email ? `mailto:${c.email}` : undefined, cta: "Write to us" },
     { icon: IconClock, title: "Business hours", body: c.business_hours },
@@ -36,12 +35,13 @@ export default async function ContactPage() {
         </div>
       </section>
 
-      <section className="py-20">
+      <section className="py-14">
         <div className="wrap grid gap-10 lg:grid-cols-[1.2fr_1fr]">
           <EnquiryForm business="general" title="Send us a message" intro="Tell us a little about what you need and the best way to reach you." submitLabel="Send message" />
           <div className="flex flex-col gap-6">
             <div className="card overflow-hidden">
-              <iframe title={`${companyName(c)} location`} className="h-[340px] w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" src={map} />
+              <iframe title={`${companyName(c)} location`} className="h-[340px] w-full border-0" loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen src={map} />
+              <a href={mapOpen} target="_blank" rel="noopener noreferrer" className="link-gold block border-t border-line px-5 py-3 text-sm">Open in Google Maps →</a>
             </div>
             <div className="pattern-navy p-7 text-white">
               <p className="font-display text-xl">{companyName(c)}</p>

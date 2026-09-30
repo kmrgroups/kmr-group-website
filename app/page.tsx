@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FitImage from "@/components/FitImage";
 import { supabase } from "@/lib/supabaseClient";
 import { getSite, companyName, paragraphs, verticalHref } from "@/lib/site";
 import HeroSlider from "@/components/HeroSlider";
@@ -47,7 +48,7 @@ export default async function HomePage() {
             <div className="grid grid-cols-2 bg-white shadow-lift md:grid-cols-4">
               {(stats as SiteStat[]).slice(0, 4).map((s, i) => (
                 <div key={s.id} className={`border-line px-6 py-8 text-center md:px-8 ${i % 2 ? "border-l" : ""} ${i > 1 ? "border-t md:border-t-0" : ""} ${i === 2 ? "md:border-l" : ""}`}>
-                  <p className="font-display text-4xl font-semibold text-navy md:text-5xl">{s.value}</p>
+                  <p className="font-display text-3xl font-semibold text-navy">{s.value}</p>
                   <p className="mt-2 text-[13px] leading-snug text-muted">{s.label}</p>
                 </div>
               ))}
@@ -57,20 +58,19 @@ export default async function HomePage() {
       ) : null}
 
       {/* About */}
-      <section className="py-24">
+      <section className="py-16">
         <div className="wrap grid items-center gap-16 lg:grid-cols-2">
           <div className="corner order-2 lg:order-1">
             <div className="pattern-navy relative aspect-[5/4] overflow-hidden">
-              {c.logo_full_url || c.founder_photo_url
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={(c.logo_full_url || c.founder_photo_url)!} alt={companyName(c)} className={`h-full w-full ${c.logo_full_url ? "bg-white object-contain p-10" : "object-cover"}`} />
+              {c.about_image_url || c.logo_url
+                ? <FitImage src={(c.about_image_url || c.logo_url)!} alt={companyName(c)} className="h-full w-full" fill={c.about_image_url ? "blur" : "plain"} imgClassName={c.about_image_url ? "" : "p-12"} />
                 : <div className="grid h-full place-items-center"><span className="border-2 border-gold px-6 py-2 font-display text-6xl font-bold text-white">KMR</span></div>}
             </div>
             {c.founded_year && <div className="absolute -bottom-6 right-6 bg-gold px-6 py-4 text-navy-950 shadow-lift"><p className="text-[11px] font-semibold uppercase tracking-widest">Established</p><p className="font-display text-3xl font-bold">{c.founded_year}</p></div>}
           </div>
           <div className="order-1 lg:order-2">
             <p className="eyebrow mb-4">About {companyName(c).replace(/ of Companies$/i, "")}</p>
-            <h2 className="h-display text-3xl text-navy md:text-[44px]">{c.tagline || "Built on trust, driven by precision"}</h2>
+            <h2 className="h-display text-2xl text-navy md:text-[32px]">{c.tagline || "Built on trust, driven by precision"}</h2>
             <p className="lead mt-6">{c.short_about || "A multi-business group bringing manufacturing know-how to trading, software, training and supply."}</p>
             {(c.vision || c.mission) && (
               <div className="mt-8 grid gap-4 sm:grid-cols-2">
@@ -86,7 +86,7 @@ export default async function HomePage() {
 
       {/* Businesses */}
       {site.verticals.length > 0 && (
-        <section className="bg-white py-24">
+        <section className="bg-white py-16">
           <div className="wrap">
             <SectionHead eyebrow="What we do" title="Our business verticals" intro="Independent businesses, one standard of quality — each backed by the whole group." center />
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -95,8 +95,7 @@ export default async function HomePage() {
                 return (
                   <Link key={v.id} href={verticalHref(v)} className="group relative flex min-h-[300px] flex-col justify-end overflow-hidden bg-navy p-8 text-white">
                     {v.image_url
-                      // eslint-disable-next-line @next/next/no-img-element
-                      ? <img src={v.image_url} alt="" className="absolute inset-0 h-full w-full object-cover opacity-45 transition duration-700 group-hover:scale-105 group-hover:opacity-35" />
+                      ? <FitImage src={v.image_url} className="absolute inset-0 opacity-60 transition duration-500 group-hover:opacity-45" />
                       : <div className="pattern-navy absolute inset-0" />}
                     <div className="absolute inset-0 bg-gradient-to-t from-navy-950 via-navy-950/60 to-transparent" />
                     <div className="relative">
@@ -120,20 +119,19 @@ export default async function HomePage() {
 
       {/* Founder */}
       {founderIntro && (
-        <section className="pattern-navy py-24 text-white">
+        <section className="pattern-navy py-16 text-white">
           <div className="wrap grid items-center gap-14 lg:grid-cols-[380px_1fr]">
             <div className="corner mx-auto w-full max-w-[380px]">
               <div className="aspect-[4/5] overflow-hidden bg-navy-800">
                 {c.founder_photo_url
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={c.founder_photo_url} alt={c.founder_name || "Founder"} className="h-full w-full object-cover" />
-                  : <div className="grid h-full place-items-center font-display text-7xl text-gold/60">{(c.founder_name || "K").slice(0, 1)}</div>}
+                  ? <FitImage src={c.founder_photo_url} alt={c.founder_name || "Founder"} className="h-full w-full" />
+                  : <div className="grid h-full place-items-center font-display text-6xl text-gold/60">{(c.founder_name || "K").slice(0, 1)}</div>}
               </div>
             </div>
             <div>
               <p className="eyebrow eyebrow-light mb-6">Founder’s message</p>
               <IconQuote className="h-12 w-12 text-gold" />
-              <blockquote className="mt-4 font-display text-2xl leading-relaxed text-white/90 md:text-[30px] md:leading-[1.45]">{founderIntro}</blockquote>
+              <blockquote className="mt-4 font-display text-xl leading-relaxed text-white/90 md:text-2xl">{founderIntro}</blockquote>
               <div className="mt-8 flex flex-wrap items-center gap-6">
                 {c.founder_signature_url
                   // eslint-disable-next-line @next/next/no-img-element
@@ -151,7 +149,7 @@ export default async function HomePage() {
 
       {/* Software */}
       {software.length > 0 && (
-        <section className="py-24">
+        <section className="py-16">
           <div className="wrap">
             <SectionHead eyebrow="Software solutions" title="Run your plant on KMR Apps" intro="Cloud software built by manufacturing people — one login, your data in India, a free pilot to start."
               action={<Link href="/software" className="btn-outline shrink-0">All solutions <IconArrow className="h-4 w-4" /></Link>} />
@@ -171,7 +169,7 @@ export default async function HomePage() {
 
       {/* Shop */}
       {products.length > 0 && (
-        <section className="bg-sand/60 py-24">
+        <section className="bg-sand/60 py-16">
           <div className="wrap">
             <SectionHead eyebrow="Online shop" title="Featured from our catalogue" intro="Order online and pay securely — UPI, cards, net banking or bank transfer, straight to our company account."
               action={<Link href="/shop" className="btn-outline shrink-0">Visit the shop <IconArrow className="h-4 w-4" /></Link>} />
@@ -182,7 +180,7 @@ export default async function HomePage() {
 
       {/* Training */}
       {programmes.length > 0 && (
-        <section className="bg-white py-24">
+        <section className="bg-white py-16">
           <div className="wrap">
             <SectionHead eyebrow="Training & development" title="Programmes that build capability" action={<Link href="/training" className="btn-outline shrink-0">All programmes <IconArrow className="h-4 w-4" /></Link>} />
             <div className="grid gap-6 md:grid-cols-3">{programmes.map((p) => <ProductCard key={p.id} p={p} />)}</div>
@@ -191,17 +189,17 @@ export default async function HomePage() {
       )}
 
       {/* Careers + contact */}
-      <section className="py-24">
+      <section className="py-16">
         <div className="wrap grid gap-6 md:grid-cols-2">
           <div className="card flex flex-col p-10">
             <IconBriefcase className="h-10 w-10 text-gold" />
-            <h3 className="mt-6 font-display text-3xl font-semibold text-navy">Build your career with us</h3>
+            <h3 className="mt-5 font-display text-2xl font-semibold text-navy">Build your career with us</h3>
             <p className="mt-3 text-muted">We look for people who take ownership and care about quality. {jobs ? `${jobs} open position${jobs === 1 ? "" : "s"} right now.` : "Send us your profile for future openings."}</p>
             <Link href="/careers" className="btn-navy mt-8 self-start">View careers <IconArrow className="h-4 w-4" /></Link>
           </div>
           <div className="pattern-navy flex flex-col p-10 text-white">
             <IconGlobe className="h-10 w-10 text-gold" />
-            <h3 className="mt-6 font-display text-3xl font-semibold">Let’s work together</h3>
+            <h3 className="mt-5 font-display text-2xl font-semibold">Let’s work together</h3>
             <p className="mt-3 text-white/70">Products, software, training or a trade enquiry — tell us what you need and we reply within one working day.</p>
             <Link href="/contact" className="btn-gold mt-8 self-start">Contact us <IconArrow className="h-4 w-4" /></Link>
           </div>

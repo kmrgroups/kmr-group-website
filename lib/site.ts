@@ -35,3 +35,22 @@ export const inr = (n: number) => `₹${Number(n).toLocaleString("en-IN", { maxi
 
 /** Where a business card links to, from its key when no link was set. */
 export const verticalHref = (v: Vertical) => v.link || ({ shop: "/shop", software: "/software", training: "/training", import_export: "/trade#import_export", trading: "/trade#trading", distribution: "/trade#distribution" } as Record<string, string>)[v.slug ?? ""] || "/contact";
+
+/**
+ * Map for the Contact page and footer. Accepts whatever was pasted in the CMS: the Google Maps "Embed a map" code
+ * (<iframe …>), its src link, or an ordinary share link (maps.app.goo.gl / google.com/maps/place/…).
+ * Share links cannot be shown inside a page, so they become the "Open in Google Maps" link and the embedded map
+ * is built from the coordinates or the address.
+ */
+export function mapLinks(c: Partial<CompanyInfo>) {
+  const raw = (c.map_embed_url ?? "").trim();
+  const src = raw.match(/src=["']([^"']+)["']/i)?.[1] ?? raw;
+  const pasted = /^https?:\/\//i.test(src) ? src : "";
+  const isEmbed = /google\.[a-z.]+\/maps\/embed|output=embed/i.test(pasted);
+  const lat = c.map_lat != null && String(c.map_lat) !== "" ? Number(c.map_lat) : NaN, lng = c.map_lng != null && String(c.map_lng) !== "" ? Number(c.map_lng) : NaN;
+  const hasPoint = Number.isFinite(lat) && Number.isFinite(lng) && !(lat === 0 && lng === 0);
+  const query = hasPoint ? `${lat},${lng}` : [companyName(c), fullAddress(c)].filter(Boolean).join(", ") || "Puducherry, India";
+  const embed = isEmbed ? pasted : `https://maps.google.com/maps?q=${encodeURIComponent(query)}&z=${hasPoint ? 16 : 14}&output=embed`;
+  const open = pasted && !isEmbed ? pasted : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+  return { embed, open };
+}

@@ -11,7 +11,7 @@ export default async function GalleryPage() {
   return (
     <>
       <PageHero eyebrow="Gallery" title="Moments & milestones" intro="Our people, facilities, events and work — in pictures." />
-      <section className="py-20">
+      <section className="py-14">
         <div className="wrap">
           {items.length === 0 ? <p className="text-muted">Photos and videos are coming soon.</p> : (
             <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">

@@ -13,7 +13,7 @@ export default async function PoliciesPage() {
   return (
     <>
       <PageHero eyebrow="Policies" title="Company policies" intro="How we sell, deliver, refund, protect your data and handle grievances." />
-      <section className="py-20">
+      <section className="py-14">
         <div className="wrap grid gap-5 md:grid-cols-2 lg:grid-cols-3">
           {pages.map((p) => (
             <Link key={p.slug} href={`/policies/${p.slug}`} className="card-hover group flex flex-col p-7">

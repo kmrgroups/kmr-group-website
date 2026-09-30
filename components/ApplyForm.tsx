@@ -13,7 +13,7 @@ export default function ApplyForm({ jobId, jobTitle }: { jobId: string | null; j
     e.preventDefault(); setErr("");
     const fd = new FormData(e.currentTarget);
     const f = fd.get("resume");
-    if (f instanceof File && f.size > 5 * 1024 * 1024) { setErr("The résumé must be under 5 MB."); return; }
+    if (f instanceof File && f.size > 4 * 1024 * 1024) { setErr("The résumé must be under 4 MB."); return; }
     setBusy(true);
     const r = await fetch("/api/careers/apply", { method: "POST", body: fd });
     const j = await r.json().catch(() => ({}));
@@ -46,7 +46,7 @@ export default function ApplyForm({ jobId, jobTitle }: { jobId: string | null; j
       <div><label className="label" htmlFor="a-co">Current company</label><input id="a-co" name="current_company" maxLength={120} className="field" /></div>
       <div><label className="label" htmlFor="a-li">LinkedIn profile</label><input id="a-li" name="linkedin_url" maxLength={200} placeholder="https://linkedin.com/in/…" className="field" /></div>
       <div>
-        <span className="label">Résumé * (PDF or Word, up to 5 MB)</span>
+        <span className="label">Résumé * (PDF or Word, up to 4 MB)</span>
         <label className="flex cursor-pointer items-center gap-3 border border-dashed border-gold/60 bg-gold-pale/40 px-4 py-4 text-sm text-navy hover:bg-gold-pale">
           <IconFile className="h-6 w-6 shrink-0 text-gold-dark" />
           <span className="truncate">{file || "Choose a file…"}</span>

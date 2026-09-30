@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getSite, companyName, fullAddress, telHref, verticalHref } from "@/lib/site";
+import { getSite, companyName, fullAddress, mapLinks, telHref, verticalHref } from "@/lib/site";
 import SocialLinks from "./SocialLinks";
 import { IconClock, IconMail, IconPhone, IconPin } from "./Icons";
 
@@ -45,7 +45,7 @@ export default async function Footer() {
         <div>
           <p className={head}>Get in touch</p>
           <ul className="space-y-4 text-sm text-white/75">
-            {addr && <li className="flex gap-3"><IconPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><span>{addr}</span></li>}
+            {addr && <li className="flex gap-3"><IconPin className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><a href={mapLinks(c).open} target="_blank" rel="noopener noreferrer" className={link}>{addr}</a></li>}
             {c.phone && <li className="flex gap-3"><IconPhone className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><a href={telHref(c.phone)} className={link}>{c.phone}</a>{c.alt_phone && <>&nbsp;·&nbsp;<a href={telHref(c.alt_phone)} className={link}>{c.alt_phone}</a></>}</li>}
             {c.email && <li className="flex gap-3"><IconMail className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><a href={`mailto:${c.email}`} className={link}>{c.email}</a></li>}
             {c.business_hours && <li className="flex gap-3"><IconClock className="mt-0.5 h-4 w-4 shrink-0 text-gold" /><span>{c.business_hours}</span></li>}

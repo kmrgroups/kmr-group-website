@@ -31,11 +31,11 @@ export default function NavBar({ logo, name, verticals, cta }: { logo?: string; 
 
   return (
     <header className={`sticky top-0 z-50 border-b bg-white/95 backdrop-blur transition-shadow ${scrolled ? "border-line shadow-[0_8px_30px_-18px_rgba(11,28,58,.45)]" : "border-transparent"}`}>
-      <div className="wrap flex h-20 items-center justify-between gap-6">
+      <div className="wrap flex h-16 items-center justify-between gap-6">
         <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={`${name} — home`}>
           {logo
             // eslint-disable-next-line @next/next/no-img-element
-            ? <img src={logo} alt={name} className="h-12 w-auto max-w-[170px] object-contain" />
+            ? <img src={logo} alt={name} className="h-10 w-auto max-w-[150px] object-contain" />
             : <span className="border-2 border-gold px-2.5 py-0.5 font-display text-2xl font-bold tracking-wide text-navy">KMR</span>}
           <span className="hidden flex-col leading-tight lg:flex">
             <span className="font-display text-[17px] font-semibold text-navy">{name.replace(/ of Companies$/i, "")}</span>
@@ -77,7 +77,7 @@ export default function NavBar({ logo, name, verticals, cta }: { logo?: string; 
       </div>
 
       {open && (
-        <div className="max-h-[calc(100vh-80px)] overflow-y-auto border-t border-line bg-white xl:hidden">
+        <div className="max-h-[calc(100vh-64px)] overflow-y-auto border-t border-line bg-white xl:hidden">
           <nav className="wrap flex flex-col py-4" aria-label="Mobile">
             {LINKS.map((l) => (
               <div key={l.href}>

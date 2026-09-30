@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import FitImage from "@/components/FitImage";
 import ProductCard from "@/components/ProductCard";
 import EnquiryForm from "@/components/EnquiryForm";
 import { PageHero } from "@/components/Blocks";
@@ -31,17 +32,14 @@ export default async function TradePage() {
         const list = products.filter((p) => p.business === l.key);
         const Icon = l.icon;
         return (
-          <section key={l.key} id={l.key} className={`scroll-mt-24 py-20 ${i % 2 ? "bg-white" : ""}`}>
+          <section key={l.key} id={l.key} className={`scroll-mt-24 py-14 ${i % 2 ? "bg-white" : ""}`}>
             <div className="wrap">
               <div className="grid items-start gap-12 lg:grid-cols-[1fr_1.1fr]">
                 <div>
                   <span className="grid h-14 w-14 place-items-center bg-navy text-gold-light"><Icon className="h-7 w-7" /></span>
-                  <h2 className="h-display mt-6 text-3xl text-navy md:text-[44px]">{v[l.key]?.title || l.title}</h2>
+                  <h2 className="h-display mt-5 text-2xl text-navy md:text-[32px]">{v[l.key]?.title || l.title}</h2>
                   <p className="lead mt-4">{v[l.key]?.description || l.text}</p>
-                  {v[l.key]?.image_url && (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={v[l.key].image_url} alt="" className="mt-8 aspect-[16/9] w-full object-cover" />
-                  )}
+                  {v[l.key]?.image_url && <FitImage src={v[l.key].image_url!} className="mt-8 aspect-[16/9] w-full" />}
                 </div>
                 <EnquiryForm business={l.key} title={`Request a quote — ${v[l.key]?.title || l.title}`} askQuantity submitLabel="Request quote" />
               </div>

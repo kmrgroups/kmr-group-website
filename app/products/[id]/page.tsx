@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabaseClient";
+import FitImage from "@/components/FitImage";
 import type { Product } from "@/lib/types";
 import { notFound } from "next/navigation";
 import Link from "next/link";
@@ -60,20 +61,19 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
           <div className="corner">
             <div className="aspect-square overflow-hidden bg-white shadow-card">
               {product.image_url
-                // eslint-disable-next-line @next/next/no-img-element
-                ? <img src={product.image_url} alt={product.name} className="h-full w-full object-cover" />
+                ? <FitImage src={product.image_url} alt={product.name} className="h-full w-full" fill="plain" imgClassName="p-4" eager />
                 : <div className="pattern-navy grid h-full w-full place-items-center"><Fallback className="h-24 w-24 text-gold/60" /></div>}
             </div>
           </div>
 
           <div>
             {product.category && <p className="eyebrow mb-3">{product.category}</p>}
-            <h1 className="h-display text-4xl text-navy md:text-5xl">{product.name}</h1>
+            <h1 className="h-display text-2xl text-navy md:text-[34px]">{product.name}</h1>
             <div className="mt-6 border-y border-line py-5">
               {buy ? (
                 <>
                   <div className="flex flex-wrap items-baseline gap-3">
-                    <span className="font-display text-4xl font-semibold text-navy">{inr(product.price)}</span>
+                    <span className="font-display text-3xl font-semibold text-navy">{inr(product.price)}</span>
                     {off > 0 && <><span className="text-lg text-muted line-through">{inr(product.mrp!)}</span><span className="bg-gold px-2 py-0.5 text-xs font-bold text-navy-950">{off}% OFF</span></>}
                   </div>
                   <p className="mt-1 text-sm text-muted">{course ? "per participant · " : ""}inclusive of GST</p>
@@ -103,7 +103,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       {product.description && (
         <section className="bg-white py-16">
-          <div className="wrap max-w-4xl"><h2 className="h-display mb-6 text-3xl text-navy">Details</h2><RichText text={product.description} /></div>
+          <div className="wrap max-w-4xl"><h2 className="h-display mb-5 text-2xl text-navy">Details</h2><RichText text={product.description} /></div>
         </section>
       )}
 
@@ -117,7 +117,7 @@ export default async function ProductDetailPage({ params }: { params: Promise<{ 
 
       {related.length > 0 && (
         <section className="bg-sand/60 py-16">
-          <div className="wrap"><h2 className="h-display mb-8 text-3xl text-navy">You may also like</h2>
+          <div className="wrap"><h2 className="h-display mb-6 text-2xl text-navy">You may also like</h2>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{related.map((p) => <ProductCard key={p.id} p={p} />)}</div></div>
         </section>
       )}

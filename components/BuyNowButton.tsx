@@ -45,7 +45,7 @@ export default function BuyNowButton({ product, mode = "buy" }: { product: Produ
   return (
     <div>
       {!open ? (
-        <button onClick={() => setOpen(true)} className="btn-gold px-10 py-4 text-base">
+        <button onClick={() => setOpen(true)} className="btn-gold">
           {enrol ? "Enrol now" : "Buy Now"}
         </button>
       ) : (

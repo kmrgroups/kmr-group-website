@@ -9,7 +9,7 @@
 }
 
 html { scroll-behavior: smooth; }
-body { background-color: #FAF7F1; color: #101828; }
+body { background-color: #FAF7F1; color: #101828; font-size: 15px; }
 ::selection { background-color: #C6A15B; color: #0B1C3A; }
 img { max-width: 100%; }
 
@@ -19,9 +19,9 @@ img { max-width: 100%; }
   .eyebrow::before { content: ""; @apply block h-px w-8 bg-gold; }
   .eyebrow-light { @apply text-gold-light; }
   .h-display { @apply font-display font-semibold leading-[1.08] tracking-[-0.01em]; }
-  .lead { @apply text-lg leading-relaxed text-muted; }
+  .lead { @apply text-base leading-relaxed text-muted; }
 
-  .btn { @apply inline-flex items-center justify-center gap-2 px-6 py-3 text-sm font-semibold tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60; }
+  .btn { @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 text-[13.5px] font-semibold tracking-wide transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-60; }
   .btn-gold { @apply btn bg-gold text-navy-950 hover:bg-gold-light shadow-[0_8px_20px_-10px_rgba(198,161,91,.8)]; }
   .btn-navy { @apply btn bg-navy text-white hover:bg-navy-700; }
   .btn-outline { @apply btn border border-navy/20 text-navy hover:border-gold hover:text-gold-dark; }
@@ -30,7 +30,7 @@ img { max-width: 100%; }
 
   .card { @apply border border-line bg-white shadow-card; }
   .card-hover { @apply card transition-all duration-300 hover:-translate-y-1 hover:border-gold/60 hover:shadow-lift; }
-  .field { @apply w-full border border-line bg-white px-4 py-3 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-gold focus:ring-2 focus:ring-gold/20; }
+  .field { @apply w-full border border-line bg-white px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-muted/70 focus:border-gold focus:ring-2 focus:ring-gold/20; }
   .label { @apply mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted; }
 
   .pattern-navy {
@@ -46,8 +46,8 @@ img { max-width: 100%; }
   .corner::before, .corner::after { content: ""; position: absolute; width: 22px; height: 22px; border-color: #C6A15B; border-style: solid; pointer-events: none; }
   .corner::before { top: -8px; left: -8px; border-width: 2px 0 0 2px; }
   .corner::after { bottom: -8px; right: -8px; border-width: 0 2px 2px 0; }
-  .prose-kmr p { @apply mb-4 leading-[1.8] text-ink/80; }
-  .prose-kmr h2 { @apply mb-3 mt-8 font-display text-2xl font-semibold text-navy; }
+  .prose-kmr p { @apply mb-4 text-[15px] leading-[1.75] text-ink/80; }
+  .prose-kmr h2 { @apply mb-3 mt-7 font-display text-xl font-semibold text-navy; }
   .prose-kmr ul { @apply mb-4 list-disc space-y-1.5 pl-5 text-ink/80; }
 }
 

@@ -56,7 +56,7 @@ export function PayOnlineButton({ token, amountLabel }: { token: string; amountL
 
   return (
     <div>
-      <button onClick={pay} disabled={busy} className="btn-gold w-full py-4 text-base"><IconLock className="h-4 w-4" />{busy ? "Opening secure payment…" : `Pay ${amountLabel} securely`}</button>
+      <button onClick={pay} disabled={busy} className="btn-gold w-full py-3"><IconLock className="h-4 w-4" />{busy ? "Opening secure payment…" : `Pay ${amountLabel} securely`}</button>
       {msg.error && <p className="mt-3 text-sm text-danger" role="alert">{msg.error}</p>}
       {msg.ok && <p className="mt-3 text-sm text-success" role="status">{msg.ok}</p>}
     </div>

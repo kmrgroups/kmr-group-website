@@ -3,7 +3,6 @@
 -- together with the KMR Console's 0021_website.sql (either order). Safe to run more than once.
 --  • Products belong to a business: shop (goods, bought online), training (courses), import_export / trading /
 --    distribution (enquiry / request for quote). Software (KMR Apps) comes from the KMR Console's products and prices.
---  • Products can be published from a company's Operations Master in the KMR Console (ops_customer_id + ops_code).
 --  • Everything is managed in KMR Console → Website; the website's own /admin is retired.
 -- ============================================================
 alter table products
@@ -15,14 +14,11 @@ alter table products
   add column if not exists hsn_code        text,
   add column if not exists enquiry_only    boolean not null default false,
   add column if not exists details         jsonb not null default '{}',
-  add column if not exists ops_customer_id uuid,
-  add column if not exists ops_code        text,
   add column if not exists updated_at      timestamptz default now();
 alter table products drop constraint if exists products_business_check;
 alter table products add constraint products_business_check check (business in ('shop','training','import_export','trading','distribution'));
 alter table products drop constraint if exists products_kind_check;
 alter table products add constraint products_kind_check check (kind in ('goods','course','service'));
-create unique index if not exists products_ops_link on products (ops_customer_id, ops_code) where ops_code is not null;
 create index if not exists products_business on products (business, is_active, sort_order);
 
 alter table verticals

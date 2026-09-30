@@ -37,7 +37,7 @@ export default async function SoftwarePage() {
       </section>
 
       {apps.length > 0 && (
-        <section className="py-20">
+        <section className="py-14">
           <div className="wrap">
             <SectionHead eyebrow="KMR Apps" title="Products & plans" intro="Priced per user or per machine, billed monthly or yearly, GST extra." />
             <div className="grid gap-6 md:grid-cols-2">
@@ -50,7 +50,7 @@ export default async function SoftwarePage() {
                       <span className="grid h-14 w-14 place-items-center bg-navy text-gold-light"><IconCode className="h-7 w-7" /></span>
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{a.version ? `Version ${a.version}` : "Cloud app"}</span>
                     </div>
-                    <h3 className="mt-6 font-display text-3xl font-semibold text-navy">{a.name}</h3>
+                    <h3 className="mt-6 font-display text-2xl font-semibold text-navy">{a.name}</h3>
                     <p className="mt-2 text-muted">{a.description}</p>
                     {FEATURES[a.code] && <ul className="mt-6 space-y-2">{FEATURES[a.code].map((f) => <li key={f} className="flex gap-3 text-sm text-ink/80"><IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" />{f}</li>)}</ul>}
                     <div className="mt-8 border-t border-line pt-6">
@@ -72,7 +72,7 @@ export default async function SoftwarePage() {
       )}
 
       {solutions.length > 0 && (
-        <section className="bg-white py-20">
+        <section className="bg-white py-14">
           <div className="wrap">
             <SectionHead eyebrow="Solutions & services" title="Custom software for your business" intro="From ERP set-up to automation and AI — scoped, priced and delivered by our team." />
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{solutions.map((p) => <ProductCard key={p.id} p={p} />)}</div>
@@ -80,11 +80,11 @@ export default async function SoftwarePage() {
         </section>
       )}
 
-      <section id="demo" className="pattern-navy scroll-mt-24 py-20 text-white">
+      <section id="demo" className="pattern-navy scroll-mt-24 py-14 text-white">
         <div className="wrap grid items-start gap-12 lg:grid-cols-2">
           <div>
             <p className="eyebrow eyebrow-light mb-4">Free pilot</p>
-            <h2 className="h-display text-3xl md:text-[44px]">Try it with your team</h2>
+            <h2 className="h-display text-2xl md:text-[32px]">Try it with your team</h2>
             <p className="mt-5 text-white/70">Tell us which apps you need. We set up your company, your first administrator login and sample data — usually the same day. Already a customer? Sign in from the link we sent you.</p>
             <ul className="mt-8 space-y-3 text-white/80">{apps.map((a) => <li key={a.code} className="flex gap-3"><IconCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" />{a.name}</li>)}</ul>
           </div>

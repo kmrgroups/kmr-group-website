@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FitImage from "@/components/FitImage";
 
 /** Navy page banner with eyebrow, title, intro and breadcrumb. */
 export function PageHero({ eyebrow, title, intro, crumbs = [], image, children }: {
@@ -8,20 +9,19 @@ export function PageHero({ eyebrow, title, intro, crumbs = [], image, children }
     <section className="pattern-navy relative overflow-hidden text-white">
       {image && (
         <>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={image} alt="" className="absolute inset-0 h-full w-full object-cover opacity-25" />
+          <FitImage src={image} className="absolute inset-0 opacity-30" />
           <div className="absolute inset-0 bg-gradient-to-r from-navy-950 via-navy-950/85 to-navy-950/40" />
         </>
       )}
-      <div className="wrap relative py-16 md:py-24">
+      <div className="wrap relative py-12 md:py-16">
         <nav className="mb-6 text-[12.5px] text-white/55" aria-label="Breadcrumb">
           <Link href="/" className="hover:text-gold-light">Home</Link>
           {crumbs.map(([label, href]) => <span key={label}> <span className="mx-1.5 text-gold/70">/</span> {href ? <Link href={href} className="hover:text-gold-light">{label}</Link> : <span className="text-white/80">{label}</span>}</span>)}
           {!crumbs.length && <span> <span className="mx-1.5 text-gold/70">/</span> <span className="text-white/80">{title}</span></span>}
         </nav>
         {eyebrow && <p className="eyebrow eyebrow-light mb-4">{eyebrow}</p>}
-        <h1 className="h-display max-w-4xl text-4xl md:text-6xl">{title}</h1>
-        {intro && <p className="mt-5 max-w-2xl text-lg leading-relaxed text-white/70">{intro}</p>}
+        <h1 className="h-display max-w-3xl text-3xl md:text-[42px]">{title}</h1>
+        {intro && <p className="mt-4 max-w-2xl text-base leading-relaxed text-white/75">{intro}</p>}
         {children}
       </div>
       <div className="h-1 bg-gradient-to-r from-gold via-gold-light to-gold" />
@@ -34,10 +34,10 @@ export function SectionHead({ eyebrow, title, intro, center, light, action }: {
   eyebrow?: string; title: string; intro?: string | null; center?: boolean; light?: boolean; action?: React.ReactNode;
 }) {
   return (
-    <div className={`mb-12 flex flex-col gap-6 ${center ? "items-center text-center" : "md:flex-row md:items-end md:justify-between"}`}>
+    <div className={`mb-8 flex flex-col gap-5 ${center ? "items-center text-center" : "md:flex-row md:items-end md:justify-between"}`}>
       <div className={center ? "max-w-3xl" : "max-w-3xl"}>
         {eyebrow && <p className={`eyebrow mb-4 ${light ? "eyebrow-light" : ""}`}>{eyebrow}</p>}
-        <h2 className={`h-display text-3xl md:text-[44px] ${light ? "text-white" : "text-navy"}`}>{title}</h2>
+        <h2 className={`h-display text-2xl md:text-[32px] ${light ? "text-white" : "text-navy"}`}>{title}</h2>
         {intro && <p className={`mt-4 text-[17px] leading-relaxed ${light ? "text-white/70" : "text-muted"}`}>{intro}</p>}
       </div>
       {action}
@@ -70,7 +70,7 @@ export function CtaBand({ title, text, primary, secondary }: { title: string; te
           <div className="absolute -right-8 -top-8 h-40 w-40 rounded-full border border-gold/30" />
           <div className="relative flex flex-col gap-8 md:flex-row md:items-center md:justify-between">
             <div className="max-w-2xl">
-              <h2 className="h-display text-3xl md:text-4xl">{title}</h2>
+              <h2 className="h-display text-2xl md:text-[30px]">{title}</h2>
               {text && <p className="mt-3 text-white/70">{text}</p>}
             </div>
             <div className="flex shrink-0 flex-wrap gap-3">

@@ -40,9 +40,9 @@ export default async function JobPage({ params }: { params: Promise<{ id: string
       <section className="py-16">
         <div className="wrap grid gap-12 lg:grid-cols-[1fr_440px]">
           <div>
-            {j.description && <><h2 className="h-display mb-5 text-3xl text-navy">About the role</h2><RichText text={j.description} /></>}
+            {j.description && <><h2 className="h-display mb-4 text-2xl text-navy">About the role</h2><RichText text={j.description} /></>}
             {reqs.length > 0 && <>
-              <h2 className="h-display mb-5 mt-10 text-3xl text-navy">What we are looking for</h2>
+              <h2 className="h-display mb-4 mt-10 text-2xl text-navy">What we are looking for</h2>
               <ul className="space-y-3">{reqs.map((r) => <li key={r} className="flex gap-3 text-ink/80"><IconCheck className="mt-0.5 h-5 w-5 shrink-0 text-gold" />{r}</li>)}</ul>
             </>}
             {facts.length > 0 && <dl className="card mt-10 grid gap-px bg-line sm:grid-cols-2">{facts.map(([k, v]) => <div key={k} className="bg-white p-5"><dt className="text-[11px] font-semibold uppercase tracking-wider text-muted">{k}</dt><dd className="mt-1 font-medium text-navy">{v}</dd></div>)}</dl>}

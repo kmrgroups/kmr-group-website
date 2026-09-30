@@ -13,7 +13,7 @@ export async function generateMetadata(): Promise<Metadata> {
     title: { default: c.tagline ? `${name} — ${c.tagline}` : name, template: `%s · ${name}` },
     description,
     manifest: "/manifest.json",
-    openGraph: { type: "website", siteName: name, title: name, description, images: c.logo_full_url || c.logo_url ? [{ url: (c.logo_full_url || c.logo_url)! }] : undefined },
+    openGraph: { type: "website", siteName: name, title: name, description, images: c.about_image_url || c.logo_url ? [{ url: (c.about_image_url || c.logo_url)! }] : undefined },
   };
 }
 

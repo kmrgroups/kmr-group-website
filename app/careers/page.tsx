@@ -21,7 +21,7 @@ export default async function CareersPage({ searchParams }: { searchParams: Prom
     <>
       <PageHero eyebrow="Careers" title="Build what’s next with us" intro="Join a group that values precision, ownership and learning — across trading, software, training and supply." />
 
-      <section className="bg-white py-20">
+      <section className="bg-white py-14">
         <div className="wrap">
           <SectionHead eyebrow="Why KMR" title="Life at KMR" center />
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
@@ -36,7 +36,7 @@ export default async function CareersPage({ searchParams }: { searchParams: Prom
         </div>
       </section>
 
-      <section id="openings" className="scroll-mt-24 py-20">
+      <section id="openings" className="scroll-mt-24 py-14">
         <div className="wrap">
           <SectionHead eyebrow="Open positions" title={jobs.length ? `${jobs.length} open role${jobs.length === 1 ? "" : "s"}` : "No openings right now"}
             intro={jobs.length ? "Find a role that fits and apply online — it takes two minutes." : "We are always glad to hear from good people. Send your profile and we will contact you when a suitable role opens."} />

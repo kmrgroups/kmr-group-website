@@ -1,4 +1,5 @@
 import Link from "next/link";
+import FitImage from "@/components/FitImage";
 import type { Product } from "@/lib/types";
 import { inr } from "@/lib/site";
 import { IconArrow, IconBag, IconCap, IconCode, IconGlobe } from "./Icons";
@@ -15,8 +16,7 @@ export default function ProductCard({ p }: { p: Product }) {
     <Link href={`/products/${p.id}`} className="card-hover group flex flex-col overflow-hidden">
       <div className="relative aspect-[4/3] overflow-hidden bg-sand">
         {p.image_url
-          // eslint-disable-next-line @next/next/no-img-element
-          ? <img src={p.image_url} alt={p.name} className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+          ? <FitImage src={p.image_url} alt={p.name} className="h-full w-full" fill="plain" imgClassName="p-3 transition-transform duration-500 group-hover:scale-[1.03]" />
           : <div className="pattern-navy grid h-full w-full place-items-center"><Fallback className="h-12 w-12 text-gold/70" /></div>}
         {off > 0 && buy && <span className="absolute left-3 top-3 bg-gold px-2 py-1 text-[11px] font-bold text-navy-950">{off}% OFF</span>}
         {p.featured && <span className="absolute right-3 top-3 bg-navy/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-gold-light">Featured</span>}

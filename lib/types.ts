@@ -46,6 +46,7 @@ export type CompanyInfo = {
   map_embed_url?: string;
   careers_email?: string;
   alt_phone?: string;
+  about_image_url?: string;
 };
 
 export type SiteSettings = {

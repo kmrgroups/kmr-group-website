@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   if (!(file instanceof File) || !file.size) return NextResponse.json({ error: "Please attach your résumé." }, { status: 400 });
   const ext = TYPES[file.type] ?? (/\.(pdf|docx?)$/i.exec(file.name)?.[1]?.toLowerCase());
   if (!ext) return NextResponse.json({ error: "The résumé must be a PDF or Word file." }, { status: 400 });
-  if (file.size > 5 * 1024 * 1024) return NextResponse.json({ error: "The résumé must be under 5 MB." }, { status: 400 });
+  if (file.size > 4 * 1024 * 1024) return NextResponse.json({ error: "The résumé must be under 4 MB." }, { status: 400 });
 
   const db = supabaseAdmin();
   const jobIdRaw = s("job_id", 40);
