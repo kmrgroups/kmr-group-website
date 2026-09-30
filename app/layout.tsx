@@ -3,6 +3,8 @@ import "./globals.css";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import { getSite, companyName } from "@/lib/site";
+import OrgJsonLd from "@/components/OrgJsonLd";
+import { Analytics } from "@vercel/analytics/next";
 
 export async function generateMetadata(): Promise<Metadata> {
   const { company: c } = await getSite();
@@ -31,6 +33,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <Header />
         <main>{children}</main>
         <Footer />
+        <OrgJsonLd />
+        <Analytics />
       </body>
     </html>
   );

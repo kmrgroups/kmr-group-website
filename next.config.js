@@ -5,7 +5,20 @@
 const HRM_ORIGIN = (process.env.HRM_ORIGIN || "https://kmr-hrm.vercel.app").replace(/\/+$/, "");
 const CONSOLE_ORIGIN = (process.env.CONSOLE_ORIGIN || "https://kmr-console.vercel.app").replace(/\/+$/, "");
 
+// Security headers for every page (no strict Content-Security-Policy: Razorpay checkout, Google Maps and fonts load from other sites)
+const SECURITY_HEADERS = [
+  { key: "Strict-Transport-Security", value: "max-age=63072000; includeSubDomains; preload" },
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+  { key: "X-Frame-Options", value: "SAMEORIGIN" },
+  { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(self \"https://checkout.razorpay.com\" \"https://api.razorpay.com\")" },
+];
+
 const nextConfig = {
+  poweredByHeader: false,
+  async headers() {
+    return [{ source: "/((?!it/).*)", headers: SECURITY_HEADERS }];
+  },
   images: {
     remotePatterns: [
       { protocol: "https", hostname: "*.supabase.co" }

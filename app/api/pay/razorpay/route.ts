@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { ipOf, rateOk, tooMany } from "@/lib/rate";
 import { createRazorpayOrder, razorpayConfigured, razorpayKeyId } from "@/lib/razorpay";
 
 // Starts an online payment for a shop order: creates a Razorpay order for the exact amount in the database.
 export async function POST(req: NextRequest) {
+  if (!(await rateOk(`rzp:${ipOf(req)}`, 20, 3600))) return tooMany();
   try {
     const { token } = await req.json();
     if (!/^[a-f0-9]{20,64}$/.test(String(token ?? ""))) return NextResponse.json({ error: "Invalid order link." }, { status: 400 });

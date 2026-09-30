@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { mailOrderPaidOnline } from "@/lib/notify";
 import { webhookSignatureOk } from "@/lib/razorpay";
 
 // Razorpay › Webhooks (events payment.captured and order.paid): marks the shop order paid even if the customer closed the page.
@@ -16,5 +17,6 @@ export async function POST(req: NextRequest) {
     console.error("[pay/webhook]", error.message);
     return NextResponse.json({ error: "Could not update the order." }, { status: 500 });                                 // Razorpay retries
   }
+  if (data === "paid") await mailOrderPaidOnline(p.order_id);
   return NextResponse.json({ ok: true, result: data });
 }

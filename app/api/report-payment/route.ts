@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { ipOf, rateOk, tooMany } from "@/lib/rate";
+import { mailOrderPaymentReported } from "@/lib/notify";
 
 // The customer tells us they paid (UTR / reference). Staff confirm it in Admin → Orders after checking the bank.
 export async function POST(req: NextRequest) {
+  if (!(await rateOk(`order-report:${ipOf(req)}`, 10, 3600))) return tooMany();
   try {
     const b = await req.json();
     const token = String(b.token ?? "");
@@ -15,6 +18,7 @@ export async function POST(req: NextRequest) {
       p_paid_on: b.paidOn, p_amount: amount, p_payer: String(b.payer ?? "").slice(0, 120) || null,
     });
     if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+    await mailOrderPaymentReported(token, amount, String(b.reference ?? "").slice(0, 80));
     return NextResponse.json({ ok: true });
   } catch (err: unknown) {
     return NextResponse.json({ error: (err as Error).message || "Something went wrong." }, { status: 500 });

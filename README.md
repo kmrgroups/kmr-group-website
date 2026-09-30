@@ -37,7 +37,15 @@ SUPABASE_SERVICE_ROLE_KEY=…          # server only
 RAZORPAY_KEY_ID=rzp_live_…
 RAZORPAY_KEY_SECRET=…
 RAZORPAY_WEBHOOK_SECRET=…
+# Emails (same values as KMR Console) — order, payment, enquiry and job-application emails; error alerts
+RESEND_API_KEY=re_…
+EMAIL_FROM=KMR Group of Companies <no-reply@kmr-groups.com>
+ALERT_EMAIL=info@kmr-groups.com
 ```
+
+Needs the Console's `0022_hardening.sql` (rate limits, email log, error log). Every email is listed in
+**KMR Console › System health**. Security headers, `sitemap.xml`, `robots.txt`, Google company details (JSON-LD) and
+Vercel Analytics are built in.
 
 ```bash
 npm install

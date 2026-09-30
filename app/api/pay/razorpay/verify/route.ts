@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { mailOrderPaidOnline } from "@/lib/notify";
 import { captureRazorpayPayment, checkoutSignatureOk, fetchRazorpayPayment, razorpayConfigured } from "@/lib/razorpay";
 
 // After checkout: the signature proves the response came from Razorpay; the payment is then fetched from Razorpay
@@ -16,6 +17,7 @@ export async function POST(req: NextRequest) {
     if (pay.status !== "captured") return NextResponse.json({ error: `Payment is ${pay.status}. If money was deducted, it will be refunded by your bank automatically.` }, { status: 400 });
     const { data, error } = await supabaseAdmin().rpc("shop_gateway_paid", { p_gateway_order: orderId, p_payment: paymentId, p_amount_paise: pay.amount });
     if (error) { console.error("[pay/verify]", error.message); return NextResponse.json({ error: "Payment received but the order could not be updated — we will confirm it manually." }, { status: 500 }); }
+    if (data === "paid") await mailOrderPaidOnline(orderId);
     return NextResponse.json({ ok: true, result: data });
   } catch (e) {
     console.error("[pay/verify]", (e as Error).message);

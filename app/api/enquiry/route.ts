@@ -1,11 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { ipOf, rateOk, tooMany } from "@/lib/rate";
+import { mailEnquiry } from "@/lib/notify";
 
 // Enquiries from every business section → KMR Console › Enquiries (console.leads). Server only; honeypot + daily limit.
 const BUSINESSES = ["software", "shop", "training", "import_export", "trading", "distribution", "general"];
 const SOFTWARE = ["hrm", "balloon", "pd", "capacity"];
 
 export async function POST(req: NextRequest) {
+  if (!(await rateOk(`enquiry:${ipOf(req)}`, 10, 3600))) return tooMany();
   let b: Record<string, unknown>;
   try { b = await req.json(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   if (b.website) return NextResponse.json({ ok: true });
@@ -30,5 +33,6 @@ export async function POST(req: NextRequest) {
     console.error("[enquiry]", error.message);
     return NextResponse.json({ error: "Could not send right now. Please email info@kmr-groups.com." }, { status: 500 });
   }
+  await mailEnquiry({ name, email, phone, company, country, business, about: productName, quantity, message });
   return NextResponse.json({ ok: true });
 }

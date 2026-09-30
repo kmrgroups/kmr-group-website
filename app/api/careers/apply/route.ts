@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseAdmin } from "@/lib/supabaseAdmin";
+import { ipOf, rateOk, tooMany } from "@/lib/rate";
+import { mailApplication } from "@/lib/notify";
 
 // Job applications → public.job_applications (read only in KMR Console); résumé → private bucket "kmr-careers".
 const TYPES: Record<string, string> = {
@@ -8,6 +10,7 @@ const TYPES: Record<string, string> = {
 };
 
 export async function POST(req: NextRequest) {
+  if (!(await rateOk(`apply:${ipOf(req)}`, 6, 3600))) return tooMany();
   let fd: FormData;
   try { fd = await req.formData(); } catch { return NextResponse.json({ error: "Invalid request." }, { status: 400 }); }
   if (String(fd.get("website") ?? "")) return NextResponse.json({ ok: true });                // honeypot
@@ -44,5 +47,6 @@ export async function POST(req: NextRequest) {
     resume_path: path, cover_note: s("cover_note", 2000) || null,
   });
   if (error) { console.error("[careers]", error.message); return NextResponse.json({ error: "Could not send your application. Please try again." }, { status: 500 }); }
+  await mailApplication({ name, email, phone, job: jobTitle, experience: s("experience", 40), location: s("location", 80) });
   return NextResponse.json({ ok: true });
 }
