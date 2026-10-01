@@ -746,8 +746,8 @@ const GUIDE = `
 <ol><li>Admin → <b>Customer workspaces</b> → company name, their admin's e-mail and a starting password → <b>Create workspace</b>.</li>
 <li>Send them the page link, the e-mail and the password. They sign in straight away – no confirmation e-mail.</li>
 <li>Their admin uploads their logo (Admin → Company) and adds their own people with passwords (Admin → Users).</li></ol>
-<h3>AI reading of photos and scans</h3>
-<p>Needs the <code>bi-ai-read</code> Edge Function and an AI key in Supabase (see UPGRADE-V2-GUIDE). Without it, photos and scans are read by the free text scanner instead.</p>
+<h3>Reading photos, scans and PDFs</h3>
+<p>Everything is read by the free smart reader inside the browser: dimensions, tolerances (±, stacked, limits), Ø, threads, GD&amp;T frames with their symbols and datums, surface finish, notes and the title block. No AI key, no Edge Function and no cost; the drawing never leaves the computer.</p>
 <h3>B. Give a customer their own private copy (own database, own domain)</h3>
 <ol><li>They create a free Supabase project and run <code>supabase/schema.sql</code> in its SQL Editor.</li>
 <li>Copy the project URL and the <i>anon public</i> key (Project Settings → API) into <code>balloon/config.js</code>.</li>

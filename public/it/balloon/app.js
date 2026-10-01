@@ -37,6 +37,37 @@ function applyGen(it){
     if(t!=null){ it.upper=t; it.lower=-t; it.gen=true; } else if(it.gen){ it.upper=it.lower=null; it.gen=false; }
   }
 }
+/* ISO 286 limits for a fit code after the size ("Ø40 h6", "Ø25 H7", "12 N9"): [upper, lower] in mm, or null when the
+   code / size is not in the table. Size steps up to 500 mm; IT5–IT11; shafts d e f g h js k m n p (r s to 50 mm);
+   holes D E F G H JS K M N P. */
+const I286={steps:[3,6,10,18,30,50,80,120,180,250,315,400,500],
+  IT:{5:[4,5,6,8,9,11,13,15,18,20,23,25,27],6:[6,8,9,11,13,16,19,22,25,29,32,36,40],7:[10,12,15,18,21,25,30,35,40,46,52,57,63],
+      8:[14,18,22,27,33,39,46,54,63,72,81,89,97],9:[25,30,36,43,52,62,74,87,100,115,130,140,155],10:[40,48,58,70,84,100,120,140,160,185,210,230,250],
+      11:[60,75,90,110,130,160,190,220,250,290,320,360,400]},
+  es:{d:[-20,-30,-40,-50,-65,-80,-100,-120,-145,-170,-190,-210,-230],e:[-14,-20,-25,-32,-40,-50,-60,-72,-85,-100,-110,-125,-135],
+      f:[-6,-10,-13,-16,-20,-25,-30,-36,-43,-50,-56,-62,-68],g:[-2,-4,-5,-6,-7,-9,-10,-12,-14,-15,-17,-18,-20],h:[0,0,0,0,0,0,0,0,0,0,0,0,0]},
+  ei:{k:[0,1,1,1,2,2,2,3,3,4,4,4,5],m:[2,4,6,7,8,9,11,13,15,17,20,21,23],n:[4,8,10,12,15,17,20,23,27,31,34,37,40],
+      p:[6,12,15,18,22,26,32,37,43,50,56,62,68],r:[10,15,19,23,28,34],s:[14,19,23,28,35,43]}};
+function isoFit(size,code){
+  const m=String(code||"").match(/^(js|JS|[a-hk-npr-sA-HK-NP])(\d{1,2})$/); if(!m||!(size>0)||size>500) return null;
+  const L=m[1], g=+m[2], i=I286.steps.findIndex(v=>size<=v), T=I286.IT[g]; if(i<0||!T) return null;
+  const it=T[i], um=v=>+(v/1000).toFixed(4), lo=L.toLowerCase(), hole=L!==lo;
+  if(lo==="js") return [um(it/2),um(-it/2)];
+  if(!hole){
+    if(I286.es[L]){ const es=I286.es[L][i]; return [um(es),um(es-it)]; }
+    if(I286.ei[L]){ const t=I286.ei[L]; if(i>=t.length) return null; const ei=L==="k"&&(g<4||g>7)?0:t[i]; return [um(ei+it),um(ei)]; }
+    return null;
+  }
+  if(I286.es[lo]){ const EI=-I286.es[lo][i]; return [um(EI+it),um(EI)]; }       // D E F G H
+  const prev=I286.IT[g-1], delta=prev?it-prev[i]:0, ei=I286.ei[lo]; if(!ei||i>=ei.length) return null;
+  let ES;
+  if(size<=3) ES={k:0,m:-2,n:-4,p:-6}[lo];
+  else if(lo==="k") ES=g<=8?-ei[i]+delta:0;
+  else if(lo==="m") ES=g<=8?-ei[i]+delta:-ei[i];
+  else if(lo==="n") ES=g<=8?-ei[i]+delta:0;
+  else ES=g<=7?-ei[i]+delta:-ei[i];                                            // P
+  return [um(ES),um(ES-it)];
+}
 function parseCallout(t){
   const o={}; if(!t) return o; const s=String(t).replace(/%%c/gi,"Ø").replace(/%%p/gi,"±").replace(/%%d/gi,"°").replace(/⌀/g,"Ø").replace(/−/g,"-").replace(/,(\d)/g,".$1");
   if(/\bM\d/.test(s)) o.type="Thread"; else if(/\bR[az](?=\s*\d|\b)|√\s*\d|^\s*N\d{1,2}\s*$/i.test(s)) o.type="Surface finish";
@@ -44,8 +75,12 @@ function parseCallout(t){
   else if(/\d\s*[x×X]\s*45\s*°/.test(s)) o.type="Chamfer"; else if(/°/.test(s)) o.type="Angle";
   const m=s.replace(/^\s*\d+\s*[xX×]\s+/,"").replace(/^[^\d]*?(HEX|A\/F|AF|E|MIN|MAX|=|:|\s)+/i,"").match(/-?\d+(\.\d+)?/); if(m) o.nominal=+m[0];
   let pm=s.match(/±\s*(\d+(\.\d+)?)/); if(pm){o.upper=+pm[1];o.lower=-pm[1];}
-  const st=s.match(/([+-]\s*\d*\.?\d+)\s*[\/^ ]\s*([+-]?\s*\d*\.?\d+)/);
+  const st=s.match(/([+-]\s*\d*\.?\d+)\s*[\/^ ]\s*([+-]?\s*\d*\.?\d+)/)||s.match(/\s(0)\s*\/\s*([+-]\s*\d*\.?\d+)/);   // "45 0/-0.05": upper 0 has no sign
   if(!pm&&st){ const a=+st[1].replace(/\s/g,""), b=+st[2].replace(/\s/g,""); o.upper=Math.max(a,b); o.lower=Math.min(a,b); }
+  if(!pm&&!st&&o.type!=="Thread"){ const one=s.match(/^\D{0,3}\d+(?:\.\d+)?\s*-\s*(\d*\.\d+)\s*$/); if(one&&o.nominal!=null&&+one[1]<=Math.abs(o.nominal)*0.2){ o.upper=0; o.lower=-(+one[1]); } }   // not a range like "0.8-1.2"
+  // a fit code after the size: ISO 286 limits (when no tolerance is written as numbers)
+  if(o.upper==null&&o.lower==null&&o.nominal!=null&&o.type!=="Thread"){ const fm=s.match(/\d(?:\.\d+)?\s*(js\d{1,2}|JS\d{1,2}|[a-hk-npr-sA-HK-NP]\d{1,2})\b/);
+    if(fm){ const lim=isoFit(Math.abs(o.nominal),fm[1]); if(lim){ o.upper=lim[0]; o.lower=lim[1]; o.fit=fm[1]; } } }
   if(/\bMIN\b/i.test(s)&&o.upper==null){ o.lower=0; o.upper=null; }
   if(/\bMAX\b/i.test(s)&&o.upper==null){ o.upper=0; o.lower=null; }
   if(/\bHEX\b|A\/F|\bAF\b/i.test(s)&&!o.type) o.type="Linear";
@@ -260,9 +295,8 @@ function renderAll(){
   const has=S.sheets.length>0; $("empty").hidden=has; $("zoomBar").hidden=!has;
   ["bAdd","bRenum","bPDF","bCSV","bSym"].forEach(id=>$(id).disabled=!has);
   $("bRenum").disabled=!S.items.length; $("bPDF").disabled=!has; $("bCSV").disabled=!S.items.length;
-  $("bAI").disabled=!has; $("bAI").style.opacity=(sample&&imgLimits)?"":"0.55";
-  $("bText").disabled=!has;
-  $("bAI").title=!has?"Open a drawing first":(!sample||!imgLimits)?"AI reading isn't available in this view":"Read every dimension with AI and place the balloons";
+  $("bAI").disabled=!has; $("bText").disabled=!has;
+  $("bAI").title=!has?"Open a drawing first":"Smart read: every dimension, tolerance, Ø, thread, GD&T frame and the title block — free, in this browser; the drawing is not sent anywhere";
   renderSheets(); renderTable(); draw();
 }
 
@@ -299,11 +333,30 @@ function cleanScan(src){
   for(let p=0,i=0;p<N;p++,i+=4){ let v=(n[p]-ink)/(white-ink); v=v<0?0:v>1?1:v; v=v>0.9?1:Math.pow(v,1.6); const o=Math.round(v*255); d[i]=d[i+1]=d[i+2]=o; d[i+3]=255; }
   g.putImageData(img,0,0); return c;
 }
-/* Images and scanned PDFs have no readable text inside, so read them straight away:
-   with AI when it is switched on, otherwise with the free text scanner. */
+/* Images and scanned PDFs have no readable text inside, so read them straight away with the free smart reader. */
 async function autoRead(){
   if(S.items.length||!S.sheets.length) return;
-  if(sample&&imgLimits){ const r=await runAI(true); if(r!=="failed") return; }
+  await ocrAll();
+}
+/* GD&T frames drawn as lines in a PDF: found on the rendered sheet and read (free); text pieces inside a frame are dropped */
+async function addFrames(){
+  if(!window.BIR) return 0; let n=0;
+  for(let si=0;si<S.sheets.length;si++){ const sh=S.sheets[si]; if(sh.isCad) continue;
+    let fr=[]; try{ fr=BIR.findFrames(sh); }catch(e){ console.warn(e); continue; }
+    if(!fr.length) continue;
+    S.items=S.items.filter(it=>it.sheet!==si||!fr.some(f=>it.ax>f.x0-6&&it.ax<f.x1+6&&it.ay>f.y0-6&&it.ay<f.y1+6));
+    for(let i=0;i<fr.length;i++){ busy(`Reading GD&T frame ${i+1} of ${fr.length}`); await tick(); try{ S.items.push(await BIR.readFrame(sh,si,fr[i])); n++; }catch(e){ console.warn(e); } }
+  }
+  busy(null); return n;
+}
+/* Smart read button: the best free read for this kind of file */
+async function runSmart(){
+  if(!S.sheets.length) return;
+  if(S.items.length&&!confirm("Replace the current balloons with a fresh smart read of the drawing?")) return;
+  if(S.cadItems){ S.items=S.cadItems.map(d=>newItem(0,d.ax,d.ay,Object.assign({},d))); S.sel=null; renumber(); toast(`Read ${S.items.length} characteristics from the CAD data.`); return; }
+  if(S.sheets.some(s=>s.text&&s.text.length>5&&!s.ocr)){
+    const n=findTextItems(); let f=0; try{ f=await addFrames(); }catch(e){ console.warn(e); } S.sel=null; renumber();
+    toast(n+f?`Read ${S.items.length} characteristics from the PDF${f?`, including ${f} GD&T frame${f>1?"s":""}`:""}. Check each row against the drawing.`:"No dimension text found in this PDF.",7000); return; }
   await ocrAll();
 }
 async function loadFile(file,opts={}){
@@ -341,6 +394,10 @@ async function loadFile(file,opts={}){
       sheets=[{canvas:cv0,scan:true}]; sheets[0].w=cv0.width; sheets[0].h=cv0.height; isScan=true;
     } else { throw new Error("Unsupported file type ."+ext); }
     S.sheets=sheets; S.cur=0; S.items=[]; S.sel=null; S.fileName=name.replace(/\.[^.]+$/,""); S.originalFile=file; S.cleaned=doClean;
+    if(window.BIR&&(isScan||ext==="pdf")){ const desk=opts.restore?(opts.restore.desk||[]):null;
+      S.sheets.forEach((sh,i)=>{ if(sh.isCad||(sh.text&&sh.text.length>5)) return;
+        if(desk){ if(desk[i]){ busy("Straightening the scan"); sh.canvas=BIR.rotate(sh.canvas,desk[i]); sh.deskew=desk[i]; } }
+        else if(isScan||!(sh.text&&sh.text.length)){ busy("Straightening the scan"); try{ BIR.deskew(sh); }catch(e){ console.warn(e); } } }); }
     if(opts.restore){ S.cadItems=S._dxfItems||null; S._dxfItems=null; applySnapshot(opts.restore); renderAll(); requestAnimationFrame(()=>{resize();fit();}); return; }
     if(!opts.keepHeader){ S.header=Object.assign({},S.header,{partNo:"",partName:"",drawingNo:"",rev:"",customer:"",material:""}); }
     if(!S.header.drawingNo) S.header.drawingNo=S.fileName; syncHeader();
@@ -349,7 +406,9 @@ async function loadFile(file,opts={}){
       if(S.sheets[0].text&&S.sheets[0].text.length){ readTitleBlock(groupText(S.sheets[0].text),0); postProcess(); S.cadItems=S.items.map(i=>({...i})); }
       renumber();
       toast(ext==="step"||ext==="stp" ? `Converted the 3D model into front, top, left and isometric views with overall sizes. Add balloons for the features you need to inspect.` : `Read ${S.items.length} characteristics directly from the CAD data${ext==="dwg"?" (converted from DWG)":""}. Check them, then export.`,7000); }
-    else if(S.sheets.some(s=>s.text&&s.text.length>5)){ const n=findTextItems(); if(n) toast(`Found ${n} characteristics in the PDF text at no cost${S._clsCount?`, ${S._clsCount} marked SC/CC`:""}. Check each row against the drawing.`,7000); else toast("No dimension text found in this PDF. Tap “Find dimensions” to read it with the free text scanner (OCR)."); }
+    else if(S.sheets.some(s=>s.text&&s.text.length>5)){ const n=findTextItems(); if(n) toast(`Found ${n} characteristics in the PDF text at no cost${S._clsCount?`, ${S._clsCount} marked SC/CC`:""}. Check each row against the drawing.`,7000); else toast("No dimension text found in this PDF. Tap “Find dimensions” to read it with the free text scanner (OCR).");
+      // GD&T frames are usually lines in a PDF, not text: find and read them on the rendered sheet
+      if(!S.readonly) setTimeout(async()=>{ try{ const f=await addFrames(); if(f){ S.sel=null; renumber(); toast(`Found ${S.items.length} characteristics in the PDF, including ${f} GD&T frame${f>1?"s":""}. Check each row against the drawing.`,7000); } }catch(e){ console.warn(e); } },350); }
     else isScan=true;
     renderAll(); requestAnimationFrame(()=>{resize();fit();});
     if(isScan && !S.readonly) setTimeout(autoRead,350);
@@ -665,9 +724,11 @@ async function convertStep(buf,name){
 }
 
 /* ---------- free text reading for vector PDFs ---------- */
-const NOTE_RX=/\b(HARDEN|HRC|HRB|HV\d|CASE DEPTH|COAT|PLAT|ZINC|PAINT|BURR|SHARP|FINISH|TREAT|ANODI|PHOSPHAT|PASSIVAT|WELD|TORQUE)\b/i;
+const NOTE_RX=/\b(HARDEN\w*|TEMPER\w*|HRC|HRB|HV\d+|CASE DEPTH|COAT\w*|PLAT\w*|ZINC|PAINT\w*|(DE)?BURR\w*|SHARP|FINISH|TREAT\w*|ANODI\w*|PHOSPHAT\w*|PASSIVAT\w*|WELD\w*|TORQUE|BREAK|EDGES|NITRID\w*|CARBURI\w*|BLACKEN\w*|OXIDE)\b/i;
 function groupH(flat){
-  flat=flat.slice().sort((a,b)=>a.y-b.y||a.x-b.x); const groups=[];
+  // rows first (a word 1 px higher must not jump ahead of the word on its left), then left to right in each row
+  const rows=[]; for(const t of flat.slice().sort((a,b)=>a.y-b.y)){ const r=rows.find(r=>Math.abs(r.y-t.y)<0.4*Math.max(r.h,t.h)&&!(t.h<0.8*r.h||r.h<0.8*t.h)); if(r) r.list.push(t); else rows.push({y:t.y,h:t.h,list:[t]}); }
+  flat=rows.flatMap(r=>r.list.sort((a,b)=>a.x-b.x)); const groups=[];
   for(const t of flat){
     const small=/^[+\-±]?\s*\d*[.,]?\d+$/.test(t.s.replace(/\s/g,""))&&/^[+\-±0]/.test(t.s.trim());
     const g=groups.find(g=>!(small&&t.h<0.85*g.h) && Math.abs(g.y-t.y)<0.45*Math.max(g.h,t.h) && t.x-(g.x1)<0.9*Math.max(g.h,t.h) && t.x-g.x1>-0.6*t.h);
@@ -716,7 +777,7 @@ const SC_GLYPH=/[▼▽▲△◆◇⬥⬦⯁⯆\uE000-\uF8FF]/g;
 function classify(g,sh){
   let s=g.s.replace(/\s+/g," ").trim(), cls="";
   if(SC_GLYPH.test(s)){ SC_GLYPH.lastIndex=0; const t=s.replace(SC_GLYPH,"").trim(); if(t&&/\d/.test(t)){ s=t; cls="SC"; } }
-  SC_GLYPH.lastIndex=0; if(!/\d/.test(s)) return null;
+  SC_GLYPH.lastIndex=0; if(!/\d/.test(s)&&!(NOTE_RX.test(s)&&s.length>=8)) return null;   // notes such as "REMOVE ALL BURRS" have no digit
   if(g.limits){ const L=g.limits; return {type:L.dia?"Diameter":"Linear",text:s,nominal:L.lo,upper:+(L.hi-L.lo).toFixed(4),lower:0,unit:"mm",conf:0.85,cls}; }
   const r=classify0(g,sh,s); if(r&&cls) r.cls=cls; return r;
 }
@@ -724,7 +785,7 @@ function classify0(g,sh,s){
   const cx=(g.x0+g.x1)/2, cy=g.y-g.h/2, edge=0.035;
   if(g.grid) return null;  // border grid labels
   if(cx>sh.w*0.62&&cy>sh.h*0.8) return null;                                                     // title block area
-  if(/\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|SCALE|SHEET|\d+\s*:\s*\d+|DRG|DWG|REV\b|DATE|WEIGHT|MASS|PART\s*NO|MATERIAL|MATL|GOST|ГОСТ|DIN\s|ISO\s/i.test(s)) return null;
+  if(!/^\s*(\d+\s*[xX×]\s*)?M\d/.test(s)&&/\d{1,2}[\/.-]\d{1,2}[\/.-]\d{2,4}|SCALE|SHEET|\d+\s*:\s*\d+|DRG|DWG|REV\b|DATE|WEIGHT|MASS|PART\s*NO|MATERIAL|MATL|GOST|ГОСТ|DIN\s|ISO\s/i.test(s)) return null;
   if(NOTE_RX.test(s)&&s.length<=90) return {type:"Note",text:s.replace(/^\d+[.)]\s*/,""),conf:0.7,unit:"—"};
   if(s.length>42) return null;
   const letters=(s.replace(/THRU|DEEP|TYP\.?|EQ\.?\s?SP\.?|PCD|PCD\.?|CRS|MAX|MIN|HEX|A\/F|ALL ROUND|[A-H][0-9]{1,2}|[a-h][0-9]{1,2}|Ra|Rz|x|X|×|Ø|R|M/g,"").match(/[A-Za-z]/g)||[]).length;
@@ -769,7 +830,7 @@ function readTitleBlock(groups,si){
       if(!v){ let best=null,bd=Infinity;
         for(const o of groups){ if(o===g) continue; const t=o.s.trim(); if(!t||Object.values(TB).some(r=>r.test(t))) continue;
           const dxr=o.x0-g.x1, dyr=Math.abs(o.y-g.y), dxb=Math.abs(o.x0-g.x0), dyb=o.y-g.y;
-          let d=Infinity; if(dxr>-g.h&&dxr<14*g.h&&dyr<0.7*g.h) d=dxr; else if(dyb>0.3*g.h&&dyb<3.2*g.h&&dxb<8*g.h) d=dyb*1.5+dxb*0.3;
+          let d=Infinity; if(dxr>-g.h&&dxr<24*g.h&&dyr<0.7*g.h) d=dxr*0.05; else if(dyb>0.3*g.h&&dyb<3.2*g.h&&dxb<8*g.h) d=1000+dyb*1.5+dxb*0.3;
           if(d<bd){bd=d;best=o;} }
         if(best){ v=best.s.trim(); at=best; } }
       if(v&&v.length<=60){ found[k]=v; if(k==="material") found._matAt=at; } } }
@@ -942,17 +1003,25 @@ async function getOcr(){
   try{ return await ocrLoading; }catch(e){ ocrLoading=null; throw e; }
 }
 function toPng(c){ return new Promise(r=>c.toBlob(async b=>r(new Uint8Array(await b.arrayBuffer())),"image/png")); }
-async function ocrCanvas(c,psm){
+async function ocrCanvas(c,psm,minConf=35){
   const {M,api}=await getOcr(); M.FS.writeFile("/input",await toPng(c)); api.SetPageSegMode(psm); api.SetImageFile(1,0);
   const tsv=api.GetTSVText(0)||""; api.Clear();
-  return tsv.split("\n").map(l=>l.split("\t")).filter(c=>c[0]==="5"&&c[11]&&c[11].trim()&&+c[10]>=35)
+  return tsv.split("\n").map(l=>l.split("\t")).filter(c=>c[0]==="5"&&c[11]&&c[11].trim()&&+c[10]>=minConf)
     .map(c=>({s:c[11].trim(),x:+c[6],y:+c[7]+ +c[9],h:+c[9],w:+c[8],conf:+c[10]/100}));
 }
 function rotCanvas(src,cw){ const c=document.createElement("canvas"); c.width=src.height; c.height=src.width; const g=c.getContext("2d");
   if(cw){ g.translate(c.width,0); g.rotate(Math.PI/2); } else { g.translate(0,c.height); g.rotate(-Math.PI/2); } g.drawImage(src,0,0); return c; }
-function cleanOcr(s){ return s.replace(/[|]/g,"").replace(/(\d)\s*[:;]\s*(0[.,]\d)/g,"$1±$2").replace(/^[oO@](\d)/,"Ø$1").replace(/(\d),(\d)/g,"$1.$2"); }
+function cleanOcr(s){ return s.replace(/(M\d+(?:[.,]\d+)?\s*[xX×]\s*\d+(?:[.,]\d+)?\s*-\s*\d)9(?![\d.])/g,"$1g").replace(/(\d)\s*[xX×]\s*4[5S]?\s*[¢°ºo*]/g,"$1x45°").replace(/[|]/g,"").replace(/(\d)\s*[:;]\s*(0[.,]\d)/g,"$1±$2").replace(/^[oO@](\d)/,"Ø$1").replace(/(\d),(\d)/g,"$1.$2"); }
 async function ocrAll(){
   let out=[]; const total=S.sheets.length;
+  if(window.BIR){
+    try{ out=await BIR.smartRead(); }
+    catch(e){ busy(null); toast("The free reader couldn't run: "+(e.message||e)+". Place balloons with “Add balloon” instead.",8000); return; }
+    busy(null); S.items=out; postProcess(); S.sel=null; renumber();
+    const low=S.items.filter(i=>i.conf!=null&&i.conf<0.7).length;
+    toast(out.length?`Read ${out.length} characteristics for free${S._clsCount?`, ${S._clsCount} marked SC/CC`:""}${low?` — ${low} marked “to check”`:""}. Check every row against the drawing; tap a balloon number to jump to it.`:"The reader didn't find dimension text. Place balloons with “Add balloon” — each one reads the text under it.",9000);
+    return;
+  }
   try{
     for(let si=0;si<total;si++){ const sh=S.sheets[si];
       busy(`Scanning sheet ${si+1} of ${total} for text (free) — about 20 seconds`); await tick();
@@ -1085,7 +1154,7 @@ async function runAI(auto){
   toast(`AI found ${S.items.length} characteristics and placed the balloons${low?`; ${low} marked “to check”`:""}. Review each row against the drawing before exporting.`,8000);
   return "ok";
 }
-$("bAI").onclick=runAI;
+$("bAI").onclick=runSmart;
 $("busyStop").onclick=()=>aiCtl&&aiCtl.abort();
 $("bAdd").onclick=()=>setMode(S.mode==="add"?"pan":"add");
 $("bRenum").onclick=()=>{renumber();toast("Balloons renumbered top-to-bottom, left-to-right on each sheet.");};
@@ -1215,7 +1284,7 @@ document.querySelectorAll(".phead details").forEach(d=>d.addEventListener("toggl
 document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".phead details")) document.querySelectorAll(".phead details[open]").forEach(d=>d.open=false); });
 
 /* ---------- API used by the hosted (cloud) version ---------- */
-function getSnapshot(){ return {v:1,clean:!!S.cleaned,fileName:S.fileName,header:{...S.header},set:{...S.set},
+function getSnapshot(){ return {v:1,clean:!!S.cleaned,desk:S.sheets.map(s=>s.deskew||0),fileName:S.fileName,header:{...S.header},set:{...S.set},
   items:S.items.map((it,i)=>{ const {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr}=it; return {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,no:i+1,zone:zone(it)}; })}; }
 function applySnapshot(p){
   S.header=Object.assign({},S.header,p.header||{}); Object.assign(S.set,p.set||{});
@@ -1225,13 +1294,11 @@ function applySnapshot(p){
 }
 function setReadonly(on){ S.readonly=!!on; document.body.classList.toggle("readonly",!!on); renderAll(); }
 /* the website's cloud layer plugs its own AI reader in here (see cloud.js) */
-function useAI(provider){ sample=provider||null; imgLimits=provider?{images:true}:null; $("bAI").hidden=!provider&&!window.claude; renderAll(); }
+function useAI(){ renderAll(); }   // kept for older cloud.js builds; reading is always the free smart reader now
 window.BI={S,loadFile,renderAll,syncHeader,toast,busy,getSnapshot,applySnapshot,setReadonly,fit,resize,exportPDF,useAI};
 
 /* ---------- runtime ---------- */
-if(!window.claude) $("bAI").hidden=true;
 (async()=>{
-  try{ sample=await window.claude?.use("sample"); if(sample){ const l=await sample.limits().catch(()=>null); imgLimits=l&&l.images?l.images:null; } }catch(e){ sample=null; }
   try{ downloads=await window.claude?.use("downloads"); }catch(e){ downloads=null; }
   renderAll();
 })();

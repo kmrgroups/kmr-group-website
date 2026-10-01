@@ -157,7 +157,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
     <div class="tools">
       <button class="btn primary" id="bOpen">Open drawing</button>
       <button class="btn" id="bText" disabled title="Reads dimension text from PDF, DXF, DWG and STEP files on your device">Find dimensions</button>
-      <button class="btn ai" id="bAI" disabled title="Open a drawing first">Read with AI</button>
+      <button class="btn ai" id="bAI" disabled title="Open a drawing first">Smart read</button>
       <button class="btn" id="bAdd" disabled>Add balloon</button>
       <button class="btn" id="bRenum" disabled>Renumber</button>
       <button class="btn" id="bSym" disabled title="Tap one special-characteristic symbol on the drawing; every copy gets marked">Mark SC</button>
@@ -183,7 +183,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
       <div class="empty" id="empty">
         <div class="card">
           <h2>Open an engineering drawing</h2>
-          <p>PNG, JPG, PDF (multi-sheet), DXF, DWG or STEP. DWG and STEP are converted to a drawing right here. Opening, converting and reading happen in your browser at no cost; only “Read with AI” sends the drawing to Claude.</p>
+          <p>PNG, JPG, PDF (multi-sheet), DXF, DWG or STEP. DWG and STEP are converted to a drawing right here. Opening, converting and reading — dimensions, tolerances, GD&amp;T frames and the title block — all happen in your browser, free. The drawing is never sent anywhere.</p>
           <div class="row"><button class="btn primary" id="bOpen2">Choose file</button><button class="btn" id="bSample">Try a sample drawing</button></div>
           <p class="conv" id="convStatus"></p>
         </div>
@@ -215,7 +215,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
           <label>Grid columns<input id="sCols" type="number" min="1" max="24" value="8"></label>
           <label>Grid rows<input id="sRows" type="number" min="1" max="20" value="6"></label>
           <label>Balloon size<select id="sSize"><option value="0.7">Small</option><option value="1" selected>Medium</option><option value="1.4">Large</option></select></label>
-          <label>AI detail
+          <label hidden>AI detail
             <select id="sTiles"><option value="1">Whole sheet (1 read)</option><option value="4" selected>4 zones — better for small text</option></select></label>
           <label>Photos &amp; scans (JPG, PNG)
             <select id="sClean"><option value="1" selected>Clean up into a crisp drawing (recommended)</option><option value="0">Keep the picture as it is</option></select></label>
@@ -238,6 +238,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
 <script src="balloon/config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="balloon/app.js"></script>
+<script src="balloon/reader.js"></script>
 <script src="balloon/cloud.js"></script>
 
 <script src="/it/apps/back.js"></script>

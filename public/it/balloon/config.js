@@ -14,7 +14,7 @@
 
     appName:    "Balloon Inspector",   // shown in the header and browser tab
     engineBase: "balloon/engines/",     // where the DWG/STEP/OCR engine files live
-    aiFunction: "bi-ai-read",           // Supabase Edge Function that reads photos/scans with AI ("" = off)
+    aiFunction: "",                     // off: drawings are read by the free smart reader in the browser (no paid AI service)
     pdUrl:      "pd.html"               // Process Documents page for "Send to Process Documents" ("" = hide the button)
   };
 })();
