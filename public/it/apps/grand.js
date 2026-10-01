@@ -4,8 +4,8 @@
    3. Administration  — company details & logo, users & access, invoices & payments: download, upload, flush (backup first) */
 (function () {
   "use strict";
-  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", hrm_qms: "HRM QMS & training", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", ops: "Operations Master" };
-  const UNIT = { hrm: "employees", hrm_candidates: "candidates", hrm_qms: "skill records", balloon: "reports", pd: "records", capacity: "records", ops: "records" };
+  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", hrm_qms: "HRM QMS & training", hrm_engage: "HRM engagement", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", ops: "Operations Master" };
+  const UNIT = { hrm: "employees", hrm_candidates: "candidates", hrm_qms: "skill records", hrm_engage: "records", balloon: "reports", pd: "records", capacity: "records", ops: "records" };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
   function save(json, name) {
@@ -174,6 +174,7 @@
       }
       if (data.hrm_flow && data.hrm_flow.recruitment !== undefined) data.hrm_candidates = data.hrm_flow.recruitment;
       if (data.hrm_flow && data.hrm_flow.qms !== undefined) data.hrm_qms = data.hrm_flow.qms;
+      if (data.hrm_flow && data.hrm_flow.engagement !== undefined) data.hrm_engage = data.hrm_flow.engagement;
       const parts = Object.keys(APP).filter((k) => data[k] !== undefined).map((k) => `${esc(APP[k])} ${data[k]}`).join(" · ");
       this.overview(ctx, act === "load"
         ? `<b>Sample data loaded</b> — ${parts}.${extra} Lists already holding sample data are left as they are.`
