@@ -350,7 +350,8 @@
       if (t && !/-/.test(t) && t.length === 2 && t[0] === t[1]) t = t[0];          // one letter read twice
       if (t) datums.push(/-/.test(t) && t.length === 3 ? t : t.replace(/-/g, "").slice(0, 2));
     }
-    const text = `${sym.name ? sym.name + " " : ""}${dia ? "Ø" : ""}${num || "?"}${mod ? "(" + (mod === "Ⓜ" ? "M" : "L") + ")" : ""}${datums.length ? " | " + datums.join(" | ") : ""}`;
+    // the table adds the symbol name and the datums itself (see renderTable / PDF export), so the text is the tolerance only
+    const text = `${dia ? "Ø" : ""}${num || "?"}${mod ? "(" + (mod === "Ⓜ" ? "M" : "L") + ")" : ""}`;
     const conf = Math.min(sym.conf || 0.3, num ? 0.85 : 0.3);
     return newItem(si, f.x0, (f.y0 + f.y1) / 2, { type: "GD&T", text, nominal: null, upper: num != null ? +num : null, lower: 0, gdt: sym.name || "(check symbol)",
       datum: datums.join("|"), unit: "mm", conf: +conf.toFixed(2), source: "ocr", ex: f.x1 });
@@ -661,6 +662,8 @@
   /** small, safe clean-ups of a callout's text */
   function tidy(t) {
     let s = String(t || "").replace(/[,;]+$/, "").trim();
+    // a deviation that lost its decimal point: "25-01" → "25 -0.1", "40 ±005" → "40 ±0.05" (a deviation never starts with 0 otherwise)
+    s = s.replace(/(\d)\s*([+\-±])\s*0(\d{1,3})(?![\d.])/g, (all, a, sign, d) => `${a} ${sign}0.${d}`);
     s = s.replace(/([ØR])[^\w\s.±+\-]+(?=\S)/g, "$1")          // junk mark after Ø / R ("Ø‘60")
       .replace(/Ø[A-Za-z](?=\d)/g, "Ø")                         // "ØG11"
       .replace(/([ØR])0(?=\d)/g, "$1");                          // a size never starts with 0 unless it is 0.x ("Ø060")
