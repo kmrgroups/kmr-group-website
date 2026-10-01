@@ -4,8 +4,8 @@
    3. Administration  — company details & logo, users & access, invoices & payments: download, upload, flush (backup first) */
 (function () {
   "use strict";
-  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", ops: "Operations Master" };
-  const UNIT = { hrm: "employees", hrm_candidates: "candidates", balloon: "reports", pd: "records", capacity: "records", ops: "records" };
+  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", hrm_qms: "HRM QMS & training", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", ops: "Operations Master" };
+  const UNIT = { hrm: "employees", hrm_candidates: "candidates", hrm_qms: "skill records", balloon: "reports", pd: "records", capacity: "records", ops: "records" };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
   function save(json, name) {
@@ -39,7 +39,7 @@
           <div class="card" style="--c:#4F46E5"><div style="font-size:26px;line-height:1">🧪</div><h3>Sample Data Master</h3>
             <p>Ready-made sample data for every app, to try things out. Your real data is never touched.</p>
             <table class="gm">${rows(o.sample, { hrm: "sample employees", hrm_candidates: "sample candidates", balloon: "sample drawing", ops: "sample records" })}</table>
-            <p style="font-size:12px;color:var(--muted)">HRM gets the whole flow: employees in two plants with a month of attendance, leave, salaries and loans, and hiring from opening to new joiner (scored candidates, interviews, scorecards, offers). Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too.</p>
+            <p style="font-size:12px;color:var(--muted)">HRM gets the whole flow: employees in two plants with a month of attendance, leave, salaries and loans, hiring from opening to new joiner (scored candidates, interviews, scorecards, offers), and QMS &amp; training (skill matrix, competencies, training plan, effectiveness, R&amp;R, KPIs, auditors). Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too.</p>
             <div class="gm-btns">${btn("gmSmpLd", "Load sample data")}${btn("gmSmpFl", "Flush sample data", { red: 1, off: !nSample })}</div></div>
           <div class="card" style="--c:#B45309"><div style="font-size:26px;line-height:1">🏢</div><h3>Administration Data</h3>
             <p>Company details &amp; logo, users &amp; access, invoices &amp; payments.</p>
@@ -173,6 +173,7 @@
         } catch { extra = " HRM attendance for the sample month is worked out tonight (or open HRM › Attendance › Recalculate)."; }
       }
       if (data.hrm_flow && data.hrm_flow.recruitment !== undefined) data.hrm_candidates = data.hrm_flow.recruitment;
+      if (data.hrm_flow && data.hrm_flow.qms !== undefined) data.hrm_qms = data.hrm_flow.qms;
       const parts = Object.keys(APP).filter((k) => data[k] !== undefined).map((k) => `${esc(APP[k])} ${data[k]}`).join(" · ");
       this.overview(ctx, act === "load"
         ? `<b>Sample data loaded</b> — ${parts}.${extra} Lists already holding sample data are left as they are.`
