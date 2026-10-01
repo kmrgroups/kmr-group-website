@@ -97,7 +97,7 @@
       <aside class="side">
         <div class="who">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></div>
         <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
-        ${ops || isAdmin ? `<h4>Masters</h4>` : ""}${ops ? `<button data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</button>` : ""}${isAdmin ? `<button data-datam="1"><i style="background:#0EA5E9"></i>Data Master</button>` : ""}
+        ${ops || isAdmin ? `<h4>Masters</h4>` : ""}${ops ? `<button data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</button>` : ""}${isAdmin ? `<button data-datam="1"><i style="background:#0EA5E9"></i>Data Master</button><button data-grand="1"><i style="background:#B45309"></i>Grand Master</button>` : ""}
         ${isAdmin ? `<h4>Administration</h4><button data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</button><button data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</button><button data-admin="invoices"><i style="background:#F3C55A"></i>Invoices &amp; payments</button>` : ""}
         <h4>More KMR apps</h4>${others.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></button>`).join("")}
         ${SOON.map(([k, n]) => `<button data-soon="${k}" data-name="${esc(n)}"><i style="background:#64748b"></i>${esc(n)}<span class="lock">Soon</span></button>`).join("")}
@@ -113,6 +113,7 @@
     document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => open(b.dataset.open)));
     document.querySelectorAll("[data-admin]").forEach((b) => b.addEventListener("click", () => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView())));
     document.querySelectorAll("[data-datam]").forEach((b) => b.addEventListener("click", () => window.KMR_DATA && window.KMR_DATA.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog })));
+    document.querySelectorAll("[data-grand]").forEach((b) => b.addEventListener("click", () => window.KMR_GRAND && window.KMR_GRAND.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog })));
     document.querySelectorAll("[data-ops]").forEach((b) => b.addEventListener("click", () => window.KMR_OPS && window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id })));
     const home = document.querySelector(".side .who"); if (home) { home.style.cursor = "pointer"; home.title = "Your apps"; home.onclick = () => appView(); }
     document.querySelectorAll("[data-soon]").forEach((b) => b.addEventListener("click", () => dialog(`${b.dataset.name} — coming soon`, "This module of the KMR Intelligent Digital Manufacturing platform is on its way. Register your interest and we'll invite you to the pilot.", `<a class="btn" href="${buyUrl(b.dataset.soon)}">Register interest</a>`)));
@@ -273,6 +274,7 @@
     appView();
     if (OPEN && rows.some((r) => r.product_code === OPEN)) { history.replaceState(null, "", location.pathname); open(OPEN); }
     else if (location.hash === "#admin" && isAdmin) { history.replaceState(null, "", location.pathname); usersView(); }
+    else if (location.hash === "#grand" && isAdmin && window.KMR_GRAND) { history.replaceState(null, "", location.pathname); window.KMR_GRAND.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog }); }
     else if (location.hash === "#data" && isAdmin && window.KMR_DATA) { history.replaceState(null, "", location.pathname); window.KMR_DATA.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog }); }
     else if (location.hash === "#ops" && ops && window.KMR_OPS) { history.replaceState(null, "", location.pathname); window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id }); }
   }
