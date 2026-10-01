@@ -134,7 +134,7 @@
 
   /* ---------------- Administration (company administrators) ---------------- */
   const ROLE_OPTS = {
-    hrm: [["", "No access"], ["company_admin", "Company admin"], ["hr_manager", "HR manager"], ["hr_executive", "HR executive"], ["manager", "Manager (own team)"], ["payroll", "Payroll"]],
+    hrm: [["", "No access"], ["company_admin", "Company admin"], ["hr_manager", "HR manager"], ["hr_executive", "HR executive"], ["manager", "Manager (own team)"], ["payroll", "Payroll"], ["interviewer", "Interviewer (interview panels)"]],
     other: [["", "No access"], ["admin", "Admin"], ["editor", "Editor"], ["viewer", "Viewer"]],
   };
   const mainEl = () => document.querySelector(".main");
