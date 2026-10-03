@@ -30,8 +30,11 @@ table{width:100%;border-collapse:collapse}th,td{padding:8px 9px;border-bottom:1p
 th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);background:var(--bg);position:sticky;top:0}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 .bar{height:9px;border-radius:6px;background:var(--line);overflow:hidden;min-width:90px}.bar i{display:block;height:100%;background:var(--c,var(--green))}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
+input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+td input[type=number]{width:96px;text-align:right}
 .chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c)}
-.g{--c:var(--green)}.a{--c:var(--amber)}.r{--c:var(--red)}.b{--c:var(--blue)}.x{--c:#94a3b8}
+.g{--c:var(--green)}.a{--c:var(--amber)}.r{--c:var(--red)}.b{--c:var(--blue)}.x{--c:#94a3b8}.u{--c:#7c3aed}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .box{border:1px solid var(--line);border-radius:12px;padding:14px}.box h3{margin:0 0 10px;font-size:13px}
 .scroll{overflow:auto;max-height:68vh}
@@ -125,11 +128,12 @@ function calc(l) {
   const demand = +l.demand_qty, pending = Math.max(demand - done, 0);
   const lastDue = Object.keys(plan).sort().pop();
   let st, label;
-  if (demand > 0 && done >= demand) { st = 'b'; label = done > demand ? 'Over-despatched' : 'Completed'; }
+  if (demand === 0) { st = done > 0 ? 'u' : 'x'; label = done > 0 ? 'Unplanned sale' : 'No plan qty'; }
+  else if (demand > 0 && done >= demand) { st = 'b'; label = done > demand ? 'Over-despatched' : 'Completed'; }
   else if (lastDue && lastDue < t && pending > 0) { st = 'r'; label = 'Overdue'; }
   else if (expected === 0) { st = 'x'; label = 'Not due yet'; }
   else { const r = done / expected; if (r >= 1) { st = 'g'; label = 'On track'; } else if (r >= CFG.AMBER_BELOW) { st = 'g'; label = 'On track'; } else if (r >= CFG.RED_BELOW) { st = 'a'; label = 'Slipping'; } else { st = 'r'; label = 'Behind'; } }
-  return { plan, done, expected, demand, pending, st, label, behind: Math.max(expected - done, 0), pct: demand ? done / demand : 0 };
+  return { plan, done, expected, demand, pending, st, label, unplanned: demand === 0, behind: Math.max(expected - done, 0), pct: demand ? done / demand : 0 };
 }
 
 /* ======== load / save ======== */
@@ -141,10 +145,12 @@ async function load() {
 }
 
 /* ======== rendering ======== */
-function render() { renderDash(); renderPlan(); renderDaily(); }
+function render() { keepScroll(() => { renderDash(); drawPlan(); renderDaily(); }); }
 
 function renderDash() {
-  const rows = lines.map(l => ({ l, c: calc(l) }));
+  const all = lines.map(l => ({ l, c: calc(l) }));
+  const rows = all.filter(r => !r.c.unplanned), unp = all.filter(r => r.c.unplanned && r.c.done > 0);   // unplanned = despatched with plan qty 0
+  const UQ = unp.reduce((a, r) => a + r.c.done, 0), UV = moneySum(unp, r => r.c.done * r.l.price);
   const T = rows.reduce((a, { c }) => (a.d += c.demand, a.a += c.done, a.p += c.pending, a.e += c.expected, a), { d: 0, a: 0, p: 0, e: 0 });
   const V = moneySum(rows, r => r.c.demand * r.l.price), AV = moneySum(rows, r => r.c.done * r.l.price), PV = moneySum(rows, r => r.c.pending * r.l.price);
   const cnt = k => rows.filter(r => r.c.st === k).length;
@@ -153,7 +159,7 @@ function renderDash() {
   const k = (v, s, c) => `<div class="kpi" style="--c:${c || 'var(--brand)'}"><b>${v}</b><span>${s}</span></div>`;
   // cumulative plan vs actual (SVG)
   const ds = days(M), t = todayStr();
-  const cur = rows.some(r => r.l.currency === 'INR') ? 'INR' : rows[0]?.l.currency, cr = rows.filter(r => r.l.currency === cur);   // chart in one currency
+  const cur = all.some(r => r.l.currency === 'INR') ? 'INR' : all[0]?.l.currency, cr = all.filter(r => r.l.currency === cur);   // chart in one currency
   let cp = 0, ca = 0; const P = [], A = [];
   ds.forEach(d => { cp += cr.reduce((s, { l, c }) => s + (c.plan[d] || 0) * l.price, 0); P.push(cp);
     if (d <= t) { ca += cr.reduce((s, { l }) => s + ((desp[l.id] || {})[d] || 0) * l.price, 0); A.push(ca); } });
@@ -164,26 +170,29 @@ function renderDash() {
     ${[1, 8, 15, 22, ds.length].map(d => `<text x="${X(d - 1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--mut)">${d}</text>`).join('')}
     <path d="${path(P)}" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6 4"/>
     ${A.length ? `<path d="${path(A)}" fill="none" stroke="var(--brand)" stroke-width="3"/><circle cx="${X(A.length - 1)}" cy="${Y(ca)}" r="4.5" fill="var(--brand)"/>` : ''}
-  </svg><div class="legend"><span>━ Actual (value)</span><span>┅ Plan (value, per delivery schedule)</span><span>· ${cur} lines only</span></div>`;
+  </svg><div class="legend"><span>━ Actual (value, incl. unplanned sales)</span><span>┅ Plan (value, per delivery schedule)</span><span>· ${cur} lines only</span></div>`;
   // customer-wise
   const by = {}; rows.forEach(({ l, c }) => { const o = by[l.buyer_name || '—'] ||= { d: 0, a: 0, e: 0 }; o.d += c.demand; o.a += c.done; o.e += c.expected; });
   const cust = Object.entries(by).map(([n, o]) => { const p = o.d ? Math.min(o.a / o.d, 1) : 0, r = o.e ? o.a / o.e : 1, cl = r >= CFG.AMBER_BELOW ? 'var(--green)' : r >= CFG.RED_BELOW ? 'var(--amber)' : 'var(--red)';
     return `<tr><td>${esc(n)}</td><td class="n">${fmt(o.a)} / ${fmt(o.d)}</td><td style="width:42%"><div class="bar" style="--c:${cl}"><i style="width:${p * 100}%"></i></div></td><td class="n">${fmt(p * 100)}%</td></tr>`; }).join('');
   const attn = rows.filter(r => r.c.st === 'r' || r.c.st === 'a').sort((a, b) => b.c.behind * b.l.price - a.c.behind * a.l.price).slice(0, 8)
     .map(({ l, c }) => `<tr><td>${esc(l.buyer_name)}<br><span class="mut">${esc(l.part_code)} · ${esc(l.part_name)}</span></td><td class="n">${fmt(c.pending)}</td><td class="n">${money(c.pending * l.price, l.currency)}</td><td><span class="chip ${c.st}">${c.label}</span></td></tr>`).join('');
+  const unpRows = unp.sort((a, b) => b.c.done * b.l.price - a.c.done * a.l.price).map(({ l, c }) => `<tr><td>${esc(l.buyer_name)}</td><td><b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td><td class="n">${fmt(c.done)}</td><td class="n">${money(c.done * l.price, l.currency)}</td></tr>`).join('');
   $('#dash').innerHTML = !lines.length ? `<p class="mut">No sales plan for ${monthLabel(M)} yet. Open <b>Sales plan</b> and press <b>Add parts</b>.</p>` : `
     <div class="kpis">
-      ${k(fmt(T.d), 'Customer demand (qty)')}${k(fmt(T.a), 'Actual despatch (qty)', 'var(--green)')}${k(fmt(T.p), 'Pending (qty)', 'var(--amber)')}
+      ${k(fmt(T.d), 'Customer demand (qty)')}${k(fmt(T.a), 'Despatch against plan (qty)', 'var(--green)')}${k(fmt(T.p), 'Pending (qty)', 'var(--amber)')}${k(fmt(UQ), 'Unplanned sales (qty)', '#7c3aed')}
       ${k(fmt(ach * 100) + '%', 'Month achievement', col)}${k(fmt(adh * 100) + '%', 'vs expected by today', col)}
-      ${k(V, 'Plan value')}${k(AV, 'Actual value', 'var(--green)')}${k(PV, 'Pending value', 'var(--amber)')}
+      ${k(V, 'Plan value')}${k(AV, 'Actual value (planned parts)', 'var(--green)')}${k(PV, 'Pending value', 'var(--amber)')}${k(UV, 'Unplanned sales value', '#7c3aed')}
     </div>
-    <div class="legend"><span><span class="chip g">On track</span> ≥ ${CFG.AMBER_BELOW * 100}% of expected by today</span><span><span class="chip a">Slipping</span> ${CFG.RED_BELOW * 100}–${CFG.AMBER_BELOW * 100}%</span><span><span class="chip r">Behind / Overdue</span></span><span><span class="chip b">Completed</span></span><span><span class="chip x">Not due yet</span></span>
+    <div class="legend"><span><span class="chip g">On track</span> ≥ ${CFG.AMBER_BELOW * 100}% of expected by today</span><span><span class="chip a">Slipping</span> ${CFG.RED_BELOW * 100}–${CFG.AMBER_BELOW * 100}%</span><span><span class="chip r">Behind / Overdue</span></span><span><span class="chip b">Completed</span></span><span><span class="chip x">Not due yet</span></span><span><span class="chip u">Unplanned sale</span> despatched with plan qty 0</span>
       <span>· On track ${cnt('g')} · Slipping ${cnt('a')} · Behind/Overdue ${cnt('r')} · Completed ${cnt('b')}</span></div>
     <div class="grid2">
       <div class="box"><h3>Cumulative sales value — plan vs actual · ${monthLabel(M)}</h3>${chart}</div>
       <div class="box"><h3>Customer-wise achievement</h3><table><tbody>${cust}</tbody></table></div>
       <div class="box" style="grid-column:1/-1"><h3>Needs attention (largest pending value first)</h3>
         ${attn ? `<table><thead><tr><th>Customer / part</th><th class="n">Pending qty</th><th class="n">Pending value</th><th>Status</th></tr></thead><tbody>${attn}</tbody></table>` : '<p class="mut">Nothing behind plan. 🎉</p>'}</div>
+      <div class="box" style="grid-column:1/-1"><h3>Unplanned sales (despatched, not in the customer demand)</h3>
+        ${unpRows ? `<table><thead><tr><th>Customer</th><th>Part</th><th class="n">Despatched qty</th><th class="n">Value</th></tr></thead><tbody>${unpRows}</tbody></table>` : '<p class="mut">No unplanned sales this month.</p>'}</div>
     </div>`;
 }
 
@@ -196,20 +205,35 @@ function schedInputs(l, i, isDraft) {
    ${l.sched_type === 'weekly' ? `<select data-k="sched_weekday" data-id="${id}" ${dis}>${[1, 2, 3, 4, 5, 6, 7].map(w => `<option value="${w}" ${+l.sched_weekday === w ? 'selected' : ''}>${['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][w]}</option>`).join('')}</select>` : ''}`;
 }
 
-function renderPlan() {
+const canSave = () => draft.length > 0 || lines.some(l => l._dirty);
+const rowOf = id => id.startsWith('d') ? draft[+id.slice(1)] : lines.find(x => x.id === id);
+// re-draw a part of the screen without the page or the table jumping back to the top
+function keepScroll(fn) {
+  const y = window.scrollY, sc = [...document.querySelectorAll('.scroll')].map(e => e.scrollTop);
+  fn(); document.querySelectorAll('.scroll').forEach((e, i) => e.scrollTop = sc[i] || 0); window.scrollTo(0, y);
+}
+// update one row's figures in place (the row is not re-drawn, so typing, Tab and drop-downs keep working)
+function refreshRow(id) {
+  const l = rowOf(id), tr = document.querySelector(`[data-row="${id}"]`); if (!l || !tr) return;
+  tr.querySelector('.pv').textContent = money(l.demand_qty * l.price, l.currency);
+  if (!id.startsWith('d')) { const c = calc(l); tr.querySelector('.pn').textContent = fmt(c.pending); tr.querySelector('.st').innerHTML = `<span class="chip ${c.st}">${c.label}</span>`; }
+  const b = $('#savep'); if (b) b.disabled = !canSave();
+}
+function renderPlan() { keepScroll(drawPlan); }
+function drawPlan() {
   const all = [...lines.map(l => ({ l, d: false })), ...draft.map((l, i) => ({ l, d: true, i }))];
   const body = all.map(({ l, d, i }) => { const c = d ? null : calc(l), id = d ? `d${i}` : l.id;
     return `<tr data-row="${id}" ${d ? 'style="background:#7c3aed12"' : ''}>
       <td>${esc(l.buyer_name)}</td><td><b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td>
-      <td class="n">${l.price ? money(l.price, l.currency) : `<input type="number" step="0.01" min="0" data-k="price" data-id="${id}" value="${l.price}" title="No price found in Operations Master — enter it" ${canEdit ? '' : 'disabled'}>`}</td>
+      <td class="n"><input type="number" step="any" min="0" data-k="price" data-id="${id}" value="${l.price}" title="${l.price ? 'Price from Operations Master (you can change it)' : 'No price found in Operations Master — enter it'}" style="${l.price ? '' : 'border-color:var(--amber)'}" ${canEdit ? '' : 'disabled'}></td>
       <td class="n"><input type="number" min="0" step="1" data-k="demand_qty" data-id="${id}" value="${l.demand_qty}" ${canEdit ? '' : 'disabled'}></td>
       <td>${schedInputs(l, i, d)}</td>
-      <td class="n">${money(l.demand_qty * l.price, l.currency)}</td>
-      <td class="n">${c ? fmt(c.done) : '—'}</td><td class="n">${c ? fmt(c.pending) : '—'}</td>
-      <td>${c ? `<span class="chip ${c.st}">${c.label}</span>` : '<span class="chip x">Unsaved</span>'}</td>
+      <td class="n pv">${money(l.demand_qty * l.price, l.currency)}</td>
+      <td class="n pd">${c ? fmt(c.done) : '—'}</td><td class="n pn">${c ? fmt(c.pending) : '—'}</td>
+      <td class="st">${c ? `<span class="chip ${c.st}">${c.label}</span>` : '<span class="chip x">Unsaved</span>'}</td>
       <td>${canEdit ? `<button class="btn ghost sm" data-del="${id}" title="Remove">✕</button>` : ''}</td></tr>`; }).join('');
   $('#plan').innerHTML = `<div class="row"><b>Sales plan — ${monthLabel(M)}</b><div style="flex:1"></div>
-      ${canEdit ? `<button class="btn ghost" id="addp">＋ Add parts</button><button class="btn" id="savep" ${draft.length || window._dirty ? '' : 'disabled'}>Save plan</button>` : '<span class="mut">View only</span>'}</div>
+      ${canEdit ? `<button class="btn ghost" id="addp">＋ Add parts</button><button class="btn" id="savep" ${canSave() ? '' : 'disabled'}>Save plan</button>` : '<span class="mut">View only</span>'}</div>
     ${all.length ? `<div class="scroll"><table><thead><tr><th>Customer</th><th>Part</th><th class="n">Price</th><th class="n">Demand qty</th><th>Delivery</th><th class="n">Plan value</th><th class="n">Despatched</th><th class="n">Pending</th><th>Status</th><th></th></tr></thead><tbody>${body}</tbody></table></div>`
       : '<p class="mut">No parts yet. Press <b>Add parts</b> to pick parts from the Operations Master — customer, part number, part name and price come with them.</p>'}`;
 }
@@ -229,11 +253,11 @@ function renderDaily() {
     else if (p && d < t) { bg = 'var(--red)'; tx = '#fff'; } else if (p) bg = '#94a3b833';
     return `<td style="background:${bg};color:${tx}" title="${d}: planned ${fmt(p, 1)} · despatched ${fmt(a)}">${a ? fmt(a) : p ? '·' : ''}</td>`; }).join('')}</tr>`).join('');
   $('#daily').innerHTML = `<div class="row"><b>Daily despatch</b><input type="date" id="dday" min="${M}-01" max="${M}-${dim(M)}" value="${day}">
-      <span class="mut">Enter what actually left the plant on this date.</span><div style="flex:1"></div>${canEdit ? '<button class="btn" id="saved">Save day</button>' : ''}</div>
+      <span class="mut">Enter what actually left the plant on this date.</span><div style="flex:1"></div>${canEdit ? '<button class="btn ghost" id="addu">＋ Add part not in plan</button><button class="btn" id="saved">Save day</button>' : ''}</div>
     ${rows.length ? `<div class="scroll" style="max-height:40vh"><table><thead><tr><th>Customer</th><th>Part</th><th class="n">Planned this day</th><th class="n">Month despatched / demand</th><th class="n">Pending</th><th class="n">Despatched this day</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
     <h3 style="margin:18px 0 6px;font-size:13px">Month tracker</h3>
     <div class="legend"><span><span class="chip g">n</span> met plan</span><span><span class="chip a">n</span> less than plan</span><span><span class="chip b">n</span> unplanned day</span><span><span class="chip r">·</span> planned, nothing despatched</span><span>· = planned, upcoming</span></div>
-    <div class="scroll" style="max-height:34vh"><table class="heat"><thead><tr><th class="l">Part</th>${ds.map(d => `<th style="text-align:center;padding:3px">${+d.slice(8)}</th>`).join('')}</tr></thead><tbody>${heat}</tbody></table></div>` : '<p class="mut">Add parts to the sales plan first.</p>'}`;
+    <div class="scroll" style="max-height:34vh"><table class="heat"><thead><tr><th class="l">Part</th>${ds.map(d => `<th style="text-align:center;padding:3px">${+d.slice(8)}</th>`).join('')}</tr></thead><tbody>${heat}</tbody></table></div>` : '<p class="mut">No parts yet. Add parts in <b>Sales plan</b>, or use <b>Add part not in plan</b> for an unplanned sale.</p>'}`;
 }
 
 /* ======== events ======== */
@@ -241,9 +265,10 @@ document.addEventListener('click', async e => {
   const t = e.target;
   if (t.classList.contains('tab')) { document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === t)); ['dash', 'plan', 'daily'].forEach(s => $('#' + s).classList.toggle('hide', s !== t.dataset.t)); return; }
   try {
-    if (t.id === 'addp') { await openParts(); }
+    if (t.id === 'addp') { await openParts('plan'); }
+    else if (t.id === 'addu') { await openParts('daily'); }
     else if (t.id === 'pcancel') $('#parts').classList.remove('on');
-    else if (t.id === 'padd') addSelected();
+    else if (t.id === 'padd') await addSelected();
     else if (t.id === 'savep') await savePlan();
     else if (t.id === 'saved') await saveDay();
     else if (t.dataset.del) {
@@ -254,15 +279,26 @@ document.addEventListener('click', async e => {
     }
   } catch (err) { say(err.message); }
 });
+// typing: update the figures in place (no re-draw, so no jumping and the Save button wakes up straight away)
+document.addEventListener('input', e => {
+  const t = e.target; if (!t.dataset.k || !['price', 'demand_qty'].includes(t.dataset.k)) return;
+  const l = rowOf(t.dataset.id); if (!l) return;
+  l[t.dataset.k] = Math.max(+t.value || 0, 0); if (!t.dataset.id.startsWith('d')) l._dirty = true;
+  refreshRow(t.dataset.id); renderDash();
+});
 document.addEventListener('change', e => {
   const t = e.target;
-  if (t.id === 'dday') return renderDaily();
+  if (t.id === 'dday') return keepScroll(renderDaily);
   if (!t.dataset.k) return;
-  const id = t.dataset.id, l = id.startsWith('d') ? draft[+id.slice(1)] : lines.find(x => x.id === id); if (!l) return;
-  l[t.dataset.k] = ['price', 'demand_qty'].includes(t.dataset.k) ? Math.max(+t.value || 0, 0) : t.value;
-  if (t.dataset.k === 'sched_type') { if (t.value === 'weekly' && !l.sched_weekday) l.sched_weekday = 1; if (t.value !== 'date') l.sched_date = null; }
-  if (!id.startsWith('d')) l._dirty = window._dirty = true;
-  renderPlan(); renderDash();
+  const id = t.dataset.id, l = rowOf(id); if (!l) return;
+  if (['price', 'demand_qty'].includes(t.dataset.k)) return;       // already handled while typing
+  l[t.dataset.k] = t.value; if (!id.startsWith('d')) l._dirty = true;
+  if (t.dataset.k === 'sched_type') {
+    if (t.value === 'weekly' && !l.sched_weekday) l.sched_weekday = 1; if (t.value !== 'date') l.sched_date = null;
+    renderPlan();                                                   // shows the date / weekday box; scroll position is kept
+    const again = document.querySelector(`select[data-k="sched_type"][data-id="${id}"]`); if (again) again.focus({ preventScroll: true });
+  } else { const b = $('#savep'); if (b) b.disabled = !canSave(); }
+  renderDash();
 });
 $('#q').addEventListener('input', paintParts);
 $('#month').addEventListener('change', e => { M = e.target.value; load().catch(err => say(err.message)); });
@@ -270,11 +306,11 @@ $('#prev').onclick = () => shift(-1); $('#next').onclick = () => shift(1);
 function shift(n) { const d = new Date(Date.UTC(+M.slice(0, 4), +M.slice(5, 7) - 1 + n, 1)); M = d.toISOString().slice(0, 7); $('#month').value = M; load().catch(err => say(err.message)); }
 
 async function savePlan() {
-  const rows = [...lines.filter(l => l._dirty), ...draft].map(l => ({ ...l, month: M + '-01' }));
+  const rows = [...lines.filter(l => l._dirty), ...draft].map(({ _dirty, ...l }) => ({ ...l, month: M + '-01' }));
   if (!rows.length) return;
-  const bad = rows.find(l => !(+l.demand_qty > 0)); if (bad) return say(`Enter the demand quantity for ${bad.part_code}.`);
+  const bad = draft.find(l => !(+l.demand_qty > 0)); if (bad) return say(`Enter the demand quantity for ${bad.part_code}.`);
   await api.rpc('kmr_sf_save_lines', { p: rows, p_slug: slug });
-  window._dirty = false; await load(); say('Sales plan saved.', true);
+  await load(); say('Sales plan saved.', true);
 }
 async function saveDay() {
   const day = $('#dday').value, rows = [...document.querySelectorAll('[data-dl]')].map(i => ({ line_id: i.dataset.dl, day, qty: i.value === '' ? 0 : +i.value }))
@@ -285,7 +321,9 @@ async function saveDay() {
 
 /* ---- Add parts (from Operations Master) ---- */
 const picked = new Set();
-async function openParts() {
+let pickMode = 'plan';
+async function openParts(mode) {
+  pickMode = mode; document.querySelector('#parts .hd b').textContent = mode === 'daily' ? 'Add part not in the sales plan (unplanned sale)' : 'Add parts from Operations Master';
   if (!PARTS.length) PARTS = await api.rpc('kmr_sf_parts', { p_slug: slug });
   picked.clear(); $('#q').value = ''; paintParts(); $('#parts').classList.add('on');
 }
@@ -295,15 +333,23 @@ function paintParts() {
   $('#plist').innerHTML = list.map(p => { const k = p.part_code + '|' + p.buyer_code, used = have.has(k);
     return `<tr ${used ? 'style="opacity:.45"' : ''}><td><input type="checkbox" data-pk="${esc(k)}" ${used ? 'disabled checked' : picked.has(k) ? 'checked' : ''}></td>
       <td>${esc(p.buyer_name)}</td><td><b>${esc(p.part_code)}</b></td><td>${esc(p.part_name)}</td>
-      <td class="n">${p.price ? money(p.price, p.currency) : '<span class="mut" title="No customer rate contract found">—</span>'}</td></tr>`; }).join('') || '<tr><td colspan="5" class="mut">No parts found. Add parts under Operations Master › Parts first.</td></tr>';
+      <td class="n">${p.price ? `<span title="${esc(p.price_source || '')}">${money(p.price, p.currency)}</span>${/expired/.test(p.price_source || '') ? ' <span title="Rate contract has expired — please check the price">⚠</span>' : ''}` : '<span class="mut" title="No customer rate contract found — enter the price in the plan">—</span>'}</td></tr>`; }).join('') || '<tr><td colspan="5" class="mut">No parts found. Add parts under Operations Master › Parts first.</td></tr>';
   $('#pcount').textContent = `${picked.size} selected`;
 }
 document.addEventListener('change', e => { if (e.target.dataset.pk) { e.target.checked ? picked.add(e.target.dataset.pk) : picked.delete(e.target.dataset.pk); $('#pcount').textContent = `${picked.size} selected`; } });
-function addSelected() {
-  PARTS.filter(p => picked.has(p.part_code + '|' + p.buyer_code)).forEach(p => draft.push({
-    month: M + '-01', buyer_code: p.buyer_code, buyer_name: p.buyer_name, part_code: p.part_code, part_name: p.part_name,
-    price: +p.price || 0, currency: p.currency, uom: p.uom, demand_qty: 0, sched_type: 'date', sched_date: null, sched_weekday: null }));
-  $('#parts').classList.remove('on'); renderPlan(); document.querySelector('[data-t=plan]').click();
+async function addSelected() {
+  const chosen = PARTS.filter(p => picked.has(p.part_code + '|' + p.buyer_code));
+  if (!chosen.length) return say('Tick at least one part.');
+  const mk = p => ({ month: M + '-01', buyer_code: p.buyer_code, buyer_name: p.buyer_name, part_code: p.part_code, part_name: p.part_name,
+    price: +p.price || 0, currency: p.currency, uom: p.uom, demand_qty: 0, sched_type: 'date', sched_date: null, sched_weekday: null });
+  $('#parts').classList.remove('on');
+  if (pickMode === 'daily') {          // unplanned sale: goes straight into the sales plan with plan qty 0, ready for the despatch entry
+    try {
+      await api.rpc('kmr_sf_save_lines', { p_slug: slug, p: chosen.map(p => ({ ...mk(p), sched_type: 'daily' })) });
+      await load(); document.querySelector('[data-t=daily]').click();
+      say(`${chosen.length} part(s) added to the sales plan with plan qty 0. Enter the despatch quantity below.`, true);
+    } catch (err) { say(err.message); }
+  } else { chosen.forEach(p => draft.push(mk(p))); renderPlan(); document.querySelector('[data-t=plan]').click(); }
 }
 
 /* ======== Supabase key: nothing to paste — taken from the KMR apps already on this website ======== */
