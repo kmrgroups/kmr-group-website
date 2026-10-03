@@ -306,13 +306,36 @@ function addSelected() {
   $('#parts').classList.remove('on'); renderPlan(); document.querySelector('[data-t=plan]').click();
 }
 
+/* ======== Supabase key: nothing to paste — taken from the KMR apps already on this website ======== */
+// Reads the public (anon / publishable) key the other KMR pages use. A key that is not the public one is never accepted.
+const isPublicKey = k => { if (k.startsWith('sb_publishable_')) return true;
+  try { return JSON.parse(atob(k.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role === 'anon'; } catch { return false; } };
+function keysIn(text) { return [...new Set(text.match(/sb_publishable_[A-Za-z0-9_-]{10,}|eyJ[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}\.[A-Za-z0-9_-]{15,}/g) || [])].filter(isPublicKey); }
+async function findKey() {
+  if (CFG.SUPABASE_ANON_KEY && !CFG.SUPABASE_ANON_KEY.startsWith('PASTE')) return CFG.SUPABASE_ANON_KEY;
+  const cached = sessionStorage.getItem('kmr_pub_key'); if (cached) return cached;
+  const pages = ['/it/capacity.html', '/it/balloon.html', '/it/pd.html', '/it/index.html', '/it/'];
+  for (const pg of pages) {
+    try {
+      const r = await fetch(pg, { credentials: 'same-origin' }); if (!r.ok) continue;
+      const html = await r.text(); let found = keysIn(html);
+      if (!found.length) for (const m of html.matchAll(/<script[^>]+src=["']([^"']+)["']/g)) {      // key kept in a shared script file
+        const u = new URL(m[1], location.origin + pg); if (u.origin !== location.origin) continue;
+        try { found = keysIn(await (await fetch(u)).text()); } catch {} if (found.length) break; }
+      if (found.length) { sessionStorage.setItem('kmr_pub_key', found[0]); return found[0]; }
+    } catch {}
+  }
+  throw new Error('Could not find the KMR public key on this website. Please contact KMR support.');
+}
+
 /* ======== start ======== */
 async function boot() {
   try {
     $('#month').value = M;
     if (!DEMO) {
       const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
-      sb = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { db: { schema: 'public' } });
+      const key = await findKey();
+      sb = createClient(CFG.SUPABASE_URL, key, { db: { schema: 'public' } });
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { location.href = '/it/?next=' + encodeURIComponent(location.pathname + location.search); return; }
       if (!slug) {                                   // opened from the portal card: find the company
