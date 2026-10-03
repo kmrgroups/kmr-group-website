@@ -77,7 +77,7 @@ td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
 /* ======== configuration ======== */
 const CFG = {
   SUPABASE_URL: 'https://dehlcusptkzfhqvpfyjh.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_ukWZLiTOXfUZsNAyn5BM7Q_YjSFcUus',
+  SUPABASE_ANON_KEY: 'PASTE-THE-SAME-PUBLISHABLE-KEY-AS-THE-OTHER-KMR-APPS',
   WORK_DAYS: [1,2,3,4,5,6],            // ISO weekdays used to spread a "Daily" schedule (Mon–Sat)
   AMBER_BELOW: 0.9, RED_BELOW: 0.7     // despatched ÷ expected-by-today
 };
@@ -311,11 +311,20 @@ async function boot() {
   try {
     $('#month').value = M;
     if (!DEMO) {
-      if (!slug) throw new Error('Open Sales Flow from your company’s KMR Apps page (the link carries your company name).');
       const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
       sb = createClient(CFG.SUPABASE_URL, CFG.SUPABASE_ANON_KEY, { db: { schema: 'public' } });
       const { data: { session } } = await sb.auth.getSession();
       if (!session) { location.href = '/it/?next=' + encodeURIComponent(location.pathname + location.search); return; }
+      if (!slug) {                                   // opened from the portal card: find the company
+        const ref = (document.referrer.match(/\/it\/app\/([^/?#]+)/) || [])[1];
+        if (ref) slug = decodeURIComponent(ref).toLowerCase();
+        else {
+          const mine = await api.rpc('kmr_sf_my_companies', {});
+          if (mine.length === 1) slug = mine[0].slug;
+          else if (mine.length > 1) throw new Error('You use Sales Flow for more than one company. Open it from your company’s KMR Apps page.');
+        }
+        if (!slug) throw new Error('No Sales Flow access found for this login. Ask your administrator to give you access (Administration › Users & access).');
+      }
     }
     ctx = await api.rpc('kmr_sf_context', { p_slug: slug });
     if (!ctx) throw new Error('You do not have access to Sales Flow, or your company’s subscription is not active. Ask your administrator (Administration › Users & access).');
