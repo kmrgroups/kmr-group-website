@@ -14,7 +14,7 @@ header .sp{flex:1}
 .tabs{display:flex;gap:4px;padding:10px 22px 0}
 .tab{border:0;background:none;padding:9px 16px;border-radius:10px 10px 0 0;font-weight:600;color:var(--mut);cursor:pointer}
 .tab.on{background:var(--card);color:var(--brand);box-shadow:0 -2px 0 var(--brand) inset}
-main{padding:0 22px 40px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:18px}
+main{padding:0 22px 20px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:18px}
 input,select,button,textarea{font:inherit;color:inherit}
 input,select{padding:7px 9px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 header input{color:#0f172a;background:#fff}
@@ -35,6 +35,14 @@ input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-
 td input[type=number]{width:96px;text-align:right}
 .chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c)}
 .g{--c:var(--green)}.a{--c:var(--amber)}.r{--c:var(--red)}.b{--c:var(--blue)}.x{--c:#94a3b8}.u{--c:#7c3aed}
+.cA{--c:#1d4ed8}.cB{--c:#0d9488}.cC{--c:#64748b}
+.cc{display:inline-block;min-width:20px;text-align:center;padding:1px 6px;border-radius:6px;font-size:11px;font-weight:800;color:#fff;background:var(--c);margin-right:6px}
+.cls{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:16px}
+.cls .box{border-top:4px solid var(--c)}.cls h4{margin:0 0 6px;font-size:15px}
+.mk{position:relative}.mk b{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--ink)}
+.fl{display:inline-block;margin:1px 3px 1px 0;padding:1px 7px;border-radius:99px;font-size:10px;font-weight:700;color:#fff;background:var(--c)}
+.brief{margin:0;padding-left:18px}.brief li{margin:5px 0}
+.stack{display:flex;height:22px;border-radius:7px;overflow:hidden;margin:4px 0 2px}.stack i{display:block;color:#fff;font:700 11px/22px system-ui;text-align:center;overflow:hidden;white-space:nowrap}
 .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}
 .box{border:1px solid var(--line);border-radius:12px;padding:14px}.box h3{margin:0 0 10px;font-size:13px}
 .scroll{overflow:auto;max-height:68vh}
@@ -46,6 +54,10 @@ td input[type=number]{width:96px;text-align:right}
 .modal .ft{justify-content:flex-end;border-top:1px solid var(--line)}
 .msg{padding:10px 14px;border-radius:10px;margin-bottom:12px;background:#fee2e2;color:#991b1b}.msg.ok{background:#dcfce7;color:#166534}
 .mut{color:var(--mut)}.hide{display:none}
+.back{position:fixed;left:12px;bottom:12px;z-index:6;background:linear-gradient(90deg,var(--brand),var(--brand2));color:#fff;border-radius:99px;padding:10px 18px;font-weight:700;font-size:13px;text-decoration:none;box-shadow:0 6px 18px #7c3aed55}
+.back:hover{filter:brightness(1.08)}
+footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
+@media print{.back{display:none}}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:6px 0 12px}
 </style>
 </head>
@@ -69,6 +81,8 @@ td input[type=number]{width:96px;text-align:right}
   <section id="plan" class="hide"></section>
   <section id="daily" class="hide"></section>
 </div></main>
+<footer>Powered By : <b>KMR Group of Companies</b></footer>
+<a class="back hide" id="back" href="#">← <span id="backco"></span> · KMR Apps</a>
 
 <div class="modal" id="parts"><div class="in">
   <div class="hd"><b>Add parts from Operations Master</b><div style="flex:1"></div><input id="q" placeholder="Search customer, part no. or name" style="width:280px"></div>
@@ -82,7 +96,10 @@ const CFG = {
   SUPABASE_URL: 'https://dehlcusptkzfhqvpfyjh.supabase.co',
   SUPABASE_ANON_KEY: 'PASTE-THE-SAME-PUBLISHABLE-KEY-AS-THE-OTHER-KMR-APPS',
   WORK_DAYS: [1,2,3,4,5,6],            // ISO weekdays used to spread a "Daily" schedule (Mon–Sat)
-  AMBER_BELOW: 0.9, RED_BELOW: 0.7     // despatched ÷ expected-by-today
+  AMBER_BELOW: 0.9, RED_BELOW: 0.7,    // despatched ÷ expected-by-today
+  ABC: [70, 90],                       // Class A = parts making the first 70% of plan value, B = next 20%, C = the last 10%
+  CONC: 40,                            // warn when one customer holds more than this % of the plan value
+  FX: { INR: 1, USD: 84, EUR: 92 }     // only used to compare parts priced in different currencies in the ABC analysis
 };
 const qs = new URLSearchParams(location.search), DEMO = qs.has('demo');
 let slug = (qs.get('co') || '').toLowerCase();
@@ -110,14 +127,14 @@ const api = DEMO ? demoApi() : {
 /* ======== planning maths ======== */
 // planned quantity of a line on each day of its month
 function plannedByDay(l) {
-  const ds = days(l.month.slice(0, 7)), out = {};
-  const q = +l.demand_qty;
-  if (l.sched_type === 'date') { if (l.sched_date) out[l.sched_date] = q; }
-  else {
-    const pick = ds.filter(d => l.sched_type === 'daily' ? CFG.WORK_DAYS.includes(isoDow(d)) : isoDow(d) === +l.sched_weekday);
-    pick.forEach((d, i) => out[d] = Math.round(q / pick.length * 100) / 100);
-    if (pick.length) { const s = Object.values(out).reduce((a, b) => a + b, 0); out[pick[pick.length - 1]] += Math.round((q - s) * 100) / 100; }
-  }
+  const ds = days(l.month.slice(0, 7)), out = {}, q = +l.demand_qty;
+  if (l.sched_type === 'date') { if (l.sched_date) out[l.sched_date] = q; return out; }
+  const pick = ds.filter(d => l.sched_type === 'daily' ? CFG.WORK_DAYS.includes(isoDow(d)) : isoDow(d) === +l.sched_weekday), n = pick.length;
+  if (!n || !q) return out;
+  if (Number.isInteger(q)) {            // whole pieces: the remainder is spread evenly, the days always add up to the demand
+    const base = Math.floor(q / n), r = q - base * n;
+    pick.forEach((d, i) => out[d] = base + (Math.floor((i + 1) * r / n) - Math.floor(i * r / n)));
+  } else { pick.forEach(d => out[d] = Math.round(q / n * 100) / 100); }
   return out;
 }
 function calc(l) {
@@ -146,6 +163,78 @@ async function load() {
 
 /* ======== rendering ======== */
 function render() { keepScroll(() => { renderDash(); drawPlan(); renderDaily(); }); }
+
+
+/* ======== ABC analysis of the sales plan ======== */
+let CLS = {};                                    // line id -> 'A' | 'B' | 'C' | '–' (no price)
+const fx = c => CFG.FX[c] ?? 1;
+const addDays = (ds, n) => new Date(new Date(ds + 'T00:00:00Z').getTime() + n * 864e5).toISOString().slice(0, 10);
+const clsChip = id => CLS[id] ? (CLS[id] === '–' ? '<span class="cc x" title="No price — not classified">?</span>' : `<span class="cc c${CLS[id]}" title="Class ${CLS[id]} part (by plan value)">${CLS[id]}</span>`) : '';
+function classify(rows) {                        // rows = planned lines only
+  const priced = rows.filter(r => r.l.price > 0).map(r => ({ ...r, v: r.c.demand * r.l.price * fx(r.l.currency) })).sort((a, b) => b.v - a.v);
+  const tot = priced.reduce((a, r) => a + r.v, 0); let cum = 0; CLS = {};
+  priced.forEach(r => { const before = tot ? cum / tot * 100 : 0; r.cls = before < CFG.ABC[0] ? 'A' : before < CFG.ABC[1] ? 'B' : 'C'; CLS[r.l.id] = r.cls; cum += r.v; });
+  rows.filter(r => !(r.l.price > 0)).forEach(r => CLS[r.l.id] = '–');
+  return { priced, tot };
+}
+function flagsOf(l, c) {
+  const f = [], t = todayStr();
+  if (c.label === 'Overdue') f.push(['Overdue', 'r']); else if (c.st === 'r') f.push(['Behind plan', 'r']); else if (c.st === 'a') f.push(['Slipping', 'a']);
+  if (c.expected > 0 && c.done === 0) f.push(['Nothing despatched yet', 'r']);
+  if (l.sched_type === 'date' && l.sched_date && c.pending > 0 && l.sched_date >= t && l.sched_date <= addDays(t, 3)) f.push(['Due in ≤ 3 days', 'a']);
+  if (!(l.price > 0)) f.push(['No price', 'x']);
+  return f;
+}
+function analysis(rows, unp, UVtxt) {
+  const { priced, tot } = classify(rows);
+  if (!rows.length) return '';
+  const inr = n => money(n, 'INR'), pc = n => fmt(n, 0) + '%';
+  const G = { A: null, B: null, C: null }; Object.keys(G).forEach(k => G[k] = { n: 0, val: 0, done: 0, exp: 0, pend: 0, behind: 0, late: 0, slip: 0 });
+  priced.forEach(r => { const g = G[r.cls], p = r.l.price * fx(r.l.currency);
+    g.n++; g.val += r.v; g.done += Math.min(r.c.done, r.c.demand) * p; g.exp += r.c.expected * p; g.pend += r.c.pending * p; g.behind += r.c.behind * p;
+    if (r.c.st === 'r') g.late++; if (r.c.st === 'a') g.slip++; });
+  const sum = k => Object.values(G).reduce((a, g) => a + g[k], 0), ach = tot ? sum('done') / tot * 100 : 0, exp = tot ? sum('exp') / tot * 100 : 0;
+  const focus = { A: 'Review every day — secure material, machine time and transport for these first.', B: 'Review twice a week; recover quickly if they start to slip.', C: 'Review weekly; consolidate despatches and avoid spending daily effort here.' };
+  const verdict = g => { const gap = g.val ? (g.exp - g.done) / g.val * 100 : 0; return gap >= 15 ? ['Needs immediate focus', 'r', gap] : gap >= 5 ? ['Watch closely', 'a', gap] : ['On course', 'g', gap]; };
+  const cards = ['A', 'B', 'C'].map(k => { const g = G[k], v = verdict(g), a = g.val ? g.done / g.val * 100 : 0, e = g.val ? g.exp / g.val * 100 : 0;
+    return `<div class="box c${k}"><h4><span class="cc c${k}">${k}</span>Class ${k} parts <span class="fl ${v[1]}" style="float:right">${g.n ? v[0] : 'No parts'}</span></h4>
+      <div class="mut" style="font-size:12px">${g.n} parts (${pc(priced.length ? g.n / priced.length * 100 : 0)} of parts) · ${pc(tot ? g.val / tot * 100 : 0)} of plan value</div>
+      <div style="margin:8px 0 3px;font-size:12px">Plan ${inr(g.val)}</div>
+      <div class="bar mk" style="--c:var(--${v[1] === 'g' ? 'green' : v[1] === 'a' ? 'amber' : 'red'})"><i style="width:${Math.min(a, 100)}%"></i><b style="left:${Math.min(e, 100)}%" title="Expected by today ${pc(e)}"></b></div>
+      <div style="font-size:12px;margin:3px 0 8px">Achieved <b>${pc(a)}</b> · expected by today <b>${pc(e)}</b> (marker)</div>
+      <div style="font-size:12px">Behind plan by <b>${inr(g.behind)}</b> · Pending <b>${inr(g.pend)}</b><br>${g.late} behind / overdue · ${g.slip} slipping</div>
+      <div class="mut" style="font-size:12px;margin-top:8px">▸ ${focus[k]}</div></div>`; }).join('');
+  // customer concentration
+  const byC = {}; priced.forEach(r => byC[r.l.buyer_name || '—'] = (byC[r.l.buyer_name || '—'] || 0) + r.v);
+  const topC = Object.entries(byC).sort((a, b) => b[1] - a[1])[0], topShare = tot && topC ? topC[1] / tot * 100 : 0;
+  const top3 = tot ? priced.slice(0, 3).reduce((a, r) => a + r.v, 0) / tot * 100 : 0;
+  const unpriced = rows.filter(r => !(r.l.price > 0)), noDesp = rows.filter(r => r.c.expected > 0 && r.c.done === 0);
+  const worst = ['A', 'B', 'C'].filter(k => G[k].n).sort((a, b) => G[b].behind - G[a].behind)[0];
+  const B = [];
+  B.push(`<b>Overall:</b> ${pc(ach)} of the plan value is despatched against ${pc(exp)} expected by today — ${ach + 5 < exp ? `<b style="color:var(--red)">${fmt(exp - ach)} points behind</b>` : ach >= exp ? '<b style="color:var(--green)">on or ahead of schedule</b>' : 'slightly behind'}. Total plan ${inr(tot)}.`);
+  if (worst && G[worst].behind > 0) B.push(`<b>Concentrate on Class ${worst} first:</b> ${inr(G[worst].behind)} is behind schedule there (${G[worst].late} parts behind/overdue). ${worst === 'A' ? `The ${G.A.n} Class A parts carry ${pc(G.A.val / tot * 100)} of the month’s value.` : ''}`);
+  else B.push('<b>All classes are on course</b> — keep the daily despatch routine.');
+  B.push(`<b>Dependence:</b> the top 3 parts carry ${pc(top3)} of plan value${topC ? `, and <b>${esc(topC[0])}</b> alone holds ${pc(topShare)}${topShare >= CFG.CONC ? ' — <span style="color:var(--red)">high dependence; a delay with this customer moves the whole month</span>' : ''}` : ''}.`);
+  if (noDesp.length) B.push(`<b>${noDesp.length} part(s) due to have shipped but nothing despatched yet</b> — check stock, quality holds and customer schedules.`);
+  if (unp.length) B.push(`<b>Unplanned sales:</b> ${UVtxt} across ${unp.length} part(s) were despatched without customer demand — confirm with the customer or add the demand.`);
+  if (unpriced.length) B.push(`<b>${unpriced.length} planned part(s) have no price</b> — enter the price in Sales plan so they are valued and classified (they show “?”).`);
+  if (rows.some(r => r.l.currency !== 'INR')) B.push('<span class="mut">Parts priced in other currencies are converted with the rates in CFG.FX for this analysis.</span>');
+  // where to concentrate: biggest value behind schedule first
+  const pri = rows.map(r => ({ ...r, f: flagsOf(r.l, r.c), bv: r.c.behind * r.l.price * fx(r.l.currency) }))
+    .filter(r => r.f.some(x => x[1] !== 'x') ).sort((a, b) => b.bv - a.bv || b.c.pending - a.c.pending).slice(0, 10)
+    .map(({ l, c, f }) => `<tr><td>${clsChip(l.id)}</td><td>${esc(l.buyer_name)}<br><span class="mut">${esc(l.part_code)} · ${esc(l.part_name)}</span></td><td class="n">${fmt(c.behind)}</td><td class="n">${fmt(c.pending)}</td><td class="n">${money(c.behind * l.price, l.currency)}</td><td>${f.map(x => `<span class="fl ${x[1]}">${x[0]}</span>`).join('')}</td></tr>`).join('');
+  const sh = k => priced.length ? G[k].n / priced.length * 100 : 0, sv = k => tot ? G[k].val / tot * 100 : 0;
+  const stack = f => ['A', 'B', 'C'].map(k => `<i class="c${k}" style="width:${f(k)}%;background:var(--c)" title="Class ${k}: ${pc(f(k))}">${f(k) >= 7 ? k + ' ' + pc(f(k)) : ''}</i>`).join('');
+  return `<div class="box" style="margin-bottom:16px"><h3 style="font-size:15px;margin-bottom:8px">Sales plan analysis — where to concentrate · ${monthLabel(M)}</h3>
+      <ul class="brief">${B.map(x => `<li>${x}</li>`).join('')}</ul></div>
+    <div class="cls">${cards}</div>
+    <div class="box" style="margin-bottom:16px"><h3>ABC mix — a few parts make most of the money</h3>
+      <div class="mut" style="font-size:12px">Share of parts (${priced.length} priced parts)</div><div class="stack">${stack(sh)}</div>
+      <div class="mut" style="font-size:12px;margin-top:8px">Share of plan value</div><div class="stack">${stack(sv)}</div>
+      <div class="legend" style="margin:8px 0 0"><span>Class A = parts making the first ${CFG.ABC[0]}% of plan value</span><span>B = next ${CFG.ABC[1] - CFG.ABC[0]}%</span><span>C = last ${100 - CFG.ABC[1]}%</span></div></div>
+    <div class="box" style="margin-bottom:16px"><h3>Where to concentrate now (largest value behind schedule first)</h3>
+      ${pri ? `<div class="scroll" style="max-height:46vh"><table><thead><tr><th>Class</th><th>Customer / part</th><th class="n">Should have shipped, not shipped</th><th class="n">Pending qty</th><th class="n">Value behind</th><th>Indicators</th></tr></thead><tbody>${pri}</tbody></table></div>` : '<p class="mut">Nothing is behind plan. 🎉</p>'}</div>`;
+}
 
 function renderDash() {
   const all = lines.map(l => ({ l, c: calc(l) }));
@@ -177,6 +266,7 @@ function renderDash() {
     return `<tr><td>${esc(n)}</td><td class="n">${fmt(o.a)} / ${fmt(o.d)}</td><td style="width:42%"><div class="bar" style="--c:${cl}"><i style="width:${p * 100}%"></i></div></td><td class="n">${fmt(p * 100)}%</td></tr>`; }).join('');
   const attn = rows.filter(r => r.c.st === 'r' || r.c.st === 'a').sort((a, b) => b.c.behind * b.l.price - a.c.behind * a.l.price).slice(0, 8)
     .map(({ l, c }) => `<tr><td>${esc(l.buyer_name)}<br><span class="mut">${esc(l.part_code)} · ${esc(l.part_name)}</span></td><td class="n">${fmt(c.pending)}</td><td class="n">${money(c.pending * l.price, l.currency)}</td><td><span class="chip ${c.st}">${c.label}</span></td></tr>`).join('');
+  const ANALYSIS = analysis(rows, unp, UV);
   const unpRows = unp.sort((a, b) => b.c.done * b.l.price - a.c.done * a.l.price).map(({ l, c }) => `<tr><td>${esc(l.buyer_name)}</td><td><b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td><td class="n">${fmt(c.done)}</td><td class="n">${money(c.done * l.price, l.currency)}</td></tr>`).join('');
   $('#dash').innerHTML = !lines.length ? `<p class="mut">No sales plan for ${monthLabel(M)} yet. Open <b>Sales plan</b> and press <b>Add parts</b>.</p>` : `
     <div class="kpis">
@@ -186,11 +276,10 @@ function renderDash() {
     </div>
     <div class="legend"><span><span class="chip g">On track</span> ≥ ${CFG.AMBER_BELOW * 100}% of expected by today</span><span><span class="chip a">Slipping</span> ${CFG.RED_BELOW * 100}–${CFG.AMBER_BELOW * 100}%</span><span><span class="chip r">Behind / Overdue</span></span><span><span class="chip b">Completed</span></span><span><span class="chip x">Not due yet</span></span><span><span class="chip u">Unplanned sale</span> despatched with plan qty 0</span>
       <span>· On track ${cnt('g')} · Slipping ${cnt('a')} · Behind/Overdue ${cnt('r')} · Completed ${cnt('b')}</span></div>
+    ${ANALYSIS}
     <div class="grid2">
       <div class="box"><h3>Cumulative sales value — plan vs actual · ${monthLabel(M)}</h3>${chart}</div>
       <div class="box"><h3>Customer-wise achievement</h3><table><tbody>${cust}</tbody></table></div>
-      <div class="box" style="grid-column:1/-1"><h3>Needs attention (largest pending value first)</h3>
-        ${attn ? `<table><thead><tr><th>Customer / part</th><th class="n">Pending qty</th><th class="n">Pending value</th><th>Status</th></tr></thead><tbody>${attn}</tbody></table>` : '<p class="mut">Nothing behind plan. 🎉</p>'}</div>
       <div class="box" style="grid-column:1/-1"><h3>Unplanned sales (despatched, not in the customer demand)</h3>
         ${unpRows ? `<table><thead><tr><th>Customer</th><th>Part</th><th class="n">Despatched qty</th><th class="n">Value</th></tr></thead><tbody>${unpRows}</tbody></table>` : '<p class="mut">No unplanned sales this month.</p>'}</div>
     </div>`;
@@ -199,14 +288,15 @@ function renderDash() {
 const schedText = l => l.sched_type === 'date' ? 'On ' + (l.sched_date || '—').split('-').reverse().join('-') : l.sched_type === 'daily' ? 'Daily (Mon–Sat)' : 'Every ' + ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][l.sched_weekday];
 
 function schedInputs(l, i, isDraft) {
-  const id = isDraft ? `d${i}` : l.id, dis = canEdit ? '' : 'disabled';
+  const id = isDraft ? `new-${i}` : l.id, dis = canEdit ? '' : 'disabled';
   return `<select data-k="sched_type" data-id="${id}" ${dis}><option value="date" ${l.sched_type === 'date' ? 'selected' : ''}>Specific date</option><option value="daily" ${l.sched_type === 'daily' ? 'selected' : ''}>Daily</option><option value="weekly" ${l.sched_type === 'weekly' ? 'selected' : ''}>Weekly</option></select>
    ${l.sched_type === 'date' ? `<input type="date" data-k="sched_date" data-id="${id}" min="${M}-01" max="${M}-${dim(M)}" value="${l.sched_date || ''}" ${dis}>` : ''}
    ${l.sched_type === 'weekly' ? `<select data-k="sched_weekday" data-id="${id}" ${dis}>${[1, 2, 3, 4, 5, 6, 7].map(w => `<option value="${w}" ${+l.sched_weekday === w ? 'selected' : ''}>${['', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'][w]}</option>`).join('')}</select>` : ''}`;
 }
 
 const canSave = () => draft.length > 0 || lines.some(l => l._dirty);
-const rowOf = id => id.startsWith('d') ? draft[+id.slice(1)] : lines.find(x => x.id === id);
+const isNew = id => id.startsWith('new-');
+const rowOf = id => isNew(id) ? draft[+id.slice(4)] : lines.find(x => x.id === id);
 // re-draw a part of the screen without the page or the table jumping back to the top
 function keepScroll(fn) {
   const y = window.scrollY, sc = [...document.querySelectorAll('.scroll')].map(e => e.scrollTop);
@@ -216,15 +306,15 @@ function keepScroll(fn) {
 function refreshRow(id) {
   const l = rowOf(id), tr = document.querySelector(`[data-row="${id}"]`); if (!l || !tr) return;
   tr.querySelector('.pv').textContent = money(l.demand_qty * l.price, l.currency);
-  if (!id.startsWith('d')) { const c = calc(l); tr.querySelector('.pn').textContent = fmt(c.pending); tr.querySelector('.st').innerHTML = `<span class="chip ${c.st}">${c.label}</span>`; }
+  if (!isNew(id)) { const c = calc(l); tr.querySelector('.pn').textContent = fmt(c.pending); tr.querySelector('.st').innerHTML = `<span class="chip ${c.st}">${c.label}</span>`; }
   const b = $('#savep'); if (b) b.disabled = !canSave();
 }
 function renderPlan() { keepScroll(drawPlan); }
 function drawPlan() {
   const all = [...lines.map(l => ({ l, d: false })), ...draft.map((l, i) => ({ l, d: true, i }))];
-  const body = all.map(({ l, d, i }) => { const c = d ? null : calc(l), id = d ? `d${i}` : l.id;
+  const body = all.map(({ l, d, i }) => { const c = d ? null : calc(l), id = d ? `new-${i}` : l.id;
     return `<tr data-row="${id}" ${d ? 'style="background:#7c3aed12"' : ''}>
-      <td>${esc(l.buyer_name)}</td><td><b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td>
+      <td>${esc(l.buyer_name)}</td><td>${clsChip(l.id)}<b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td>
       <td class="n"><input type="number" step="any" min="0" data-k="price" data-id="${id}" value="${l.price}" title="${l.price ? 'Price from Operations Master (you can change it)' : 'No price found in Operations Master — enter it'}" style="${l.price ? '' : 'border-color:var(--amber)'}" ${canEdit ? '' : 'disabled'}></td>
       <td class="n"><input type="number" min="0" step="1" data-k="demand_qty" data-id="${id}" value="${l.demand_qty}" ${canEdit ? '' : 'disabled'}></td>
       <td>${schedInputs(l, i, d)}</td>
@@ -242,8 +332,8 @@ function renderDaily() {
   const day = $('#dday')?.value || (todayStr().slice(0, 7) === M ? todayStr() : M + '-01');
   const rows = lines.map(l => ({ l, c: calc(l) }));
   const body = rows.map(({ l, c }) => { const plan = c.plan[day] || 0, got = (desp[l.id] || {})[day] || 0;
-    return `<tr><td>${esc(l.buyer_name)}</td><td><b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td>
-      <td class="n">${fmt(plan, 1)}</td><td class="n">${fmt(c.done)} / ${fmt(c.demand)}</td><td class="n">${fmt(c.pending)}</td>
+    return `<tr><td>${esc(l.buyer_name)}</td><td>${clsChip(l.id)}<b>${esc(l.part_code)}</b><br><span class="mut">${esc(l.part_name)}</span></td>
+      <td class="n">${fmt(plan, Number.isInteger(plan) ? 0 : 2)}</td><td class="n">${fmt(c.done)} / ${fmt(c.demand)}</td><td class="n">${fmt(c.pending)}</td>
       <td class="n"><input type="number" min="0" step="1" data-dl="${l.id}" value="${got || ''}" placeholder="0" ${canEdit && day <= todayStr() ? '' : 'disabled'}></td>
       <td><span class="chip ${c.st}">${c.label}</span></td></tr>`; }).join('');
   const ds = days(M), t = todayStr();
@@ -251,10 +341,10 @@ function renderDaily() {
     const p = c.plan[d] || 0, a = (desp[l.id] || {})[d] || 0; let bg = 'transparent', tx = '';
     if (a) { bg = a >= p && p ? 'var(--green)' : p ? 'var(--amber)' : 'var(--blue)'; tx = '#fff'; }
     else if (p && d < t) { bg = 'var(--red)'; tx = '#fff'; } else if (p) bg = '#94a3b833';
-    return `<td style="background:${bg};color:${tx}" title="${d}: planned ${fmt(p, 1)} · despatched ${fmt(a)}">${a ? fmt(a) : p ? '·' : ''}</td>`; }).join('')}</tr>`).join('');
+    return `<td style="background:${bg};color:${tx}" title="${d}: planned ${fmt(p, Number.isInteger(p) ? 0 : 2)} · despatched ${fmt(a)}">${a ? fmt(a) : p ? '·' : ''}</td>`; }).join('')}</tr>`).join('');
   $('#daily').innerHTML = `<div class="row"><b>Daily despatch</b><input type="date" id="dday" min="${M}-01" max="${M}-${dim(M)}" value="${day}">
       <span class="mut">Enter what actually left the plant on this date.</span><div style="flex:1"></div>${canEdit ? '<button class="btn ghost" id="addu">＋ Add part not in plan</button><button class="btn" id="saved">Save day</button>' : ''}</div>
-    ${rows.length ? `<div class="scroll" style="max-height:40vh"><table><thead><tr><th>Customer</th><th>Part</th><th class="n">Planned this day</th><th class="n">Month despatched / demand</th><th class="n">Pending</th><th class="n">Despatched this day</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
+    ${rows.length ? `<p class="mut" style="margin:-6px 0 10px;font-size:12px"><b>Planned this day</b> = the month’s customer demand spread over its delivery schedule: <b>Daily</b> → demand ÷ working days (Mon–Sat) · <b>Weekly</b> → demand ÷ number of that weekday in the month · <b>Specific date</b> → the full quantity on that date. Shown in whole pieces; the days always add up to the demand.</p><div class="scroll" style="max-height:40vh"><table><thead><tr><th>Customer</th><th>Part</th><th class="n" title="Month demand spread over the delivery schedule (see the note above)">Planned this day ⓘ</th><th class="n">Month despatched / demand</th><th class="n">Pending</th><th class="n">Despatched this day</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
     <h3 style="margin:18px 0 6px;font-size:13px">Month tracker</h3>
     <div class="legend"><span><span class="chip g">n</span> met plan</span><span><span class="chip a">n</span> less than plan</span><span><span class="chip b">n</span> unplanned day</span><span><span class="chip r">·</span> planned, nothing despatched</span><span>· = planned, upcoming</span></div>
     <div class="scroll" style="max-height:34vh"><table class="heat"><thead><tr><th class="l">Part</th>${ds.map(d => `<th style="text-align:center;padding:3px">${+d.slice(8)}</th>`).join('')}</tr></thead><tbody>${heat}</tbody></table></div>` : '<p class="mut">No parts yet. Add parts in <b>Sales plan</b>, or use <b>Add part not in plan</b> for an unplanned sale.</p>'}`;
@@ -273,7 +363,7 @@ document.addEventListener('click', async e => {
     else if (t.id === 'saved') await saveDay();
     else if (t.dataset.del) {
       const id = t.dataset.del;
-      if (id.startsWith('d')) draft.splice(+id.slice(1), 1);
+      if (isNew(id)) draft.splice(+id.slice(4), 1);
       else { if (!confirm('Remove this part from the month’s plan, with its despatch entries?')) return; await api.rpc('kmr_sf_delete_line', { p_slug: slug, p_id: id }); await load(); say('Removed.', true); return; }
       renderPlan();
     }
@@ -283,7 +373,7 @@ document.addEventListener('click', async e => {
 document.addEventListener('input', e => {
   const t = e.target; if (!t.dataset.k || !['price', 'demand_qty'].includes(t.dataset.k)) return;
   const l = rowOf(t.dataset.id); if (!l) return;
-  l[t.dataset.k] = Math.max(+t.value || 0, 0); if (!t.dataset.id.startsWith('d')) l._dirty = true;
+  l[t.dataset.k] = Math.max(+t.value || 0, 0); if (!isNew(t.dataset.id)) l._dirty = true;
   refreshRow(t.dataset.id); renderDash();
 });
 document.addEventListener('change', e => {
@@ -292,7 +382,7 @@ document.addEventListener('change', e => {
   if (!t.dataset.k) return;
   const id = t.dataset.id, l = rowOf(id); if (!l) return;
   if (['price', 'demand_qty'].includes(t.dataset.k)) return;       // already handled while typing
-  l[t.dataset.k] = t.value; if (!id.startsWith('d')) l._dirty = true;
+  l[t.dataset.k] = t.value; if (!isNew(id)) l._dirty = true;
   if (t.dataset.k === 'sched_type') {
     if (t.value === 'weekly' && !l.sched_weekday) l.sched_weekday = 1; if (t.value !== 'date') l.sched_date = null;
     renderPlan();                                                   // shows the date / weekday box; scroll position is kept
@@ -310,7 +400,11 @@ async function savePlan() {
   if (!rows.length) return;
   const bad = draft.find(l => !(+l.demand_qty > 0)); if (bad) return say(`Enter the demand quantity for ${bad.part_code}.`);
   await api.rpc('kmr_sf_save_lines', { p: rows, p_slug: slug });
-  await load(); say('Sales plan saved.', true);
+  const sent = rows.filter(r => r.id), want = Object.fromEntries(sent.map(r => [r.id, +r.price]));
+  await load();
+  const lost = lines.filter(l => l.id in want && Math.abs(+l.price - want[l.id]) > 0.005);   // never silently lose a typed price
+  if (lost.length) say(`Saved, but the price of ${lost.map(l => l.part_code).slice(0, 5).join(', ')} did not stick (database shows ${lost.map(l => l.price).slice(0, 5).join(', ')}). Please tell KMR support.`);
+  else say('Sales plan saved.', true);
 }
 async function saveDay() {
   const day = $('#dday').value, rows = [...document.querySelectorAll('[data-dl]')].map(i => ({ line_id: i.dataset.dl, day, qty: i.value === '' ? 0 : +i.value }))
@@ -399,6 +493,7 @@ async function boot() {
     if (!ctx) throw new Error('You do not have access to Sales Flow, or your company’s subscription is not active. Ask your administrator (Administration › Users & access).');
     canEdit = ['admin', 'editor'].includes(ctx.role);
     $('#co').textContent = ctx.company; $('#role').textContent = ctx.role;
+    $('#backco').textContent = String(ctx.company || '').toUpperCase(); $('#back').href = DEMO ? '#' : '/it/app/' + encodeURIComponent(slug); $('#back').classList.remove('hide');
     await load();
     const h = location.hash.slice(1); if (['plan', 'daily'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
   } catch (err) { say(err.message); $('#co').textContent = ''; }
