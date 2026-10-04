@@ -1,5 +1,6 @@
 import { supabase } from "@/lib/supabaseClient";
 import FitImage from "@/components/FitImage";
+import { verticalArt } from "@/lib/art";
 import ProductCard from "@/components/ProductCard";
 import EnquiryForm from "@/components/EnquiryForm";
 import { PageHero } from "@/components/Blocks";
@@ -39,7 +40,7 @@ export default async function TradePage() {
                   <span className="grid h-14 w-14 place-items-center bg-navy text-gold-light"><Icon className="h-7 w-7" /></span>
                   <h2 className="h-display mt-5 text-2xl text-navy md:text-[32px]">{v[l.key]?.title || l.title}</h2>
                   <p className="lead mt-4">{v[l.key]?.description || l.text}</p>
-                  {v[l.key]?.image_url && <FitImage src={v[l.key].image_url!} className="mt-8 aspect-[16/9] w-full" />}
+                  <FitImage src={verticalArt({ slug: l.key, image_url: v[l.key]?.image_url })} className="mt-8 aspect-[16/9] w-full" fill={v[l.key]?.image_url ? "blur" : "none"} imgClassName={v[l.key]?.image_url ? "" : "object-cover"} />
                 </div>
                 <EnquiryForm business={l.key} title={`Request a quote — ${v[l.key]?.title || l.title}`} askQuantity submitLabel="Request quote" />
               </div>

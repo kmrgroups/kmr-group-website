@@ -12,6 +12,7 @@
 @media (prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#141a2e;--ink:#e8ecf8;--mut:#93a0bd;--line:#26304d}}
 *{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:var(--bg);color:var(--ink)}
 header{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var(--side);color:#fff;flex-wrap:wrap}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}
 header h1{font-size:17px;margin:0}header .co{opacity:.7;font-size:12px}
 header .sp{flex:1}
 .tabs{display:flex;gap:4px;padding:10px 22px 0}
@@ -76,6 +77,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
 </head>
 <body>
 <header>
+  <span class="clogo" id="clogo" hidden></span>
   <div><h1>Sales Flow</h1><div class="co" id="co">Loading…</div></div>
   <div class="sp"></div>
   <button class="btn ghost sm" id="prev" style="color:#fff;border-color:#fff6">‹</button>
@@ -739,6 +741,14 @@ async function findKey() {
   throw new Error('Could not find the KMR public key on this website. Please contact KMR support.');
 }
 
+/* the customer's logo + name (set in KMR Console / Administration), same as every KMR app; also the tab icon */
+async function showBrand(){let b={name:(ctx&&ctx.company)||'',logo:null};try{const pp=JSON.parse(localStorage.getItem('kmr-portal')||'null');if(pp&&(DEMO||pp.slug===slug))b.logo=pp.logo||null}catch(e){}
+if(!DEMO&&sb&&slug){try{const{data}=await sb.rpc('kmr_portal_brand',{p_slug:slug});if(data&&data[0]){b.logo=data[0].logo_url||b.logo;b.name=data[0].name||b.name}}catch(e){}
+try{localStorage.setItem('kmr-portal',JSON.stringify({slug,name:b.name,logo:b.logo||null}))}catch(e){}}
+const el=document.getElementById('clogo');if(!el)return;const safe=String(b.logo||'').replace(/["<>]/g,'');
+el.innerHTML=safe?'<img src="'+safe+'" alt="">':String(b.name||'K').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase().replace(/[<>&]/g,'');el.hidden=false;
+if(safe){document.querySelectorAll('link[rel~="icon"]').forEach(l=>l.remove());const ic=document.createElement('link');ic.rel='icon';ic.href=safe;document.head.append(ic)}}
+
 /* ======== start ======== */
 async function boot() {
   try {
@@ -764,7 +774,7 @@ async function boot() {
     if (!ctx) throw new Error('You do not have access to Sales Flow, or your company’s subscription is not active. Ask your administrator (Administration › Users & access).');
     canEdit = ['admin', 'editor'].includes(ctx.role);
     $('#co').textContent = ctx.company; $('#role').textContent = ctx.role;
-    if (!DEMO && slug) try { const pp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); if (!pp || pp.slug !== slug) localStorage.setItem('kmr-portal', JSON.stringify({ slug, name: ctx.company, logo: null })); } catch (e) {}   // the shared footer's ← KMR Apps button goes back to this company
+    showBrand();   // logo + company name top-left, tab icon, and the shared footer's ← KMR Apps target
     await load(); try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
     const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (['dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
   } catch (err) { say(err.message); $('#co').textContent = ''; }

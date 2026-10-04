@@ -5,6 +5,7 @@ import HeroSlider from "@/components/HeroSlider";
 import ProductCard from "@/components/ProductCard";
 import ProductRow from "@/components/ProductRow";
 import FitImage from "@/components/FitImage";
+import { appArt, verticalArt } from "@/lib/art";
 import BenefitTabs, { type Benefit } from "@/components/BenefitTabs";
 import { SectionHead } from "@/components/Blocks";
 import {
@@ -15,7 +16,7 @@ import type { HeroContent, HeroSlide, Product, SiteStat, Vertical } from "@/lib/
 
 export const revalidate = 60;
 
-type App = { code: string; name: string; description: string | null; seat_label: string; prices: { period: string; amount: number; min: number }[] };
+type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
 type Point = { id: string; section: string; title: string; text?: string; icon?: string; link?: string; link_label?: string };
 
 const VICON: Record<string, typeof IconBag> = { shop: IconBag, software: IconCode, training: IconCap, import_export: IconGlobe, trading: IconTruck, distribution: IconTruck, investment: IconChart };
@@ -50,7 +51,7 @@ export default async function HomePage() {
   }];
   const shop = (shopData as Product[]) || [];
   const programmes = (courses as Product[]) || [];
-  const software = ((apps as App[]) || []).filter((a) => a.code !== "console").slice(0, 4);
+  const software = ((apps as App[]) || []).filter((a) => a.code !== "console" && a.listed !== false);   // every KMR App, in the order set in Website CMS › KMR Apps
   const points = (pts as Point[]) || [];
   const audience = points.filter((p) => p.section === "audience"), why = points.filter((p) => p.section === "why"), steps = points.filter((p) => p.section === "process");
   const benefits = (ben as Benefit[]) || [];
@@ -62,7 +63,7 @@ export default async function HomePage() {
     ["Secure payments", "Only to our company bank account"],
     ["Clear policies", "Returns, shipping & grievance"],
   ].filter(Boolean) as [string, string][]);
-  const fromPrice = (a: App) => { const m = a.prices.find((x) => x.period === "month") ?? a.prices[0]; return m ? `From ${inr(m.amount)} / ${a.seat_label.replace(/s$/, "")} / ${m.period}` : "Free pilot available"; };
+  const fromPrice = (a: App) => { const m = a.prices.find((x) => x.period === "month") ?? a.prices[0]; return m ? `From ${inr(m.amount)} / ${a.seat_label.replace(/s$/, "")} / ${m.period} + GST` : "Free pilot available"; };
 
   return (
     <>
@@ -121,16 +122,19 @@ export default async function HomePage() {
               {site.verticals.map((v: Vertical) => {
                 const Icon = VICON[v.slug ?? ""] ?? IconBriefcase;
                 return (
-                  <Link key={v.id} href={verticalHref(v)} className="card-hover group flex gap-4 p-6">
-                    <span className="grid h-12 w-12 shrink-0 place-items-center bg-navy text-gold-light transition-colors group-hover:bg-gold group-hover:text-navy-950">
-                      {v.icon_url
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={v.icon_url} alt="" className="h-7 w-7 object-contain" /> : <Icon className="h-6 w-6" />}
-                    </span>
-                    <span>
-                      <span className="block font-display text-lg font-semibold text-navy">{v.title}</span>
-                      <span className="mt-1 line-clamp-2 block text-sm text-muted">{v.description}</span>
-                      <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-gold-dark">Explore <IconArrow className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
+                  <Link key={v.id} href={verticalHref(v)} className="card-hover group flex flex-col overflow-hidden">
+                    <div className="aspect-[16/10] overflow-hidden border-b border-line"><FitImage src={verticalArt(v)} alt={v.title} className="h-full w-full" fill={v.image_url ? "blur" : "none"} imgClassName={`${v.image_url ? "" : "object-cover"} transition-transform duration-500 group-hover:scale-[1.03]`} /></div>
+                    <span className="flex flex-1 gap-4 p-6">
+                      <span className="grid h-12 w-12 shrink-0 place-items-center bg-navy text-gold-light transition-colors group-hover:bg-gold group-hover:text-navy-950">
+                        {v.icon_url
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={v.icon_url} alt="" className="h-7 w-7 object-contain" /> : <Icon className="h-6 w-6" />}
+                      </span>
+                      <span>
+                        <span className="block font-display text-lg font-semibold text-navy">{v.title}</span>
+                        <span className="mt-1 line-clamp-2 block text-sm text-muted">{v.description}</span>
+                        <span className="mt-2 inline-flex items-center gap-1.5 text-sm font-semibold text-gold-dark">Explore <IconArrow className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
+                      </span>
                     </span>
                   </Link>
                 );
@@ -153,14 +157,19 @@ export default async function HomePage() {
             )}
             {software.length > 0 && (
               <div>
-                <div className="mb-5 flex items-end justify-between"><h3 className="font-display text-xl font-semibold text-navy">Software for manufacturers — KMR Apps</h3><Link href="/software" className="link-gold text-sm">Plans & pricing →</Link></div>
-                <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mb-5 flex items-end justify-between"><h3 className="font-display text-xl font-semibold text-navy">Software for manufacturers — KMR Apps</h3><Link href="/software" className="link-gold text-sm">Compare plans & book a demo →</Link></div>
+                <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {software.map((a) => (
-                    <Link key={a.code} href="/software" className="card-hover group flex flex-col p-6">
-                      <span className="grid h-11 w-11 place-items-center bg-navy text-gold-light transition-colors group-hover:bg-gold group-hover:text-navy-950"><IconCode className="h-5 w-5" /></span>
-                      <h4 className="mt-4 font-display text-lg font-semibold text-navy">{a.name}</h4>
-                      <p className="mt-1 line-clamp-3 flex-1 text-sm text-muted">{a.description}</p>
-                      <p className="mt-4 text-sm font-semibold text-gold-dark">{fromPrice(a)}</p>
+                    <Link key={a.code} href={`/software#${a.code}`} className="card-hover group flex flex-col overflow-hidden">
+                      <div className="aspect-[16/10] overflow-hidden border-b border-line"><FitImage src={appArt(a.code, a.image_url)} alt={a.name} className="h-full w-full" fill={a.image_url ? "blur" : "none"} imgClassName={`${a.image_url ? "" : "object-cover"} transition-transform duration-500 group-hover:scale-[1.03]`} /></div>
+                      <div className="flex flex-1 flex-col p-6">
+                        <h4 className="font-display text-lg font-semibold text-navy">{a.name}</h4>
+                        <p className="mt-1 line-clamp-3 flex-1 text-sm text-muted">{a.tagline || a.description}</p>
+                        <div className="mt-4 flex items-center justify-between gap-3 border-t border-line pt-4">
+                          <span className="text-sm font-semibold text-navy">{fromPrice(a)}</span>
+                          <span className="inline-flex items-center gap-1.5 text-sm font-semibold text-gold-dark">Details <IconArrow className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" /></span>
+                        </div>
+                      </div>
                     </Link>
                   ))}
                 </div>

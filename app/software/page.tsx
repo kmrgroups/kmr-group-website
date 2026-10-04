@@ -1,20 +1,24 @@
 import { supabase } from "@/lib/supabaseClient";
 import EnquiryForm from "@/components/EnquiryForm";
 import ProductRow from "@/components/ProductRow";
+import FitImage from "@/components/FitImage";
+import { appArt } from "@/lib/art";
 import { PageHero, SectionHead } from "@/components/Blocks";
 import { IconCheck, IconCode, IconGlobe, IconLock, IconUsers } from "@/components/Icons";
 import type { Product } from "@/lib/types";
 
 export const revalidate = 60;
-export const metadata = { title: "Software solutions", description: "KMR Apps for manufacturers — HRM, Balloon Inspector, Process Documents and Capacity Planner — and custom software solutions." };
+export const metadata = { title: "Software solutions", description: "KMR Apps for manufacturers — HRM, Balloon Inspector, Process Documents, Capacity Planner, Sales Flow and Calibration Hub — and custom software solutions." };
 
-type App = { code: string; name: string; description: string | null; app_path: string | null; seat_label: string; version: string | null; prices: { period: string; amount: number; min: number }[] };
+type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
 const FEATURES: Record<string, string[]> = {
   hrm: ["Self-onboarding, ID cards, biometric attendance", "Leave, shifts and payroll-ready registers", "IATF 16949 / ISO 9001 HR records"],
   balloon: ["Balloon drawings (PDF, DXF, STEP) in minutes", "Inspection reports and FAI", "Shares data with Process Documents"],
   pd: ["APQP / PPAP documents from the ballooned drawing", "Process flow, PFMEA, control plan", "Inspection formats and CNC set-up sheets"],
   capacity: ["Monthly plan and machine loading", "Takt time, levelling and alternate machines", "Uses your Operations Master and HRM holidays"],
-};
+  sales: ["Monthly plan per part from your Operations Master", "Daily despatch vs plan, pending and ABC analysis", "Loss reasons and action plans"],
+  calib: ["Instrument register with QR labels", "Calibration due alerts and gauge history", "MSA (Gauge R&R) and out-of-tolerance cases"],
+};   // used when no features are entered in Website CMS › KMR Apps
 const inr = (n: number) => `₹${Number(n).toLocaleString("en-IN")}`;
 
 export default async function SoftwarePage() {
@@ -22,7 +26,7 @@ export default async function SoftwarePage() {
     supabase.rpc("kmr_software_catalog"),
     supabase.from("products").select("*").eq("is_active", true).eq("business", "software").order("sort_order"),
   ]);
-  const apps = ((data as App[]) || []).filter((a) => a.code !== "console");
+  const apps = ((data as App[]) || []).filter((a) => a.code !== "console" && a.listed !== false);
   const solutions = (sol as Product[]) || [];
 
   return (
@@ -40,19 +44,21 @@ export default async function SoftwarePage() {
         <section className="py-14">
           <div className="wrap">
             <SectionHead eyebrow="KMR Apps" title="Products & plans" intro="Priced per user or per machine, billed monthly or yearly, GST extra." />
-            <div className="grid gap-6 md:grid-cols-2">
+            <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
               {apps.map((a) => {
                 const m = a.prices.find((x) => x.period === "month"), y = a.prices.find((x) => x.period === "year");
                 const unit = a.seat_label.replace(/s$/, "");
                 return (
-                  <div key={a.code} className="card flex flex-col p-8">
+                  <div key={a.code} id={a.code} className="card flex scroll-mt-28 flex-col overflow-hidden">
+                    <FitImage src={appArt(a.code, a.image_url)} alt={a.name} className="aspect-[16/10] w-full border-b border-line" fill={a.image_url ? "blur" : "none"} imgClassName={a.image_url ? "" : "object-cover"} />
+                    <div className="flex flex-1 flex-col p-8">
                     <div className="flex items-start justify-between gap-4">
-                      <span className="grid h-14 w-14 place-items-center bg-navy text-gold-light"><IconCode className="h-7 w-7" /></span>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-gold-dark">KMR Apps</span>
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted">{a.version ? `Version ${a.version}` : "Cloud app"}</span>
                     </div>
-                    <h3 className="mt-6 font-display text-2xl font-semibold text-navy">{a.name}</h3>
-                    <p className="mt-2 text-muted">{a.description}</p>
-                    {FEATURES[a.code] && <ul className="mt-6 space-y-2">{FEATURES[a.code].map((f) => <li key={f} className="flex gap-3 text-sm text-ink/80"><IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" />{f}</li>)}</ul>}
+                    <h3 className="mt-3 font-display text-2xl font-semibold text-navy">{a.name}</h3>
+                    <p className="mt-2 text-muted">{a.tagline || a.description}</p>
+                    {(a.features?.length ? a.features : FEATURES[a.code]) && <ul className="mt-6 space-y-2">{(a.features?.length ? a.features : FEATURES[a.code]).map((f) => <li key={f} className="flex gap-3 text-sm text-ink/80"><IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-gold" />{f}</li>)}</ul>}
                     <div className="mt-8 border-t border-line pt-6">
                       {m || y ? (
                         <p><span className="font-display text-3xl font-semibold text-navy">{inr((m ?? y)!.amount)}</span><span className="text-sm text-muted"> / {unit} / {m ? "month" : "year"} + GST</span>
@@ -60,8 +66,9 @@ export default async function SoftwarePage() {
                       ) : <p className="text-sm font-semibold text-gold-dark">Pricing on request</p>}
                       <div className="mt-5 flex flex-wrap gap-3">
                         <a href="#demo" className="btn-gold">Book a free demo</a>
-                        <a href={({ hrm: "/it/hrm", balloon: "/it/balloon.html", pd: "/it/pd.html", capacity: "/it/capacity.html" } as Record<string, string>)[a.code] ?? "/it/"} className="btn-outline">Explore the app</a>
+                        <a href={`${a.code === "hrm" ? "/it/hrm/api/auth/demo" : (a.app_path || "/it/")}${a.code === "hrm" ? "" : (a.app_path || "").includes("?") ? "&demo=1" : "?demo=1"}`} className="btn-outline">Try with sample data</a>
                       </div>
+                    </div>
                     </div>
                   </div>
                 );
