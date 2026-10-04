@@ -9,9 +9,16 @@
 }
 
 html { scroll-behavior: smooth; }
-body { background-color: #FAF7F1; color: #101828; font-size: 15px; }
+body { background-color: #FAF7F1; color: #101828; font-size: 15px; letter-spacing: -0.005em; }
 ::selection { background-color: #C6A15B; color: #0B1C3A; }
 img { max-width: 100%; }
+
+:focus-visible { outline: 2px solid #C6A15B; outline-offset: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
 
 @layer components {
   .wrap { @apply mx-auto w-full max-w-[1360px] px-5 sm:px-8; }

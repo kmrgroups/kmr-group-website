@@ -21,7 +21,7 @@ export default function HeroSlider({ slides, fallback }: { slides: HeroSlide[]; 
   const s = slides[i];
 
   return (
-    <section className="pattern-navy text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-roledescription="carousel">
+    <section className="pattern-navy relative overflow-hidden text-white" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)} aria-roledescription="carousel">
       <div className="wrap grid items-center gap-10 py-12 lg:min-h-[500px] lg:grid-cols-[1fr_1.05fr] lg:py-14">
         <div key={`t-${i}`} className="animate-fadeUp">
           {s.eyebrow && <p className="eyebrow eyebrow-light mb-5">{s.eyebrow}</p>}

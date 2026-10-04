@@ -13,7 +13,7 @@ export default async function Footer() {
 
   return (
     <footer className="pattern-navy mt-0 text-white">
-      <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.4fr_1fr_1fr_1.3fr]">
+      <div className="wrap grid gap-12 py-16 md:grid-cols-2 lg:grid-cols-[1.45fr_1fr_1fr_1.25fr] lg:py-20">
         <div>
           <Link href="/" className="inline-block">
             {c.logo_url

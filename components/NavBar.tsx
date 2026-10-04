@@ -30,7 +30,7 @@ export default function NavBar({ logo, name, verticals, cta }: { logo?: string; 
   const active = (href: string) => path === href || path.startsWith(href + "/") || (href === "/businesses" && path.startsWith("/trade"));
 
   return (
-    <header className={`sticky top-0 z-50 border-b bg-white/95 backdrop-blur transition-shadow ${scrolled ? "border-line shadow-[0_8px_30px_-18px_rgba(11,28,58,.45)]" : "border-transparent"}`}>
+    <header className={`sticky top-0 z-50 border-b bg-white/90 backdrop-blur-xl transition-all duration-300 ${scrolled ? "border-line shadow-[0_12px_36px_-20px_rgba(11,28,58,.5)]" : "border-transparent"}`}>
       <div className="wrap flex h-16 items-center justify-between gap-6">
         <Link href="/" className="flex shrink-0 items-center gap-3" aria-label={`${name} — home`}>
           {logo
