@@ -1175,6 +1175,7 @@ $("sClean").onchange=e=>{S.set.clean=+e.target.value; toast("Applies to the next
 /* ---------- export ---------- */
 function pdfSafe(s){ return translit(String(s??"")).split("").map(c=>GDT[c]?GDT[c]:c).join("").replace(/⌀/g,"Ø").replace(/[−–—]/g,"-").replace(/µ/g,"u").replace(/[^\x20-\x7E\xA0-\xFF]/g,"?"); }
 async function save(filename, data){
+  if(/\.pdf$/i.test(filename)&&window.KMRPdf){ window.KMRPdf.view(data instanceof Blob?data:new Blob([data],{type:"application/pdf"}),filename); return; }
   if(!downloads){ if(window.claude){ toast("Saving files isn't available in this view."); return; }
     const url=URL.createObjectURL(data instanceof Blob?data:new Blob([data])); const a=document.createElement("a"); a.href=url; a.download=filename; document.body.append(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(url),4000); return; }
   try{ await downloads.save({filename,data}); }

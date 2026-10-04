@@ -246,6 +246,7 @@ function assignOp(c, ctx){
 
 /* ---------------- operation catalogue ---------------- */
 const OPS = {
+  OTHER: {rank:50, name:"Other process", sym:"op", inHouse:true},
   RMI:   {rank:0,  name:"Raw material receiving & inspection", sym:"insp",  inHouse:true},
   RMSTORE:{rank:1, name:"Raw material storage (identified & tagged)", sym:"store", inHouse:true},
   CUT:   {rank:2,  name:"Bar cutting / sawing",                   sym:"op",   inHouse:true},

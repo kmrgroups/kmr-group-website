@@ -312,7 +312,8 @@ function generate(P, keepHeader){
 function preserve(oldD, newD, ids){
   ids.forEach(id=>{ const o=oldD[id], n=newD[id]; if(!o||!n) return;
     if(o.docNo) n.docNo=o.docNo; if(o.rev) n.rev=o.rev;
-    if(["setup","patrol","self"].includes(id)){ if(o.slots) n.slots=o.slots; (n.sections||[]).forEach(s=>{ const os=(o.sections||[]).find(x=>x.opNo===s.opNo); if(!os) return; s.meta=Object.assign(s.meta||{},os.meta||{});
+    if(id==="sop"){ (n.sections||[]).forEach(s=>{ const os=(o.sections||[]).find(x=>x.opName&&x.opName===s.opName&&x.machine===s.machine)||(o.sections||[]).find(x=>x.opName&&x.opName===s.opName); if(os&&os.img) s.img=os.img; }); }
+    if(["setup","patrol","self"].includes(id)){ if(o.slots) n.slots=o.slots; (n.sections||[]).forEach(s=>{ const os=(o.sections||[]).find(x=>x.opName&&x.opName===s.opName&&x.machine===s.machine)||(o.sections||[]).find(x=>x.opName&&x.opName===s.opName)||(o.sections||[]).find(x=>x.opNo===s.opNo); if(!os) return; s.meta=Object.assign(s.meta||{},os.meta||{});
       s.rows.forEach(r=>{ const or=(os.rows||[]).find(x=>String(x.charNo)===String(r.charNo)); if(or) Object.keys(or).forEach(k=>{ if(/^[rt]\d+$/.test(k)||k==="remark") r[k]=or[k]; }); });
       (s.params||[]).forEach(p=>{ const op=(os.params||[]).find(x=>x.name===p.name); if(op){ p.actual=op.actual; p.ok=op.ok; } }); }); }
     if(id==="pdi"){ n.meta=Object.assign(n.meta||{},o.meta||{}); n.rows.forEach(r=>{ const or=(o.rows||[]).find(x=>String(x.charNo)===String(r.charNo)); if(or) ["s1","s2","s3","s4","s5"].forEach(k=>r[k]=or[k]); }); }
@@ -554,6 +555,6 @@ async function pane(t){
 window.PDApp = { S, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
 if(CLOUD){
   sb.auth.onAuthStateChange(ev=>{ if(ev==="PASSWORD_RECOVERY") newPasswordScreen(); });
-  (async()=>{ const {data:{session}}=await sb.auth.getSession(); if(!session) loginScreen(); else start(); })();
+  (async()=>{ const {data:{session}}=await sb.auth.getSession(); if(!session) loginScreen(); else start().then(async()=>{ try{ const n=window.KMRNav&&KMRNav.pending(); if(n){ if(n.prj) await openProject(n.prj); go(n.go); } }catch(_){} }); })();
 } else start();
 })();

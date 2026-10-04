@@ -50,7 +50,7 @@ function blocksFor(id){
     case "sop": {
       doc.sections.forEach((s,i)=>{ B.push({kind:"section", title:`Op ${s.opNo} – ${s.opName}`, newPage:i>0});
         B.push(kv([["Operation",`${s.opNo} – ${s.opName}`],["Machine / equipment",s.machine||""],["SOP no.",s.docNo||(doc.docNo+"/"+s.opNo)]],3));
-        B.push({kind:"boxes", items:[["Tools",s.tools],["Gauges / instruments",s.gauges],["Consumables",s.consumables],["Personal protective equipment",s.ppe]]});
+        B.push({kind:"image", src:s.img||""}); B.push({kind:"boxes", items:[["Tools",s.tools],["Gauges / instruments",s.gauges],["Consumables",s.consumables],["Personal protective equipment",s.ppe]]});
         B.push({kind:"label",text:"Work sequence"}); B.push(tableBlock([{k:"no",label:"Step",w:3},{k:"step",label:"Work step",w:22},{k:"key",label:"Key point / reason",w:16}], s.steps));
         if(s.checks.length){ B.push({kind:"label",text:"Quality checks at this operation"}); B.push(tableBlock([{k:"charNo",label:"Balloon",w:4},{k:"char",label:"Characteristic",w:10},{k:"spec",label:"Specification",w:13},{k:"cls",label:"Class",w:4},{k:"gauge",label:"Gauge",w:14},{k:"freq",label:"Frequency",w:8}], s.checks)); }
         if(s.params.length){ B.push({kind:"label",text:"Process parameters"}); B.push(tableBlock([{k:"name",label:"Parameter",w:12},{k:"spec",label:"Specification",w:20},{k:"freq",label:"Check frequency",w:10}], s.params)); }
@@ -90,32 +90,33 @@ function blocksFor(id){
    PDF
    ====================================================================== */
 function logoInfo(){ return new Promise(res=>{ const L=A().S.org&&A().S.org.logo; if(!L) return res(null); const im=new Image(); im.onload=()=>res({src:L,r:im.width/im.height||1}); im.onerror=()=>res(null); im.src=L; }); }
-function paperFor(id){ const s=A().S.settings; return (id==="pfmea"||id==="cp") ? (s.bigPaper||"a3") : (s.paper||"a4"); }
+function paperFor(id){ const s=A().S.settings; return id==="sop" ? "a3" : (id==="pfmea"||id==="cp") ? (s.bigPaper||"a3") : (s.paper||"a4"); }
 async function pdf(ids){
   const {jsPDF}=window.jspdf; const S=A().S, h=S.plan.header, logo=await logoInfo(), co=S.settings.companyName||(S.org&&S.org.name)||"";
   let doc=null; const ranges=[]; const drawn=new Set();
   for(const id of ids){
-    const d=D.DOCS.find(x=>x.id===id), dd=S.docs[id], fmt=paperFor(id);
-    if(!doc) doc=new jsPDF({orientation:"landscape",unit:"mm",format:fmt}); else doc.addPage(fmt,"landscape");
+    const d=D.DOCS.find(x=>x.id===id), dd=S.docs[id], fmt=paperFor(id), ori=id==="sop"?"portrait":"landscape";
+    if(!doc) doc=new jsPDF({orientation:ori,unit:"mm",format:fmt}); else doc.addPage(fmt,ori);
     const start=doc.getNumberOfPages();
     const meta={title:d.title, docNo:dd.docNo||"", rev:dd.rev||"00", date:dmy(h.revDate||""), info:infoFor(id), company:co};
     const PW=()=>doc.internal.pageSize.getWidth(), PH=()=>doc.internal.pageSize.getHeight();
     const hdr=()=>{ const p=doc.getCurrentPageInfo().pageNumber; if(drawn.has(p)) return topOf(); drawn.add(p); return drawHeader(doc, meta, logo); };
     const topOf=()=>headerHeight(meta)+8+3;
     let y=hdr();
-    const need=(hmm)=>{ if(y+hmm>PH()-14){ doc.addPage(fmt,"landscape"); y=hdr(); } };
+    const need=(hmm)=>{ if(y+hmm>PH()-14){ doc.addPage(fmt,ori); y=hdr(); } };
     const blocks=blocksFor(id);
     let firstSection=true;
     for(const b of blocks){
-      if(b.kind==="section"){ if(b.newPage&&!firstSection){ doc.addPage(fmt,"landscape"); y=hdr(); } firstSection=false; need(10);
+      if(b.kind==="section"){ if(b.newPage&&!firstSection){ doc.addPage(fmt,ori); y=hdr(); } firstSection=false; need(10);
         doc.setFillColor(230,238,251); doc.setDrawColor(21,35,59); doc.setLineWidth(0.2); doc.rect(10,y,PW()-20,7,"FD"); doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(21,35,59); doc.text(T(b.title),12,y+4.8); y+=9; continue; }
+      if(b.kind==="image"){ if(!b.src) continue; const bh=95, bw=PW()-20; need(bh+4); doc.setDrawColor(170,180,195); doc.setLineWidth(0.2); doc.rect(10,y,bw,bh); try{ const ip=doc.getImageProperties(b.src), r=Math.min((bw-2)/ip.width,(bh-2)/ip.height), w=ip.width*r, hh=ip.height*r; doc.addImage(b.src,ip.fileType||"JPEG",10+(bw-w)/2,y+(bh-hh)/2,w,hh,undefined,"FAST"); }catch(e){} y+=bh+3; continue; }
       if(b.kind==="label"){ need(8); doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(21,35,59); doc.text(T(b.text),10,y+4); y+=6; continue; }
       if(b.kind==="text"){ need(8); doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90,100,115); doc.text(T(b.text),10,y+4); y+=8; continue; }
       if(b.kind==="sim"){ need(9); doc.setFillColor(255,243,220); doc.setDrawColor(168,105,15); doc.rect(10,y,PW()-20,7,"FD"); doc.setTextColor(168,105,15); doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.text("SIMULATED DATA - FOR TRAINING ONLY - NOT FOR PPAP SUBMISSION",PW()/2,y+4.8,{align:"center"}); y+=9;
         const wm=()=>{ doc.saveGraphicsState&&doc.saveGraphicsState(); try{ doc.setGState(new doc.GState({opacity:0.12})); }catch(e){} doc.setTextColor(200,120,20); doc.setFontSize(54); doc.text("SIMULATED",PW()/2,PH()/2+10,{align:"center",angle:20}); doc.restoreGraphicsState&&doc.restoreGraphicsState(); }; wm(); continue; }
       if(b.kind==="verdict"){ need(9); const c=b.tone==="ok"?[227,243,234,30,123,74]:b.tone==="ng"?[251,230,233,200,16,46]:[255,243,220,168,105,15]; doc.setFillColor(c[0],c[1],c[2]); doc.rect(10,y,PW()-20,7,"F"); doc.setTextColor(c[3],c[4],c[5]); doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.text(T(b.text).slice(0,220),12,y+4.7); y+=9; continue; }
       if(b.kind==="chart"){ const ratio=b.model.h/b.model.w, maxW=Math.min(PW()-20,250); let w=Math.min(maxW,(PH()-16-y)/ratio);
-        if(w<150){ doc.addPage(fmt,"landscape"); y=hdr(); w=Math.min(maxW,(PH()-16-y)/ratio); }
+        if(w<150){ doc.addPage(fmt,ori); y=hdr(); w=Math.min(maxW,(PH()-16-y)/ratio); }
         const hh=w*ratio; CH.toPDF(doc,b.model,10+(PW()-20-w)/2,y,w); y+=hh+4; continue; }
       if(b.kind==="kv"){ const cols=b.cols, rows=[]; for(let i=0;i<b.pairs.length;i+=cols){ const r=[]; for(let j=0;j<cols;j++){ const p=b.pairs[i+j]; r.push({content:p?T(p[0]):"",styles:{fillColor:[241,244,248],textColor:[91,103,120],fontSize:6.8}}); r.push({content:p?T(p[1]):"",styles:{fontStyle:"bold"}}); } rows.push(r); }
         doc.autoTable({body:rows,startY:y,margin:{left:10,right:10,top:topOf(),bottom:14},theme:"grid",styles:{fontSize:7.5,cellPadding:1.3,lineColor:[170,180,195],lineWidth:0.15,textColor:[21,35,59],overflow:"linebreak"},didDrawPage:()=>hdr()});
@@ -125,7 +126,7 @@ async function pdf(ids){
       if(b.kind==="table"){ y=pdfTable(doc,b,y,topOf,hdr); continue; }
     }
     // signatures
-    const sigH = id==="cp"?26:15; if(y+sigH>PH()-14){ doc.addPage(fmt,"landscape"); y=hdr(); }
+    const sigH = id==="cp"?26:15; if(y+sigH>PH()-14){ doc.addPage(fmt,ori); y=hdr(); }
     const w3=(PW()-20)/3; [["Prepared by",h.preparedBy],["Reviewed by",h.reviewedBy],["Approved by",h.approvedBy]].forEach((s,i)=>{ const x=10+i*w3; doc.setDrawColor(21,35,59); doc.setLineWidth(0.3); doc.rect(x,y,w3,13); doc.setFont("helvetica","normal"); doc.setFontSize(6.8); doc.setTextColor(91,103,120); doc.text(s[0]+"  (name, sign & date)",x+2,y+3.6); doc.setFont("helvetica","bold"); doc.setFontSize(8.5); doc.setTextColor(21,35,59); doc.text(T(s[1]||""),x+2,y+8.5); });
     if(id==="cp"){ const w2=(PW()-20)/2; y+=13; ["Customer engineering approval / date","Customer quality approval / date"].forEach((s,i)=>{ const x=10+i*w2; doc.rect(x,y,w2,10); doc.setFont("helvetica","normal"); doc.setFontSize(6.8); doc.setTextColor(91,103,120); doc.text(s,x+2,y+3.6); }); }
     ranges.push([start, doc.getNumberOfPages(), meta]);
@@ -136,7 +137,7 @@ async function pdf(ids){
     doc.text(T(`${meta.company} · ${meta.title} · ${meta.docNo} Rev ${meta.rev}`),10,PH-5.5); doc.text(`Page ${p-a+1} of ${b-a+1}`,PW-10,PH-5.5,{align:"right"}); doc.text(T(`Printed ${new Date().toLocaleDateString("en-GB")} · Controlled copy when stamped`),PW/2,PH-5.5,{align:"center"}); } });
   const h2=S.plan.header, base=(h2.partNo||"part").replace(/[^\w.-]+/g,"_");
   const name = ids.length===1 ? `${base}_${D.DOCS.find(x=>x.id===ids[0]).code}_Rev${(S.docs[ids[0]].rev||"00")}.pdf` : `${base}_Process_Documents.pdf`;
-  doc.save(name);
+  if(window.KMRPdf) window.KMRPdf.view(doc.output("blob"),name); else doc.save(name);
 }
 function headerHeight(meta){ return 15 + Math.ceil(meta.info.length/4)*7.4; }
 function drawHeader(doc, meta, logo){
