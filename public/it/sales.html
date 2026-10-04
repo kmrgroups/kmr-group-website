@@ -2,8 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script src="/it/apps/sso.js"></script>
 <script src="/it/apps/kmr-ui.js"></script>
+<script src="/it/company-config.js"></script>
 <title>Sales Flow · KMR Apps</title>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--brand:#7c3aed;--brand2:#db2777;--green:#16a34a;--amber:#f59e0b;--red:#dc2626;--blue:#2563eb;--side:#130a3a}
@@ -96,8 +98,6 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
   <section id="loss" class="hide"></section>
   <section id="act" class="hide"></section>
 </div></main>
-<footer>Powered By : <b>KMR Group of Companies</b></footer>
-<a class="back hide" id="back" href="#">← <span id="backco"></span> · KMR Apps</a>
 
 <div class="modal" id="amodal"><div class="in" style="width:min(780px,94vw)">
   <div class="hd"><b id="amtitle">New action plan</b></div>
@@ -123,8 +123,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
 <script>
 /* ======== configuration ======== */
 const CFG = {
-  SUPABASE_URL: 'https://dehlcusptkzfhqvpfyjh.supabase.co',
-  SUPABASE_ANON_KEY: 'PASTE-THE-SAME-PUBLISHABLE-KEY-AS-THE-OTHER-KMR-APPS',
+  SUPABASE_URL: (window.COMPANY_CONFIG || {}).supabaseUrl || 'https://dehlcusptkzfhqvpfyjh.supabase.co',
+  SUPABASE_ANON_KEY: (window.COMPANY_CONFIG || {}).supabaseAnonKey || 'PASTE-THE-SAME-PUBLISHABLE-KEY-AS-THE-OTHER-KMR-APPS',
   WORK_DAYS: [1,2,3,4,5,6],            // ISO weekdays used to spread a "Daily" schedule (Mon–Sat)
   AMBER_BELOW: 0.9, RED_BELOW: 0.7,    // despatched ÷ expected-by-today
   ABC: [70, 90],                       // Class A = parts making the first 70% of plan value, B = next 20%, C = the last 10%
@@ -744,11 +744,11 @@ async function boot() {
   try {
     $('#month').value = M;
     if (!DEMO) {
-      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm');
+      const { createClient } = await import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm');
       const key = await findKey();
       sb = createClient(CFG.SUPABASE_URL, key, { db: { schema: 'public' } });
       const { data: { session } } = await sb.auth.getSession();
-      if (!session) { location.href = '/it/?next=' + encodeURIComponent(location.pathname + location.search); return; }
+      if (!session) { if (window.KMR_SSO) KMR_SSO.toPortal(null, { signin: true }); else location.href = '/it/apps.html?open=sales'; return; }   // one KMR sign-in only
       if (!slug) {                                   // opened from the portal card: find the company
         const ref = (document.referrer.match(/\/it\/app\/([^/?#]+)/) || [])[1];
         if (ref) slug = decodeURIComponent(ref).toLowerCase();
@@ -764,7 +764,7 @@ async function boot() {
     if (!ctx) throw new Error('You do not have access to Sales Flow, or your company’s subscription is not active. Ask your administrator (Administration › Users & access).');
     canEdit = ['admin', 'editor'].includes(ctx.role);
     $('#co').textContent = ctx.company; $('#role').textContent = ctx.role;
-    $('#backco').textContent = String(ctx.company || '').toUpperCase(); $('#back').href = DEMO ? '#' : '/it/app/' + encodeURIComponent(slug); $('#back').classList.remove('hide');
+    if (!DEMO && slug) try { const pp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); if (!pp || pp.slug !== slug) localStorage.setItem('kmr-portal', JSON.stringify({ slug, name: ctx.company, logo: null })); } catch (e) {}   // the shared footer's ← KMR Apps button goes back to this company
     await load(); try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
     const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (['dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
   } catch (err) { say(err.message); $('#co').textContent = ''; }
@@ -806,5 +806,6 @@ function demoApi() {
 }
 boot();
 </script>
+<script src="/it/apps/back.js"></script>
 </body>
 </html>

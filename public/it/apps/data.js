@@ -4,15 +4,19 @@
   "use strict";
   const APPS = {
     hrm: { name: "HRM Suite", color: "#0EA5E9", what: "Employees, attendance, leave, payroll, loans, ID cards, onboarding and documents." },
-    balloon: { name: "Balloon Inspector", color: "#8B5CF6", what: "Ballooned drawings and inspection reports (drawing files are kept so a restore brings them back)." },
+    balloon: { name: "Balloon Inspector", color: "#A855F7", what: "Ballooned drawings and inspection reports (drawing files are kept so a restore brings them back)." },
     pd: { name: "Process Documents", color: "#F59E0B", what: "Projects (PFD, PFMEA, control plan, SOP …) and the workspace’s own lists." },
     capacity: { name: "Capacity Planner", color: "#10B981", what: "Monthly plans (quantities, due dates, machine days) and saved versions." },
+    sales: { name: "Sales Flow", color: "#E11D48", what: "Monthly plan lines, daily despatch, loss reasons and action plans." },
+    calib: { name: "Calibration Hub", color: "#6366F1", what: "Instruments, calibration records, gauge history, out-of-tolerance cases and MSA studies." },
     ops: { name: "Operations Master", color: "#0EA5E9", what: "Parts, customers, suppliers, machines, gauges, tools, consumables, cycle times, CFT, standards and documents." },
   };
   const LABEL = {
     employees: "employees", attendance_days: "attendance days", leave_requests: "leave requests", payroll_runs: "payroll months", loans: "loans",
     id_cards: "ID cards", onboarding_invites: "onboarding", bi_reports: "reports", pd_projects: "projects", pd_masters: "own lists",
     cp_plans: "plan", cp_history: "saved versions", ops_records: "records",
+    sf_lines: "plan lines", sf_despatch: "despatch days", sf_actions: "action plans",
+    cal_instruments: "instruments", cal_records: "calibrations", cal_events: "history events", cal_oot: "OOT cases", cal_msa: "MSA studies",
   };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };

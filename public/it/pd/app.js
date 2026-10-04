@@ -323,12 +323,15 @@ function preserve(oldD, newD, ids){
     if(id==="charts"&&o.meta) n.meta=o.meta;
   });
 }
-async function regenFromPlan(){
-  const P=S.prj, ed=Object.keys(P.doc.edited||{}).filter(k=>P.doc.edited[k]);
+/* documents whose rows are the process route itself – a move / insert / renumber always rebuilds them */
+const ROUTE_DOCS=["pfd"];
+async function regenFromPlan(opt){
+  const P=S.prj, route=!!(opt&&opt.route), ed=Object.keys(P.doc.edited||{}).filter(k=>P.doc.edited[k]&&!(route&&ROUTE_DOCS.includes(k)));
   let only=null;
   if(ed.length){ const names=ed.map(id=>(D.DOCS.find(d=>d.id===id)||{}).title).filter(Boolean);
-    const keep=confirm(`These documents have changes made on screen:\n\n• ${names.join("\n• ")}\n\nOK = keep those edits and update only the other documents.\nCancel = rebuild everything from the plan (screen edits are replaced; readings are kept).`);
+    const keep=confirm(`These documents have changes made on screen:\n\n• ${names.join("\n• ")}\n\nOK = keep those edits (rows are re-ordered to the new route) and update the other documents.\nCancel = rebuild everything from the plan (screen edits are replaced; readings are kept).`);
     only = keep ? D.DOCS.map(d=>d.id).filter(id=>!ed.includes(id)) : null; }
+  if(route) ROUTE_DOCS.forEach(id=>{ if(P.doc.edited) P.doc.edited[id]=false; });
   const docs=D.genAll(S.plan, genSettings()); preserve(S.docs, docs, D.DOCS.map(d=>d.id));
   (only||D.DOCS.map(d=>d.id)).forEach(id=>{ S.docs[id]=docs[id]; if(!only) P.doc.edited[id]=false; });
   P.doc.planDirty=false; changed(null); nav(); toast(only?`Updated ${only.length} documents; kept your edits in ${ed.length}.`:`All ${D.DOCS.length} documents updated from the process plan.`); UI.render(S.view);

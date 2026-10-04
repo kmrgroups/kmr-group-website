@@ -5,7 +5,7 @@
   "use strict";
   let portal = null; try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {}
   const demo = /[?&]demo=1(&|$)/.test(location.search);
-  const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : "";
+  const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : /sales\.html/.test(location.pathname) ? "sales" : /calibration/.test(location.pathname) ? "calib" : "";
   const css = document.createElement("style");
   css.textContent = `body{padding-bottom:30px}
   .side{height:calc(100vh - 30px)!important}

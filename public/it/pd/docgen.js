@@ -166,7 +166,7 @@ GEN.pfd = (plan, x) => ({ rows: plan.ops.map(o=>{
   return { opNo:o.opNo, sym:o.sym, name:o.name, desc:(OPDESC[o.key]||"")+(o.note?". "+o.note:""), machine:o.machine||"",
     product: ch.map(c=>`#${c.no} ${c.label}: ${c.spec}`).concat((o.params||[]).filter(p=>(p.kind||E.paramKind(p.name))==="product").map(p=>`${p.name}: ${p.spec}`)).join("\n") || (o.verify?`All characteristics (${o.verify.length}) verified`:"—"),
     process: (o.params||[]).filter(p=>(p.kind||E.paramKind(p.name))!=="product").map(p=>`${p.name}: ${p.spec}`).join("\n") || "—",
-    cls: uniq(ch.map(c=>c.cls)).join(", "), src, remarks: o.inHouse?"In-house":"Sub-contract" }; }) });
+    cls: uniq(ch.map(c=>c.cls).concat((o.params||[]).map(p=>p.cls)).filter(Boolean)).join(", "), src, remarks: o.inHouse?"In-house":"Sub-contract" }; }) });
 
 /* ---------- PFMEA ---------- */
 /* failure effects: one line each for Your plant / Ship-to plant (customer) / End user (field) */
@@ -239,7 +239,7 @@ GEN.cp = (plan, x) => {
         freq: cc?"Each part + 5 pcs / 2 hrs":sc?"Every 2 hrs":inspOp?"Each lot":"First-off, every 2 hrs, last-off",
         method: cc?"Poka-yoke / 100% gauging; X̄-R chart; setup approval":sc?"X̄-R chart; setup approval report":inspOp?(o.key==="RMI"?"Incoming inspection report":"Inspection report"):"Setup approval, self & patrol inspection reports",
         react: react(c), resp: inspOp?"QA inspector":"Operator / setter" }); });
-    (o.params||[]).forEach(p=>rows.push({opNo:o.opNo, name:o.name, machine:mach, charNo:"", product:(p.kind||E.paramKind(p.name))==="product"?p.name:"", process:(p.kind||E.paramKind(p.name))==="product"?"":p.name, cls:"", spec:p.spec, tech:p.method, size:"1", freq:p.freq,
+    (o.params||[]).forEach(p=>rows.push({opNo:o.opNo, name:o.name, machine:mach, charNo:"", product:(p.kind||E.paramKind(p.name))==="product"?p.name:"", process:(p.kind||E.paramKind(p.name))==="product"?"":p.name, cls:p.cls||"", spec:p.spec, tech:p.method, size:"1", freq:p.freq,
       method: /program|recipe/i.test(p.method)?"Program / recipe lock; setup approval":"Check sheet / setup approval", react:"Adjust to specification; verify parts produced since last check; inform supervisor", resp:p.resp||"Operator"}));
     if(!ch.length && !(o.params||[]).length){
       const t = {RMSTORE:["Identification & FIFO","Heat / lot tag on every bundle","Visual"],FGSTORE:["Identification & FIFO","Part-wise location, FIFO card","Visual"],DISPATCH:["Correct part & quantity","As per invoice & label","Label vs invoice check"],

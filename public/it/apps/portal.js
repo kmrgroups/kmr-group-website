@@ -15,6 +15,8 @@
     balloon: { color: "#A855F7", desc: "Balloon any drawing and build the inspection report.", demo: "/it/balloon.html?demo=1" },
     pd: { color: "#F59E0B", desc: "PFD, PFMEA, Control Plan, SOP, SPC, MSA and reports from the ballooned drawing.", demo: "/it/pd.html?demo=1&sample=1" },
     capacity: { color: "#10B981", desc: "Capacity plan, takt time and machine loading for every plant, with version history.", demo: "/it/capacity.html?demo=1" },
+    sales: { color: "#E11D48", desc: "Monthly sales plan vs actual despatch, daily tracking, loss reasons and action plans.", demo: "/it/sales.html?demo=1" },
+    calib: { color: "#6366F1", desc: "Instrument register, calibration due control, gauge history, MSA and out-of-tolerance cases.", demo: "/it/calibration.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["maint", "Maintenance"], ["proc", "Procurement"], ["crm", "CRM & RFQ"], ["mmd", "MMD"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["apqp", "APQP & PPAP"], ["fmea", "AIAG-VDA FMEA"], ["spc", "SPC & MSA"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null;
@@ -70,7 +72,7 @@
     const r = rows.find((x) => x.product_code === code);
     if (!r || !r.purchased || !r.ok) {
       const meta = META[code];
-      if (!meta) return;
+      if (!meta) return dialog(`${r ? r.product_name : code} — sample data`, "The sample-data version of this app is not available yet. Ask KMR for a demo.", `<a class="btn" href="${buyUrl(code)}">Contact KMR</a>`);
       location.href = meta.demo + (meta.demo.includes("?") ? "&" : "?") + "from=" + encodeURIComponent(SLUG);
       return;
     }
@@ -86,7 +88,11 @@
       [["access_token", session.access_token], ["refresh_token", session.refresh_token], ["co", r.product_slug || ""]].forEach(([k, v]) => { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; fm.append(i); });
       document.body.append(fm); fm.submit(); return;
     }
-    location.href = r.app_path + (r.app_path.includes("?") ? "&" : "?") + "kmr=1";
+    let path = r.app_path;
+    try { const back = sessionStorage.getItem("kmr-return-" + code); sessionStorage.removeItem("kmr-return-" + code);
+      if (back && back.split("?")[0] === r.app_path.split("?")[0]) path = back; } catch (e) {}
+    path = path.replace(/([?&])co=[^&]*&?/, "$1").replace(/[?&]$/, "");
+    location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "");
   }
 
   function appView() {

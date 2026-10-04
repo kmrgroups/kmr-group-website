@@ -4,8 +4,8 @@
    3. Administration  — company details & logo, users & access, invoices & payments: download, upload, flush (backup first) */
 (function () {
   "use strict";
-  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", hrm_qms: "HRM QMS & training", hrm_engage: "HRM engagement", hrm_comp: "HRM policies & compliance", hrm_safety: "HRM safety", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", ops: "Operations Master" };
-  const UNIT = { hrm: "employees", hrm_candidates: "candidates", hrm_qms: "skill records", hrm_engage: "records", hrm_comp: "records", hrm_safety: "records", balloon: "reports", pd: "records", capacity: "records", ops: "records" };
+  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", hrm_qms: "HRM QMS & training", hrm_engage: "HRM engagement", hrm_comp: "HRM policies & compliance", hrm_safety: "HRM safety", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", sales: "Sales Flow", calib: "Calibration Hub", ops: "Operations Master" };
+  const UNIT = { hrm: "employees", hrm_candidates: "candidates", hrm_qms: "skill records", hrm_engage: "records", hrm_comp: "records", hrm_safety: "records", balloon: "reports", pd: "records", capacity: "records", sales: "plan lines", calib: "instruments", ops: "records" };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
   function save(json, name) {
@@ -38,8 +38,8 @@
             <div class="gm-btns">${btn("gmRealDl", "Download JSON")}${upl("gmRealUp", "Upload JSON")}${btn("gmRealFl", "Flush real data", { red: 1, off: !nReal })}</div></div>
           <div class="card" style="--c:#4F46E5"><div style="font-size:26px;line-height:1">🧪</div><h3>Sample Data Master</h3>
             <p>Ready-made sample data for every app, to try things out. Your real data is never touched.</p>
-            <table class="gm">${rows(o.sample, { hrm: "sample employees", hrm_candidates: "sample candidates", balloon: "sample drawing", ops: "sample records" })}</table>
-            <p style="font-size:12px;color:var(--muted)">HRM gets the whole flow: employees in two plants with a month of attendance, leave, salaries and loans, hiring from opening to new joiner (scored candidates, interviews, scorecards, offers), and QMS &amp; training (skill matrix, competencies, training plan, effectiveness, R&amp;R, KPIs, auditors). Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too.</p>
+            <table class="gm">${rows(o.sample, { hrm: "sample employees", hrm_candidates: "sample candidates", balloon: "sample drawing", sales: "sample plan lines", calib: "sample instruments", ops: "sample records" })}</table>
+            <p style="font-size:12px;color:var(--muted)">HRM gets the whole flow: employees in two plants with a month of attendance, leave, salaries and loans, hiring from opening to new joiner (scored candidates, interviews, scorecards, offers), and QMS &amp; training (skill matrix, competencies, training plan, effectiveness, R&amp;R, KPIs, auditors). Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too. Sales Flow gets last month’s and this month’s plan for every sample part (prices from the sample rate contracts) with daily despatch, loss reasons and action plans; Calibration Hub gets every sample gauge as an instrument with its calibration history, an out-of-tolerance case and an MSA study.</p>
             <div class="gm-btns">${btn("gmSmpLd", "Load sample data")}${btn("gmSmpFl", "Flush sample data", { red: 1, off: !nSample })}</div></div>
           <div class="card" style="--c:#B45309"><div style="font-size:26px;line-height:1">🏢</div><h3>Administration Data</h3>
             <p>Company details &amp; logo, users &amp; access, invoices &amp; payments.</p>
@@ -158,7 +158,7 @@
     },
 
     async sample(ctx, act, b) {
-      if (act === "flush" && !confirm("Remove the sample data from every app?\n\nSample employees, the sample drawing and the sample Operations Master records go. Your real data is not touched.")) return;
+      if (act === "flush" && !confirm("Remove the sample data from every app?\n\nSample employees, the sample drawing, the sample Sales Flow plan, the sample Calibration Hub instruments and the sample Operations Master records go. Your real data is not touched.")) return;
       const t = b.textContent; b.disabled = true; b.textContent = act === "load" ? "Loading…" : "Flushing…";
       const { data, error } = await ctx.sb.rpc("kmr_grand_sample", { p_slug: ctx.slug, p_action: act });
       if (error) { b.disabled = false; b.textContent = t; alert(error.message); return; }

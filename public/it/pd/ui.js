@@ -218,6 +218,24 @@ V.chars = (M)=>{
 };
 
 /* ---------- process plan ---------- */
+function specialPills(o,ch){ const cl=ch.map(c=>c.cls).concat((o.params||[]).map(p=>p.cls)); return (cl.includes("CC")?`<span class="pill cc">CC</span>`:"")+(cl.some(x=>x==="SC"||x==="KC")?`<span class="pill sc">SC</span>`:""); }
+/* op numbers before a move / insert / renumber: [operation object, old number] */
+function snapOps(plan){ return plan.ops.map(o=>[o,+o.opNo]); }
+/* after op numbers changed: characteristics, gauges and every document that kept screen edits follow the new route */
+function renumbered(plan,before){
+  const map={}; before.forEach(([o,old])=>{ map[old]=+o.opNo; });
+  const re=v=>{ const n=+v; return v!==""&&v!=null&&!isNaN(n)&&map[n]!=null?map[n]:v; };
+  plan.chars.forEach(c=>{ const o=plan.ops.find(x=>x.chars.includes(c.no)); c.op=o?o.opNo:""; });
+  (plan.gauges||[]).forEach(g=>{ g.ops=(g.ops||[]).map(re); });
+  const order={}; plan.ops.forEach((o,k)=>{ order[+o.opNo]=k; });
+  const rank=v=>order[+v]!=null?order[+v]:9999;
+  const docs=A().S.docs||{};
+  Object.keys(docs).forEach(id=>{ const d=docs[id]; if(!d) return;
+    if(Array.isArray(d.rows)&&d.rows.some(r=>r&&r.opNo!==undefined)){ d.rows.forEach(r=>{ if(r.opNo!==undefined&&r.opNo!=="") r.opNo=re(r.opNo); }); d.rows=d.rows.map((r,k)=>[r,k]).sort((a,b)=>(rank(a[0].opNo)-rank(b[0].opNo))||(a[1]-b[1])).map(x=>x[0]); }
+    if(Array.isArray(d.rows)) d.rows.forEach(r=>{ if(r&&typeof r.ops==="string") r.ops=r.ops.split(/\s*,\s*/).filter(Boolean).map(re).join(", "); });
+    if(Array.isArray(d.sections)&&d.sections.some(x=>x&&x.opNo!==undefined)){ d.sections.forEach(x=>{ if(x.opNo!==undefined) x.opNo=re(x.opNo); }); d.sections.sort((a,b)=>rank(a.opNo)-rank(b.opNo)); }
+  });
+}
 V.plan = (M)=>{
   const S=A().S, plan=S.plan, machines=S.machines;
   const draw=()=>{
@@ -225,12 +243,12 @@ V.plan = (M)=>{
     <button class="btn small" id="plAdd" ${ro()?"disabled":""}>+ Add operation</button><button class="btn small primary" id="plApply" ${ro()?"disabled":""}>Update documents</button></div>
   <p class="hintline" style="margin:-4px 0 10px">Process selection, machine, tools, consumables and gauges for every operation — worked out from the ballooning data. Edit anything, then <b>Update documents</b>.</p>
   ${plan.ops.map((o,i)=>{ const ch=o.chars.map(n=>plan.chars.find(c=>c.no===n)).filter(Boolean);
-    return `<details class="op" data-i="${i}"><summary><span class="dh" draggable="true" title="Drag to move this process up or down" style="cursor:grab;margin-right:6px;user-select:none">⠿</span><span class="no">${o.opNo}</span><span class="nm">${esc(o.name)}</span><span class="pills">${o.inHouse?"":`<span class="pill">Sub-contract</span>`}<span class="pill">${esc(o.machine||"—")}</span><span class="pill">${ch.length} chars</span><span class="pill">${o.tools.length} tools</span><span class="pill">${o.gauges.length} gauges</span>${ch.some(c=>c.cls==="CC")?`<span class="pill cc">CC</span>`:""}${ch.some(c=>c.cls==="SC")?`<span class="pill sc">SC</span>`:""}</span></summary>
+    return `<details class="op" data-i="${i}"><summary><span class="dh" draggable="true" title="Drag to move this process up or down" style="cursor:grab;margin-right:6px;user-select:none">⠿</span><span class="no">${o.opNo}</span><span class="nm">${esc(o.name)}</span><span class="pills">${o.inHouse?"":`<span class="pill">Sub-contract</span>`}<span class="pill">${esc(o.machine||"—")}</span><span class="pill">${ch.length} chars</span><span class="pill">${o.tools.length} tools</span><span class="pill">${o.gauges.length} gauges</span>${specialPills(o,ch)}</span></summary>
     <div class="in" data-in="${i}"></div></details>`; }).join("")}`;
   M.querySelectorAll("details.op").forEach(d=>d.addEventListener("toggle",()=>{ if(d.open) opBody(+d.dataset.i); }));
   $("plApply").onclick=()=>A().regenFromPlan();
   // move a process; numbers keep their order (10, 20, 30…), characteristics follow their process, then every document is rebuilt from the plan
-  const reorder=(from,to)=>{ if(from===to||from<0||to<0||from>=plan.ops.length||to>=plan.ops.length) return; const nums=plan.ops.map(o=>o.opNo).sort((a,b)=>a-b); const [m]=plan.ops.splice(from,1); plan.ops.splice(to,0,m); plan.ops.forEach((o,k)=>{ o.opNo=nums[k]; }); plan.chars.forEach(c=>{ const o=plan.ops.find(x=>x.chars.includes(c.no)); if(o) c.op=o.opNo; }); A().changed("_plan"); draw(); A().toast("Process moved — numbers updated. Updating all documents…"); A().regenFromPlan(); };
+  const reorder=(from,to)=>{ if(from===to||from<0||to<0||from>=plan.ops.length||to>=plan.ops.length) return; const before=snapOps(plan); const nums=plan.ops.map(o=>+o.opNo).sort((a,b)=>a-b); const [m]=plan.ops.splice(from,1); plan.ops.splice(to,0,m); plan.ops.forEach((o,k)=>{ o.opNo=nums[k]; }); renumbered(plan,before); A().changed("_plan"); draw(); A().toast("Process moved — numbers updated. Updating all documents…"); A().regenFromPlan({route:true}); };
   let dragFrom=-1;
   M.querySelectorAll(".dh").forEach(h=>{ const d=h.closest("details.op"); h.addEventListener("dragstart",e=>{ if(ro()){ e.preventDefault(); return; } dragFrom=+d.dataset.i; e.dataTransfer.effectAllowed="move"; try{ e.dataTransfer.setData("text/plain",String(dragFrom)); }catch(_){} d.style.opacity=".5"; }); h.addEventListener("dragend",()=>{ d.style.opacity=""; M.querySelectorAll("details.op").forEach(x=>x.style.boxShadow=""); }); });
   M.querySelectorAll("details.op").forEach(d=>{ d.addEventListener("dragover",e=>{ if(dragFrom<0) return; e.preventDefault(); const r=d.getBoundingClientRect(), below=e.clientY>r.top+r.height/2; d.style.boxShadow=below?"0 3px 0 0 #2563eb":"0 -3px 0 0 #2563eb"; }); d.addEventListener("dragleave",()=>{ d.style.boxShadow=""; }); d.addEventListener("drop",e=>{ if(dragFrom<0) return; e.preventDefault(); const to0=+d.dataset.i, r=d.getBoundingClientRect(), below=e.clientY>r.top+r.height/2; let to=to0+(below?1:0); if(dragFrom<to) to--; const f=dragFrom; dragFrom=-1; reorder(f,to); }); });
@@ -248,9 +266,10 @@ V.plan = (M)=>{
       q("#aoC").onclick=()=>{ dlg.remove(); done(null); }; q("#aoO").onclick=()=>{ const K=q("#aoK").value, nm=q("#aoN").value.trim(); if(K==="OTHER"&&!nm){ q("#aoN").focus(); return; } dlg.remove(); done({K,nm,at:+q("#aoW").value}); }; });
     if(!res) return; const {K,nm,at}=res; const T=E.OPS[K]; if(!T) return;
     const op={key:K,opNo:0,name:K==="OTHER"?nm:T.name,sym:T.sym,inHouse:T.inHouse,chars:[],machineId:"",machine:"",tools:[],consumables:(E.DEFAULT_CONSUMABLES[K]||[]).slice(),gauges:[],params:(()=>{ try{ return E.paramsFor({key:K},{matCls:"P",maxOD:plan.ctxInfo.maxOD,length:plan.ctxInfo.length,notes:plan.notes,header:plan.header}); }catch(_){ return []; } })()};
-    const prev=at>0?+plan.ops[at-1].opNo:0, next=at<plan.ops.length?+plan.ops[at].opNo:null, n=prev+10; if(next!==null&&n>=next){ for(let j=at;j<plan.ops.length;j++) plan.ops[j].opNo=+plan.ops[j].opNo+10; } op.opNo=n;
-    plan.ops.splice(at,0,op); plan.chars.forEach(c=>{ const o=plan.ops.find(x=>x.chars.includes(c.no)); if(o) c.op=o.opNo; }); A().changed("_plan"); draw(); A().regenFromPlan(); };
+    const before=snapOps(plan); const prev=at>0?+plan.ops[at-1].opNo:0, next=at<plan.ops.length?+plan.ops[at].opNo:null, n=prev+10; if(next!==null&&n>=next){ for(let j=at;j<plan.ops.length;j++) plan.ops[j].opNo=+plan.ops[j].opNo+10; } op.opNo=n;
+    plan.ops.splice(at,0,op); renumbered(plan,before); A().changed("_plan"); draw(); A().regenFromPlan({route:true}); };
   };
+  const pillsOf=(i)=>{ const o=plan.ops[i], d=M.querySelector(`details.op[data-i="${i}"] .pills`); if(!o||!d) return; d.querySelectorAll(".pill.cc,.pill.sc").forEach(x=>x.remove()); d.insertAdjacentHTML("beforeend",specialPills(o,o.chars.map(n=>plan.chars.find(c=>c.no===n)).filter(Boolean))); };
   const opBody=(i)=>{
     const o=plan.ops[i], host=M.querySelector(`[data-in="${i}"]`); if(!host) return;
     const mOpts=machines.map(m=>`<option value="${esc(m.id)}"${m.id===o.machineId?" selected":""}>${esc(m.id+" "+m.name)}</option>`).join("");
@@ -261,21 +280,28 @@ V.plan = (M)=>{
       <label class="fld">Machine (from master)<select data-f="machineId" ${ro()?"disabled":""}><option value="">— other / sub-contract —</option>${mOpts}</select></label>
       <label class="fld">Machine / equipment text<input data-f="machine" value="${esc(o.machine||"")}" ${ro()}></label>
       <label class="fld">Where<select data-f="inHouse" ${ro()?"disabled":""}><option value="1"${o.inHouse?" selected":""}>In-house</option><option value="0"${o.inHouse?"":" selected"}>Sub-contract</option></select></label></div>
-    <p class="hintline" style="margin:10px 0 4px">Characteristics produced here: ${o.chars.length?o.chars.map(n=>{ const c=plan.chars.find(x=>x.no===n); return c?`<span class="pill ${c.cls==="CC"?"cc":c.cls?"sc":""}">#${n} ${esc(c.spec)}</span>`:""; }).join(" "):"none"} <span>(move them on the Characteristics screen)</span></p>
-    <h4 style="font:600 15px var(--display);margin:14px 0 6px">Tools</h4><div data-g="tools"></div>
+    <h4 style="font:600 15px var(--display);margin:14px 0 6px">Product characteristics <span class="hintline" style="font:400 13px var(--body)">– ballooned characteristics produced at this operation; set SC / CC here or on the Characteristics screen (add or move them there)</span></h4><div data-g="prod"></div>
     <h4 style="font:600 15px var(--display);margin:14px 0 6px">Process parameters & in-process checks <span class="hintline" style="font:400 13px var(--body)">– “Control plan column” decides whether it is listed as a product or a process characteristic</span></h4><div data-g="params"></div>
+    <h4 style="font:600 15px var(--display);margin:14px 0 6px">Tools</h4><div data-g="tools"></div>
     <div class="cols2" style="margin-top:14px"><label class="fld">Consumables (one per line)<textarea data-f="consumables" rows="5" ${ro()}>${esc((o.consumables||[]).join("\n"))}</textarea></label>
       <div class="fld">Gauges used at this operation<div class="checklist">${plan.gauges.length?plan.gauges.map(g=>`<label><input type="checkbox" data-gauge="${esc(g.id)}" ${o.gauges.includes(g.id)?"checked":""} ${ro()?"disabled":""}><span class="gid">${esc(g.id)}</span><span>${esc(g.name+" "+(g.range||""))}</span></label>`).join(""):`<span class="hintline" style="padding:6px">No gauges in this project.</span>`}</div></div></div>
     <div class="addrow"><button class="btn small" data-mv="-1" ${ro()?"disabled":""}>Move up</button><button class="btn small" data-mv="1" ${ro()?"disabled":""}>Move down</button><button class="btn small danger" data-del ${ro()?"disabled":""}>Delete operation</button>${window.PDCNC&&PDCNC.isCNC(o)?`<span style="flex:1"></span><button class="btn small" data-cnc>CNC program for this operation →</button>`:""}</div>`;
     host.querySelectorAll("[data-f]").forEach(el=>el.addEventListener("change",()=>{ const f=el.dataset.f; let v=el.value;
       if(f==="opNo") v=+v||o.opNo; if(f==="inHouse") v=v==="1"; if(f==="consumables") v=v.split("\n").map(s=>s.trim()).filter(Boolean);
       if(f==="machineId"){ const m=machines.find(x=>x.id===v); if(m){ o.machine=m.name; host.querySelector('[data-f="machine"]').value=m.name; } }
-      o[f]=v; if(f==="opNo"){ plan.chars.forEach(c=>{ if(o.chars.includes(c.no)) c.op=o.opNo; }); } A().changed("_plan"); }));
+      if(f==="opNo"){ const before=snapOps(plan); o.opNo=v; plan.ops.sort((a,b)=>+a.opNo-+b.opNo); renumbered(plan,before); A().changed("_plan"); draw(); A().regenFromPlan({route:true}); return; }
+      o[f]=v; A().changed("_plan"); }));
     host.querySelectorAll("[data-gauge]").forEach(cb=>cb.addEventListener("change",()=>{ const id=cb.dataset.gauge; o.gauges=o.gauges.filter(x=>x!==id); if(cb.checked) o.gauges.push(id); const g=plan.gauges.find(x=>x.id===id); if(g){ g.ops=g.ops.filter(x=>x!==o.opNo); if(cb.checked) g.ops.push(o.opNo); } A().changed("_plan"); }));
     grid(host.querySelector('[data-g="tools"]'),{rows:o.tools,free:true,cols:[{k:"id",label:"Tool ID",w:5},{k:"desc",label:"Description",w:14},{k:"spec",label:"Insert / size",w:14},{k:"holder",label:"Holder",w:10},{k:"grade",label:"Grade",w:9},{k:"life",label:"Tool life",w:7},{k:"remarks",label:"Remarks",w:8}],
       onChange:()=>A().changed("_plan"), rowsChanged:()=>A().changed("_plan"), newRow:()=>({id:nextToolId(plan),desc:"",spec:"",holder:"",grade:"",life:"",remarks:""})});
-    grid(host.querySelector('[data-g="params"]'),{rows:o.params,free:true,cols:[{k:"name",label:"Characteristic / parameter",w:12},{k:"kind",label:"Control plan column",w:8,type:"sel",opts:[["product","Product characteristic"],["process","Process characteristic"]]},{k:"spec",label:"Specification",w:18,type:"long"},{k:"method",label:"Method",w:10},{k:"freq",label:"Frequency",w:9},{k:"resp",label:"Responsibility",w:7}],
-      onChange:(r,k)=>{ if(k==="name"&&!r._kindSet) r.kind=E.paramKind(r.name); if(k==="kind") r._kindSet=true; A().changed("_plan"); }, rowsChanged:()=>A().changed("_plan"), newRow:()=>({name:"",kind:"process",spec:"",method:"",freq:"",resp:"Operator"})});
+    const pRows=o.chars.map(n=>plan.chars.find(c=>c.no===n)).filter(Boolean);
+    const gOpts=[["","—"]].concat(plan.gauges.map(g=>[g.id,`${g.id} ${g.name} ${g.range||""}`]));
+    grid(host.querySelector('[data-g="prod"]'),{rows:pRows,free:true,rowTools:false,newRow:null,cols:[{k:"no",label:"Balloon",w:4,type:"ro"},{k:"label",label:"Characteristic",w:10},{k:"spec",label:"Specification",w:16,type:"ro"},{k:"lsl",label:"LSL",w:5.5,type:"ro"},{k:"usl",label:"USL",w:5.5,type:"ro"},{k:"cls",label:"SC / CC",w:5,type:"sel",opts:SC.CLS},{k:"gauge",label:"Gauge",w:13,type:"sel",opts:gOpts}],
+      cellClass:(r,c)=>c.k==="cls"&&r.cls==="CC"?"cc":c.k==="cls"&&r.cls?"sc":"",
+      onChange:(c,k)=>{ if(k==="gauge"){ plan.gauges.forEach(g=>{ g.chars=g.chars.filter(n=>n!==c.no); }); const g=plan.gauges.find(g=>g.id===c.gauge); if(g&&!g.chars.includes(c.no)) g.chars.push(c.no); } A().changed("_plan"); if(k==="cls") pillsOf(i); }});
+    grid(host.querySelector('[data-g="params"]'),{rows:o.params,free:true,cols:[{k:"name",label:"Characteristic / parameter",w:12},{k:"kind",label:"Control plan column",w:8,type:"sel",opts:[["product","Product characteristic"],["process","Process characteristic"]]},{k:"cls",label:"SC / CC",w:5,type:"sel",opts:SC.CLS},{k:"spec",label:"Specification",w:18,type:"long"},{k:"method",label:"Method",w:10},{k:"freq",label:"Frequency",w:9},{k:"resp",label:"Responsibility",w:7}],
+      cellClass:(r,c)=>c.k==="cls"&&r.cls==="CC"?"cc":c.k==="cls"&&r.cls?"sc":"",
+      onChange:(r,k)=>{ if(k==="name"&&!r._kindSet) r.kind=E.paramKind(r.name); if(k==="kind") r._kindSet=true; A().changed("_plan"); if(k==="cls") pillsOf(i); }, rowsChanged:()=>A().changed("_plan"), newRow:()=>({name:"",kind:"process",cls:"",spec:"",method:"",freq:"",resp:"Operator"})});
     host.querySelectorAll("[data-mv]").forEach(b=>b.onclick=()=>{ const j=i+(+b.dataset.mv); if(M._reorder) M._reorder(i,j); });
     const cb=host.querySelector("[data-cnc]"); if(cb) cb.onclick=()=>{ V._cncOp=o.opNo; A().go("cnc"); };
     host.querySelector("[data-del]").onclick=()=>{ if(!confirm(`Delete operation ${o.opNo} ${o.name}? Its characteristics become unassigned.`)) return; plan.ops.splice(i,1); plan.chars.forEach(c=>{ if(o.chars.includes(c.no)) c.op=""; }); A().changed("_plan"); draw(); };
