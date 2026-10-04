@@ -1,16 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL as string;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY as string;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // This will show clearly in the browser console instead of a silent failure
-  console.warn(
-    "Supabase env vars are missing. Copy .env.local.example to .env.local and fill in your project values."
-  );
-}
+/**
+ * Keep the module importable when a preview is missing its project variables.
+ * Supabase data requests will return empty fallbacks until the variables are
+ * configured, rather than crashing the entire app during module evaluation.
+ */
+const fallbackSupabaseUrl = "https://supabase-preview.invalid";
+const fallbackSupabaseKey = "preview-not-configured";
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(
+  supabaseUrl || fallbackSupabaseUrl,
+  supabaseAnonKey || fallbackSupabaseKey
+);
 
 // Storage bucket used for all uploaded media (banner, leadership photos,
 // gallery photos/videos, product images). Created by supabase/schema.sql.
