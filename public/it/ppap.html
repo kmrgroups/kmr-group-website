@@ -1,0 +1,171 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<title>PPAP Submissions · KMR Apps</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#b45309;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#141a2e;--ink:#e8ecf8;--mut:#93a0bd;--line:#26304d}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}
+header{display:flex;gap:12px;align-items:center;padding:12px 18px;background:#0c1a3a;color:#fff;flex-wrap:wrap}header h1{font-size:17px;margin:0}header small{opacity:.7;display:block}
+.tabs{display:flex;gap:4px;padding:10px 14px 0;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{text-decoration:none;display:inline-block;border:0;background:none;padding:9px 14px;font-weight:600;color:var(--mut);border-radius:10px 10px 0 0;white-space:nowrap;flex:none}.tab.on{background:var(--card);color:var(--b1);box-shadow:0 -2px 0 var(--b1) inset}
+main{padding:0 14px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:16px;overflow-x:auto}
+input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);width:100%;min-width:0}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--b1),var(--b2));cursor:pointer;text-decoration:none;display:inline-block}.btn.o{background:none;color:var(--b1);border:1px solid var(--b1)}.sm{padding:4px 9px;font-size:12px}.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.row>.grow{flex:1}.row select,.row input{width:auto}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px}.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-top:3px solid var(--c,var(--b1))}.kpi b{display:block;font-size:22px}.kpi span{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--mut)}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c,#94a3b8)}.g{--c:var(--g)}.a{--c:var(--a)}.r{--c:var(--r)}.x{--c:#94a3b8}.b{--c:#0891b2}
+.mut{color:var(--mut)}.hide{display:none}.msg{padding:9px 12px;border-radius:10px;margin-bottom:10px;background:#fee2e2;color:#991b1b}.msg.ok{background:#dcfce7;color:#166534}
+a{color:var(--b1)}.note{font-size:12px;color:var(--mut);margin:8px 0}
+.src{font-size:12px;margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.src.missing a,.src.na{color:var(--mut)}
+.req{display:inline-block;min-width:26px;text-align:center;border-radius:6px;padding:1px 6px;font-weight:800;font-size:12px;border:1px solid var(--line)}.req.S{background:#fef3c7;border-color:#f59e0b;color:#92400e}.req.R{background:#e0f2fe;border-color:#7dd3fc;color:#075985}.req.A{background:#ede9fe;border-color:#c4b5fd;color:#5b21b6}
+tr.ready td:nth-child(2) b,tr.done td:nth-child(2) b{color:var(--g)}tr.na{opacity:.55}
+.links{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.links a{border:1px solid var(--line);border-radius:99px;padding:4px 11px;font-size:12px;text-decoration:none;color:var(--ink)}.links a:hover{border-color:var(--b1)}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:9;padding:10px}.modal.on{display:flex}.in{background:var(--card);border-radius:14px;width:min(720px,100%);max-height:92vh;overflow:auto;padding:16px}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}.frm label{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:2px}.frm .full{grid-column:1/-1}
+.back{position:fixed;left:12px;bottom:12px;z-index:6;background:linear-gradient(90deg,var(--b1),var(--b2));color:#fff;border-radius:99px;padding:10px 16px;font-weight:700;font-size:13px;text-decoration:none}
+.sheet{border:2px solid var(--ink);padding:14px;border-radius:4px;background:#fff;color:#000}.sheet h2{margin:0 0 2px;text-align:center;letter-spacing:.04em}.sheet label{color:#444}.sheet input,.sheet select,.sheet textarea{background:#fff;color:#000;border-color:#cbd5e1}
+.sheet .sec{background:#e5e7eb;color:#000;font-weight:800;font-size:12px;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;margin:12px -14px 8px}
+.chk{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:4px 14px}.chk label{display:flex;gap:7px;align-items:center;font-size:13px;color:#000;font-weight:400}.chk input{width:auto}
+.lv{display:flex;gap:6px;flex-wrap:wrap}.lv label{display:flex;align-items:center;gap:4px;border:1px solid var(--line);border-radius:8px;padding:3px 9px;color:var(--ink);font-weight:600;font-size:13px}.lv input{width:auto}
+@media print{body{background:#fff;color:#000;padding:0}header,.tabs,.noprint,.kmr-foot,.kmr-demo,.back{display:none!important}.panel{border:0;padding:0}main{padding:0}table{min-width:0}.sheet{border-width:1.5px}.sheet input,.sheet select,.sheet textarea{border:0;border-bottom:1px solid #999;border-radius:0;padding:2px}tr{break-inside:avoid}}
+</style></head><body>
+<header><span class="clogo" id="clogo" hidden></span><div><h1>PPAP Submissions</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<div class="tabs"><a class="tab on" data-t="list" href="#go=list">Submissions</a><a class="tab" data-t="package" href="#go=package" id="tPk">Package (18 elements)</a><a class="tab" data-t="psw" href="#go=psw" id="tPs">Part Submission Warrant</a></div>
+<main><div class="panel"><div id="msg"></div><section id="list"></section><section id="package" class="hide"></section><section id="psw" class="hide"></section></div></main>
+<div class="modal" id="m"><div class="in" id="mb"></div></div>
+<script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
+<script>
+const {$,esc,iso,today,fmt,say,call,appHref,sourceInfo,stateChip}=QP;
+const S={list:[],cur:null,sub:null,links:null,parts:null};
+const canEdit=()=>QP.canEdit;
+const open=(h)=>{$('#mb').innerHTML=h;$('#m').classList.add('on')},closeM=()=>$('#m').classList.remove('on');
+$('#m').addEventListener('click',e=>{if(e.target.id==='m')closeM()});document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+
+/* ---- the 18 elements. lv = what each submission level asks for, level 1..5: S submit to the customer and keep a copy · R keep at the supplier, available on request · * as the customer specifies.
+        This follows the requirements table of the AIAG PPAP manual (4th edition) as published in common summaries — your manual and the customer's own requirements take precedence. ---- */
+const EL=[
+ {n:1,t:'Design records',d:'Drawing / model at the current revision — the ballooned drawing',src:['bi:report'],lv:'RSS*R'},
+ {n:2,t:'Authorized engineering change documents',d:'Change notices not yet shown on the drawing',src:[],lv:'RSS*R'},
+ {n:3,t:'Customer engineering approval',d:'Customer’s engineering approval, where required',src:[],lv:'RRS*R'},
+ {n:4,t:'Design FMEA',d:'Needed when the supplier is design-responsible',src:[],lv:'RRS*R'},
+ {n:5,t:'Process flow diagram',d:'Receiving to shipping, consistent with the PFMEA and control plan',src:['pd:pfd'],lv:'RRS*R'},
+ {n:6,t:'Process FMEA',d:'Covers every step of the process flow',src:['pd:pfmea'],lv:'RRS*R'},
+ {n:7,t:'Control plan',d:'Prototype / pre-launch / production, as the customer requires',src:['pd:cp'],lv:'RRS*R'},
+ {n:8,t:'Measurement system analysis studies',d:'Gauge R&R and other studies for the control-plan gauges',src:['pd:msa'],lv:'RRS*R'},
+ {n:9,t:'Dimensional results',d:'Every dimension on the ballooned drawing, measured on production parts',src:['bi:measured'],lv:'RSS*R'},
+ {n:10,t:'Material / performance test results',d:'Tests called for by the drawing or the control plan',src:[],lv:'RSS*R'},
+ {n:11,t:'Initial process studies',d:'Capability of the special characteristics from the significant production run',src:['pd:spc'],lv:'RRS*R'},
+ {n:12,t:'Qualified laboratory documentation',d:'Laboratory scope and accreditation for the tests performed',src:[],lv:'RSS*R'},
+ {n:13,t:'Appearance approval report',d:'Where appearance requirements apply',src:[],lv:'SSS*R'},
+ {n:14,t:'Sample production parts',d:'Parts from the significant production run, as the customer requires',src:[],lv:'RSS*R'},
+ {n:15,t:'Master sample',d:'Signed sample kept by the supplier',src:[],lv:'RRR*R'},
+ {n:16,t:'Checking aids',d:'Fixtures and gauges used, with calibration records',src:['pd:gauges','cal:gauges'],lv:'RRR*R'},
+ {n:17,t:'Records of customer-specific requirements',d:'Evidence that each customer requirement was met',src:[],lv:'RRS*R'},
+ {n:18,t:'Part Submission Warrant (PSW)',d:'The signed summary of the submission',src:['psw'],lv:'SSSSS'}];
+const LEVELS={1:'PSW only (and the appearance report where it applies) goes to the customer',2:'PSW with product samples and limited supporting data',3:'PSW with product samples and complete supporting data — the default',4:'PSW and other requirements as the customer defines',5:'PSW with samples and complete data, reviewed at the supplier’s manufacturing site'};
+const REASONS=['Initial submission','Engineering change','Tooling: transfer, replacement, refurbishment or additional','Correction of a discrepancy','Tooling inactive for more than one year','Change to optional construction or material','Sub-supplier or material source change','Change in part processing','Parts produced at an additional or replacement location','Other'];
+const ELS={open:['Open','x'],ready:['Ready','g'],done:['Submitted','b'],na:['Not applicable','x']};
+const STAT={draft:['Draft','x'],ready:['Ready to submit','a'],submitted:['Submitted — awaiting customer','b'],approved:['Approved','g'],interim:['Interim approval','a'],rejected:['Rejected','r']};
+const req=(e,lv)=>e.lv[lv-1]==='*'?'A':e.lv[lv-1];   // A = "*" as the customer specifies
+const reqLabel={S:'Submit',R:'Retain',A:'As customer specifies'};
+
+/* ---------------- routing (every screen has an address) ---------------- */
+const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return{go:m?m[1]:'list',prj:m&&m[2]?m[2]:null}};
+const hrefTo=(go,prj)=>'#go='+go+(prj?'&prj='+prj:'');
+async function route(){
+  const {go,prj}=hashOf(); if(prj&&prj!==S.cur){S.cur=prj;S.sub=null;S.links=null}
+  $('#tPk').href=hrefTo('package',S.cur);$('#tPs').href=hrefTo('psw',S.cur);
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));['list','package','psw'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  try{ if(go==='list')await drawList(); else {await loadSub(); if(S.sub){ if(go==='package')drawPackage(); else drawPsw(); }} }catch(e){say(e.message)}
+}
+document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route();window.scrollTo(0,0)});
+window.addEventListener('hashchange',route);
+
+/* ---------------- list ---------------- */
+async function drawList(){
+  S.list=await call('kmr_ppap_list'); const L=S.list;
+  const cnt=(s)=>L.filter(x=>s.includes(x.status)).length;
+  $('#list').innerHTML=`<div class="kpis"><div class="kpi"><b>${L.length}</b><span>Submissions</span></div><div class="kpi" style="--c:var(--a)"><b>${cnt(['draft','ready'])}</b><span>In preparation</span></div><div class="kpi" style="--c:#0891b2"><b>${cnt(['submitted'])}</b><span>Awaiting the customer</span></div><div class="kpi" style="--c:var(--g)"><b>${cnt(['approved','interim'])}</b><span>Approved</span></div><div class="kpi" style="--c:var(--r)"><b>${cnt(['rejected'])}</b><span>Rejected</span></div></div>
+  <div class="row"><b class="grow">PPAP submissions — one per part, revision and reason</b>${canEdit()?'<button class="btn" id="ns">+ New submission</button>':''}</div>
+  <p class="note">The package is assembled from what your other KMR apps already hold — the ballooned drawing and measured results, the flow, PFMEA, control plan, MSA and capability studies, and gauge calibration — and each element links to the exact screen. Approving a submission completes the APQP deliverable “Production part approval”.</p>
+  ${L.length?`<table><thead><tr><th>Part</th><th>Customer</th><th>Level</th><th>Reason</th><th>Status</th><th>Elements ready</th><th>Submitted</th><th>Decision</th></tr></thead><tbody>${L.map(x=>`<tr><td><a href="${hrefTo('package',x.id)}"><b>${esc(x.part_code)}</b></a> <span class="mut">rev ${esc(x.drawing_rev||'—')}</span><div class="mut">${esc(x.part_name||'')}</div></td><td>${esc(x.customer_name||'—')}</td><td>Level ${x.level}</td><td>${esc(x.reason)}</td><td><span class="chip ${STAT[x.status][1]}">${STAT[x.status][0]}</span></td><td>${x.ready}/18</td><td>${fmt(x.submitted_on)}</td><td>${fmt(x.decided_on)}</td></tr>`).join('')}</tbody></table>`:'<p class="mut">No submission yet. Start one for a part — choose it from your Operations Master.</p>'}`;
+  if($('#ns'))$('#ns').onclick=newSub;
+}
+async function newSub(){
+  S.parts=S.parts||await call('kmr_qp_parts'); if(!S.parts.parts.length){say('Add the part under KMR Apps › Operations Master › Parts first.');return}
+  const cus=(c)=>(S.parts.customers.find(x=>x.code===c)||{}).name||c||'';
+  open(`<h3 style="margin-top:0">New PPAP submission</h3><div class="frm"><div class="full"><label>Part (from the Operations Master)</label><select id="nP">${S.parts.parts.map(p=>`<option value="${esc(p.code)}">${esc(p.code)} — ${esc(p.name||'')}</option>`).join('')}</select></div>
+  <div><label>Submission level</label><select id="nL">${[1,2,3,4,5].map(n=>`<option value="${n}" ${n===3?'selected':''}>Level ${n}</option>`).join('')}</select></div><div><label>Reason for submission</label><select id="nR">${REASONS.map(r=>`<option>${esc(r)}</option>`).join('')}</select></div></div><p class="note" id="nI"></p>
+  <div class="row" style="justify-content:flex-end"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="nOk">Create submission</button></div>`);
+  const info=()=>{$('#nI').textContent='Level '+$('#nL').value+': '+LEVELS[$('#nL').value]+'.'};$('#nL').onchange=info;info();
+  $('#nOk').onclick=async()=>{const p=S.parts.parts.find(x=>x.code===$('#nP').value);let apqp=null;try{const L=await call('kmr_qp_links',{p_part:p.code});apqp=L.apqp&&L.apqp.id||null}catch(e){}
+    const els={};EL.forEach(e=>{els['e'+e.n]={status:'open',note:''}});
+    try{const id=await call('kmr_ppap_save',{p:{part_code:p.code,part_name:p.name,customer_code:p.customer,customer_name:cus(p.customer),drawing_no:p.drawing_no,drawing_rev:p.revision,level:+$('#nL').value,reason:$('#nR').value,apqp_id:apqp,
+      psw:{part_number:p.code,part_name:p.name,drawing_no:p.drawing_no,drawing_rev:p.revision,customer_name:cus(p.customer),org_name:QP.ctx.company,weight_kg:p.weight_kg||'',cavities:'1'},elements:els}});
+      closeM();history.replaceState(null,'',location.pathname+location.search+hrefTo('package',id));say('Submission created. Work through the 18 elements.',true);route()}catch(e){say(e.message);closeM()}};
+}
+
+/* ---------------- data ---------------- */
+async function loadSub(){ if(!S.cur){ $('#package').innerHTML=$('#psw').innerHTML='<p class="mut">Choose a submission under <a href="#go=list">Submissions</a>.</p>'; S.sub=null; return}
+  if(!S.sub){S.sub=await call('kmr_ppap_get',{p_id:S.cur}); S.links=await call('kmr_qp_links',{p_part:S.sub.part_code}).catch(()=>({}))}
+  EL.forEach(e=>{if(!S.sub.elements['e'+e.n])S.sub.elements['e'+e.n]={status:'open',note:''}}); }
+/* edits are applied to the local copy first, so several quick edits never overwrite each other; if the save fails the screen reloads the saved version */
+async function save(patch,quiet){ Object.assign(S.sub,patch); try{ await call('kmr_ppap_save',{p:Object.assign({id:S.sub.id},patch)}); if(!quiet)say('Saved.',true); return true }catch(e){say(e.message);S.sub=null;route();return false} }
+function pswDone(){const p=S.sub.psw||{};return !!(p.part_number&&p.org_name&&p.sign_name&&p.sign_date&&p.rate_qty&&p.rate_hours)}
+const counts=()=>{const o={S:[0,0],R:[0,0],A:[0,0]};EL.forEach(e=>{const st=S.sub.elements['e'+e.n].status;if(st==='na')return;const k=req(e,S.sub.level),ok=['ready','done'].includes(st)||(e.n===18&&pswDone());o[k][1]++;if(ok)o[k][0]++});return o};
+
+/* ---------------- package ---------------- */
+function drawPackage(){
+  const P=S.sub,L=S.links||{},c=counts(),editable=canEdit()&&!['approved','interim'].includes(P.status),all=c.S[0]+c.R[0]+c.A[0],tot=c.S[1]+c.R[1]+c.A[1];
+  $('#package').innerHTML=`<div class="row"><div class="grow"><h2 style="margin:0">${esc(P.part_code)} — ${esc(P.part_name||'')} <span class="chip ${STAT[P.status][1]}">${STAT[P.status][0]}</span></h2><div class="mut">${esc(P.customer_name||'')} · drawing ${esc(P.drawing_no||'—')} rev ${esc(P.drawing_rev||'—')}${P.submitted_on?' · submitted '+fmt(P.submitted_on):''}${P.decided_on?' · decided '+fmt(P.decided_on):''}</div></div><button class="btn o sm noprint" onclick="window.print()">Print / Save as PDF</button></div>
+  <div class="row noprint"><label class="mut">Level</label><select id="pl" ${editable?'':'disabled'} style="width:auto">${[1,2,3,4,5].map(n=>`<option value="${n}" ${P.level===n?'selected':''}>Level ${n}</option>`).join('')}</select><label class="mut">Reason</label><select id="pr" ${editable?'':'disabled'} style="max-width:340px">${REASONS.map(r=>`<option ${P.reason===r?'selected':''}>${esc(r)}</option>`).join('')}</select><span class="mut" id="lvT">${esc(LEVELS[P.level])}</span></div>
+  <div class="kpis"><div class="kpi" style="--c:var(--a)"><b>${c.S[0]}/${c.S[1]}</b><span>to submit (S) ready</span></div><div class="kpi" style="--c:#0891b2"><b>${c.R[0]}/${c.R[1]}</b><span>to retain (R) ready</span></div>${c.A[1]?`<div class="kpi" style="--c:#7c3aed"><b>${c.A[0]}/${c.A[1]}</b><span>as customer specifies (*)</span></div>`:''}<div class="kpi" style="--c:var(--g)"><b>${tot?Math.round(all*100/tot):0}%</b><span>of the package ready</span></div></div>
+  <div class="links noprint"><span class="mut" style="padding:4px 0">Open in:</span><a href="${L.pd?sourceInfo('pd:pfd',L).href:appHref('pd')}">Process Documents</a><a href="${L.balloon?sourceInfo('bi:report',L).href:appHref('balloon')}">Balloon Inspector</a><a href="${appHref('calib',{hash:'go=inst'})}">Calibration Hub</a>${L.apqp?`<a href="${appHref('apqp',{hash:'go=phases&prj='+L.apqp.id})}">APQP programme</a>`:`<a href="${appHref('apqp')}">APQP Planner</a>`}</div>
+  <table><thead><tr><th style="width:34px">#</th><th>Element</th><th style="width:96px">Level ${P.level}</th><th style="width:140px">Status</th><th style="width:210px">Reference / note</th></tr></thead><tbody>${EL.map(e=>row(e,L,editable)).join('')}</tbody></table>
+  <p class="note">S = submit to the customer and keep a copy · R = keep at the supplier and make available on request · * = as the customer specifies (confirm in the customer’s requirements). The level table follows the AIAG PPAP manual, 4th edition, as commonly published — where your customer’s requirements differ, theirs apply.</p>
+  <div class="row noprint" style="margin-top:14px"><b>Submission</b>${editable?`<button class="btn o sm" id="bReady">Mark ready to submit</button><span class="grow"></span><label class="mut">Submitted on</label><input type="date" id="sD" value="${esc((P.submitted_on||'').slice(0,10)||today())}" style="width:auto"><button class="btn sm" id="bSub">Mark submitted</button>`:''}</div>
+  ${canEdit()&&['submitted','approved','interim','rejected'].includes(P.status)?`<div class="row noprint"><b>Customer decision</b><input type="date" id="dD" value="${esc((P.decided_on||'').slice(0,10)||today())}" style="width:auto"><input id="dN" placeholder="Customer comments / disposition notes" value="${esc(P.disposition_notes||'')}" style="flex:1;min-width:180px"><button class="btn sm" data-dec="approved">Approved</button><button class="btn o sm" data-dec="interim">Interim</button><button class="btn o sm" data-dec="rejected" style="color:var(--r);border-color:var(--r)">Rejected</button></div>`:''}`;
+  bindPackage(editable);
+}
+function row(e,L,editable){
+  const el=S.sub.elements['e'+e.n],k=req(e,S.sub.level),infos=e.src.map(s=>s==='psw'?{state:pswDone()?'ready':'missing',text:pswDone()?'Warrant complete':'Warrant not complete yet',href:hrefTo('psw',S.sub.id),app:'PPAP Submissions'}:sourceInfo(s,L)).filter(Boolean);
+  const ready=infos.some(i=>i.state==='ready')&&!['ready','done','na'].includes(el.status)&&editable;
+  return `<tr data-n="${e.n}" class="${el.status}"><td>${e.n}</td><td><b>${esc(e.t)}</b><div class="mut" style="font-size:12px">${esc(e.d)}</div>${infos.map(i=>`<div class="src ${i.state}">${stateChip(i.state)}${i.href?`<a href="${esc(i.href)}">${esc(i.text)}</a>`:esc(i.text)}${i.app?`<span class="mut">· ${esc(i.app)}</span>`:''}</div>`).join('')}${ready?`<div class="src"><button class="btn o sm" data-ready="${e.n}">Mark ready</button></div>`:''}</td>
+  <td><span class="req ${k}" title="${reqLabel[k]}">${k==='A'?'*':k}</span></td><td><select data-f="status" ${editable?'':'disabled'}>${Object.entries(ELS).map(([v,l])=>`<option value="${v}" ${el.status===v?'selected':''}>${l[0]}</option>`).join('')}</select></td><td><input data-f="note" value="${esc(el.note||'')}" placeholder="Document no. / note" ${editable?'':'disabled'}></td></tr>`}
+function bindPackage(editable){
+  $('#pl').onchange=async()=>{const v=+$('#pl').value;if(await save({level:v},true))drawPackage()};
+  $('#pr').onchange=()=>save({reason:$('#pr').value},true);
+  document.querySelectorAll('#package tbody [data-f]').forEach(el=>el.addEventListener('change',async()=>{const n=el.closest('tr').dataset.n,f=el.dataset.f;S.sub.elements['e'+n][f]=el.value;if(await save({elements:S.sub.elements},true)){ if(f==='status')drawPackage() }}));
+  document.querySelectorAll('[data-ready]').forEach(b=>b.onclick=async()=>{S.sub.elements['e'+b.dataset.ready].status='ready';if(await save({elements:S.sub.elements},true))drawPackage()});
+  if($('#bReady'))$('#bReady').onclick=async()=>{const c=counts(),miss=c.S[1]-c.S[0]+c.R[1]-c.R[0]+c.A[1]-c.A[0];if(miss&&!confirm(miss+' element(s) are not ready yet. Mark the submission ready anyway?'))return;if(await save({status:'ready'},true))drawPackage()};
+  if($('#bSub'))$('#bSub').onclick=async()=>{const c=counts(),missS=c.S[1]-c.S[0];if(missS&&!confirm(missS+' element(s) that must be submitted are not ready. Mark as submitted anyway?'))return;if(await save({status:'submitted',submitted_on:$('#sD').value},true)){say('Marked as submitted. Record the customer’s decision when it arrives.',true);drawPackage()}};
+  document.querySelectorAll('[data-dec]').forEach(b=>b.onclick=async()=>{const st=b.dataset.dec;if(await save({status:st,decided_on:$('#dD').value,disposition_notes:$('#dN').value},true)){say(st==='rejected'?'Recorded as rejected.':'Recorded. The APQP deliverable “Production part approval” is now complete.',true);drawPackage()}});
+}
+
+/* ---------------- Part Submission Warrant ---------------- */
+function drawPsw(){
+  const P=S.sub,p=P.psw||{},ed=canEdit()&&!['approved','interim'].includes(P.status),dis=ed?'':'disabled';
+  const f=(k,l,t,cls)=>`<div class="${cls||''}"><label>${l}</label><input data-p="${k}" type="${t||'text'}" value="${esc(p[k]||'')}" ${dis}></div>`;
+  const yn=(k,l)=>`<div><label>${l}</label><select data-p="${k}" ${dis}><option value=""></option><option ${p[k]==='Yes'?'selected':''}>Yes</option><option ${p[k]==='No'?'selected':''}>No</option><option ${p[k]==='n/a'?'selected':''}>n/a</option></select></div>`;
+  const res=p.results||[];
+  $('#psw').innerHTML=`<div class="row noprint"><span class="grow mut">Part Submission Warrant — the signed summary of the submission. Prefilled from the Operations Master and your company details; fill the rest, print and sign.</span><button class="btn" onclick="window.print()">Print / Save as PDF</button></div>
+  <div class="sheet"><h2>PART SUBMISSION WARRANT</h2><div style="text-align:center;font-size:12px">${esc(QP.ctx.company)}</div>
+  <div class="sec">Part</div><div class="frm">${f('part_name','Part name')}${f('part_number','Customer part number')}${f('drawing_no','Drawing number')}${f('drawing_rev','Engineering change / drawing level')}${f('drawing_date','Dated','date')}${f('org_part_number','Organization part number')}${yn('safety_reg','Safety and / or government regulation')}${f('purchase_order','Purchase order number')}${f('weight_kg','Part weight (kg)')}${f('checking_aid','Checking aid number')}${f('application','Application / model')}${f('cavities','Cavities / tool numbers')}</div>
+  <div class="sec">Organization and customer</div><div class="frm">${f('org_name','Organization name')}${f('supplier_code','Supplier / vendor code')}${f('mfg_address','Manufacturing address','text','full')}${f('customer_name','Customer name / division')}${f('buyer','Buyer / buyer code')}</div>
+  <div class="sec">Material reporting</div><div class="frm">${yn('substances','Substances of concern reported as the customer requires')}${f('substances_format','Reported through (IMDS / other)')}${yn('polymer_marking','Polymeric parts marked with ISO codes')}</div>
+  <div class="sec">Reason for submission</div><div class="chk">${REASONS.map(r=>`<label><input type="radio" name="rs" ${P.reason===r?'checked':''} disabled> ${esc(r)}</label>`).join('')}</div>
+  <div class="sec">Requested submission level</div><div class="chk">${[1,2,3,4,5].map(n=>`<label><input type="radio" name="lv" ${P.level===n?'checked':''} disabled> Level ${n}</label>`).join('')}</div><div class="note" style="color:#444">Change the level and the reason on the Package tab.</div>
+  <div class="sec">Submission results</div><div class="chk">${[['dim','Dimensional measurements'],['mat','Material and functional tests'],['app','Appearance criteria'],['spc','Statistical process package']].map(([k,l])=>`<label><input type="checkbox" data-r="${k}" ${res.includes(k)?'checked':''} ${dis}> ${l}</label>`).join('')}</div>
+  <div class="frm" style="margin-top:8px">${yn('meets','The results meet all drawing and specification requirements')}${f('tool_no','Mold / tool / die / pattern / cavity / production process')}<div class="full"><label>Explanation (required when the results do not all meet requirements)</label><textarea data-p="explain" rows="2" ${dis}>${esc(p.explain||'')}</textarea></div></div>
+  <div class="sec">Declaration</div><p style="font-size:13px;margin:4px 0">We confirm that the samples represented by this warrant are representative of parts made to the requirements of the Production Part Approval Process manual, produced at a production rate of <input data-p="rate_qty" value="${esc(p.rate_qty||'')}" ${dis} style="width:80px;display:inline-block"> pieces per <input data-p="rate_hours" value="${esc(p.rate_hours||'')}" ${dis} style="width:70px;display:inline-block"> hours, and that documented evidence of compliance is on file and available for review. Any deviations are noted below.</p>
+  <div class="frm"><div class="full"><label>Deviations / comments</label><textarea data-p="comments" rows="2" ${dis}>${esc(p.comments||'')}</textarea></div>${yn('tags','Each customer tool is properly tagged and numbered')}</div>
+  <div class="sec">Organization authorization</div><div class="frm">${f('sign_name','Name (print)')}${f('sign_title','Title')}${f('sign_phone','Phone')}${f('sign_email','E-mail')}${f('sign_date','Date','date')}<div><label>Signature</label><div style="height:34px;border-bottom:1px solid #000"></div></div></div>
+  <div class="sec">For customer use only</div><div class="frm"><div><label>PPAP warrant disposition</label><div style="padding:6px 0">${P.status==='approved'?'☑':'☐'} Approved &nbsp; ${P.status==='interim'?'☑':'☐'} Interim &nbsp; ${P.status==='rejected'?'☑':'☐'} Rejected</div></div>${f('cust_sign','Customer name (print)')}${f('cust_date','Date','date')}${f('cust_track','Customer tracking number (optional)')}<div class="full"><label>Customer comments</label><div style="min-height:34px;border-bottom:1px solid #000">${esc(P.disposition_notes||'')}</div></div></div></div>
+  <p class="note noprint">Layout follows the standard PSW fields. The declaration wording here is a plain-language version — if your customer requires the exact form, transfer the data to it.</p>`;
+  document.querySelectorAll('#psw [data-p]').forEach(el=>el.addEventListener('change',async()=>{S.sub.psw=Object.assign({},S.sub.psw||{},{[el.dataset.p]:el.value});await save({psw:S.sub.psw},true)}));
+  document.querySelectorAll('#psw [data-r]').forEach(el=>el.addEventListener('change',async()=>{const set=new Set((S.sub.psw||{}).results||[]);el.checked?set.add(el.dataset.r):set.delete(el.dataset.r);S.sub.psw=Object.assign({},S.sub.psw||{},{results:[...set]});await save({psw:S.sub.psw},true)}));
+}
+
+(async()=>{try{await QP.init('ppap'); if(!QP.ctx)return; await route()}catch(e){say(e.message)}})();
+</script>
+<script src="/it/apps/back.js"></script></body></html>

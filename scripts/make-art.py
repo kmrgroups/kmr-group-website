@@ -353,12 +353,55 @@ def badge_web():
             + f"<rect x='120' y='172' width='76' height='18' rx='9' fill='{GOLD}'/><text x='158' y='185' {FONT} font-size='10' font-weight='800' fill='{NAVY}' text-anchor='middle'>Buy now</text></g>")
 
 
+def app_apqp():
+    a = "#0891B2"
+    b = heading("APQP programme · DP-1101", "Five phases, gates and deliverables")
+    names = ["Plan and define", "Design and dev.", "Process design", "Validation", "Feedback"]
+    prog = [100, 100, 78, 38, 0]
+    for i, (nm, pg) in enumerate(zip(names, prog)):
+        x = i * 84
+        col = OK if pg == 100 else a if pg else MUTED
+        b += (f"<rect x='{x}' y='40' width='76' height='62' rx='9' fill='#fff' stroke='{col}' stroke-width='2'/>"
+              f"<text x='{x + 38}' y='58' {FONT} font-size='9.5' font-weight='800' fill='{INK}' text-anchor='middle'>PHASE {i + 1}</text>"
+              f"<text x='{x + 38}' y='71' {FONT} font-size='8' fill='{MUTED}' text-anchor='middle'>{nm}</text>"
+              f"<rect x='{x + 9}' y='80' width='58' height='7' rx='3.5' fill='#EEF1F6'/><rect x='{x + 9}' y='80' width='{58 * pg / 100:.0f}' height='7' rx='3.5' fill='{col}'/>"
+              f"<text x='{x + 38}' y='96' {FONT} font-size='8.5' font-weight='700' fill='{col}' text-anchor='middle'>{pg}%</text>")
+        if i < 4:
+            b += f"<path d='M{x + 78} 71h4' stroke='{MUTED}' stroke-width='2'/>"
+        if pg == 100:
+            b += f"<circle cx='{x + 38}' cy='113' r='7' fill='{OK}'/><path d='M{x + 34} 113l3 3 5-6' stroke='#fff' stroke-width='2' fill='none' stroke-linecap='round'/>"
+    b += rows(0, 128, 418, [["3.5", "Process FMEA", "Process Documents", ("Linked", OK)], ["3.7", "Pre-launch control plan", "Process Documents", ("Linked", OK)], ["3.9", "MSA plan", "Process Documents", ("Partly", AMBER)],
+                            ["4.3", "Preliminary capability study", "Process Documents", ("Not yet", MUTED)], ["4.4", "Production part approval", "PPAP Submissions", ("Open", AMBER)], ["2.12", "Gages / testing equipment", "Calibration Hub", ("Linked", OK)]],
+              [34, 150, 130, 70], head=["#", "Deliverable", "Evidence from", "Status"], rh=21)
+    return window(a, "APQP", b)
+
+
+def app_ppap():
+    a = "#B45309"
+    b = heading("PPAP · Level 3 · DP-1101", "18 elements assembled from your apps")
+    els = [("Design records", "Balloon", OK), ("Process flow", "PD", OK), ("Process FMEA", "PD", OK), ("Control plan", "PD", OK), ("MSA studies", "PD", OK), ("Dimensional results", "Balloon", OK),
+           ("Initial process studies", "PD", AMBER), ("Checking aids", "Calib.", OK), ("Material tests", "—", RED)]
+    for i, (nm, srcn, c) in enumerate(els):
+        y = 38 + i * 24
+        b += (f"<rect x='0' y='{y}' width='238' height='20' rx='5' fill='#F6F8FC'/><circle cx='11' cy='{y + 10}' r='5.5' fill='{c}'/>"
+              f"<text x='24' y='{y + 14}' {FONT} font-size='9.5' font-weight='600' fill='{INK}'>{nm}</text><text x='232' y='{y + 14}' {FONT} font-size='8.5' fill='{MUTED}' text-anchor='end'>{srcn}</text>")
+    # warrant
+    b += (f"<g transform='translate(252 38)'><rect width='166' height='222' rx='6' fill='#fff' stroke='{INK}' stroke-width='1.6'/><text x='83' y='18' {FONT} font-size='10.5' font-weight='800' fill='{INK}' text-anchor='middle'>PART SUBMISSION WARRANT</text>"
+          + "".join(f"<rect x='10' y='{30 + k * 17}' width='{70 if k % 2 else 100}' height='6' rx='3' fill='#D8DEE9'/><rect x='{92 if k % 2 else 118}' y='{30 + k * 17}' width='{54 if k % 2 else 36}' height='6' rx='3' fill='#EEF1F6'/>" for k in range(6))
+          + f"<rect x='10' y='140' width='146' height='1' fill='#D8DEE9'/><text x='10' y='156' {FONT} font-size='8' font-weight='700' fill='{INK}'>Level 3 · Initial submission</text>"
+          f"<rect x='10' y='166' width='146' height='28' rx='4' fill='#FBF3E0'/><text x='16' y='184' {FONT} font-size='8' fill='{INK}'>Dimensional · Material · Appearance · SPC</text>"
+          f"<path d='M14 214q16-14 28-2t26-4' stroke='{NAVY}' stroke-width='1.6' fill='none'/><rect x='104' y='204' width='44' height='16' rx='8' fill='{OK}'/><text x='126' y='215' {FONT} font-size='8' font-weight='800' fill='#fff' text-anchor='middle'>APPROVED</text></g>")
+    return window(a, "PPAP", b)
+
+
 ART = {
     "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
     "app-pd": lambda: svg(bg("#F59E0B") + app_pd(), "Process Documents"),
     "app-capacity": lambda: svg(bg("#10B981") + app_capacity(), "Capacity Planner"),
     "app-sales": lambda: svg(bg("#E11D48") + app_sales(), "Sales Flow"),
+    "app-apqp": lambda: svg(bg("#0891B2") + app_apqp(), "APQP Planner"),
+    "app-ppap": lambda: svg(bg("#B45309") + app_ppap(), "PPAP Submissions"),
     "app-calib": lambda: svg(bg("#6366F1") + app_calib(), "Calibration Hub"),
     "v-shop": scene_shop, "v-software": scene_software, "v-training": scene_training, "v-trade": scene_trade, "v-invest": scene_invest,
     "t-quality": lambda: doc_scene(GOLD, "Internal audit plan", ["Clause-wise checklist", "Process audit · turtle", "Clear nonconformities", "Verified corrective action"], badge_shield(), "Quality systems training"),

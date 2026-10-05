@@ -1,0 +1,151 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<title>APQP Planner · KMR Apps</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#141a2e;--ink:#e8ecf8;--mut:#93a0bd;--line:#26304d}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}
+header{display:flex;gap:12px;align-items:center;padding:12px 18px;background:#0c1a3a;color:#fff;flex-wrap:wrap}header h1{font-size:17px;margin:0}header small{opacity:.7;display:block}
+.tabs{display:flex;gap:4px;padding:10px 14px 0;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{text-decoration:none;display:inline-block;border:0;background:none;padding:9px 14px;font-weight:600;color:var(--mut);border-radius:10px 10px 0 0;white-space:nowrap;flex:none}.tab.on{background:var(--card);color:var(--b1);box-shadow:0 -2px 0 var(--b1) inset}
+main{padding:0 14px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:16px;overflow-x:auto}
+input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);width:100%;min-width:0}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--b1),var(--b2));cursor:pointer;text-decoration:none;display:inline-block}.btn.o{background:none;color:var(--b1);border:1px solid var(--b1)}.sm{padding:4px 9px;font-size:12px}.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.row>.grow{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-top:3px solid var(--c,var(--b1))}.kpi b{display:block;font-size:22px}.kpi span{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;min-width:700px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--mut)}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c,#94a3b8)}.g{--c:var(--g)}.a{--c:var(--a)}.r{--c:var(--r)}.x{--c:#94a3b8}.b{--c:var(--b1)}
+.mut{color:var(--mut)}.hide{display:none}.msg{padding:9px 12px;border-radius:10px;margin-bottom:10px;background:#fee2e2;color:#991b1b}.msg.ok{background:#dcfce7;color:#166534}
+a{color:var(--b1)}
+.bar{display:flex;gap:2px;min-width:120px}.bar i{flex:1;height:8px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}.bar i b{position:absolute;inset:0 auto 0 0;background:var(--g)}
+.ph{border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}.ph>h3{margin:0;padding:10px 12px;background:var(--bg);display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:15px}.ph>h3 .grow{flex:1}
+.ph table{min-width:820px}.ph input,.ph select{padding:4px 6px;font-size:13px}
+tr.done td:nth-child(2) b{color:var(--mut);text-decoration:line-through}tr.na{opacity:.55}
+.src{font-size:12px;margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.src.missing a,.src.na{color:var(--mut)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:12px;padding:10px;border-top:3px solid var(--c,var(--b1))}.tile b{font-size:20px}.tile small{display:block;color:var(--mut)}
+.links{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.links a{border:1px solid var(--line);border-radius:99px;padding:4px 11px;font-size:12px;text-decoration:none;color:var(--ink)}.links a:hover{border-color:var(--b1)}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:9;padding:10px}.modal.on{display:flex}.in{background:var(--card);border-radius:14px;width:min(720px,100%);max-height:92vh;overflow:auto;padding:16px}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.frm label{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:2px}
+.note{font-size:12px;color:var(--mut);margin:8px 0}
+.back{position:fixed;left:12px;bottom:12px;z-index:6;background:linear-gradient(90deg,var(--b1),var(--b2));color:#fff;border-radius:99px;padding:10px 16px;font-weight:700;font-size:13px;text-decoration:none}
+.rep h2{margin:0 0 4px}.rep table{min-width:0}
+@media print{body{background:#fff;color:#000;padding:0}header,.tabs,.noprint,.kmr-foot,.kmr-demo,.back{display:none!important}.panel{border:0;padding:0}main{padding:0}.ph{break-inside:avoid}}
+</style></head><body>
+<header><span class="clogo" id="clogo" hidden></span><div><h1>APQP Planner</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<div class="tabs"><a class="tab on" data-t="prog" href="#go=prog">Programmes</a><a class="tab" data-t="phases" href="#go=phases" id="tPh">Phases &amp; deliverables</a><a class="tab" data-t="report" href="#go=report" id="tRp">Status report</a></div>
+<main><div class="panel"><div id="msg"></div><section id="prog"></section><section id="phases" class="hide"></section><section id="report" class="hide"></section></div></main>
+<div class="modal" id="m"><div class="in" id="mb"></div></div>
+<script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
+<script>
+const {$,esc,iso,today,fmt,say,call,rpc,appHref,sourceInfo,stateChip}=QP;
+const S={list:[],cur:null,data:null,links:null,parts:null};
+const ST={open:['Open','x'],progress:['In progress','b'],done:['Done','g'],na:['Not applicable','x']};
+const PH=window.QP_PHASES||{};
+const canEdit=()=>QP.canEdit;
+const open=(h)=>{$('#mb').innerHTML=h;$('#m').classList.add('on')},closeM=()=>$('#m').classList.remove('on');
+$('#m').addEventListener('click',e=>{if(e.target.id==='m')closeM()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+const pct=(d,t)=>t?Math.round(d*100/t):0;
+const bar=(ph)=>'<div class="bar">'+[1,2,3,4,5].map(n=>{const p=ph&&ph[n];return `<i title="Phase ${n}: ${p?p.done+'/'+p.total:'—'}"><b style="width:${p?pct(p.done,p.total):0}%"></b></i>`}).join('')+'</div>';
+
+/* ---------------- routing: every screen has an address (#go=…&prj=…) so right-click › open in new tab works ---------------- */
+const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return {go:m?m[1]:'prog',prj:m&&m[2]?m[2]:null}};
+const hrefTo=(go,prj)=>'#go='+go+(prj?'&prj='+prj:'');
+function setTabs(){const p=S.cur;$('#tPh').href=hrefTo('phases',p);$('#tRp').href=hrefTo('report',p)}
+async function route(){
+  const {go,prj}=hashOf(); if(prj&&prj!==S.cur){S.cur=prj;S.data=null;S.links=null} setTabs();
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
+  ['prog','phases','report'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  try{ if(go==='prog')await drawProg(); else if(go==='phases')await drawPhases(); else await drawReport(); }catch(e){say(e.message)}
+}
+document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route();window.scrollTo(0,0)});
+window.addEventListener('hashchange',route);
+
+/* ---------------- programmes ---------------- */
+async function drawProg(){
+  S.list=await call('kmr_apqp_list');
+  const open_=S.list.reduce((a,p)=>a+(p.total-p.done),0),over=S.list.reduce((a,p)=>a+p.overdue,0),gates=S.list.reduce((a,p)=>a+Object.keys(p.gates||{}).filter(k=>p.gates[k]&&p.gates[k].ok).length,0);
+  $('#prog').innerHTML=`<div class="kpis"><div class="kpi"><b>${S.list.length}</b><span>Programmes</span></div><div class="kpi" style="--c:var(--a)"><b>${open_}</b><span>Open deliverables</span></div><div class="kpi" style="--c:var(--r)"><b>${over}</b><span>Overdue</span></div><div class="kpi" style="--c:var(--g)"><b>${gates}</b><span>Phase gates signed</span></div></div>
+  <div class="row"><b class="grow">Programmes — one per part</b>${canEdit()?'<button class="btn" id="np">+ New programme</button>':''}</div>
+  <p class="note">Each programme follows the five APQP phases. The evidence for a deliverable — drawing, flow, PFMEA, control plan, MSA, SPC, gauges — is read live from your other KMR apps; nothing is typed twice.</p>
+  ${S.list.length?`<table><thead><tr><th>Part</th><th>Customer</th><th>Programme</th><th>SOP</th><th>Phases 1–5</th><th>Done</th><th>Overdue</th><th></th></tr></thead><tbody>${S.list.map(p=>`<tr><td><a href="${hrefTo('phases',p.id)}"><b>${esc(p.part_code)}</b></a><div class="mut">${esc(p.part_name||'')}</div></td><td>${esc(p.customer_name||'—')}</td><td>${esc(p.program||'')}${p.status!=='active'?` <span class="chip x">${esc(p.status.replace('_',' '))}</span>`:''}</td><td>${fmt(p.sop_date)}</td><td>${bar(p.phases)}</td><td>${p.done}/${p.total} <span class="mut">(${pct(p.done,p.total)}%)</span></td><td>${p.overdue?`<span class="chip r">${p.overdue}</span>`:'<span class="mut">—</span>'}</td><td style="white-space:nowrap"><a class="btn o sm" href="${hrefTo('report',p.id)}">Report</a></td></tr>`).join('')}</tbody></table>`:'<p class="mut">No programme yet. Start one for a new part — choose it from your Operations Master.</p>'}`;
+  if($('#np'))$('#np').onclick=newProg;
+}
+async function newProg(){
+  S.parts=S.parts||await call('kmr_qp_parts'); const have=new Set(S.list.map(p=>p.part_code)),av=S.parts.parts.filter(p=>!have.has(p.code));
+  if(!av.length){say('Every part in your Operations Master already has a programme. Add the new part under KMR Apps › Operations Master › Parts first.');return}
+  const cus=(c)=>(S.parts.customers.find(x=>x.code===c)||{}).name||c||'';
+  open(`<h3 style="margin-top:0">New APQP programme</h3><div class="frm"><div><label>Part (from the Operations Master)</label><select id="npP">${av.map(p=>`<option value="${esc(p.code)}">${esc(p.code)} — ${esc(p.name||'')}</option>`).join('')}</select></div><div><label>Customer</label><input id="npC" readonly></div><div><label>Programme name</label><input id="npN"></div><div><label>Start of production (SOP)</label><input type="date" id="npS"></div></div>
+  <p class="note" id="npI"></p><label style="font-size:12px;color:var(--mut);font-weight:600">Cross-functional team (from the Operations Master CFT list)</label><div id="npT" style="display:grid;gap:4px;margin:6px 0">${S.parts.cft.map((c,i)=>`<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:var(--ink);font-weight:400"><input type="checkbox" style="width:auto" data-i="${i}" ${/leader|member/i.test(c.role||'')?'checked':''}> ${esc(c.name)} <span class="mut">${esc(c.role||'')}${c.function?' · '+esc(c.function):''}</span></label>`).join('')||'<span class="mut">No CFT members in the Operations Master yet — you can add names later.</span>'}</div>
+  <div class="row" style="justify-content:flex-end"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="npOk">Create programme</button></div>`);
+  const fill=()=>{const p=av.find(x=>x.code===$('#npP').value);$('#npC').value=cus(p.customer);$('#npN').value='New part launch — '+(p.name||p.code);$('#npI').textContent=`Drawing ${p.drawing_no||'—'} rev ${p.revision||'—'} · annual volume ${p.annual_volume?Number(p.annual_volume).toLocaleString('en-IN'):'—'} — taken from the Operations Master.`};
+  $('#npP').onchange=fill;fill();
+  $('#npOk').onclick=async()=>{const p=av.find(x=>x.code===$('#npP').value),team=[...document.querySelectorAll('#npT input:checked')].map(i=>{const c=S.parts.cft[+i.dataset.i];return{name:c.name,role:c.role,function:c.function}});
+    try{const id=await call('kmr_apqp_create',{p:{part_code:p.code,part_name:p.name,customer_code:p.customer,customer_name:cus(p.customer),drawing_no:p.drawing_no,drawing_rev:p.revision,annual_volume:p.annual_volume,program:$('#npN').value,sop_date:$('#npS').value,team}});closeM();history.replaceState(null,'',location.pathname+location.search+hrefTo('phases',id));say('Programme created with all five phases.',true);route()}catch(e){say(e.message);closeM()}};
+}
+
+/* ---------------- phases & deliverables ---------------- */
+async function drawPhases(){
+  const host=$('#phases'); if(!S.cur){host.innerHTML='<p class="mut">Choose a programme under <a href="#go=prog">Programmes</a>.</p>';return}
+  S.data=await call('kmr_apqp_get',{p_id:S.cur}); const P=S.data.project;
+  S.links=await call('kmr_qp_links',{p_part:P.part_code}).catch(()=>({}));
+  const L=S.links||{},hasPd=L.pd,tm=(P.team||[]).map(t=>t.name);
+  host.innerHTML=`<div class="rep"><div class="row"><div class="grow"><h2>${esc(P.part_code)} — ${esc(P.part_name||'')}</h2><div class="mut">${esc(P.customer_name||'')} · drawing ${esc(P.drawing_no||'—')} rev ${esc(P.drawing_rev||'—')} · SOP ${fmt(P.sop_date)} · ${esc(P.program||'')}</div></div>
+    ${canEdit()?'<button class="btn o sm" id="eP">Edit programme</button><button class="btn o sm" id="eT">Team</button>':''}${QP.ctx&&QP.ctx.role==='admin'?'<button class="btn o sm" id="dP" style="color:var(--r);border-color:var(--r)">Delete</button>':''}</div>
+    <div class="links"><span class="mut" style="padding:4px 0">Open in:</span>
+      <a href="${appHref('ops',{hash:'ops/parts'})}">Operations Master</a>
+      <a href="${hasPd?sourceInfo('pd:pfd',L).href:appHref('pd')}">Process Documents${hasPd?'':' (not started)'}</a>
+      <a href="${L.balloon?sourceInfo('bi:report',L).href:appHref('balloon')}">Balloon Inspector${L.balloon?'':' (no drawing)'}</a>
+      <a href="${appHref('capacity',{hash:'capacity'})}">Capacity Planner</a><a href="${appHref('calib',{hash:'go=inst'})}">Calibration Hub</a><a href="${sourceInfo('ppap',L).href}">PPAP Submissions</a></div>
+    <div class="tiles" id="tiles"></div><p class="note">Source evidence is read live from the linked apps. “Mark done” appears when the source already holds what the deliverable needs.</p>
+    <div id="phs"></div></div>`;
+  drawBody(); bindHead(P);
+}
+function bindHead(P){
+  if($('#eP'))$('#eP').onclick=()=>open(`<h3 style="margin-top:0">Edit programme</h3><div class="frm"><div><label>Programme name</label><input id="eN" value="${esc(P.program||'')}"></div><div><label>SOP date</label><input type="date" id="eS" value="${esc((P.sop_date||'').slice(0,10))}"></div><div><label>Annual volume</label><input id="eV" value="${esc(P.annual_volume||'')}"></div><div><label>Status</label><select id="eU">${['active','on_hold','closed'].map(s=>`<option value="${s}" ${P.status===s?'selected':''}>${s.replace('_',' ')}</option>`).join('')}</select></div></div><label class="note">Notes</label><textarea id="eO" rows="3">${esc(P.notes||'')}</textarea><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="eOk">Save</button></div>`)||($('#eOk').onclick=async()=>{try{await call('kmr_apqp_save',{p:{id:P.id,program:$('#eN').value,sop_date:$('#eS').value,annual_volume:$('#eV').value,status:$('#eU').value,notes:$('#eO').value}});closeM();say('Saved.',true);route()}catch(e){say(e.message)}});
+  if($('#eT'))$('#eT').onclick=()=>{const t=[...(P.team||[])];const draw=()=>{$('#mb').innerHTML=`<h3 style="margin-top:0">Team</h3>${t.map((m,i)=>`<div class="row" style="margin:4px 0"><span class="grow"><b>${esc(m.name)}</b> <span class="mut">${esc(m.role||'')}${m.function?' · '+esc(m.function):''}</span></span><button class="btn o sm" data-rm="${i}">Remove</button></div>`).join('')||'<p class="mut">No team members.</p>'}<div class="row" style="margin-top:10px"><input id="tN" placeholder="Name" style="flex:2"><input id="tR" placeholder="Role (e.g. CFT member)" style="flex:2"><button class="btn sm" id="tA">Add</button></div><div class="row" style="justify-content:flex-end"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="tOk">Save team</button></div>`;
+      document.querySelectorAll('[data-rm]').forEach(b=>b.onclick=()=>{t.splice(+b.dataset.rm,1);draw()});$('#tA').onclick=()=>{if($('#tN').value.trim()){t.push({name:$('#tN').value.trim(),role:$('#tR').value.trim()||'CFT member'});draw()}};
+      $('#tOk').onclick=async()=>{try{await call('kmr_apqp_save',{p:{id:P.id,team:t}});closeM();say('Team saved.',true);route()}catch(e){say(e.message)}}};open('');draw()};
+  if($('#dP'))$('#dP').onclick=async()=>{if(!confirm('Delete this programme and all its deliverables? This cannot be undone.'))return;try{await call('kmr_apqp_delete',{p_id:P.id});S.cur=null;history.replaceState(null,'',location.pathname+location.search+'#go=prog');say('Programme deleted.',true);route()}catch(e){say(e.message)}};
+}
+function phaseStats(n){const its=S.data.items.filter(i=>i.phase===n&&i.status!=='na');return{t:its.length,d:its.filter(i=>i.status==='done').length,o:its.filter(i=>['open','progress'].includes(i.status)&&i.due&&i.due.slice(0,10)<today()).length}}
+function drawTiles(){const P=S.data.project,g=P.gates||{};$('#tiles').innerHTML=[1,2,3,4,5].map(n=>{const s=phaseStats(n),ok=g[n]&&g[n].ok;return`<div class="tile" style="--c:${ok?'var(--g)':s.d===s.t&&s.t?'var(--b1)':'var(--a)'}"><small>Phase ${n}</small><b>${pct(s.d,s.t)}%</b><small>${s.d}/${s.t} done${s.o?` · <span style="color:var(--r)">${s.o} overdue</span>`:''}</small><small>${ok?'✓ Gate signed '+fmt(g[n].at):'Gate not signed'}</small></div>`}).join('')}
+function drawBody(){
+  drawTiles(); const P=S.data.project,L=S.links||{},tm=(P.team||[]).map(t=>t.name),g=P.gates||{};
+  $('#phs').innerHTML=`<datalist id="own">${tm.map(n=>`<option value="${esc(n)}">`).join('')}</datalist>`+[1,2,3,4,5].map(n=>{const its=S.data.items.filter(i=>i.phase===n).sort((a,b)=>a.seq-b.seq),s=phaseStats(n),gate=g[n];
+    return `<div class="ph" data-ph="${n}"><h3><span>Phase ${n} — ${esc(PH[n]||'')}</span><span class="grow"></span><span class="mut" style="font-weight:400">${s.d}/${s.t} done</span>${canEdit()?`<button class="btn o sm" data-add="${n}">+ Deliverable</button>`:''}</h3>
+    <table><thead><tr><th style="width:44px">#</th><th>Deliverable</th><th style="width:150px">Owner</th><th style="width:135px">Due</th><th style="width:140px">Status</th><th style="width:170px">Notes</th><th style="width:30px"></th></tr></thead><tbody>${its.map(i=>row(i,L)).join('')}</tbody></table>
+    <div class="row" style="padding:10px 12px;margin:0;border-top:1px solid var(--line)"><b>Phase ${n} gate</b>${gate&&gate.ok?`<span class="chip g">signed ${fmt(gate.at)} · ${esc(gate.by||'')}</span>${canEdit()?`<button class="btn o sm" data-reopen="${n}">Reopen</button>`:''}`:`<span class="chip x">not signed</span>${canEdit()?`<button class="btn sm" data-gate="${n}">Sign off phase ${n}</button>`:''}`}</div></div>`}).join('');
+  bindBody();
+}
+function row(i,L){const si=i.source?sourceInfo(i.source,L):null,sug=si&&si.state==='ready'&&!['done','na'].includes(i.status)&&canEdit();
+  return `<tr data-id="${i.id}" class="${i.status}"><td>${esc(i.code)}</td><td><b>${esc(i.title)}</b>${si?`<div class="src ${si.state}">${stateChip(si.state)}${si.href?`<a href="${esc(si.href)}">${esc(si.text)}</a>`:esc(si.text)}${si.app?`<span class="mut">· ${esc(si.app)}</span>`:''}${sug?`<button class="btn o sm" data-done="${i.id}">Mark done</button>`:''}</div>`:''}</td>
+  <td><input list="own" data-f="owner" value="${esc(i.owner||'')}" ${canEdit()?'':'disabled'}></td><td><input type="date" data-f="due" value="${esc((i.due||'').slice(0,10))}" ${canEdit()?'':'disabled'}></td>
+  <td><select data-f="status" ${canEdit()?'':'disabled'}>${Object.entries(ST).map(([k,v])=>`<option value="${k}" ${i.status===k?'selected':''}>${v[0]}</option>`).join('')}</select></td><td><input data-f="notes" value="${esc(i.notes||'')}" placeholder="Note / reference" ${canEdit()?'':'disabled'}></td>
+  <td>${/^C/.test(i.code)&&canEdit()?`<button class="btn o sm" data-del="${i.id}" title="Remove this deliverable">✕</button>`:''}</td></tr>`}
+async function saveItem(id,patch){const it=S.data.items.find(x=>x.id===id);try{await call('kmr_apqp_item',{p:Object.assign({id},patch)});Object.assign(it,patch);if(patch.status)it.done_at=patch.status==='done'?(it.done_at||today()):null;
+  const tr=document.querySelector(`tr[data-id="${id}"]`);if(tr)tr.className=it.status;drawTiles();const h=document.querySelector(`.ph[data-ph="${it.phase}"] > h3 .mut`);if(h){const s=phaseStats(it.phase);h.textContent=`${s.d}/${s.t} done`}}catch(e){say(e.message);route()}}
+function bindBody(){
+  document.querySelectorAll('#phs [data-f]').forEach(el=>el.addEventListener('change',()=>{const id=el.closest('tr').dataset.id,f=el.dataset.f;saveItem(id,{[f]:el.value})}));
+  document.querySelectorAll('[data-done]').forEach(b=>b.onclick=()=>{saveItem(b.dataset.done,{status:'done'}).then(()=>drawBody())});
+  document.querySelectorAll('[data-del]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this deliverable?'))return;try{await call('kmr_apqp_item_delete',{p_id:b.dataset.del});S.data.items=S.data.items.filter(i=>i.id!==b.dataset.del);drawBody()}catch(e){say(e.message)}});
+  document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const ph=+b.dataset.add;open(`<h3 style="margin-top:0">Add a deliverable to phase ${ph}</h3><p class="note">For a customer-specific requirement that is not in the standard list (for example an IMDS entry or a customer form).</p><div class="frm"><div style="grid-column:1/-1"><label>Deliverable</label><input id="aT"></div><div><label>Owner</label><input id="aO" list="own"></div><div><label>Due</label><input type="date" id="aD"></div></div><div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="aOk">Add</button></div>`);
+    $('#aOk').onclick=async()=>{try{await call('kmr_apqp_item_add',{p:{project_id:S.cur,phase:ph,title:$('#aT').value,owner:$('#aO').value,due:$('#aD').value}});closeM();route()}catch(e){say(e.message)}}});
+  document.querySelectorAll('[data-gate]').forEach(b=>b.onclick=async()=>{const n=+b.dataset.gate,s=phaseStats(n);if(s.d<s.t&&!confirm(`${s.t-s.d} deliverable(s) in phase ${n} are not done yet. Sign off the gate anyway?`))return;const g=Object.assign({},S.data.project.gates||{});g[n]={ok:true,by:(QP.ctx&&QP.ctx.role)||'',at:today()};try{await call('kmr_apqp_save',{p:{id:S.cur,gates:g}});S.data.project.gates=g;drawBody()}catch(e){say(e.message)}});
+  document.querySelectorAll('[data-reopen]').forEach(b=>b.onclick=async()=>{const g=Object.assign({},S.data.project.gates||{});delete g[b.dataset.reopen];try{await call('kmr_apqp_save',{p:{id:S.cur,gates:g}});S.data.project.gates=g;drawBody()}catch(e){say(e.message)}});
+}
+
+/* ---------------- status report (print / save as PDF) ---------------- */
+async function drawReport(){
+  const host=$('#report'); if(!S.cur){host.innerHTML='<p class="mut">Choose a programme under <a href="#go=prog">Programmes</a>.</p>';return}
+  S.data=await call('kmr_apqp_get',{p_id:S.cur}); const P=S.data.project,g=P.gates||{},its=S.data.items,od=its.filter(i=>['open','progress'].includes(i.status)&&i.due&&i.due.slice(0,10)<today()).sort((a,b)=>(a.due||'').localeCompare(b.due||'')),openI=its.filter(i=>['open','progress'].includes(i.status)).sort((a,b)=>(a.due||'9').localeCompare(b.due||'9'));
+  host.innerHTML=`<div class="rep"><div class="row noprint"><span class="grow"></span><button class="btn" onclick="window.print()">Print / Save as PDF</button></div>
+  <h2>APQP status report — ${esc(P.part_code)} ${esc(P.part_name||'')}</h2><div class="mut">${esc(QP.ctx.company)} · ${esc(P.customer_name||'')} · drawing ${esc(P.drawing_no||'—')} rev ${esc(P.drawing_rev||'—')} · SOP ${fmt(P.sop_date)} · report date ${fmt(today())}</div>
+  <p class="mut">Team: ${(P.team||[]).map(t=>esc(t.name)+' ('+esc(t.role||'')+')').join(', ')||'—'}</p>
+  <table style="margin-top:8px"><thead><tr><th>Phase</th><th>Done</th><th>Progress</th><th>Overdue</th><th>Gate</th></tr></thead><tbody>${[1,2,3,4,5].map(n=>{const s=phaseStats(n),gt=g[n];return`<tr><td><b>${n}</b> — ${esc(PH[n]||'')}</td><td>${s.d}/${s.t}</td><td>${pct(s.d,s.t)}%</td><td>${s.o||'—'}</td><td>${gt&&gt.ok?'Signed '+fmt(gt.at)+' ('+esc(gt.by||'')+')':'Not signed'}</td></tr>`}).join('')}</tbody></table>
+  <h3>Overdue deliverables (${od.length})</h3>${od.length?`<table><thead><tr><th>#</th><th>Deliverable</th><th>Owner</th><th>Due</th></tr></thead><tbody>${od.map(i=>`<tr><td>${esc(i.code)}</td><td>${esc(i.title)}</td><td>${esc(i.owner||'—')}</td><td style="color:var(--r)">${fmt(i.due)}</td></tr>`).join('')}</tbody></table>`:'<p class="mut">None.</p>'}
+  <h3>Open deliverables (${openI.length})</h3>${openI.length?`<table><thead><tr><th>#</th><th>Deliverable</th><th>Owner</th><th>Due</th><th>Status</th></tr></thead><tbody>${openI.map(i=>`<tr><td>${esc(i.code)}</td><td>${esc(i.title)}</td><td>${esc(i.owner||'—')}</td><td>${fmt(i.due)}</td><td>${ST[i.status][0]}</td></tr>`).join('')}</tbody></table>`:'<p class="mut">All deliverables are complete.</p>'}</div>`;
+}
+
+(async()=>{try{await QP.init('apqp'); if(!QP.ctx)return; await route()}catch(e){say(e.message)}})();
+</script>
+<script src="/it/apps/back.js"></script></body></html>
