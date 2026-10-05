@@ -167,7 +167,10 @@
   function adminHead(title, sub) { window.scrollTo(0, 0); document.querySelector(".main")?.scrollTo?.(0, 0); return `<p><a class="btn ghost" id="backApps" href="${viewHref("")}" style="height:36px">← Your apps</a></p><h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p>`; }
   function bindBack() { const b = $("#backApps"); if (b) b.onclick = (e) => { if (!plain(e)) return; e.preventDefault(); appView(); }; }
 
-  const ctxOf = () => ({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, base: BASE, setView });
+  /* Sample data belongs in the KMR demo workspace only. A real company never gets the Load-sample buttons (the database refuses anyway).
+     Before the 0049 database update the question cannot be answered, so nothing is hidden then. */
+  let SAMPLE_OK = true;
+  const ctxOf = () => ({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, base: BASE, setView, sampleOk: SAMPLE_OK });
   function dataView() { if (!window.KMR_DATA) return; setView("data"); return window.KMR_DATA.overview(ctxOf()); }
   function grandView() { if (!window.KMR_GRAND) return; setView("grand"); return window.KMR_GRAND.overview(ctxOf()); }
   async function opsView(kind) {
@@ -323,7 +326,8 @@
   }
 
   (async () => {
-    if (SLUG) { const { data } = await sb.rpc("kmr_portal_brand", { p_slug: SLUG }); if (data && data[0]) brand = data[0]; }
+    if (SLUG) { const { data } = await sb.rpc("kmr_portal_brand", { p_slug: SLUG }); if (data && data[0]) brand = data[0];
+      try { const w = await sb.rpc("kmr_workspace_info", { p_slug: SLUG }); if (!w.error && w.data && w.data.kind) SAMPLE_OK = w.data.kind === "demo"; } catch (e) { /* 0049 not applied yet */ } }
     if (brand.logo_url) setIcon(brand.logo_url);
     else { const k = await sb.rpc("kmr_platform_brand"); if (k.data && k.data.logo_url) { setIcon(k.data.logo_url); if (!SLUG) brand = { name: brand.name, logo_url: k.data.logo_url }; } }
     document.title = `${brand.name} · KMR Apps`;

@@ -37,10 +37,10 @@
             <table class="gm">${rows(o.real, UNIT)}</table>
             <div class="gm-btns">${btn("gmRealDl", "Download JSON")}${upl("gmRealUp", "Upload JSON")}${btn("gmRealFl", "Flush real data", { red: 1, off: !nReal })}</div></div>
           <div class="card" style="--c:#4F46E5"><div style="font-size:26px;line-height:1">🧪</div><h3>Sample Data Master</h3>
-            <p>Ready-made sample data for every app, to try things out. Your real data is never touched.</p>
+            ${ctx.sampleOk ? `<p>Ready-made sample data for every app, to try things out. Your real data is never touched.</p>` : `<p>Sample data lives only in the KMR demo workspace, so your company’s records stay clean. To explore an app, open it from the KMR Apps page and choose <b>Try with sample data</b> — that runs in your browser and never touches your data.</p>`}
             <table class="gm">${rows(o.sample, { hrm: "sample employees", hrm_candidates: "sample candidates", balloon: "sample drawing", sales: "sample plan lines", calib: "sample instruments", apqp: "sample programmes", ppap: "sample submissions", ops: "sample records" })}</table>
             <p style="font-size:12px;color:var(--muted)">HRM gets the whole flow: employees in two plants with a month of attendance, leave, salaries and loans, hiring from opening to new joiner (scored candidates, interviews, scorecards, offers), and QMS &amp; training (skill matrix, competencies, training plan, effectiveness, R&amp;R, KPIs, auditors). Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too. Sales Flow gets last month’s and this month’s plan for every sample part (prices from the sample rate contracts) with daily despatch, loss reasons and action plans; Calibration Hub gets every sample gauge as an instrument with its calibration history, an out-of-tolerance case and an MSA study. APQP Planner gets three programmes (built from the sample parts and CFT team) at different phases, and PPAP Submissions two Level 3 submissions linked to them.</p>
-            <div class="gm-btns">${btn("gmSmpLd", "Load sample data")}${btn("gmSmpFl", "Flush sample data", { red: 1, off: !nSample })}</div></div>
+            <div class="gm-btns">${ctx.sampleOk ? btn("gmSmpLd", "Load sample data") : ""}${ctx.sampleOk || nSample ? btn("gmSmpFl", ctx.sampleOk ? "Flush sample data" : "Remove leftover sample data", { red: 1, off: !nSample }) : ""}</div></div>
           <div class="card" style="--c:#B45309"><div style="font-size:26px;line-height:1">🏢</div><h3>Administration Data</h3>
             <p>Company details &amp; logo, users &amp; access, invoices &amp; payments.</p>
             <table class="gm">
@@ -57,8 +57,8 @@
       $("gmRealDl").onclick = () => this.download(ctx, "real", $("gmRealDl"));
       $("gmRealUp").onchange = (e) => this.upload(ctx, "real", e.target.files[0], e.target);
       $("gmRealFl").onclick = () => this.confirmReal(ctx);
-      $("gmSmpLd").onclick = () => this.sample(ctx, "load", $("gmSmpLd"));
-      $("gmSmpFl").onclick = () => this.sample(ctx, "flush", $("gmSmpFl"));
+      if ($("gmSmpLd")) $("gmSmpLd").onclick = () => this.sample(ctx, "load", $("gmSmpLd"));
+      if ($("gmSmpFl")) $("gmSmpFl").onclick = () => this.sample(ctx, "flush", $("gmSmpFl"));
       $("gmAdmDl").onclick = () => this.download(ctx, "admin", $("gmAdmDl"));
       $("gmAdmUp").onchange = (e) => this.upload(ctx, "admin", e.target.files[0], e.target);
       $("gmAdmFl").onclick = () => this.confirmAdmin(ctx);

@@ -51,7 +51,7 @@
             <div style="flex:1;min-width:240px"><b>Sample data</b><br><small style="color:var(--muted)">${nSample
               ? `${nSample} sample records are loaded, marked <span class="pill">Sample</span> in the lists. Flush removes only these. Records you have edited or imported over are yours and stay.`
               : "Try every list with one ready-made machining plant: 16 parts, 12 machines, 43 cycle times, plant standards, customers, suppliers, raw material, rate contracts, gauges, tools, consumables, CFT team and IATF 16949 documents. Nothing you already have is overwritten, and you can flush it all later."}</small></div>
-            ${nSample ? `<button class="btn ghost" id="opsFlush" style="height:42px;color:#B00E28;align-self:center;margin:0">Flush sample data</button>` : `<button class="btn" id="opsLoad" style="height:42px;align-self:center;margin:0">Load sample data</button>`}
+            ${nSample ? `<button class="btn ghost" id="opsFlush" style="height:42px;color:#B00E28;align-self:center;margin:0">${ctx.sampleOk === false ? "Remove leftover sample data" : "Flush sample data"}</button>` : ctx.sampleOk === false ? "" : `<button class="btn" id="opsLoad" style="height:42px;align-self:center;margin:0">Load sample data</button>`}
           </div>`
         : nSample ? `<p class="sub" style="margin-top:-12px">Includes ${nSample} sample records, marked <span class="pill">Sample</span>.</p>` : "";
       ctx.main.innerHTML = `<h1>Operations Master</h1><p class="sub">One set of master data for your company, used by every KMR app. ${ctx.role === "viewer" ? "You can view it." : "You can add, change and import."}</p>
@@ -69,7 +69,7 @@
           return `<div class="card" style="--c:#0EA5E9;cursor:pointer;position:relative" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3><a class="stretch" href="${hrefOf(ctx, "ops/" + K.kind)}">${esc(K.label)}</a></h3>
             <p><b style="font-size:22px;color:var(--ink)">${all}</b> records${smp ? ` · <span class="pill">${smp} sample</span>` : ""}${own ? ` · <span class="pill ok">${own} yours</span>` : ""}</p>
             ${admin || edit ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
-              ${admin ? b("sload", "Load sample", !smp) + b("sflush", "Flush sample", smp, true) : ""}
+              ${admin ? (ctx.sampleOk === false ? "" : b("sload", "Load sample", !smp)) + (ctx.sampleOk === false && !smp ? "" : b("sflush", "Flush sample", smp, true)) : ""}
               <label class="btn ghost" data-card="dload" style="height:32px;padding:0 10px;font-size:12.5px;cursor:pointer">Load data<input type="file" accept=".json,application/json" data-dload="${K.kind}" hidden></label>
               ${admin ? b("dflush", "Flush data", own, true) : ""}
             </div>` : ""}</div>`;
@@ -79,9 +79,9 @@
           const bb = (act, label, on, red) => `<button class="btn ghost" data-drawing="${act}" style="height:32px;padding:0 10px;font-size:12.5px${red ? ";color:#B00E28" : ""}" ${on ? "" : "disabled"}>${label}</button>`;
           return `<div class="card" style="--c:#8B5CF6"><div style="font-size:26px;line-height:1">🎯</div><h3>Balloon Inspector drawings</h3>
           <p>${B ? `<b style="font-size:22px;color:var(--ink)">${nd + no}</b> report${nd + no === 1 ? "" : "s"}${nd ? ` · <span class="pill">${nd} sample</span>` : ""}${no ? ` · <span class="pill ok">${no} yours</span>` : ""}` : "Balloon Inspector is not in your company’s plan."}</p>
-          ${B ? `<p style="font-size:12.5px;color:var(--muted)">Load sample adds a ready-made drawing (Mounting Plate EX-2040) that is ballooned automatically when you open it in Balloon Inspector › Reports.</p>` : ""}
+          ${B && ctx.sampleOk !== false ? `<p style="font-size:12.5px;color:var(--muted)">Load sample adds a ready-made drawing (Mounting Plate EX-2040) that is ballooned automatically when you open it in Balloon Inspector › Reports.</p>` : ""}
           ${admin && B ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
-            ${bb("load", "Load sample", !nd)}${bb("flush", "Flush sample", nd, true)}
+            ${ctx.sampleOk === false ? "" : bb("load", "Load sample", !nd)}${ctx.sampleOk === false && !nd ? "" : bb("flush", "Flush sample", nd, true)}
             <label class="btn ghost" style="height:32px;padding:0 10px;font-size:12.5px;cursor:pointer">Load data<input type="file" accept=".json,application/json" id="biLoad" hidden></label>
             ${bb("dflush", "Flush data", no, true)}
             <a class="btn ghost" href="/it/balloon.html" style="height:32px;padding:0 10px;font-size:12.5px;grid-column:1/-1">Open Balloon Inspector</a></div>` : ""}</div>`;
@@ -274,7 +274,7 @@
           <button class="btn ghost" id="opsExp" style="height:42px">Export CSV</button>
           ${ctx.role === "admin" ? `<span style="flex:1"></span>${rows.some((r) => r.sample)
             ? `<button class="btn ghost" id="opsKFlush" style="height:42px;color:#B00E28">Flush sample ${esc(K.label.toLowerCase())} (${rows.filter((r) => r.sample).length})</button>`
-            : `<button class="btn ghost" id="opsKLoad" style="height:42px">Load sample ${esc(K.label.toLowerCase())}</button>`}` : ""}
+            : ctx.sampleOk === false ? "" : `<button class="btn ghost" id="opsKLoad" style="height:42px">Load sample ${esc(K.label.toLowerCase())}</button>`}` : ""}
         </div>
         <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
           <thead><tr style="background:#F5F7FB;text-align:left">${shown.map((c) => `<th style="padding:10px 12px;white-space:nowrap">${esc(c[1])}</th>`).join("")}${K.file ? '<th style="padding:10px 12px">File</th>' : ""}<th></th></tr></thead>
