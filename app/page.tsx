@@ -6,6 +6,7 @@ import ProductCard from "@/components/ProductCard";
 import ProductRow from "@/components/ProductRow";
 import FitImage from "@/components/FitImage";
 import { appArt, verticalArt } from "@/lib/art";
+import CardMedia from "@/components/CardMedia";
 import BenefitTabs, { type Benefit } from "@/components/BenefitTabs";
 import { SectionHead } from "@/components/Blocks";
 import {
@@ -16,7 +17,7 @@ import type { HeroContent, HeroSlide, Product, SiteStat, Vertical } from "@/lib/
 
 export const revalidate = 60;
 
-type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
+type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; video_url?: string | null; video_poster?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
 type Point = { id: string; section: string; title: string; text?: string; icon?: string; link?: string; link_label?: string };
 
 const VICON: Record<string, typeof IconBag> = { shop: IconBag, software: IconCode, training: IconCap, import_export: IconGlobe, trading: IconTruck, distribution: IconTruck, investment: IconChart };
@@ -123,7 +124,7 @@ export default async function HomePage() {
                 const Icon = VICON[v.slug ?? ""] ?? IconBriefcase;
                 return (
                   <Link key={v.id} href={verticalHref(v)} className="card-hover group flex flex-col overflow-hidden">
-                    <div className="aspect-[16/10] overflow-hidden border-b border-line"><FitImage src={verticalArt(v)} alt={v.title} className="h-full w-full" fill={v.image_url ? "blur" : "none"} imgClassName={`${v.image_url ? "" : "object-cover"} transition-transform duration-500 group-hover:scale-[1.03]`} /></div>
+                    <CardMedia image={verticalArt(v)} video={v.video_url} poster={v.video_poster} alt={v.title} className="aspect-[16/10] border-b border-line" />
                     <span className="flex flex-1 gap-4 p-6">
                       <span className="grid h-12 w-12 shrink-0 place-items-center bg-navy text-gold-light transition-colors group-hover:bg-gold group-hover:text-navy-950">
                         {v.icon_url
@@ -161,7 +162,7 @@ export default async function HomePage() {
                 <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                   {software.map((a) => (
                     <Link key={a.code} href={`/software#${a.code}`} className="card-hover group flex flex-col overflow-hidden">
-                      <div className="aspect-[16/10] overflow-hidden border-b border-line"><FitImage src={appArt(a.code, a.image_url)} alt={a.name} className="h-full w-full" fill={a.image_url ? "blur" : "none"} imgClassName={`${a.image_url ? "" : "object-cover"} transition-transform duration-500 group-hover:scale-[1.03]`} /></div>
+                      <CardMedia image={appArt(a.code, a.image_url)} video={a.video_url} poster={a.video_poster} alt={a.name} className="aspect-[16/10] border-b border-line" />
                       <div className="flex flex-1 flex-col p-6">
                         <h4 className="font-display text-lg font-semibold text-navy">{a.name}</h4>
                         <p className="mt-1 line-clamp-3 flex-1 text-sm text-muted">{a.tagline || a.description}</p>

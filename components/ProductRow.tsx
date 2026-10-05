@@ -1,8 +1,8 @@
 import Link from "next/link";
-import FitImage from "@/components/FitImage";
 import type { Product } from "@/lib/types";
 import { inr } from "@/lib/site";
 import { productArt } from "@/lib/art";
+import CardMedia from "@/components/CardMedia";
 import { canBuy } from "./ProductCard";
 import { IconArrow } from "./Icons";
 
@@ -13,7 +13,7 @@ export default function ProductRow({ p }: { p: Product }) {
   const intro = (p.description ?? "").split(/\n\s*\n/)[0].replace(/^[-•*]\s+/gm, "").replace(/\s+/g, " ").trim();
   return (
     <Link href={`/products/${p.id}`} className={`card-hover group grid items-center gap-5 p-4 sm:p-5 sm:grid-cols-[160px_1fr_auto]`}>
-      <div className="aspect-[16/10] overflow-hidden border border-line bg-white sm:aspect-[8/5]"><FitImage src={productArt(p)} alt={p.name} className="h-full w-full" fill={p.image_url ? "plain" : "none"} imgClassName={p.image_url ? "" : "object-cover"} /></div>
+      <CardMedia image={productArt(p)} video={p.video_url} poster={p.video_poster} alt={p.name} className="aspect-[16/10] border border-line sm:aspect-[8/5]" />
       <div className="min-w-0">
         {p.category && <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-gold-dark">{p.category}</p>}
         <h3 className="mt-1 font-display text-lg font-semibold leading-snug text-navy">{p.name}</h3>

@@ -95,6 +95,8 @@ export type Vertical = {
   description: string;
   icon_url?: string;
   image_url?: string;
+  video_url?: string | null;
+  video_poster?: string | null;
   sort_order: number;
   slug?: string;
   link?: string;
@@ -120,6 +122,8 @@ export type Product = {
   mrp?: number;
   stock_quantity: number;
   image_url: string;
+  video_url?: string | null;
+  video_poster?: string | null;
   is_active: boolean;
   created_at: string;
   business?: "shop" | "software" | "training" | "import_export" | "trading" | "distribution";

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import FitImage from "@/components/FitImage";
 import { verticalArt } from "@/lib/art";
+import CardMedia from "@/components/CardMedia";
 import { getSite, verticalHref } from "@/lib/site";
 import { PageHero, CtaBand } from "@/components/Blocks";
 import { IconArrow, IconBag, IconBriefcase, IconCap, IconChart, IconCode, IconGlobe, IconTruck } from "@/components/Icons";
@@ -22,7 +22,7 @@ export default async function BusinessesPage() {
             const href = verticalHref(v);
             return (
               <article key={v.id} className="card flex flex-col overflow-hidden">
-                <FitImage src={verticalArt(v)} alt={v.title} className="aspect-[16/9] w-full border-b border-line" fill={v.image_url ? "blur" : "none"} imgClassName={v.image_url ? "" : "object-cover"} />
+                <CardMedia image={verticalArt(v)} video={v.video_url} poster={v.video_poster} alt={v.title} className="aspect-[16/9] w-full border-b border-line" hover={false} />
                 <div className="flex flex-1 flex-col p-6 md:p-8">
                   <div className="flex items-center gap-4">
                     <span className="grid h-12 w-12 shrink-0 place-items-center bg-navy text-gold-light"><Icon className="h-6 w-6" /></span>

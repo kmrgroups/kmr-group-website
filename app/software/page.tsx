@@ -1,7 +1,7 @@
 import { supabase } from "@/lib/supabaseClient";
 import EnquiryForm from "@/components/EnquiryForm";
 import ProductRow from "@/components/ProductRow";
-import FitImage from "@/components/FitImage";
+import CardMedia from "@/components/CardMedia";
 import { appArt } from "@/lib/art";
 import { PageHero, SectionHead } from "@/components/Blocks";
 import { IconCheck, IconCode, IconGlobe, IconLock, IconUsers } from "@/components/Icons";
@@ -10,7 +10,7 @@ import type { Product } from "@/lib/types";
 export const revalidate = 60;
 export const metadata = { title: "Software solutions", description: "KMR Apps for manufacturers — HRM, Balloon Inspector, Process Documents, Capacity Planner, Sales Flow and Calibration Hub — and custom software solutions." };
 
-type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
+type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; video_url?: string | null; video_poster?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
 const FEATURES: Record<string, string[]> = {
   hrm: ["Self-onboarding, ID cards, biometric attendance", "Leave, shifts and payroll-ready registers", "IATF 16949 / ISO 9001 HR records"],
   balloon: ["Balloon drawings (PDF, DXF, STEP) in minutes", "Inspection reports and FAI", "Shares data with Process Documents"],
@@ -50,7 +50,7 @@ export default async function SoftwarePage() {
                 const unit = a.seat_label.replace(/s$/, "");
                 return (
                   <div key={a.code} id={a.code} className="card flex scroll-mt-28 flex-col overflow-hidden">
-                    <FitImage src={appArt(a.code, a.image_url)} alt={a.name} className="aspect-[16/10] w-full border-b border-line" fill={a.image_url ? "blur" : "none"} imgClassName={a.image_url ? "" : "object-cover"} />
+                    <CardMedia image={appArt(a.code, a.image_url)} video={a.video_url} poster={a.video_poster} alt={a.name} className="aspect-[16/10] w-full border-b border-line" hover={false} />
                     <div className="flex flex-1 flex-col p-8">
                     <div className="flex items-start justify-between gap-4">
                       <span className="text-[11px] font-semibold uppercase tracking-wider text-gold-dark">KMR Apps</span>

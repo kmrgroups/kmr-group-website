@@ -3,6 +3,7 @@ import FitImage from "@/components/FitImage";
 import type { Product } from "@/lib/types";
 import { inr } from "@/lib/site";
 import { productArt } from "@/lib/art";
+import CardMedia from "@/components/CardMedia";
 import { IconArrow } from "./Icons";
 
 export { inr };
@@ -15,7 +16,9 @@ export default function ProductCard({ p }: { p: Product }) {
   return (
     <Link href={`/products/${p.id}`} className="card-hover group flex flex-col overflow-hidden">
       <div className="relative aspect-[4/3] overflow-hidden border-b border-line bg-white">
-        <FitImage src={productArt(p)} alt={p.name} className="h-full w-full" fill={p.image_url ? "plain" : "none"} imgClassName={`${p.image_url ? "p-1.5" : "object-cover"} transition-transform duration-500 group-hover:scale-[1.03]`} />
+        {p.image_url && !p.video_url && p.business === "shop"
+          ? <FitImage src={p.image_url} alt={p.name} className="h-full w-full" fill="plain" imgClassName="p-1.5 transition-transform duration-500 group-hover:scale-[1.03]" />   /* product packshots: never cropped */
+          : <CardMedia image={productArt(p)} video={p.video_url} poster={p.video_poster} alt={p.name} className="h-full w-full" />}
         {off > 0 && buy && <span className="absolute left-3 top-3 bg-gold px-2 py-1 text-[11px] font-bold text-navy-950">{off}% OFF</span>}
         {p.featured && <span className="absolute right-3 top-3 bg-navy/90 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-gold-light">Featured</span>}
       </div>

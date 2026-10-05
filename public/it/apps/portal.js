@@ -19,7 +19,26 @@
     calib: { color: "#6366F1", desc: "Instrument register, calibration due control, gauge history, MSA and out-of-tolerance cases.", demo: "/it/calibration.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["maint", "Maintenance"], ["proc", "Procurement"], ["crm", "CRM & RFQ"], ["mmd", "MMD"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["apqp", "APQP & PPAP"], ["fmea", "AIAG-VDA FMEA"], ["spc", "SPC & MSA"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
-  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null;
+  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {};
+
+  /** top of an app card: the promo video (9:16) with its thumbnail, or the app photo, or the app illustration */
+  const ART = { hrm: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1 };
+  const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
+  function mediaHtml(r) {
+    const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
+    const video = safeUrl(m.video), poster = safeUrl(m.poster);
+    if (video) return `<div class="media"><img src="${poster || img}" alt="" loading="lazy"><button class="playv" data-video="${video}" data-poster="${poster}" aria-label="Play the ${esc(r.product_name)} video">▶</button></div>`;
+    return img ? `<div class="media"><img src="${img}" alt="" loading="lazy"></div>` : "";
+  }
+  function playVideo(src, poster) {
+    const d = document.createElement("div"); d.className = "vmodal";
+    d.innerHTML = `<div class="vbox"><video src="${src}" ${poster ? `poster="${poster}"` : ""} controls autoplay playsinline></video><button aria-label="Close">×</button></div>`;
+    const close = () => { d.remove(); document.removeEventListener("keydown", esc); };
+    const esc = (e) => e.key === "Escape" && close();
+    d.addEventListener("click", (e) => { if (e.target === d || e.target.tagName === "BUTTON") close(); });
+    document.addEventListener("keydown", esc); document.body.append(d);
+  }
+  document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest(".playv"); if (b) { e.preventDefault(); e.stopPropagation(); playVideo(b.dataset.video, b.dataset.poster); } }, true);
 
   const logo = (b, cls) => b.logo_url ? `<img src="${esc(b.logo_url)}" alt="${esc(b.name)}">` : `<span class="fb ${cls || ""}">${esc((b.name || "K").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())}</span>`;
   function setIcon(url) {
@@ -112,9 +131,9 @@
       </aside>
       <main class="main">
         <h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p>
-        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div>${r.ok && !r.has_access && !r.is_contact && !isAdmin ? `<span class="pill off">No access — ask your administrator</span>` : `<button class="btn" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</button>`}</div>`).join("")}</div>
+        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div>${r.ok && !r.has_access && !r.is_contact && !isAdmin ? `<span class="pill off">No access — ask your administrator</span>` : `<button class="btn" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</button>`}</div>`).join("")}</div>
         <h2 style="margin:34px 0 0;font-size:18px">Try more of the platform</h2>
-        <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}"><h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><button class="btn ghost" data-open="${r.product_code}">Try with sample data</button></div>`).join("")}</div>
+        <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><button class="btn ghost" data-open="${r.product_code}">Try with sample data</button></div>`).join("")}</div>
       </main></div>`;
     document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => open(b.dataset.open)));
     document.querySelectorAll("[data-admin]").forEach((b) => b.addEventListener("click", () => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView())));
@@ -275,6 +294,8 @@
     try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: brand.name, logo: brand.logo_url || null })); } catch (e) {}
     setIcon(brand.logo_url);
     const st = await sb.rpc("kmr_portal_stats", { p_slug: SLUG }); stats = (st && st.data) || {};
+    // the photo / promo video set for each app in KMR Console › Website CMS › KMR Apps on the website
+    try { const cat = await sb.rpc("kmr_software_catalog"); (cat.data || []).forEach((a) => { media[a.code] = { img: a.image_url, video: a.video_url, poster: a.video_poster }; }); } catch (e) {}
     const ar = await sb.rpc("kmr_admin_role", { p_slug: SLUG }); isAdmin = !ar.error && ar.data === "admin";
     const oc = await sb.rpc("kmr_ops_context", { p_slug: SLUG }); ops = !oc.error && oc.data ? oc.data : null;
     appView();
