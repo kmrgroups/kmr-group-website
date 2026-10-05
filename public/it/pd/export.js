@@ -32,10 +32,10 @@ function expand(cols, slots){ const out=[]; cols.forEach(c=>{ if(c.slots) (slots
 function kv(pairs, cols=4){ return {kind:"kv", pairs:pairs.map(p=>[p[0],p[1]==null?"":String(p[1])]), cols}; }
 
 function blocksFor(id){
-  const S=A().S, doc=S.docs[id], spec=SC.COLS[id], B=[];
+  const S=A().S, doc=S.docs[id], spec=SC.specFor(id,doc), B=[];
   switch(id){
     case "pfd": case "pfmea": case "cp": case "sc": case "gauges": case "tools": case "pokayoke": case "machines": {
-      const rows=doc.rows.map(r=>{ const x=Object.assign({},r); if(id==="pfmea"){ x.ap=D.AP(x.s,x.o,x.d); x.ap2=(x.o2&&x.d2)?D.AP(x.s2||x.s,x.o2,x.d2):""; } return x; });
+      const rows=doc.rows.map(r=>{ const x=Object.assign({},r); if(id==="pfmea"){ window.PDFmea.derive(doc.std||"vda",x); } return x; });
       B.push(tableBlock(spec.cols, rows, spec.groups)); break; }
     case "pdi": { const m=doc.meta||{}; B.push(kv([["Date",m.date],["Invoice / DC no.",m.invoice],["Lot quantity",m.lotQty],["Sample quantity",m.sampleQty],["Inspector",m.inspector],["Lot decision",m.decision]],6));
       B.push(tableBlock(spec.cols, doc.rows.map(r=>Object.assign({},r,{result:UI.rowResult(r,"s",5)})))); break; }
@@ -98,7 +98,7 @@ async function pdf(ids){
     const d=D.DOCS.find(x=>x.id===id), dd=S.docs[id], fmt=paperFor(id), ori=id==="sop"?"portrait":"landscape";
     if(!doc) doc=new jsPDF({orientation:ori,unit:"mm",format:fmt}); else doc.addPage(fmt,ori);
     const start=doc.getNumberOfPages();
-    const meta={title:d.title, docNo:dd.docNo||"", rev:dd.rev||"00", date:dmy(h.revDate||""), info:infoFor(id), company:co};
+    const meta={title:d.title+(id==="pfmea"?" ("+window.PDFmea.STD[(S.docs.pfmea.std)||"vda"]+")":""), docNo:dd.docNo||"", rev:dd.rev||"00", date:dmy(h.revDate||""), info:infoFor(id), company:co};
     const PW=()=>doc.internal.pageSize.getWidth(), PH=()=>doc.internal.pageSize.getHeight();
     const hdr=()=>{ const p=doc.getCurrentPageInfo().pageNumber; if(drawn.has(p)) return topOf(); drawn.add(p); return drawHeader(doc, meta, logo); };
     const topOf=()=>headerHeight(meta)+8+3;

@@ -272,7 +272,7 @@ async function openProject(id){
 /* bring projects saved by older versions up to date (no data is lost) */
 function migrate(){
   (S.plan.ops||[]).forEach(o=>(o.params||[]).forEach(p=>{ if(!p.kind) p.kind=E.paramKind(p.name); }));
-  const pf=S.docs.pfmea; if(pf&&pf.rows) pf.rows.forEach(r=>{ if(r.fe) r.fe=D.fmtFE(r.fe); });
+  const pf=S.docs.pfmea; if(pf&&!pf.std) pf.std=S.settings.fmeaStd==="aiag4"?"aiag4":"vda"; if(pf&&pf.rows) pf.rows.forEach(r=>{ if(r.fe) r.fe=D.fmtFE(r.fe); });
   const cp=S.docs.cp; if(cp&&cp.rows) cp.rows.forEach(r=>{ if(!r.product&&r.process&&!r.charNo&&E.paramKind(r.process)==="product"){ r.product=r.process; r.process=""; } });
   applyHeaderDefaults(S.plan.header,false);
 }
@@ -301,7 +301,7 @@ async function newFromSource(src, biReportId){
 /* ======================================================================
    AUTOMATION PIPELINE
    ====================================================================== */
-function genSettings(){ const cust=S.plan&&S.plan._cust; return Object.assign({},S.settings,{machines:S.machines, strictMasters:!!S.masters.strict, symbols:cust?{CC:cust.ccSym||"◆",SC:cust.scSym||"▼",KC:"◇"}:S.settings.symbols}); }
+function genSettings(){ const cust=S.plan&&S.plan._cust; return Object.assign({},S.settings,{fmeaStd:(S.docs&&S.docs.pfmea&&S.docs.pfmea.std)||S.settings.fmeaStd||"vda", machines:S.machines, strictMasters:!!S.masters.strict, symbols:cust?{CC:cust.ccSym||"◆",SC:cust.scSym||"▼",KC:"◇"}:S.settings.symbols}); }
 function applyCustomer(plan){
   const list=S.masters.customers||[], name=(plan.header.customer||"").toLowerCase().trim(); if(!name||!list.length) return;
   const n=s=>String(s||"").toLowerCase().replace(/[^a-z0-9]/g,"");
@@ -491,6 +491,8 @@ async function pane(t){
       <label class="fld">Frequency – other characteristics<input data-s="freqNormal" value="${esc(st.freqNormal||"1 pc / 2 hrs")}"></label>
       <label class="fld">Time slots in patrol / self inspection<input data-s="patrolSlots" type="number" min="4" max="12" value="${esc(st.patrolSlots||8)}"></label>
       <label class="fld">PFMEA action owner (default)<input data-s="pfmeaOwner" value="${esc(st.pfmeaOwner||"Process Engineering")}"></label>
+      <label class="fld">PFMEA format for new projects<select data-s="fmeaStd"><option value="vda"${st.fmeaStd!=="aiag4"?" selected":""}>AIAG-VDA (2019)</option><option value="aiag4"${st.fmeaStd==="aiag4"?" selected":""}>AIAG FMEA 4th edition (2008)</option></select></label>
+      <label class="fld">4th edition: act when RPN is at or above<input data-s="fmeaRpn" type="number" min="1" max="1000" value="${esc(st.fmeaRpn||100)}"></label>
       <label class="fld" style="grid-column:1/-1">Reaction plan – normal characteristics<textarea data-s="reactNormal" rows="2">${esc(st.reactNormal||"Stop; segregate & 100% inspect parts since last OK check; correct offset / tool; re-approve setup; record in rejection register")}</textarea></label>
       <label class="fld" style="grid-column:1/-1">Reaction plan – CC characteristics<textarea data-s="reactCC" rows="2">${esc(st.reactCC||"Stop the machine; quarantine all parts since last OK check; inform QA head; 100% inspect; root-cause & 8D; re-approve setup")}</textarea></label></div>
       <div id="adMsg" class="err"></div><div class="addrow"><button class="btn primary" id="aSave">Save document settings</button><span class="hintline">Applies to new projects and to “Update documents”.</span></div>`;
@@ -567,7 +569,7 @@ async function pane(t){
 }
 
 /* ---------------- boot ---------------- */
-window.PDApp = { S, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
+window.PDApp = { S, dialog, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
 /* open the screen / project this address points at (a link opened in a new tab or window) */
 async function openPending(){ try{ const n=NAV0; if(!n) return; if(n.prj&&!(S.prj&&S.prj.id===n.prj)) await openProject(n.prj); if(n.go==="projects") projectsDialog(); else if(n.go&&n.go!=="home"&&S.prj) go(n.go); }catch(_){} }
 if(CLOUD){

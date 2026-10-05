@@ -172,10 +172,11 @@ GEN.pfd = (plan, x) => ({ rows: plan.ops.map(o=>{
 /* failure effects: one line each for Your plant / Ship-to plant (customer) / End user (field) */
 function fmtFE(t){ return String(t||"").replace(/\s*\n?\s*(Ship-to plant:|Customer:|End user:|Field:)/g,"\n$1").replace(/^\n+/,"").trim(); }
 GEN.pfmea = (plan, x) => {
+  const F=window.PDFmea, std=(x.s&&x.s.fmeaStd)==="aiag4"?"aiag4":"vda", lim=F.limitOf(x.s);
   const rows=[], item=`${plan.header.partName||"Part"} (${plan.header.partNo||"—"})`, due=addDays(today(),30);
   const push = (o, we, funcStep, funcWE, fe, s, fm, fc, pc, oo, dc, d, cls) => {
     const ap = AP(s,oo,d);
-    const act = ap==="H" || (ap==="M" && s>=7);
+    const act = F.needsAction(std,{s,o:oo,d},lim);   // AIAG-VDA: Action Priority · 4th edition: severity 9–10 or RPN at / above the limit
     rows.push({ opNo:o.opNo, item, step:opLabel(o), we, funcItem:`Produce ${plan.header.partName||"part"} to drawing ${plan.header.drawingNo||""} rev ${plan.header.drawingRev||""}`.trim(),
       funcStep, funcWE, fe:fmtFE(fe), s, fm, fc, pc, o:oo, dc, d, ap, cls:cls||"",
       actPrev: act ? (/wear|dressing/i.test(fc)?"Introduce in-process gauging / probe compensation; reduce tool-change interval":/offset|program/i.test(fc)?"Add probe-based offset verification after tool change":/clamp/i.test(fc)?"Add part-seating air sensor on fixture (poka-yoke)":"Review process capability; add error-proofing") : "",
@@ -220,7 +221,8 @@ GEN.pfmea = (plan, x) => {
     if(o.key==="DISPATCH"){ push(o,"Man: dispatch","Dispatch correct part & quantity","Invoice matches label","Customer: wrong part / mixed parts received – line stoppage.",7,"Wrong part / label / quantity dispatched","Manual label writing; similar parts in FG area","Printed labels; FG area segregated part-wise",2,"Label vs invoice check (barcode scan) before loading",4,""); return; }
     if(o.key==="RMSTORE"||o.key==="FGSTORE"){ push(o,"Method: storage","Store with identification & FIFO","Storage area defined","Your plant: mix-up / rust / FIFO lost.",5,"Parts / material mixed up or rusted in storage","Missing identification tag; long storage","Identification tag & FIFO card; covered racks",3,"Stores audit weekly",7,""); return; }
   });
-  return {rows, meta:{team:plan.header.coreTeam||"", scope:`Process from ${plan.ops[0]&&plan.ops[0].name} to ${plan.ops[plan.ops.length-1]&&plan.ops[plan.ops.length-1].name}`, fmeaStart:today()}};
+  rows.forEach(r=>{ r.rpn=F.rpn(r.s,r.o,r.d); r.rpn2=""; r.rec=[r.actPrev,r.actDet].filter(Boolean).join("; "); });   // 4th-edition columns, filled for both editions
+  return {std, rows, meta:{team:plan.header.coreTeam||"", scope:`Process from ${plan.ops[0]&&plan.ops[0].name} to ${plan.ops[plan.ops.length-1]&&plan.ops[plan.ops.length-1].name}`, fmeaStart:today()}};
 };
 
 /* ---------- Control Plan ---------- */

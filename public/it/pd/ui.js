@@ -155,7 +155,7 @@ function render(view){
 /* ---------- overview ---------- */
 V.overview = (M)=>{
   const S=A().S, P=S.prj, plan=S.plan, h=plan.header, docs=S.docs;
-  const cnt={}; (docs.pfmea.rows||[]).forEach(r=>cnt[r.ap]=(cnt[r.ap]||0)+1);
+  const pstd=docs.pfmea.std==="aiag4"?"aiag4":"vda", plim=window.PDFmea.limitOf(S.settings), cnt={}; (docs.pfmea.rows||[]).forEach(r=>{ const b=window.PDFmea.band(pstd,r.s,r.o,r.d,plim); cnt[b]=(cnt[b]||0)+1; });
   const scN=plan.chars.filter(c=>c.cls).length;
   const src=P.source||{};
   M.innerHTML = `${P.doc.sourceChanged?`<div class="banner warn"><b>New ballooning data received from Balloon Inspector.</b><span class="grow" style="flex:1"></span><button class="btn small primary" id="ovRerun">Re-run automation</button><button class="btn small" id="ovDismiss">Keep current documents</button></div>`:""}
@@ -165,7 +165,7 @@ V.overview = (M)=>{
     <div class="kpi"><b>${plan.chars.length}</b><span>Characteristics</span></div><div class="kpi"><b>${scN}</b><span>Special (SC / CC)</span></div>
     <div class="kpi"><b>${plan.ops.length}</b><span>Process steps</span></div><div class="kpi"><b>${(docs.machines.rows||[]).length}</b><span>Machines</span></div>
     <div class="kpi"><b>${(docs.tools.rows||[]).length}</b><span>Tools</span></div><div class="kpi"><b>${(docs.gauges.rows||[]).length}</b><span>Gauges</span></div>
-    <div class="kpi h"><b>${cnt.H||0}</b><span>PFMEA AP = High</span></div><div class="kpi m"><b>${cnt.M||0}</b><span>AP = Medium</span></div><div class="kpi l"><b>${cnt.L||0}</b><span>AP = Low</span></div>
+    <div class="kpi h"><b>${cnt.H||0}</b><span>${pstd==="aiag4"?`PFMEA: S ≥ 9 or RPN ≥ ${plim}`:"PFMEA AP = High"}</span></div><div class="kpi m"><b>${cnt.M||0}</b><span>${pstd==="aiag4"?`RPN ≥ ${Math.round(plim/2)}`:"AP = Medium"}</span></div><div class="kpi l"><b>${cnt.L||0}</b><span>${pstd==="aiag4"?"Lower risk":"AP = Low"}</span></div>
   </div>
   <div class="paper">
     <div class="box"><h3>Part & customer details</h3><div class="frm">${["partNo","partName","drawingNo","drawingRev","customer","customerCode","customerPartNo","material","model","annualVolume","phase","generalTol"].map(k=>`<label class="fld">${esc(HL[k]||k)}<input data-hh="${k}" value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}</div></div>
@@ -338,12 +338,19 @@ function nextToolId(plan){ let n=0; plan.ops.forEach(o=>o.tools.forEach(t=>{ con
 V.doc = (M, id)=>{
   const S=A().S, d=docMeta(id); if(!d){ V.overview(M); return; }
   if(V["d_"+id]) return V["d_"+id](M,id);
-  const doc=S.docs[id], spec=SC.COLS[id];
-  M.innerHTML = toolbar(d.title, `<button class="btn small" data-regen ${ro()?"disabled":""}>Regenerate</button>`)+`<div class="paper">${head(id)}<div id="g"></div>${sign(id)}</div>`;
+  const doc=S.docs[id]; if(id==="pfmea"&&!doc.std) doc.std=S.settings.fmeaStd==="aiag4"?"aiag4":"vda";
+  const spec=SC.specFor(id,doc), std=doc.std, F=window.PDFmea, lim=F.limitOf(S.settings);
+  /* PFMEA: one toggle switches the whole document between the two editions (same ratings, different form and risk measure) */
+  const fmeaBar = id==="pfmea" ? `<span class="seg" role="group" aria-label="PFMEA format"><button type="button" class="${std==="vda"?"on":""}" data-std="vda" title="${esc(F.STD_LONG.vda)}">AIAG-VDA 2019</button><button type="button" class="${std==="aiag4"?"on":""}" data-std="aiag4" title="${esc(F.STD_LONG.aiag4)}">FMEA 4th ed.</button></span><button class="btn small" type="button" data-guide>Rating guide</button>` : "";
+  M.innerHTML = toolbar(d.title+(id==="pfmea"?" — "+F.STD[std]:""), fmeaBar+`<button class="btn small" data-regen ${ro()?"disabled":""}>Regenerate</button>`)+`<div class="paper">${head(id)}<div id="g"></div>${sign(id)}</div>`;
   bindHead(M,id); bindToolbar(M,id);
+  if(id==="pfmea"){
+    M.querySelectorAll("[data-std]").forEach(b=>b.onclick=()=>{ if(b.dataset.std===doc.std) return; if(ro()){ A().toast("You have view-only access."); return; } F.syncRows(doc,b.dataset.std); doc.std=b.dataset.std; A().changed("pfmea"); render("pfmea"); A().toast("PFMEA shown in the "+F.STD[doc.std]+" format — same ratings, "+(doc.std==="aiag4"?"RPN and recommended actions.":"Action Priority and the 7-step columns.")); });
+    const gb=M.querySelector("[data-guide]"); if(gb) gb.onclick=()=>A().dialog("Rating guide — "+F.STD[doc.std], F.guideHTML(doc.std,lim), "", true);
+  }
   grid($("g"), { rows:doc.rows, cols:spec.cols, groups:spec.groups,
-    derive: id==="pfmea" ? (r=>{ r.ap=D.AP(r.s,r.o,r.d); r.ap2=D.AP(r.s2||r.s,r.o2,r.d2); if(!r.o2||!r.d2) r.ap2=""; }) : id==="pdi" ? (r=>{ r.result=rowResult(r,"s",5); }) : null,
-    cellClass:(r,c)=> c.ap ? (r[c.k]?"ap"+r[c.k]:"") : c.type==="read" ? readingClass(r,c) : (c.k==="result"&&r.result==="NG")?"ng":(c.k==="result"&&r.result==="OK")?"ok":"",
+    derive: id==="pfmea" ? (r=>F.derive(std,r)) : id==="pdi" ? (r=>{ r.result=rowResult(r,"s",5); }) : null,
+    cellClass:(r,c)=> c.rpn ? (()=>{ const two=c.k==="rpn2", b=F.band("aiag4",two?(r.s2||r.s):r.s,two?r.o2:r.o,two?r.d2:r.d,lim); return b?"ap"+b:""; })() : c.ap ? (r[c.k]?"ap"+r[c.k]:"") : c.type==="read" ? readingClass(r,c) : (c.k==="result"&&r.result==="NG")?"ng":(c.k==="result"&&r.result==="OK")?"ok":"",
     rowClass:(r,i)=> id==="pfmea"&&i>0&&doc.rows[i-1].opNo!==r.opNo ? "grp-first" : id==="cp"&&i>0&&doc.rows[i-1].opNo!==r.opNo ? "grp-first" : "",
     onChange:()=>A().changed(id), rowsChanged:()=>A().changed(id),
     newRow:(near)=>{ const o={}; spec.cols.forEach(c=>{ if(c.k) o[c.k]=""; }); if(near&&near.opNo!=null){ o.opNo=near.opNo; if(id==="pfmea"){ o.item=near.item; o.step=near.step; o.funcItem=near.funcItem; } if(id==="cp"){ o.name=near.name; o.machine=near.machine; } } if(id==="pfd") o.sym="op"; if(o.sl!==undefined) o.sl=doc.rows.length+1; return o; }
