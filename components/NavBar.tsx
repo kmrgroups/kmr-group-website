@@ -12,6 +12,7 @@ const LINKS = [
   { href: "/shop", label: "Shop" },
   { href: "/software", label: "Software" },
   { href: "/training", label: "Training" },
+  { href: "/gallery", label: "Gallery" },
   { href: "/careers", label: "Careers" },
   { href: "/contact", label: "Contact" },
 ];
