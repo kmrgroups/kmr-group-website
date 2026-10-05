@@ -17,7 +17,7 @@ header h1{font-size:17px;margin:0}header .co{opacity:.7;font-size:12px}
 header .sp{flex:1}
 .tabs{display:flex;gap:4px;padding:10px 22px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.tabs::-webkit-scrollbar{display:none}
 @media(max-width:640px){.tabs{padding:8px 10px 0}.tab{padding:9px 12px}}
-.tab{white-space:nowrap;flex:none;border:0;background:none;padding:9px 16px;border-radius:10px 10px 0 0;font-weight:600;color:var(--mut);cursor:pointer}
+.tab{text-decoration:none;display:inline-block;white-space:nowrap;flex:none;border:0;background:none;padding:9px 16px;border-radius:10px 10px 0 0;font-weight:600;color:var(--mut);cursor:pointer}
 .tab.on{background:var(--card);color:var(--brand);box-shadow:0 -2px 0 var(--brand) inset}
 main{padding:0 22px 20px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:18px}
 input,select,button,textarea{font:inherit;color:inherit}
@@ -87,11 +87,11 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
   <span class="chip x" id="role"></span>
 </header>
 <div class="tabs">
-  <button class="tab on" data-t="dash">Dashboard</button>
-  <button class="tab" data-t="plan">Sales plan</button>
-  <button class="tab" data-t="daily">Daily despatch</button>
-  <button class="tab" data-t="loss">Sales loss</button>
-  <button class="tab" data-t="act">Action plan <span id="actbadge"></span></button>
+  <a class="tab on" data-t="dash" href="#go=dash">Dashboard</a>
+  <a class="tab" data-t="plan" href="#go=plan">Sales plan</a>
+  <a class="tab" data-t="daily" href="#go=daily">Daily despatch</a>
+  <a class="tab" data-t="loss" href="#go=loss">Sales loss</a>
+  <a class="tab" data-t="act" href="#go=act">Action plan <span id="actbadge"></span></a>
 </div>
 <main><div class="panel">
   <div id="msg"></div>
@@ -393,7 +393,7 @@ function renderDaily() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const tab = t.closest('.tab');
-  if (tab) { document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === tab)); ['dash', 'plan', 'daily', 'loss', 'act'].forEach(s => $('#' + s).classList.toggle('hide', s !== tab.dataset.t)); return; }
+  if (tab) { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); try { history.replaceState(null, '', location.pathname + location.search + '#go=' + tab.dataset.t); } catch (x) { /* ignore */ } document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === tab)); ['dash', 'plan', 'daily', 'loss', 'act'].forEach(s => $('#' + s).classList.toggle('hide', s !== tab.dataset.t)); return; }
   try {
     if (t.id === 'addp') { await openParts('plan'); }
     else if (t.id === 'addu') { await openParts('daily'); }

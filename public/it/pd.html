@@ -78,11 +78,11 @@ a{color:var(--accent)}
 .side{background:var(--surface);border-right:1px solid var(--line);overflow:auto;padding:10px 8px 30px}
 .side h4{font:600 12.5px var(--display);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:14px 10px 6px}
 .nav{display:flex;flex-direction:column;gap:1px}
-.nav button{display:flex;align-items:center;gap:10px;border:none;background:none;text-align:left;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:14.5px;color:var(--ink);width:100%}
-.nav button:hover{background:var(--panel)}
-.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
+.nav a,.nav button{display:flex;align-items:center;gap:10px;border:none;background:none;text-align:left;padding:8px 10px;border-radius:7px;cursor:pointer;font-size:14.5px;color:var(--ink);width:100%}
+.nav a{text-decoration:none}a.rowlink{color:inherit;text-decoration:none}a.rowlink:hover{text-decoration:underline}.nav a:hover,.nav button:hover{background:var(--panel)}
+.nav a[aria-current="page"],.nav button[aria-current="page"]{background:var(--accent-soft);color:var(--accent);font-weight:600}
 .nav .code{font:600 11.5px var(--display);letter-spacing:.04em;color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:0 5px;min-width:44px;text-align:center;flex:none}
-.nav button[aria-current="page"] .code{color:var(--accent);border-color:var(--accent)}
+.nav a[aria-current="page"] .code,.nav button[aria-current="page"] .code{color:var(--accent);border-color:var(--accent)}
 .nav .ed{margin-left:auto;width:7px;height:7px;border-radius:50%;background:var(--warn);flex:none}
 .main{overflow:auto;min-width:0;padding:18px 22px 60px;scroll-padding-top:10px}
 .body{transition:grid-template-columns .18s}
@@ -91,7 +91,7 @@ a{color:var(--accent)}
   body.side-min .body{grid-template-columns:62px minmax(0,1fr)}
   body.side-min .side{padding:10px 6px 30px;overflow-x:hidden}
   body.side-min .side h4{font-size:0;height:1px;margin:10px 6px;border-top:1px solid var(--line2)}
-  body.side-min .nav button{justify-content:center;padding:8px 2px;font-size:0;gap:0;position:relative}
+  body.side-min .nav a,body.side-min .nav button{justify-content:center;padding:8px 2px;font-size:0;gap:0;position:relative}
   body.side-min .nav .code{min-width:44px;font-size:11px}
   body.side-min .nav .ed{position:absolute;top:4px;right:2px}
   body.side-min .main{padding:14px 14px 60px}

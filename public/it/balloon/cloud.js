@@ -33,7 +33,7 @@ css.textContent = `
 .cl-list{border:1px solid var(--line);border-radius:8px;max-height:52vh;overflow:auto}
 .cl-list table{min-width:0;table-layout:auto;font-size:14px}
 .cl-list td,.cl-list th{padding:8px 10px}
-.cl-list tr[data-open]{cursor:pointer}
+.cl-list tr[data-open]{cursor:pointer}.cl-list a.rowlink{color:inherit;text-decoration:none}.cl-list a.rowlink:hover{text-decoration:underline}
 .cl-list tr[data-open]:hover td{background:color-mix(in srgb,var(--sel) 8%,transparent)}
 .cl-guide{font-size:14px;line-height:1.55;max-height:60vh;overflow:auto;padding-right:6px}
 .cl-guide h3{font:600 18px var(--display);margin:18px 0 6px}
@@ -522,7 +522,8 @@ async function start0(){
   const sel=$("clOrg"); sel.innerHTML=C.memberships.map(m=>`<option value="${m.id}">${esc(m.name)}</option>`).join("");
   sel.hidden=C.memberships.length<2; sel.onchange=()=>chooseOrg(sel.value);
   const last=localStorage.getItem("bi_org"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local")); const pick=C.memberships.find(m=>m.id===last)||C.memberships[0];
-  if(pick) chooseOrg(pick.id); else { C.org=null; C.role=null; brand(); applyRole(); openAdmin("companies"); }
+  if(pick){ chooseOrg(pick.id); const n=window.KMRNav&&KMRNav.pending(); if(n&&n.go==="report"&&n.prj) openReport(n.prj); }   /* a report opened from a link (new tab / window) */
+  else { C.org=null; C.role=null; brand(); applyRole(); openAdmin("companies"); }
 }
 function chooseOrg(id){
   if(C.dirty && !confirm("You have unsaved changes. Switch workspace anyway?")){ $("clOrg").value=C.org.id; return; }
@@ -604,14 +605,14 @@ async function openReports(){
   const {data,error}=await sb.from("bi_reports").select("id,title,part_no,rev,drawing_no,customer,status,updated_at,file_path,file_name").eq("org_id",C.org.id).order("updated_at",{ascending:false}).limit(500);
   if(error){ $("clRl").innerHTML=`<div class="emptytable">${esc(error.message)}</div>`; return; }
   const render=q=>{ const rows=(data||[]).filter(r=>!q||JSON.stringify(r).toLowerCase().includes(q.toLowerCase()));
-    $("clRl").innerHTML=rows.length?`<table><thead><tr><th>Part no</th><th>Title</th><th>Rev</th><th>Drawing</th><th>Customer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr data-open="${r.id}"><td><b>${esc(r.part_no||"—")}</b></td><td>${esc(r.title||"")}</td><td>${esc(r.rev||"")}</td><td>${esc(r.drawing_no||"")}</td><td>${esc(r.customer||"")}</td><td>${esc(r.status)}</td><td>${new Date(r.updated_at).toLocaleString()}</td><td>${C.role==="admin"?`<button class="del" data-del="${r.id}" title="Delete report">×</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<div class="emptytable">No reports yet. Open a drawing, balloon it, then press Save.</div>`; };
+    $("clRl").innerHTML=rows.length?`<table><thead><tr><th>Part no</th><th>Title</th><th>Rev</th><th>Drawing</th><th>Customer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${rows.map(r=>`<tr data-open="${r.id}"><td><a class="rowlink" href="#go=report&prj=${r.id}"><b>${esc(r.part_no||"—")}</b></a></td><td>${esc(r.title||"")}</td><td>${esc(r.rev||"")}</td><td>${esc(r.drawing_no||"")}</td><td>${esc(r.customer||"")}</td><td>${esc(r.status)}</td><td>${new Date(r.updated_at).toLocaleString()}</td><td>${C.role==="admin"?`<button class="del" data-del="${r.id}" title="Delete report">×</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<div class="emptytable">No reports yet. Open a drawing, balloon it, then press Save.</div>`; };
   render(""); $("clQ").oninput=e=>render(e.target.value);
   $("clRl").onclick=async e=>{ const d=e.target.closest("[data-del]"); if(d){ e.stopPropagation(); const r=data.find(x=>x.id===d.dataset.del);
       if(!confirm(`Delete report ${r.part_no||r.title||""} for everyone? This can't be undone.`)) return;
       if(r.file_path) await sb.storage.from("bi-drawings").remove([r.file_path]);
       const {error}=await sb.from("bi_reports").delete().eq("id",r.id); if(error){ BI.toast(error.message); return; }
       data.splice(data.indexOf(r),1); render($("clQ").value); if(C.reportId===r.id) resetReport(); return; }
-    const tr=e.target.closest("tr[data-open]"); if(tr) openReport(tr.dataset.open); };
+    const tr=e.target.closest("tr[data-open]"); if(tr){ if(e.target.closest("a")){ if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return; e.preventDefault(); } openReport(tr.dataset.open); } };
 }
 $("clReports").onclick=openReports;
 async function openReport(id){
@@ -628,6 +629,7 @@ async function openReport(id){
     const restore=r.data&&r.data.v?r.data:undefined;   // no saved balloons yet: balloon the drawing now
     C.loading=true; await BI.loadFile(file,restore?{restore}:{}); C.loading=false;
     C.reportId=r.id; C.filePath=r.file_path.startsWith("static:")?null:r.file_path; C.dirty=!restore; updateSaveBtn();
+    try{ history.replaceState(null,"",location.pathname+location.search+"#go=report&prj="+r.id); }catch(e){}
     BI.toast(`Opened ${r.part_no||r.title||"report"}.`);
   }catch(e){ C.loading=false; BI.toast("Couldn't open the report: "+(e.message||e),8000); }
   finally{ BI.busy(null); }

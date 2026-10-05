@@ -98,11 +98,11 @@ a { color: var(--focus); }
 .brand-sub { font-size: 11px; color: #9FB0C8; margin-top: 2px; }
 .nav { padding: 12px 10px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
 .nav-group { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: #7E8FA9; padding: 14px 10px 6px; }
-.nav button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; color: var(--nav-text); position: relative; }
-.nav button:hover { background: var(--nav-hover); color: #fff; }
-.nav button.active { background: rgba(255,255,255,.1); color: var(--nav-active); font-weight: 600; }
-.nav button.active::before { content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--brass); }
-.nav button:focus-visible { outline: 2px solid var(--brass); }
+.nav :is(button,a) { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 11px; padding: 9px 10px; border-radius: 7px; cursor: pointer; font-size: 13.5px; color: var(--nav-text); position: relative; }
+.nav :is(button,a):hover { background: var(--nav-hover); color: #fff; }
+.nav :is(button,a).active { background: rgba(255,255,255,.1); color: var(--nav-active); font-weight: 600; }
+.nav :is(button,a).active::before { content: ""; position: absolute; left: -10px; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--brass); }
+.nav :is(button,a):focus-visible { outline: 2px solid var(--brass); }
 .nav svg { width: 18px; height: 18px; flex: none; opacity: .9; }
 .nav .badge { margin-left: auto; font: 600 10.5px/1 var(--mono); padding: 3px 6px; border-radius: 10px; background: #B42318; color: #fff; }
 .side-foot { padding: 14px 18px 18px; border-top: 1px solid rgba(255,255,255,.08); font-size: 11px; color: #7E8FA9; }
@@ -296,9 +296,9 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 
 /* ---------- Tabs (sub) ---------- */
 .subtabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); padding: 0 20px; overflow-x: auto; }
-.subtabs button { all: unset; cursor: pointer; padding: 11px 12px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
-.subtabs button.on { color: var(--ink); border-bottom-color: var(--brass); font-weight: 600; }
-.subtabs button:focus-visible { outline: 2px solid var(--focus); }
+.subtabs :is(button,a) { all: unset; cursor: pointer; padding: 11px 12px; font-size: 13px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; white-space: nowrap; }
+.subtabs :is(button,a).on { color: var(--ink); border-bottom-color: var(--brass); font-weight: 600; }
+.subtabs :is(button,a):focus-visible { outline: 2px solid var(--focus); }
 
 /* Toolbar row inside cards */
 .toolbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding: 0 20px 12px; }
@@ -356,7 +356,7 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
   .app { grid-template-columns: 72px 1fr; }
   .brand { justify-content: center; padding: 16px 8px; }
   .brand-text, .nav-group, .nav .lbl-t, .side-foot .hide-rail { display: none; }
-  .nav button { justify-content: center; padding: 11px 0; }
+  .nav :is(button,a) { justify-content: center; padding: 11px 0; }
   .nav .badge { position: absolute; top: 3px; right: 6px; margin: 0; }
   .side-foot { padding: 12px 8px; text-align: center; }
   .grid-2 { grid-template-columns: 1fr; }
@@ -390,9 +390,9 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
   .mcard .s { display: grid; grid-template-columns: repeat(3, 1fr); font-size: 11.5px; color: var(--muted); }
   .mcard .s b { display: block; font: 600 13px var(--mono); color: var(--text); }
   .bnav { display: grid; grid-template-columns: repeat(5, 1fr); position: fixed; left: 0; right: 0; bottom: 0; z-index: 40; background: var(--nav-bg); padding: 6px 4px calc(6px + env(safe-area-inset-bottom, 0px)); }
-  .bnav button { all: unset; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; color: var(--nav-text); padding: 4px 0; cursor: pointer; position: relative; }
-  .bnav button.active { color: #fff; }
-  .bnav button.active svg { color: var(--brass); }
+  .bnav :is(button,a) { all: unset; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10.5px; color: var(--nav-text); padding: 4px 0; cursor: pointer; position: relative; }
+  .bnav :is(button,a).active { color: #fff; }
+  .bnav :is(button,a).active svg { color: var(--brass); }
   .bnav svg { width: 20px; height: 20px; }
   .toast { left: 16px; right: 16px; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
   .glossary { grid-template-columns: 1fr; gap: 2px; }
@@ -1720,7 +1720,7 @@ function renderShell() {
     let g = '';
     if (p.group !== group) { group = p.group; g = `<div class="nav-group">${h(group)}</div>`; }
     const badge = p.id === 'capacity' && crit ? `<span class="badge" title="${crit} machines over capacity">${crit}</span>` : (p.id === 'schedule' && lateN ? `<span class="badge" title="${lateN} late operations">${lateN}</span>` : '');
-    return `${g}<button data-nav="${p.id}" class="${p.id === ui.page ? 'active' : ''}" title="${h(p.label)}" ${p.id === ui.page ? 'aria-current="page"' : ''}>${icon(p.id)}<span class="lbl-t">${h(p.label)}</span>${badge}</button>`;
+    return `${g}<a href="${pageHref(p.id)}" data-nav="${p.id}" class="${p.id === ui.page ? 'active' : ''}" title="${h(p.label)}" ${p.id === ui.page ? 'aria-current="page"' : ''}>${icon(p.id)}<span class="lbl-t">${h(p.label)}</span>${badge}</a>`;
   }).join('');
   $('#side').innerHTML = `
     <div class="brand"><div class="logo">${logo}</div><div class="brand-text"><div class="brand-name">${h(s.companyName)}</div><div class="brand-sub">${h(s.subtitle || 'Capacity Planner')}</div></div></div>
@@ -1748,7 +1748,7 @@ function renderShell() {
     </div></div>`;
 
   const mob = ['overview', 'plan', 'capacity', 'schedule'];
-  $('#bnav').innerHTML = mob.map(id => { const p = PAGES.find(x => x.id === id); return `<button data-nav="${id}" class="${ui.page === id ? 'active' : ''}">${icon(id)}<span>${h(p.label.split(' ')[0] === 'Monthly' ? 'Plan' : p.label.split(' ')[0])}</span></button>`; }).join('')
+  $('#bnav').innerHTML = mob.map(id => { const p = PAGES.find(x => x.id === id); return `<a href="${pageHref(id)}" data-nav="${id}" class="${ui.page === id ? 'active' : ''}">${icon(id)}<span>${h(p.label.split(' ')[0] === 'Monthly' ? 'Plan' : p.label.split(' ')[0])}</span></a>`; }).join('')
     + `<button data-act="moreMenu" class="${mob.includes(ui.page) ? '' : 'active'}">${icon('more')}<span>More</span></button>`;
 
   $('#printHead').innerHTML = `<div><div style="font:600 18px var(--serif);color:#0E2240">${h(s.companyName)}</div><div style="font-size:11px;color:#5B6778">${h(page.title)} · ${E.MONTHS[state.month]} ${state.year} · ${scenarioLabel()}</div></div><div style="font-size:11px;color:#5B6778;text-align:right">OEE ${s.oee}% · ${s.hoursPerDay} h/day · ${s.daysPerMonth} days/month<br>Printed ${new Date().toLocaleString()}</div>`;
@@ -1827,9 +1827,12 @@ function applyTheme() {
 }
 function pageAllowed(id) { return id !== 'settings' || can('admin'); }
 function visiblePages() { return PAGES.filter(p => pageAllowed(p.id)); }
+/* Every menu item is a real link: right-click › Open in new tab / window opens that exact screen (#page or #page/tab) */
+const pageHref = (id, sub) => location.pathname + location.search + '#' + id + (sub ? '/' + sub : '');
+function syncHash() { try { history.replaceState(null, '', pageHref(ui.page, ui.page === 'masters' ? ui.mastersTab : ui.page === 'settings' ? ui.settingsTab : '')); } catch (e) { /* ignore */ } }
 function go(page) {
   if (page === 'users') { page = 'settings'; }
-  if (!pageAllowed(page)) { toast('Settings are available to admins only.'); page = 'overview'; } ui.page = page; LS.set(K_UI, { page }); render(); window.scrollTo(0, 0); closeModal(); }
+  if (!pageAllowed(page)) { toast('Settings are available to admins only.'); page = 'overview'; } ui.page = page; LS.set(K_UI, { page }); render(); syncHash(); window.scrollTo(0, 0); closeModal(); }
 
 /* ==========================================================================
    PAGES — each returns HTML for #view. Uses globals from app-core.js
@@ -1865,7 +1868,7 @@ Pages.overview = () => {
     { n: 4, t: 'Balance & export', s: 'Level load, print, share', go: 'balance', done: Object.keys(plan.splits || {}).length > 0 }
   ];
   return `
-  <div class="steps" aria-label="Monthly workflow">${steps.map(x => `<button class="step ${x.done ? 'done' : ''}" data-nav="${x.go}"><span class="n">${x.done ? '✓' : x.n}</span><span><b>${x.t}</b><span>${h(x.s)}</span></span></button>`).join('')}</div>
+  <div class="steps" aria-label="Monthly workflow">${steps.map(x => `<a class="step ${x.done ? 'done' : ''}" href="${pageHref(x.go)}" data-nav="${x.go}"><span class="n">${x.done ? '✓' : x.n}</span><span><b>${x.t}</b><span>${h(x.s)}</span></span></a>`).join('')}</div>
 
   <section class="kpis" aria-label="Key figures">
     <div class="kpi"><span class="lbl">Plant utilisation</span><span class="val">${fmt(t.util, 1)}<small>%</small></span>
@@ -2145,7 +2148,7 @@ Pages.masters = () => window.KMR_PLATFORM ? kmrMastersPage() : mastersOriginal()
 const mastersOriginal = () => {
   const tab = ui.mastersTab;
   const issues = dataIssues();
-  const tabs = `<div class="subtabs" role="tablist"><button data-mtab="machines" class="${tab === 'machines' ? 'on' : ''}">Machines (${state.machines.length})</button><button data-mtab="routings" class="${tab === 'routings' ? 'on' : ''}">Parts & routings (${state.operations.length})</button><button data-mtab="standards" class="${tab === 'standards' ? 'on' : ''}">Plant standards & calendar</button><button data-mtab="check" class="${tab === 'check' ? 'on' : ''}">Data check${issues.length ? ` (${issues.length})` : ''}</button></div>`;
+  const tabs = `<div class="subtabs" role="tablist"><a href="${pageHref('masters', 'machines')}" data-mtab="machines" class="${tab === 'machines' ? 'on' : ''}">Machines (${state.machines.length})</a><a href="${pageHref('masters', 'routings')}" data-mtab="routings" class="${tab === 'routings' ? 'on' : ''}">Parts & routings (${state.operations.length})</a><a href="${pageHref('masters', 'standards')}" data-mtab="standards" class="${tab === 'standards' ? 'on' : ''}">Plant standards & calendar</a><a href="${pageHref('masters', 'check')}" data-mtab="check" class="${tab === 'check' ? 'on' : ''}">Data check${issues.length ? ` (${issues.length})` : ''}</a></div>`;
   let body = '';
   if (tab === 'machines') {
     const s = state.settings;
@@ -2228,7 +2231,7 @@ function standardsTab() {
 /* ---------------------------------------------------------------- SETTINGS (admin only) */
 Pages.settings = () => {
   const tab = ui.settingsTab || 'general';
-  const tabs = `<section class="card"><div class="subtabs" role="tablist" style="border-bottom:0"><button data-stab="general" class="${tab === 'general' ? 'on' : ''}">General</button><button data-stab="deploy" class="${tab === 'deploy' ? 'on' : ''}">Deployment guide · new customer</button></div></section>`;
+  const tabs = `<section class="card"><div class="subtabs" role="tablist" style="border-bottom:0"><a href="${pageHref('settings', 'general')}" data-stab="general" class="${tab === 'general' ? 'on' : ''}">General</a><a href="${pageHref('settings', 'deploy')}" data-stab="deploy" class="${tab === 'deploy' ? 'on' : ''}">Deployment guide · new customer</a></div></section>`;
   if (window.KMR_PLATFORM) return settingsGeneral();
   if (tab === 'deploy') return tabs + deployGuide();
   return tabs + settingsGeneral();
@@ -2333,6 +2336,7 @@ function setPeriod(y, m) { state.year = y; state.month = m; commit(); }
 document.addEventListener('click', ev => {
   const t = ev.target.closest('[data-nav],[data-act],[data-scn],[data-cell],[data-mach],[data-go],[data-mtab],[data-stab],[data-theme-set],[data-weekoff]');
   if (!t) return;
+  if (t.tagName === 'A') { if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return; ev.preventDefault(); }
   if (t.matches('input,select')) return;
   if (ev.target.closest('input,select,textarea') && !t.dataset.act) return;
   const d = t.dataset;
@@ -2346,8 +2350,8 @@ document.addEventListener('click', ev => {
     if (k === 'mach') { ui.selMachine = d.go.slice(5); return go('capacity'); }
     if (k === 'masters') { ui.mastersTab = v; return go('masters'); }
   }
-  if (d.mtab) { ui.mastersTab = d.mtab; return render(); }
-  if (d.stab) { ui.settingsTab = d.stab; render(); return window.scrollTo(0, 0); }
+  if (d.mtab) { ui.mastersTab = d.mtab; render(); return syncHash(); }
+  if (d.stab) { ui.settingsTab = d.stab; render(); syncHash(); return window.scrollTo(0, 0); }
   if (d.themeSet) { LS.set(K_THEME, d.themeSet); applyTheme(); return render(); }
   if (d.weekoff) {
     if (!can('editor')) return toast('You have view-only access.');
@@ -2463,8 +2467,8 @@ function kmrMastersPage() {
     <div class="card-b">
       ${canMove ? `<div class="note warn">${icon('alert')}<div><b>This planner still has its own earlier masters</b> (${own.machines.length} machines, ${own.operations.length} operations) and the Operations Master is empty, so nothing is being planned. Move them once — nothing is lost, and from then on you maintain them in one place.<div style="margin-top:8px"><button class="btn primary" data-act="moveMasters">Move to Operations Master</button></div></div></div>` : ''}
       <div class="form-grid" style="margin-top:8px">
-        <div class="field"><label>Machines</label><div><b>${state.machines.length}</b> — Operations Master › Machines</div></div>
-        <div class="field"><label>Parts & routings</label><div><b>${new Set(state.operations.map(o => o.partNo)).size}</b> parts · <b>${state.operations.length}</b> operations — Operations Master › Parts, Cycle times</div></div>
+        <div class="field"><label>Machines</label><div><b>${state.machines.length}</b> — <a href="${kmrPortalHome('#ops/machines')}">Operations Master › Machines</a></div></div>
+        <div class="field"><label>Parts & routings</label><div><b>${new Set(state.operations.map(o => o.partNo)).size}</b> parts · <b>${state.operations.length}</b> operations — Operations Master › <a href="${kmrPortalHome('#ops/parts')}">Parts</a>, <a href="${kmrPortalHome('#ops/cycle_times')}">Cycle times</a></div></div>
         <div class="field"><label>Plant standards</label><div>OEE ${h(s.oee)} % · ${h(s.hoursPerDay)} h/day · weekly off ${h(off)} — Operations Master › Plant standards</div></div>
         <div class="field"><label>Holidays / working days</label><div>${hrm ? `<b>${(s.holidays || []).length}</b> holidays from your <b>HRM holiday calendar</b>` : 'No HRM on your plan — working days use the weekly off only'}</div></div>
       </div>
@@ -2492,7 +2496,7 @@ const Actions = {
   nextMonth() { const m = state.month === 11 ? 0 : state.month + 1; setPeriod(state.month === 11 ? state.year + 1 : state.year, m); },
   moreMenu() {
     const items = visiblePages().filter(p => !['overview', 'plan', 'capacity', 'schedule'].includes(p.id));
-    modal({ title: 'More', body: `<div style="display:flex;flex-direction:column;gap:6px">${items.map(p => `<button class="btn" style="justify-content:flex-start;height:44px" data-nav="${p.id}">${icon(p.id)}${h(p.label)}</button>`).join('')}${cloudActive() ? `<button class="btn" style="justify-content:flex-start;height:44px" data-act="changePassword">${icon('lock')}Change my password</button><button class="btn danger" style="justify-content:flex-start;height:44px" data-act="signOut">${icon('logout')}Sign out · ${h((Cloud.session() || {}).email)}</button>` : ''}</div>`, buttons: [], cancel: 'Close' });
+    modal({ title: 'More', body: `<div style="display:flex;flex-direction:column;gap:6px">${items.map(p => `<a class="btn" style="justify-content:flex-start;height:44px" href="${pageHref(p.id)}" data-nav="${p.id}">${icon(p.id)}${h(p.label)}</a>`).join('')}${cloudActive() ? `<button class="btn" style="justify-content:flex-start;height:44px" data-act="changePassword">${icon('lock')}Change my password</button><button class="btn danger" style="justify-content:flex-start;height:44px" data-act="signOut">${icon('logout')}Sign out · ${h((Cloud.session() || {}).email)}</button>` : ''}</div>`, buttons: [], cancel: 'Close' });
   },
   exportMenu() {
     modal({
@@ -3163,7 +3167,7 @@ ui.deployDone = LS.get('cp4_deploy_done') || {};
   state = loadLocal();
   const brand = LS.get('cp4_brand'); if (brand && !LS.get(K_STATE)) Object.assign(state.settings, brand);
   const u = LS.get(K_UI); if (u && u.page && PAGES.some(p => p.id === u.page)) ui.page = u.page;
-  const hash = (location.hash || '').replace('#', ''); if (PAGES.some(p => p.id === hash)) ui.page = hash;
+  const [hp, hs] = (location.hash || '').replace(/^#(go=)?/, '').split('/'); if (PAGES.some(p => p.id === hp)) { ui.page = hp; if (hp === 'masters' && hs) ui.mastersTab = hs; if (hp === 'settings' && hs) ui.settingsTab = hs; }
   render();
   Cloud.loadSiteConfig().then(() => { cloudBoot(); render(); });
 })();

@@ -37,10 +37,13 @@
   }
   const csvCell = (v) => { v = String(v ?? ""); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
 
+  /** address of a screen inside the portal, so right-click › Open in new tab lands on it */
+  const hrefOf = (ctx, v) => (ctx.base || location.pathname + location.search) + "#" + v;
   window.KMR_OPS = {
     KINDS,
     /** ctx: { sb, slug, main, dialog, $, role, customerId } */
     async overview(ctx, note) {
+      if (ctx.setView) ctx.setView("ops");
       const { data: counts, error } = await ctx.sb.rpc("kmr_ops_counts", { p_slug: ctx.slug });
       const nSample = (counts && counts._sample) || 0, admin = ctx.role === "admin", edit = ctx.role === "admin" || ctx.role === "editor";
       const sampleBar = error ? "" : admin
@@ -63,7 +66,7 @@
         <div class="cards">${KINDS.map((K) => {
           const all = (counts && counts[K.kind]) || 0, smp = (counts && counts["_sample_" + K.kind]) || 0, own = (counts && counts["_own_" + K.kind]) || 0;
           const b = (act, label, on, red) => `<button class="btn ghost" data-card="${act}" data-k="${K.kind}" style="height:32px;padding:0 10px;font-size:12.5px${red ? ";color:#B00E28" : ""}" ${on ? "" : "disabled"}>${label}</button>`;
-          return `<div class="card" style="--c:#0EA5E9;cursor:pointer" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3>${esc(K.label)}</h3>
+          return `<div class="card" style="--c:#0EA5E9;cursor:pointer;position:relative" data-kind="${K.kind}"><div style="font-size:26px;line-height:1">${K.icon}</div><h3><a class="stretch" href="${hrefOf(ctx, "ops/" + K.kind)}">${esc(K.label)}</a></h3>
             <p><b style="font-size:22px;color:var(--ink)">${all}</b> records${smp ? ` · <span class="pill">${smp} sample</span>` : ""}${own ? ` · <span class="pill ok">${own} yours</span>` : ""}</p>
             ${admin || edit ? `<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:auto">
               ${admin ? b("sload", "Load sample", !smp) + b("sflush", "Flush sample", smp, true) : ""}
@@ -84,7 +87,7 @@
             <a class="btn ghost" href="/it/balloon.html" style="height:32px;padding:0 10px;font-size:12.5px;grid-column:1/-1">Open Balloon Inspector</a></div>` : ""}</div>`;
         })() : ""}
         </div>`;
-      ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = (e) => { if (e.target.closest("[data-card],[data-dload],button,label,input")) return; this.list(ctx, el.dataset.kind); }));
+      ctx.main.querySelectorAll("[data-kind]").forEach((el) => (el.onclick = (e) => { if (e.target.closest("[data-card],[data-dload],button,label,input")) return; if (e.target.closest("a") && !(e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey)) return; e.preventDefault(); this.list(ctx, el.dataset.kind); }));
       ctx.main.querySelectorAll("[data-card]").forEach((btn) => btn.addEventListener("click", (e) => e.stopPropagation()));
       ctx.main.querySelectorAll("button[data-card]").forEach((btn) => (btn.onclick = (e) => { e.stopPropagation(); this.cardAction(ctx, btn.dataset.card, btn.dataset.k, btn); }));
       ctx.main.querySelectorAll("[data-dload]").forEach((inp) => (inp.onchange = (e) => this.loadData(ctx, inp.dataset.dload, e.target.files[0], inp)));
@@ -255,8 +258,9 @@
     },
     async list(ctx, kind, note) {
       const K = KINDS.find((x) => x.kind === kind); const edit = ctx.role === "admin" || ctx.role === "editor";
-      ctx.main.innerHTML = `<p><button class="btn ghost" id="opsBack" style="height:36px">← Operations Master</button></p><h1>${K.icon} ${esc(K.label)}</h1><p class="msg">Loading…</p>`;
-      ctx.main.querySelector("#opsBack").onclick = () => this.overview(ctx);
+      if (ctx.setView) ctx.setView("ops/" + kind);
+      ctx.main.innerHTML = `<p><a class="btn ghost" id="opsBack" href="${hrefOf(ctx, "ops")}" style="height:36px">← Operations Master</a></p><h1>${K.icon} ${esc(K.label)}</h1><p class="msg">Loading…</p>`;
+      ctx.main.querySelector("#opsBack").onclick = (e) => { if (!(e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey)) return; e.preventDefault(); this.overview(ctx); };
       const { data, error } = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: kind });
       if (error) { ctx.main.querySelector(".msg").textContent = error.message; return; }
       const rows = data || [];

@@ -4,6 +4,8 @@
    ===================================================================== */
 (function(){
 "use strict";
+/* the screen / project this address points at (#go=<screen>&prj=<project>) — read now, before opening a project rewrites the address */
+const NAV0=(window.KMRNav&&KMRNav.pending())||null;
 const CFG=window.PD_CONFIG||{}, E=window.PDEngine, D=window.PDDocs, SC=window.PDSchema, UI=window.PDUI;
 const $=id=>document.getElementById(id);
 const esc=UI.esc;
@@ -122,7 +124,9 @@ function startLocal(){
   const L=LS.get("pd_local",null)||{}; S.settings=L.settings||{companyName:"My Company"}; S.masters=Object.assign({machines:[],gauges:[],customers:[],consumables:[]},L.masters||{});
   S.machines=machinesInUse(); S.org={id:"local",name:S.settings.companyName||"My Company",logo:L.logo||null,settings:S.settings};
   S.role="admin"; S.canEdit=true; S.list=LS.get("pd_projects",[]); $("demoTag").hidden=false; brand(); nav(); bindTop(); UI.render("overview");
-  if(new URLSearchParams(location.search).get("sample")==="1") newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null);
+  const pq=new URLSearchParams(location.search).get("project");
+  if(pq) openProject(pq);   /* ?project=<id>: a project opened from a link (new tab / window) */
+  else if(new URLSearchParams(location.search).get("sample")==="1"&&!(NAV0&&NAV0.prj)) newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null);   /* a link to a saved project wins over the demo sample */
 }
 async function chooseOrg(id){
   if(S.dirty && !(await flushSave())) {}
@@ -169,18 +173,26 @@ function refreshChip(){
   st.textContent=({received:"Received",generated:"Generated",in_review:"In review",approved:"Approved"})[S.prj.status]||S.prj.status; st.className="status "+S.prj.status;
   $("bSave").hidden=!S.canEdit; $("bExport").hidden=false; saveState();
 }
+/* Address of a screen: this page + #go=<screen>&prj=<project>. Home = the page without a project. */
+/* address of an open project: keeps kmr / co / direct … so a new tab or a refresh opens straight into it (sample is dropped: it would add another sample project) */
+function projectHref(id){ const u=new URLSearchParams(location.search); u.delete("sample"); u.set("project",id); return location.pathname+"?"+u.toString(); }
+function projectUrl(id){ return projectHref(id)+location.hash; }
+function navHref(go){
+  if(go==="home"||go==="projects"){ const u=new URLSearchParams(location.search); u.delete("project"); const q=u.toString(); return location.pathname+(q?"?"+q:"")+(go==="projects"?"#go=projects":""); }
+  return location.pathname+location.search+"#go="+encodeURIComponent(go)+(S.prj&&S.prj.id?"&prj="+S.prj.id:"");
+}
 function nav(){
   const side=$("side");
-  if(!S.prj){ side.innerHTML=`<h4>Start</h4><div class="nav"><button data-go="home" aria-current="page"><span class="code">HOME</span>Welcome</button><button data-go="projects"><span class="code">ALL</span>Projects</button></div>`; }
+  if(!S.prj){ side.innerHTML=`<h4>Start</h4><div class="nav"><a href="${navHref("home")}" data-go="home" aria-current="page"><span class="code">HOME</span>Welcome</a><a href="${navHref("projects")}" data-go="projects"><span class="code">ALL</span>Projects</a></div>`; }
   else {
     const ed=S.prj.doc.edited||{};
     const groups={}; D.DOCS.forEach(d=>(groups[d.group]=groups[d.group]||[]).push(d));
-    side.innerHTML=`<h4>Start</h4><div class="nav"><button data-go="home" title="Back to the welcome screen and all projects"><span class="code">HOME</span>Welcome · all projects</button></div><h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"],["cnc","CNC","CNC programs"]].map(x=>`<button data-go="${x[0]}" title="${esc(x[2])}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</button>`).join("")}</div>
-      ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<button data-go="${d.id}" title="${esc(d.title)}" ${S.view===d.id?'aria-current="page"':""}><span class="code">${d.code}</span>${esc(d.title)}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</button>`).join("")}</div>`).join("")}`;
+    side.innerHTML=`<h4>Start</h4><div class="nav"><a href="${navHref("home")}" data-go="home" title="Back to the welcome screen and all projects"><span class="code">HOME</span>Welcome · all projects</a></div><h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"],["cnc","CNC","CNC programs"]].map(x=>`<a href="${navHref(x[0])}" data-go="${x[0]}" title="${esc(x[2])}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</a>`).join("")}</div>
+      ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<a href="${navHref(d.id)}" data-go="${d.id}" title="${esc(d.title)}" ${S.view===d.id?'aria-current="page"':""}><span class="code">${d.code}</span>${esc(d.title)}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</a>`).join("")}</div>`).join("")}`;
   }
-  side.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; document.body.classList.remove("nav-open"); const g=b.dataset.go; if(g==="projects") return projectsDialog(); if(g==="home"){ if(!S.prj) return; closeProject(); return; } go(g); };
+  side.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return; e.preventDefault(); document.body.classList.remove("nav-open"); const g=b.dataset.go; if(g==="projects") return projectsDialog(); if(g==="home"){ if(!S.prj) return; closeProject(); return; } go(g); };
 }
-function go(view){ S.view=view; nav(); UI.render(view); }
+function go(view){ S.view=view; nav(); UI.render(view); try{ history.replaceState(null,"",location.pathname+location.search+"#go="+encodeURIComponent(view)+(S.prj&&S.prj.id?"&prj="+S.prj.id:"")); }catch(e){} }
 /* Back to the welcome screen (closes the open project; asks first when there are unsaved changes) */
 function closeProject(){
   const sb=$("bSave"); if(sb&&/•/.test(sb.textContent||"")&&!confirm("This project has unsaved changes. Leave it anyway?")) return;
@@ -235,10 +247,10 @@ async function projectsDialog(){
   if(CLOUD){ const {data,error}=await sb.from("pd_projects").select("id,part_no,part_name,rev,customer,status,updated_at,bi_report_id").eq("org_id",S.org.id).order("updated_at",{ascending:false}).limit(500); if(error){ $("pjL").textContent=error.message; return; } rows=data||[]; }
   else rows=(LS.get("pd_projects",[])).map(p=>({id:p.id,part_no:p.part_no,part_name:p.part_name,rev:p.rev,customer:p.customer,status:p.status,updated_at:p.updated_at,bi_report_id:p.bi_report_id}));
   const draw=()=>{ const q=($("pjQ").value||"").toLowerCase(); const r=rows.filter(x=>[x.part_no,x.part_name,x.customer].join(" ").toLowerCase().includes(q));
-    $("pjL").innerHTML = r.length?`<table class="plist"><thead><tr><th>Part no.</th><th>Part name</th><th>Rev</th><th>Customer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${r.map(x=>`<tr data-open="${x.id}"><td><b>${esc(x.part_no||"—")}</b></td><td>${esc(x.part_name||"")}</td><td>${esc(x.rev||"")}</td><td>${esc(x.customer||"")}</td><td><span class="status ${x.status}">${esc(x.status)}</span></td><td>${esc(String(x.updated_at||"").slice(0,16).replace("T"," "))}</td><td>${S.role==="admin"?`<button class="btn small danger" data-del="${x.id}">Delete</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<p class="hintline">No projects yet. Use <b>New</b> to create one from Balloon Inspector data.</p>`; };
+    $("pjL").innerHTML = r.length?`<table class="plist"><thead><tr><th>Part no.</th><th>Part name</th><th>Rev</th><th>Customer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${r.map(x=>`<tr data-open="${x.id}"><td><a class="rowlink" href="${projectHref(x.id)}"><b>${esc(x.part_no||"—")}</b></a></td><td>${esc(x.part_name||"")}</td><td>${esc(x.rev||"")}</td><td>${esc(x.customer||"")}</td><td><span class="status ${x.status}">${esc(x.status)}</span></td><td>${esc(String(x.updated_at||"").slice(0,16).replace("T"," "))}</td><td>${S.role==="admin"?`<button class="btn small danger" data-del="${x.id}">Delete</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<p class="hintline">No projects yet. Use <b>New</b> to create one from Balloon Inspector data.</p>`; };
   draw(); $("pjQ").oninput=draw; $("pjQ").focus();
   $("pjL").onclick=async e=>{ const d=e.target.closest("[data-del]"); if(d){ e.stopPropagation(); if(!confirm("Delete this project and all its documents?")) return; await deleteProject(d.dataset.del); rows=rows.filter(x=>x.id!==d.dataset.del); draw(); return; }
-    const t=e.target.closest("[data-open]"); if(t){ closeDialog(); openProject(t.dataset.open); } };
+    const t=e.target.closest("[data-open]"); if(t){ if(e.target.closest("a")){ if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return; e.preventDefault(); } closeDialog(); openProject(t.dataset.open); } };
 }
 async function deleteProject(id){ if(CLOUD){ const {error}=await sb.from("pd_projects").delete().eq("id",id); if(error){ toast(error.message); return; } } else { LS.set("pd_projects",LS.get("pd_projects",[]).filter(p=>p.id!==id)); }
   if(S.prj&&S.prj.id===id){ S.prj=null; S.plan=null; S.docs=null; refreshChip(); nav(); UI.render("overview"); } }
@@ -253,7 +265,7 @@ async function openProject(id){
     S.prj=P; S.dirty=false;
     if(!P.doc.plan||!P.doc.docs){ generate(P); busy(null); toast(`Generated ${D.DOCS.length} documents from ${S.plan.chars.length} ballooned characteristics.`,6000); if(S.canEdit) await save(); }
     else { S.plan=P.doc.plan; S.docs=P.doc.docs; ensureDocs(); migrate(); }
-    try{ history.replaceState(null,"",location.pathname+"?project="+P.id); }catch(e){}
+    try{ history.replaceState(null,"",projectUrl(P.id)); }catch(e){}
     refreshChip(); go(P.doc.sourceChanged?"overview":S.view&&S.view!=="home"?S.view:"overview");
   }catch(e){ toast("Couldn't open: "+e.message,7000); } finally{ busy(null); }
 }
@@ -364,7 +376,7 @@ async function save(manual){
     if(CLOUD){ if(!P.id){ const {data,error}=await sb.from("pd_projects").insert(row).select("id").single(); if(error) throw error; P.id=data.id; }
       else { const {error}=await sb.from("pd_projects").update(row).eq("id",P.id); if(error) throw error; } }
     else { if(!P.id) P.id=uuid(); P.updated_at=new Date().toISOString(); const list=LS.get("pd_projects",[]).filter(x=>x.id!==P.id); list.unshift(Object.assign({},row,{id:P.id,updated_at:P.updated_at})); LS.set("pd_projects",list.slice(0,40)); }
-    S.dirty=false; try{ history.replaceState(null,"",location.pathname+"?project="+P.id); }catch(e){}
+    S.dirty=false; try{ history.replaceState(null,"",projectUrl(P.id)); }catch(e){}
     if(manual) toast("Saved.");
     return true;
   }catch(e){ toast("Couldn't save: "+e.message,8000); return false; } finally{ saving=false; saveState(); }
@@ -556,8 +568,10 @@ async function pane(t){
 
 /* ---------------- boot ---------------- */
 window.PDApp = { S, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
+/* open the screen / project this address points at (a link opened in a new tab or window) */
+async function openPending(){ try{ const n=NAV0; if(!n) return; if(n.prj&&!(S.prj&&S.prj.id===n.prj)) await openProject(n.prj); if(n.go==="projects") projectsDialog(); else if(n.go&&n.go!=="home"&&S.prj) go(n.go); }catch(_){} }
 if(CLOUD){
   sb.auth.onAuthStateChange(ev=>{ if(ev==="PASSWORD_RECOVERY") newPasswordScreen(); });
-  (async()=>{ const {data:{session}}=await sb.auth.getSession(); if(!session) loginScreen(); else start().then(async()=>{ try{ const n=window.KMRNav&&KMRNav.pending(); if(n){ if(n.prj) await openProject(n.prj); go(n.go); } }catch(_){} }); })();
-} else start();
+  (async()=>{ const {data:{session}}=await sb.auth.getSession(); if(!session) loginScreen(); else start().then(openPending); })();
+} else { start(); openPending(); }
 })();

@@ -10,6 +10,15 @@
   const m = location.pathname.match(/\/it\/app\/([a-z0-9-]{2,61})/i) || location.search.match(/[?&]c=([a-z0-9-]{2,61})/i);
   const SLUG = m && !/^(undefined|null)$/i.test(m[1]) ? m[1].toLowerCase() : "";
   const OPEN = (location.search.match(/[?&]open=([a-z0-9-]+)/i) || [])[1] || "";   // a tool sent the person here to sign in
+  const HASH = location.hash.replace(/^#/, "");                                      // the screen this address points at (#ops, #users …)
+  /* Every menu item is a real link, so right-click › Open in new tab / new window works and opens that exact screen.
+     A normal left click still switches screen in place (no reload); ctrl / ⌘ / shift / middle-click follow the link. */
+  const BASE = location.pathname + (/\/it\/app\//.test(location.pathname) || !SLUG ? "" : "?c=" + SLUG);
+  const appHref = (code) => BASE + (BASE.includes("?") ? "&" : "?") + "open=" + encodeURIComponent(code);
+  const viewHref = (v) => BASE + (v ? "#" + v : "");
+  const plain = (e) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
+  const setView = (v) => { try { history.replaceState(null, "", viewHref(v)); } catch (e) { /* ignore */ } };
+  const onLink = (sel, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener("click", (e) => { if (!plain(e)) return; e.preventDefault(); fn(el, e); }));
   const META = {
     hrm: { color: "#0EA5E9", desc: "Employees, onboarding, ID cards, biometric attendance, shifts and leave.", demo: "/it/hrm/api/auth/demo" },
     balloon: { color: "#A855F7", desc: "Balloon any drawing and build the inspection report.", demo: "/it/balloon.html?demo=1" },
@@ -21,24 +30,13 @@
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["maint", "Maintenance"], ["proc", "Procurement"], ["crm", "CRM & RFQ"], ["mmd", "MMD"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["apqp", "APQP & PPAP"], ["fmea", "AIAG-VDA FMEA"], ["spc", "SPC & MSA"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {};
 
-  /** top of an app card: the promo video (9:16) with its thumbnail, or the app photo, or the app illustration */
+  /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
   const ART = { hrm: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
-    const video = safeUrl(m.video), poster = safeUrl(m.poster);
-    if (video) return `<div class="media"><img src="${poster || img}" alt="" loading="lazy"><button class="playv" data-video="${video}" data-poster="${poster}" aria-label="Play the ${esc(r.product_name)} video">▶</button></div>`;
     return img ? `<div class="media"><img src="${img}" alt="" loading="lazy"></div>` : "";
   }
-  function playVideo(src, poster) {
-    const d = document.createElement("div"); d.className = "vmodal";
-    d.innerHTML = `<div class="vbox"><video src="${src}" ${poster ? `poster="${poster}"` : ""} controls autoplay playsinline></video><button aria-label="Close">×</button></div>`;
-    const close = () => { d.remove(); document.removeEventListener("keydown", esc); };
-    const esc = (e) => e.key === "Escape" && close();
-    d.addEventListener("click", (e) => { if (e.target === d || e.target.tagName === "BUTTON") close(); });
-    document.addEventListener("keydown", esc); document.body.append(d);
-  }
-  document.addEventListener("click", (e) => { const b = e.target.closest && e.target.closest(".playv"); if (b) { e.preventDefault(); e.stopPropagation(); playVideo(b.dataset.video, b.dataset.poster); } }, true);
 
   const logo = (b, cls) => b.logo_url ? `<img src="${esc(b.logo_url)}" alt="${esc(b.name)}">` : `<span class="fb ${cls || ""}">${esc((b.name || "K").split(/\s+/).slice(0, 2).map((w) => w[0]).join("").toUpperCase())}</span>`;
   function setIcon(url) {
@@ -109,38 +107,39 @@
     }
     let path = r.app_path;
     try { const back = sessionStorage.getItem("kmr-return-" + code); sessionStorage.removeItem("kmr-return-" + code);
-      if (back && back.split("?")[0] === r.app_path.split("?")[0]) path = back; } catch (e) {}
+      if (back && back.split(/[?#]/)[0] === r.app_path.split("?")[0]) path = back; } catch (e) {}
+    let tail = ""; const hi = path.indexOf("#"); if (hi >= 0) { tail = path.slice(hi); path = path.slice(0, hi); }   // the screen (#go=…) stays at the end
     path = path.replace(/([?&])co=[^&]*&?/, "$1").replace(/[?&]$/, "");
-    location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "");
+    location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
   function appView() {
-    window.scrollTo(0, 0);
+    window.scrollTo(0, 0); setView("");
     const mine = rows.filter((r) => r.purchased), others = rows.filter((r) => !r.purchased);
     const pill = (r) => r.ok ? `<span class="pill ok">${esc(r.status)}${r.valid_until ? " · until " + esc(r.valid_until) : ""}</span>` : `<span class="pill warn">${esc(r.status)}</span>`;
     $("#root").innerHTML = `<div class="app">
       <aside class="side">
-        <div class="who">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></div>
-        <h4>Your apps</h4>${mine.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</button>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
-        ${ops || isAdmin ? `<h4>Masters</h4>` : ""}${ops ? `<button data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</button>` : ""}${isAdmin ? `<button data-datam="1"><i style="background:#0EA5E9"></i>Data Master</button><button data-grand="1"><i style="background:#B45309"></i>Grand Master</button>` : ""}
-        ${isAdmin ? `<h4>Administration</h4><button data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</button><button data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</button><button data-admin="invoices"><i style="background:#F3C55A"></i>Invoices &amp; payments</button>` : ""}
-        <h4>More KMR apps</h4>${others.map((r) => `<button data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></button>`).join("")}
+        <a class="who" href="${viewHref("")}" title="Your apps">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></a>
+        <h4>Your apps</h4>${mine.map((r) => `<a href="${appHref(r.product_code)}" data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</a>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
+        ${ops || isAdmin ? `<h4>Masters</h4>` : ""}${ops ? `<a href="${viewHref("ops")}" data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</a>` : ""}${isAdmin ? `<a href="${viewHref("data")}" data-datam="1"><i style="background:#0EA5E9"></i>Data Master</a><a href="${viewHref("grand")}" data-grand="1"><i style="background:#B45309"></i>Grand Master</a>` : ""}
+        ${isAdmin ? `<h4>Administration</h4><a href="${viewHref("company")}" data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</a><a href="${viewHref("users")}" data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</a><a href="${viewHref("invoices")}" data-admin="invoices"><i style="background:#F3C55A"></i>Invoices &amp; payments</a>` : ""}
+        <h4>More KMR apps</h4>${others.map((r) => `<a href="${appHref(r.product_code)}" data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}<span class="lock">Try</span></a>`).join("")}
         ${SOON.map(([k, n]) => `<button data-soon="${k}" data-name="${esc(n)}"><i style="background:#64748b"></i>${esc(n)}<span class="lock">Soon</span></button>`).join("")}
         <button id="pw">Change password</button>
         <button class="out" id="out">Sign out</button>
       </aside>
       <main class="main">
         <h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p>
-        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div>${r.ok && !r.has_access && !r.is_contact && !isAdmin ? `<span class="pill off">No access — ask your administrator</span>` : `<button class="btn" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</button>`}</div>`).join("")}</div>
+        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div>${r.ok && !r.has_access && !r.is_contact && !isAdmin ? `<span class="pill off">No access — ask your administrator</span>` : `<a class="btn" href="${appHref(r.product_code)}" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</a>`}</div>`).join("")}</div>
         <h2 style="margin:34px 0 0;font-size:18px">Try more of the platform</h2>
-        <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><button class="btn ghost" data-open="${r.product_code}">Try with sample data</button></div>`).join("")}</div>
+        <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><a class="btn ghost" href="${appHref(r.product_code)}" data-open="${r.product_code}">Try with sample data</a></div>`).join("")}</div>
       </main></div>`;
-    document.querySelectorAll("[data-open]").forEach((b) => b.addEventListener("click", () => open(b.dataset.open)));
-    document.querySelectorAll("[data-admin]").forEach((b) => b.addEventListener("click", () => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView())));
-    document.querySelectorAll("[data-datam]").forEach((b) => b.addEventListener("click", () => window.KMR_DATA && window.KMR_DATA.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog })));
-    document.querySelectorAll("[data-grand]").forEach((b) => b.addEventListener("click", () => window.KMR_GRAND && window.KMR_GRAND.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog })));
-    document.querySelectorAll("[data-ops]").forEach((b) => b.addEventListener("click", () => window.KMR_OPS && window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id })));
-    const home = document.querySelector(".side .who"); if (home) { home.style.cursor = "pointer"; home.title = "Your apps"; home.onclick = () => appView(); }
+    onLink("[data-open]", (b) => open(b.dataset.open));
+    onLink("[data-admin]", (b) => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView()));
+    onLink("[data-datam]", () => dataView());
+    onLink("[data-grand]", () => grandView());
+    onLink("[data-ops]", () => opsView());
+    onLink(".side .who", () => appView());
     document.querySelectorAll("[data-soon]").forEach((b) => b.addEventListener("click", () => dialog(`${b.dataset.name} — coming soon`, "This module of the KMR Intelligent Digital Manufacturing platform is on its way. Register your interest and we'll invite you to the pilot.", `<a class="btn" href="${buyUrl(b.dataset.soon)}">Register interest</a>`)));
     $("#out").onclick = async () => { await sb.auth.signOut(); try { localStorage.removeItem("kmr-portal"); } catch (e) {} loginView(); };
     $("#pw").onclick = () => {
@@ -163,10 +162,21 @@
     other: [["", "No access"], ["admin", "Admin"], ["editor", "Editor"], ["viewer", "Viewer"]],
   };
   const mainEl = () => document.querySelector(".main");
-  function adminHead(title, sub) { window.scrollTo(0, 0); document.querySelector(".main")?.scrollTo?.(0, 0); return `<p><button class="btn ghost" id="backApps" style="height:36px">← Your apps</button></p><h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p>`; }
-  function bindBack() { const b = $("#backApps"); if (b) b.onclick = () => appView(); }
+  function adminHead(title, sub) { window.scrollTo(0, 0); document.querySelector(".main")?.scrollTo?.(0, 0); return `<p><a class="btn ghost" id="backApps" href="${viewHref("")}" style="height:36px">← Your apps</a></p><h1>${esc(title)}</h1><p class="sub">${esc(sub)}</p>`; }
+  function bindBack() { const b = $("#backApps"); if (b) b.onclick = (e) => { if (!plain(e)) return; e.preventDefault(); appView(); }; }
+
+  const ctxOf = () => ({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, base: BASE, setView });
+  function dataView() { if (!window.KMR_DATA) return; setView("data"); return window.KMR_DATA.overview(ctxOf()); }
+  function grandView() { if (!window.KMR_GRAND) return; setView("grand"); return window.KMR_GRAND.overview(ctxOf()); }
+  async function opsView(kind) {
+    if (!window.KMR_OPS || !ops) return;
+    const c = { ...ctxOf(), role: ops.role, customerId: ops.customer_id };
+    setView("ops"); await window.KMR_OPS.overview(c);
+    if (kind) window.KMR_OPS.list(c, kind);
+  }
 
   async function invoicesView() {
+    setView("invoices");
     const head = adminHead("Invoices & payments", "Invoices from KMR for your subscriptions. Open one to view, print or pay it.");
     const m = mainEl(); m.innerHTML = head + `<p class="msg">Loading…</p>`; bindBack();
     const { data, error } = await sb.rpc("kmr_portal_invoices", { p_slug: SLUG });
@@ -187,6 +197,7 @@
   }
 
   async function companyView() {
+    setView("company");
     const m = mainEl(); m.innerHTML = adminHead("Company details & logo", "Shown in every KMR app your company uses — change it once here.") + `<p class="msg">Loading…</p>`; bindBack();
     const { data: c, error } = await sb.rpc("kmr_admin_company", { p_slug: SLUG });
     if (error) { m.querySelector(".msg").textContent = error.message; return; }
@@ -229,6 +240,7 @@
   }
 
   async function usersView(note) {
+    setView("users");
     const m = mainEl(); m.innerHTML = adminHead("Users & access", "One list for all your KMR apps. Choose what each person may do in each app.") + `<p class="msg">Loading…</p>`; bindBack();
     const [{ data: list, error }, { data: c }] = await Promise.all([sb.rpc("kmr_admin_users", { p_slug: SLUG }), sb.rpc("kmr_admin_company", { p_slug: SLUG })]);
     if (error) { m.querySelector(".msg").textContent = error.message; return; }
@@ -294,16 +306,18 @@
     try { localStorage.setItem("kmr-portal", JSON.stringify({ slug: SLUG, name: brand.name, logo: brand.logo_url || null })); } catch (e) {}
     setIcon(brand.logo_url);
     const st = await sb.rpc("kmr_portal_stats", { p_slug: SLUG }); stats = (st && st.data) || {};
-    // the photo / promo video set for each app in KMR Console › Website CMS › KMR Apps on the website
-    try { const cat = await sb.rpc("kmr_software_catalog"); (cat.data || []).forEach((a) => { media[a.code] = { img: a.image_url, video: a.video_url, poster: a.video_poster }; }); } catch (e) {}
+    // the app photo set in KMR Console › Website CMS › KMR Apps on the website (videos are website-only)
+    try { const cat = await sb.rpc("kmr_software_catalog"); (cat.data || []).forEach((a) => { media[a.code] = { img: a.image_url }; }); } catch (e) {}
     const ar = await sb.rpc("kmr_admin_role", { p_slug: SLUG }); isAdmin = !ar.error && ar.data === "admin";
     const oc = await sb.rpc("kmr_ops_context", { p_slug: SLUG }); ops = !oc.error && oc.data ? oc.data : null;
     appView();
-    if (OPEN && rows.some((r) => r.product_code === OPEN)) { history.replaceState(null, "", location.pathname); open(OPEN); }
-    else if (location.hash === "#admin" && isAdmin) { history.replaceState(null, "", location.pathname); usersView(); }
-    else if (location.hash === "#grand" && isAdmin && window.KMR_GRAND) { history.replaceState(null, "", location.pathname); window.KMR_GRAND.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog }); }
-    else if (location.hash === "#data" && isAdmin && window.KMR_DATA) { history.replaceState(null, "", location.pathname); window.KMR_DATA.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog }); }
-    else if (location.hash === "#ops" && ops && window.KMR_OPS) { history.replaceState(null, "", location.pathname); window.KMR_OPS.overview({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, role: ops.role, customerId: ops.customer_id }); }
+    if (OPEN && rows.some((r) => r.product_code === OPEN)) { setView(""); open(OPEN); }
+    else if ((HASH === "users" || HASH === "admin") && isAdmin) usersView();
+    else if (HASH === "company" && isAdmin) companyView();
+    else if (HASH === "invoices" && isAdmin) invoicesView();
+    else if (HASH === "grand" && isAdmin) grandView();
+    else if (HASH === "data" && isAdmin) dataView();
+    else if (/^ops(\/|$)/.test(HASH) && ops) opsView(HASH.split("/")[1] || "");
   }
 
   (async () => {

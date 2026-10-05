@@ -26,7 +26,7 @@
   const hide = () => { menu.style.display = "none"; };
   function target(el) {                      // what does this element open?
     const b = el.closest("[data-go],[data-t],[data-view],a[href]"); if (!b) return null;
-    if (b.matches("a[href]") && !/^javascript:|^#/.test(b.getAttribute("href"))) return { url: b.href };
+    if (b.matches("a[href]")) return null;       // a real link: the browser's own menu offers Open in new tab / new window / copy link
     const key = b.dataset.go || b.dataset.t || b.dataset.view; if (!key) return null;
     const prj = window.PDApp && window.PDApp.S && window.PDApp.S.prj && window.PDApp.S.prj.id;
     return { url: location.href.split("#")[0] + "#go=" + encodeURIComponent(key) + (prj ? "&prj=" + prj : "") };
