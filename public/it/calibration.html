@@ -147,4 +147,4 @@ if(f==='kmr_cal_update_record'){const r=S.records.find(x=>x.id===a.p_id);Object.
 if(f==='kmr_cal_event'){S.events.unshift({...a.p,id:'e'+Math.random(),ev_date:t,by_email:'demo'});if(a.p.ev_type==='Damage report')S.instruments.find(x=>x.id===a.p.instrument_id).status='Quarantine';return'ok'}
 if(f==='kmr_cal_close_oot'){Object.assign(S.oot.find(x=>x.id===a.p_id),a.p);return'ok'}}}}
 boot();
-</script><script src="/it/apps/back.js"></script></body></html>
+</script><script>document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest(".tab");if(t)t.scrollIntoView({inline:"nearest",block:"nearest",behavior:"smooth"})});</script><script src="/it/apps/back.js"></script></body></html>

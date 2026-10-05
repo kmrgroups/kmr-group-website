@@ -15,8 +15,9 @@ header{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var
 .clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}
 header h1{font-size:17px;margin:0}header .co{opacity:.7;font-size:12px}
 header .sp{flex:1}
-.tabs{display:flex;gap:4px;padding:10px 22px 0}
-.tab{border:0;background:none;padding:9px 16px;border-radius:10px 10px 0 0;font-weight:600;color:var(--mut);cursor:pointer}
+.tabs{display:flex;gap:4px;padding:10px 22px 0;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}.tabs::-webkit-scrollbar{display:none}
+@media(max-width:640px){.tabs{padding:8px 10px 0}.tab{padding:9px 12px}}
+.tab{white-space:nowrap;flex:none;border:0;background:none;padding:9px 16px;border-radius:10px 10px 0 0;font-weight:600;color:var(--mut);cursor:pointer}
 .tab.on{background:var(--card);color:var(--brand);box-shadow:0 -2px 0 var(--brand) inset}
 main{padding:0 22px 20px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:18px}
 input,select,button,textarea{font:inherit;color:inherit}
@@ -816,6 +817,7 @@ function demoApi() {
 }
 boot();
 </script>
+<script>document.addEventListener("click",e=>{const t=e.target.closest&&e.target.closest(".tab");if(t)t.scrollIntoView({inline:"nearest",block:"nearest",behavior:"smooth"})});</script>
 <script src="/it/apps/back.js"></script>
 </body>
 </html>
