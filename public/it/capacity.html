@@ -575,6 +575,37 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     return (state.plans && state.plans[key]) || { parts: {}, machines: {}, splits: {} };
   }
 
+  /* ---------- Dynamic capacity: net the stock off the sales quantity, stage by stage -------------------
+     Walking backwards from the customer:   need(after last op) = sales − finished-goods stock
+       an operation must make   need(after it) − stock waiting after it (WIP / in process)
+       the operation before it must then supply exactly what this one has to make
+     At the start of the routing, what the first operation must make is covered by inward-inspection and supplier stock;
+     the rest is the quantity to procure.  Static capacity skips all of this (sales quantity at every operation). */
+  function netDemand(state, plan, seqMap) {
+    const out = {};
+    const stock = (plan && plan.stock) || {};
+    const byPart = new Map();
+    state.operations.forEach(op => { const l = byPart.get(op.partNo) || []; l.push(op); byPart.set(op.partNo, l); });
+    byPart.forEach((ops, partNo) => {
+      const sales = Math.max(0, num(((plan.parts || {})[partNo] || {}).qty, 0));
+      const st = stock[partNo] || {}, wip = st.wip || {};
+      const fg = Math.max(0, num(st.fg, 0)), insp = Math.max(0, num(st.inspection, 0)), sup = Math.max(0, num(st.supplier, 0));
+      let need = Math.max(0, sales - fg);
+      const needAfterFg = need;
+      const steps = new Array(ops.length);
+      for (let k = ops.length - 1; k >= 0; k--) {
+        const w = Math.max(0, num(wip[ops[k].id], 0));
+        const produce = Math.max(0, need - w);
+        steps[k] = { opId: ops[k].id, process: ops[k].process, needAfter: need, stockAfter: w, produce };
+        need = produce;
+      }
+      const matNeed = need;
+      const procure = Math.max(0, matNeed - insp - sup);
+      out[partNo] = { sales, fg, needAfterFg, steps, material: { need: matNeed, inspection: insp, supplier: sup, procure }, byOp: Object.fromEntries(steps.map(x => [x.opId, x.produce])) };
+    });
+    return out;
+  }
+
   /* ---------- Core model --------------------------------------------------- */
   function compute(state, opts) {
     opts = opts || {};
@@ -613,6 +644,10 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       seqMap.set(op.partNo, list);
     });
 
+    // Static: every operation makes the sales quantity. Dynamic: each operation makes only what is still needed after the stock.
+    const mode = (opts.mode || state.capMode) === 'dynamic' ? 'dynamic' : 'static';
+    const net = netDemand(state, plan, seqMap);
+
     // Split / reassign overrides: either from plan (applied) or from auto-level preview
     const splits = Object.assign({}, plan.splits || {}, opts.splitsOverride || {});
 
@@ -620,7 +655,8 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     const rows = [];
     state.operations.forEach(op => {
       const part = (plan.parts && plan.parts[op.partNo]) || {};
-      const qty = Math.max(0, num(part.qty, 0));
+      const salesQty = Math.max(0, num(part.qty, 0));
+      const qty = mode === 'dynamic' ? (((net[op.partNo] || {}).byOp || {})[op.id] || 0) : salesQty;
       const due = validDue(part.due, y, m) || monthEnd;
       const pph = op.cycleTime > 0 ? (3600 / op.cycleTime) * oee : 0;
       const alloc = splits[op.id] && splits[op.id].length ? splits[op.id] : [{ machine: op.machine, share: 1 }];
@@ -636,7 +672,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
           opId: op.id, partNo: op.partNo, partName: op.partName, process: op.process,
           seq: seqList.indexOf(op.id), homeMachine: op.machine, machine: a.machine,
           moved: a.machine !== op.machine, split: alloc.length > 1,
-          cycleTime: op.cycleTime, qty: q, partQty: qty, due,
+          cycleTime: op.cycleTime, qty: q, partQty: salesQty, due,
           pph, effCT: oee > 0 ? op.cycleTime / oee : op.cycleTime,
           hoursPerDay: hrs, reqHours, reqDays,
           rowBalance: s.daysPerMonth - reqDays     // Excel Capacity-workout!L
@@ -689,7 +725,8 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     totals.bal = totals.avail - totals.req;
     totals.util = totals.avail > 0 ? totals.req / totals.avail * 100 : 0;
 
-    return { key, plan, scenario, cal, sundaysAvailable, machines, rows, schedule, totals, monthEnd };
+    totals.netQty = mode === 'dynamic' ? Object.values(net).reduce((a, p) => a + p.steps.reduce((x, st) => x + st.produce, 0), 0) : null;
+    return { key, plan, scenario, mode, net, cal, sundaysAvailable, machines, rows, schedule, totals, monthEnd };
   }
 
   /* ---------- Finite schedule: EDD + routing precedence --------------------- */
@@ -844,7 +881,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     return due;
   }
 
-  const Engine = { MONTHS, pad, periodKey, iso, daysInMonth, buildCalendar, compute, autoLevel, cellOf, getPlan, num };
+  const Engine = { MONTHS, pad, periodKey, iso, daysInMonth, buildCalendar, compute, netDemand, autoLevel, cellOf, getPlan, num };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -1251,6 +1288,7 @@ const ICONS = {
   overview: 'M3 13h8V3H3zM13 21h8v-8h-8zM3 21h8v-6H3zM13 3v8h8V3z',
   plan: 'M8 2v4M16 2v4M3 9h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2zM8 13h3M8 17h6',
   capacity: 'M4 20V10M10 20V4M16 20v-7M22 20H2',
+  stock: 'M3 7l9-4 9 4-9 4-9-4zM3 12l9 4 9-4M3 17l9 4 9-4',
   workout: 'M4 4h16v16H4zM4 9h16M4 14h16M9 4v16',
   schedule: 'M3 6h8M7 12h10M5 18h6M3 3v18',
   balance: 'M12 3v18M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0zM8 21h8',
@@ -1281,6 +1319,7 @@ const icon = (n, cls) => `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="no
 const PAGES = [
   { id: 'overview', group: 'Plan', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
   { id: 'plan', group: 'Plan', label: 'Monthly Plan', title: 'Monthly Plan', desc: 'Enter this month’s quantity and customer due date for each part.' },
+  { id: 'stock', group: 'Plan', label: 'Stock & Balance', title: 'Stock & Balance', desc: 'Stock on hand at every stage, taken off the sales quantity — what is still to be made at every process (Dynamic capacity).' },
   { id: 'capacity', group: 'Analyse', label: 'Capacity Plan', title: 'Capacity Plan', desc: 'Required vs available days per machine — same as the Excel “Capacity Plan” sheet.' },
   { id: 'workout', group: 'Analyse', label: 'Capacity Workout', title: 'Capacity Workout', desc: 'Operation-level calculation — same as the Excel “Capacity-workout” sheet.' },
   { id: 'schedule', group: 'Analyse', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
@@ -1738,6 +1777,10 @@ function renderShell() {
         <select id="selYear" aria-label="Year">${years.map(v => `<option ${v === y ? 'selected' : ''}>${v}</option>`).join('')}</select>
         <button data-act="nextMonth" aria-label="Next month">${icon('right')}</button>
       </div>
+      <div class="seg" role="group" aria-label="Capacity type">
+        <button data-capmode="static" class="${model.mode !== 'dynamic' ? 'on' : ''}" title="Static: the sales quantity goes straight to every process">Static</button>
+        <button data-capmode="dynamic" class="${model.mode === 'dynamic' ? 'on' : ''}" title="Dynamic: stock at every stage is taken off the sales quantity first">Dynamic</button>
+      </div>
       <div class="seg" role="group" aria-label="Capacity scenario">
         <button data-scn="standard" class="${sc === 'standard' ? 'on' : ''}" title="Available days as entered (Excel basis)">Standard</button>
         <button data-scn="sunday" class="${sc === 'sunday' ? 'on' : ''}" title="Add the ${sun} Sundays of this month">+${sun} Sundays</button>
@@ -1757,13 +1800,13 @@ function renderShell() {
 }
 
 /* ---------- lock controls the signed-in role may not use ---------- */
-const EDITOR_ACTS = ['addHoliday', 'delHoliday', 'pastePlan', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
+const EDITOR_ACTS = ['addHoliday', 'delHoliday', 'pastePlan', 'pasteStock', 'clearStock', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
 const ADMIN_ACTS = ['uploadLogo', 'removeLogo', 'importJson', 'resetAll', 'blankStart', 'clearPlans', 'connSave', 'connReset', 'connDownload'];
 const EDITOR_SETTINGS = ['levelTargetPct', 'lotSize', 'levelAnyMachine', 'oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours'];
 function actNeeds(act) { return ADMIN_ACTS.includes(act) ? 'admin' : EDITOR_ACTS.includes(act) ? 'editor' : null; }
 function fieldNeeds(el) {
   const d = el.dataset;
-  if (d.qty || d.due || d.avail || d.remark || d.mfield || d.ofield) return 'editor';
+  if (d.qty || d.stk || d.due || d.avail || d.remark || d.mfield || d.ofield) return 'editor';
   if (d.setting) return EDITOR_SETTINGS.includes(d.setting) ? 'editor' : 'admin';
   if (d.settingBool) return EDITOR_SETTINGS.includes(d.settingBool) ? 'editor' : 'admin';
   if (d.weekoff !== undefined || el.id === 'hDate' || el.id === 'hName') return 'editor';
@@ -1819,7 +1862,7 @@ function applyFavicon(logo) {
   img.onerror = () => setIconLink('icon', DEFAULT_ICON);
   img.src = logo;
 }
-function scenarioLabel() { return state.scenario === 'sunday' ? `Standard + ${model.sundaysAvailable} Sundays` : state.scenario === 'levelled' ? 'Auto-levelled preview' : 'Standard'; }
+function scenarioLabel() { return (model && model.mode === 'dynamic' ? 'Dynamic · ' : 'Static · ') + ( state.scenario === 'sunday' ? `Standard + ${model.sundaysAvailable} Sundays` : state.scenario === 'levelled' ? 'Auto-levelled preview' : 'Standard'); }
 
 function applyTheme() {
   const t = LS.get(K_THEME) || 'system';
@@ -2133,6 +2176,7 @@ Pages.plan = () => {
     return `<div class="mcard"><div class="t"><span class="mono">${h(p.partNo)}</span>${st}</div><div class="small muted">${h(p.partName)} · ${p.ops.length} operation${p.ops.length > 1 ? 's' : ''}</div>
       <div class="mrow"><input class="cell-inp" style="text-align:right" type="number" min="0" step="100" inputmode="numeric" id="mqty-${id}" data-qty="${h(p.partNo)}" value="${pp.qty || 0}" aria-label="Quantity for ${h(p.partNo)}"><input class="cell-inp" type="date" min="${first}" max="${last}" id="mdue-${id}" data-due="${h(p.partNo)}" value="${h(pp.due || last)}" aria-label="Due date for ${h(p.partNo)}"></div></div>`; }).join('');
   return `
+  ${model.mode === 'dynamic' ? note('ok', 'info', '<b>Dynamic capacity is ON.</b> Machine days below use the quantity left to make after the stock entered under <button class="btn sm" data-nav="stock">Stock & Balance</button>.') : ''}
   ${!hasPlan() ? note('warn', 'info', `<b>${monthName()} has no plan yet.</b> Start from zero, or copy last month’s quantities and due dates. ${state.plans[prevKey] ? `<button class="btn sm" data-act="copyPrev" style="margin-left:8px">Copy from ${E.MONTHS[(state.month + 11) % 12]}</button>` : ''}`) : ''}
   <section class="card"><div class="card-h"><div><h2>Quantities & due dates · ${monthName()}</h2><div class="sub">The quantity applies to every operation of the part. Leave the due date at month end if the customer has none.</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="pastePlan">${icon('paste')}Paste from Excel</button><button class="btn" data-act="importXlsx">${icon('excel')}Import .xlsx</button>${state.plans[prevKey] && hasPlan() ? `<button class="btn" data-act="copyPrev">${icon('copy')}Copy last month</button>` : ''}<button class="btn danger" data-act="clearQty">Clear quantities</button></div></div>
@@ -2141,6 +2185,51 @@ Pages.plan = () => {
     <div class="tbl-wrap desk-only" id="tw-plan"><table class="tbl"><thead><tr><th class="stick">Part #</th><th>Part name</th><th class="r">Monthly quantity</th><th>Customer due date</th><th>Routing (process · machine · cycle time)</th><th class="r">Machine days</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
     <div class="card-b" style="padding-top:12px"><button class="btn primary" data-nav="capacity">Review capacity ${icon('arrow')}</button></div>
   </section>`;
+};
+
+/* ---------------------------------------------------------------- STOCK & BALANCE (Dynamic capacity) */
+Pages.stock = () => {
+  const plan = planOf(), stockOf = p => (plan.stock || {})[p] || {}, dyn = model.mode === 'dynamic';
+  const q = (ui.search.stock || '').toLowerCase();
+  const parts = new Map();
+  state.operations.forEach(o => { if (!parts.has(o.partNo)) parts.set(o.partNo, { partNo: o.partNo, partName: o.partName, ops: [] }); parts.get(o.partNo).ops.push(o); });
+  const list = [...parts.values()].filter(p => !q || `${p.partNo} ${p.partName}`.toLowerCase().includes(q));
+  const sModel = E.compute(state, { mode: 'static' }), dModel = E.compute(state, { mode: 'dynamic' });
+  const sales = list.reduce((a, p) => a + ((plan.parts[p.partNo] || {}).qty || 0), 0);
+  const stockUnits = list.reduce((a, p) => { const st = stockOf(p.partNo); return a + (st.fg || 0) + Object.values(st.wip || {}).reduce((x, v) => x + (+v || 0), 0); }, 0);
+  const procure = list.reduce((a, p) => a + (((dModel.net[p.partNo] || {}).material || {}).procure || 0), 0);
+  const saved = sModel.totals.req - dModel.totals.req;
+  const inp = (part, kind, op, val) => `<input class="cell-inp" style="width:84px;text-align:right" type="number" min="0" step="1" inputmode="numeric" data-stk="${h(part)}" data-kind="${kind}" ${op != null ? `data-op="${op}"` : ''} value="${val || 0}" aria-label="${h(kind)} stock for ${h(part)}">`;
+  const cards = list.map(p => {
+    const n = (model.net || {})[p.partNo], st = stockOf(p.partNo), wip = st.wip || {};
+    if (!n) return '';
+    const th = (t, sub) => `<th class="r" style="min-width:104px">${t}${sub ? `<div class="small muted" style="font-weight:400">${sub}</div>` : ''}</th>`;
+    const cell = (v, bold) => `<td class="r num"${bold ? ' style="font-weight:700;background:var(--brass-soft,#fbf3dc)"' : ''}>${fmtInt(v)}</td>`;
+    const head = th('Supplier', 'stock at supplier') + th('Inward inspection', 'received, in inspection') + p.ops.map(o => th(h(o.process), h(o.machine) + ' · WIP after')).join('') + th('Finished goods', 'FG stock');
+    const rStock = `<td>${inp(p.partNo, 'supplier', null, st.supplier)}</td><td>${inp(p.partNo, 'inspection', null, st.inspection)}</td>` + p.ops.map(o => `<td class="r">${inp(p.partNo, 'wip', o.id, wip[o.id])}</td>`).join('') + `<td class="r">${inp(p.partNo, 'fg', null, st.fg)}</td>`;
+    const rNeed = `<td class="r num">${fmtInt(n.material.need)}</td><td class="r muted">covers the same material</td>` + n.steps.map(x => cell(x.needAfter)).join('') + cell(n.sales);
+    const rMake = `<td class="r num" style="font-weight:700;background:var(--brass-soft,#fbf3dc)">${fmtInt(n.material.procure)} <span class="small muted">to procure</span></td><td class="r muted">—</td>` + n.steps.map(x => cell(x.produce, true)).join('') + cell(n.needAfterFg, true);
+    return `<section class="card"><div class="card-h"><div><h2><span class="mono">${h(p.partNo)}</span> · ${h(p.partName)}</h2><div class="sub">Sales quantity <b>${fmtInt(n.sales)}</b> → still to make from the first process: <b>${fmtInt(n.material.need)}</b></div></div></div>
+      <div class="tbl-wrap"><table class="tbl"><thead><tr><th style="min-width:150px">Stage →</th>${head}</tr></thead><tbody>
+        <tr><td><b>Stock on hand</b><div class="small muted">enter what you have</div></td>${rStock}</tr>
+        <tr><td>Needed at this stage</td>${rNeed}</tr>
+        <tr><td><b>To make / procure</b><div class="small muted">after taking off the stock</div></td>${rMake}</tr></tbody></table></div></section>`;
+  }).join('');
+  return `
+  ${dyn ? note('ok', 'info', '<b>Dynamic capacity is ON.</b> Machine loading, the load balancer and the schedule use the balance below — not the full sales quantity.')
+         : note('warn', 'info', '<b>Static capacity is ON</b> — the full sales quantity goes to every process and the stock below is not used. Switch to <b>Dynamic</b> (top bar) to load the machines with the balance only.')}
+  <section class="card"><div class="card-h"><div><h2>How the balance is worked out · ${monthName()}</h2><div class="sub">Starting from the customer: <b>sales quantity − finished-goods stock</b> is what the last process must deliver. Each process makes only <b>what is needed after it − the stock waiting after it</b> (work in progress, in process or completed). The process before it must supply exactly what this one makes. Supplier and inward-inspection stock cover the material for the first process; the rest is to procure.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="pasteStock">${icon('paste')}Paste stock from Excel</button><button class="btn danger" data-act="clearStock">Clear stock</button></div></div>
+    <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:0 16px 14px">
+      <div class="kpi"><div class="small muted">Sales quantity</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(sales)}</div></div>
+      <div class="kpi"><div class="small muted">Stock in FG + WIP</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(stockUnits)}</div></div>
+      <div class="kpi"><div class="small muted">Machine days · Static</div><div class="num" style="font-size:20px;font-weight:700">${fmt(sModel.totals.req, 1)}</div></div>
+      <div class="kpi"><div class="small muted">Machine days · Dynamic</div><div class="num" style="font-size:20px;font-weight:700">${fmt(dModel.totals.req, 1)} <span class="small" style="color:var(--ok,#16a34a)">${saved > 0.05 ? '− ' + fmt(saved, 1) : ''}</span></div></div>
+      <div class="kpi"><div class="small muted">Material to procure</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(procure)}</div></div>
+    </div>
+    <div class="toolbar">${searchBox('stock', 'Search part number or name')}<span class="grow"></span><span class="small muted">${list.length} parts</span></div>
+  </section>
+  ${cards || '<section class="card"><div class="card-b muted">No parts yet — add parts and routings under Masters.</div></section>'}`;
 };
 
 /* ---------------------------------------------------------------- MASTERS */
@@ -2334,13 +2423,14 @@ function setPeriod(y, m) { state.year = y; state.month = m; commit(); }
 
 /* ---------- click delegation ---------- */
 document.addEventListener('click', ev => {
-  const t = ev.target.closest('[data-nav],[data-act],[data-scn],[data-cell],[data-mach],[data-go],[data-mtab],[data-stab],[data-theme-set],[data-weekoff]');
+  const t = ev.target.closest('[data-nav],[data-act],[data-capmode],[data-scn],[data-cell],[data-mach],[data-go],[data-mtab],[data-stab],[data-theme-set],[data-weekoff]');
   if (!t) return;
   if (t.tagName === 'A') { if (ev.button !== 0 || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey) return; ev.preventDefault(); }
   if (t.matches('input,select')) return;
   if (ev.target.closest('input,select,textarea') && !t.dataset.act) return;
   const d = t.dataset;
   if (d.nav) return go(d.nav);
+  if (d.capmode) { if (!can('editor')) return toast('You have view-only access.'); state.capMode = d.capmode; commit(); toast(d.capmode === 'dynamic' ? 'Dynamic capacity: stock is taken off the sales quantity at every process.' : 'Static capacity: the sales quantity goes straight to every process.'); return; }
   if (d.scn) { state.scenario = d.scn; commit(); toast(`Scenario: ${scenarioLabel()}`); return; }
   if (d.cell) { ui.cellFilter = ui.cellFilter === d.cell ? 'ALL' : d.cell; if (ui.page !== 'capacity') ui.page = 'capacity'; return render(); }
   if (d.mach) { ui.selMachine = d.mach; if (ui.page !== 'capacity') { ui.page = 'capacity'; render(); } else render(); const ins = $('#inspector'); if (ins && window.innerWidth < 1181) ins.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
@@ -2376,6 +2466,7 @@ document.addEventListener('change', ev => {
   const need = fieldNeeds(el);
   if (need && !can(need)) { toast('You do not have permission to change this.'); return render(); }
   if (d.qty) { const p = ensurePlan(); const pp = p.parts[d.qty] = p.parts[d.qty] || {}; pp.qty = Math.max(0, Number(el.value) || 0); if (!pp.due) pp.due = model.monthEnd; return commit(); }
+  if (d.stk) { const p = ensurePlan(); p.stock = p.stock || {}; const ps = p.stock[d.stk] = p.stock[d.stk] || { wip: {} }; ps.wip = ps.wip || {}; const v = Math.max(0, Math.round(Number(el.value) || 0)); if (d.kind === 'wip') ps.wip[d.op] = v; else ps[d.kind] = v; return commit(); }
   if (d.due) { const p = ensurePlan(); const pp = p.parts[d.due] = p.parts[d.due] || { qty: 0 }; pp.due = el.value || model.monthEnd; return commit(); }
   if (d.avail) { const p = ensurePlan(); const mm = p.machines[d.avail] = p.machines[d.avail] || {}; mm.availDays = el.value === '' ? null : Math.max(0, Number(el.value)); return commit(); }
   if (d.remark) { const p = ensurePlan(); const mm = p.machines[d.remark] = p.machines[d.remark] || {}; mm.remarks = el.value; return commit(); }
@@ -2566,6 +2657,20 @@ const Actions = {
       } }]
     });
   },
+  pasteStock() {
+    modal({
+      title: 'Paste stock from Excel',
+      body: `<p>Copy three columns from Excel — <b>Part #</b>, <b>Stage</b>, <b>Quantity</b> — and paste below. Stage is <b>Supplier</b>, <b>Inward inspection</b>, <b>FG</b> (finished goods), or the <b>process name</b> / <b>Op 1, Op 2…</b> for work in progress after that operation.</p><textarea class="inp" id="pasteBox" rows="8" placeholder="PART-001&#9;FG&#9;1200&#10;PART-001&#9;Op 2&#9;800&#10;PART-001&#9;Supplier&#9;3000"></textarea><p class="small muted" id="pasteInfo"></p>`,
+      buttons: [{ label: 'Apply', cls: 'primary', act: () => {
+        const res = parseStockPaste($('#pasteBox').value);
+        if (!res.rows.length) { $('#pasteInfo').textContent = 'No rows recognised. Columns: Part #, Stage, Quantity.'; return true; }
+        const p = ensurePlan(); p.stock = p.stock || {};
+        res.rows.forEach(r => { const ps = p.stock[r.partNo] = p.stock[r.partNo] || { wip: {} }; ps.wip = ps.wip || {}; if (r.kind === 'wip') ps.wip[r.op] = r.qty; else ps[r.kind] = r.qty; });
+        commit(); toast(`Stock updated for ${res.rows.length} stage${res.rows.length > 1 ? 's' : ''}${res.unknown.length ? ` · ${res.unknown.length} line${res.unknown.length > 1 ? 's' : ''} skipped` : ''}`);
+      } }]
+    });
+  },
+  clearStock() { confirmBox('Clear all stock?', `Every stock quantity for ${E.MONTHS[state.month]} ${state.year} will be set to 0.`, 'Clear', () => { const p = ensurePlan(); p.stock = {}; commit(); }, true); },
   pasteRoutings() {
     modal({
       title: 'Paste routings from Excel',
@@ -2757,6 +2862,23 @@ const Actions = {
   }
 };
 
+function parseStockPaste(txt) {
+  const rows = [], unknown = [];
+  String(txt || '').split(/\r?\n/).forEach(line => {
+    const c = line.split(/\t|;|,(?=\s*[A-Za-z])/).map(x => x.trim()); if (c.length < 3) { if (line.trim()) unknown.push(line); return; }
+    const partNo = c[0], st = c[1].toLowerCase(), qty = Number(String(c[2]).replace(/,/g, ''));
+    const ops = state.operations.filter(o => o.partNo === partNo);
+    if (!ops.length || !(qty >= 0)) { unknown.push(line); return; }
+    let r = null;
+    if (/supplier/.test(st)) r = { kind: 'supplier' };
+    else if (/inspect|inward|iqc/.test(st)) r = { kind: 'inspection' };
+    else if (/^fg$|finish|despatch|dispatch/.test(st)) r = { kind: 'fg' };
+    else { const m = st.match(/^op\s*(\d+)$/); const o = m ? ops[Number(m[1]) - 1] : ops.find(x => String(x.process).toLowerCase() === st); if (o) r = { kind: 'wip', op: o.id }; }
+    if (!r) { unknown.push(line); return; }
+    rows.push(Object.assign({ partNo, qty: Math.round(qty) }, r));
+  });
+  return { rows, unknown };
+}
 function parsePlanPaste(txt) {
   const known = new Set(state.operations.map(o => o.partNo));
   const rows = [], unknown = [];
