@@ -23,23 +23,23 @@
        CASTING  pour weight  = finished weight ÷ yield %
      returns null when there is not enough to go on (then the part weight from the Operations Master is used) */
   function blank(part, mat, dwg, set) {
-    const form = formOf(mat), w = Number(part.weight_kg) || 0, warn = [];
+    const form = formOf(mat), w = Number(part.weight_kg) || 0, warn = []; let hard = false;
     if (!mat || !form) return null;
     if (form === "bar") {
       const sz = sizeOf(mat); if (!dwg || !dwg.len || !sz.dia) return null;
       const cut = dwg.len + 2 * set.face_mm + set.part_mm, area = Math.PI / 4 * sz.dia * sz.dia;
-      if (dwg.od && sz.dia < dwg.od + 1 - 1e-9) warn.push("Bar Ø" + sz.dia + " is too small for the Ø" + dwg.od + " on the drawing — choose a larger bar in Operations Master › Parts.");
-      let kg, txt;
-      if (sz.len) { const pcs = Math.floor((sz.len - set.remnant_mm) / cut); if (pcs < 1) { warn.push("Cut length " + fx(cut) + " mm does not fit the bar."); return { kg: 0, form, text: "", warn }; }
+      if (dwg.od && sz.dia < dwg.od + 1 - 1e-9) warn.push("Bar Ø" + sz.dia + " is too small for the Ø" + dwg.od + " on the drawing — choose a larger bar in Operations Master › Parts."), hard = true;
+      let kg, txt, pcs = null;
+      if (sz.len) { pcs = Math.floor((sz.len - set.remnant_mm) / cut); if (pcs < 1) { warn.push("Cut length " + fx(cut) + " mm does not fit the bar."); return { kg: 0, form, text: "", warn, hard: true }; }
         kg = area * sz.len * set.density * 1e-6 / pcs; txt = "Bar Ø" + sz.dia + " · cut " + fx(cut) + " mm (drawing " + fx(dwg.len) + " + allowances) · " + pcs + " pcs per " + fx(sz.len / 1000) + " m bar"; }
       else { kg = area * cut * set.density * 1e-6; txt = "Bar Ø" + sz.dia + " · cut " + fx(cut) + " mm (drawing " + fx(dwg.len) + " + allowances)"; }
-      return { kg: r3(kg), form, text: txt, warn };
+      return { kg: r3(kg), form, text: txt, warn, hard, cut, pcs, dia: sz.dia };
     }
     let fin = w, est = false;
     if (!fin && dwg && dwg.od && dwg.len) { fin = Math.PI / 4 * dwg.od * dwg.od * dwg.len * set.density * 1e-6 * 0.6; est = true; warn.push("No finished weight in the Operations Master — estimated from the drawing envelope (Ø" + dwg.od + " × " + dwg.len + "); enter the part weight for an exact figure."); }
     if (!fin) return null;
-    if (form === "forging") return { kg: r3(fin * (1 + set.forge_pct / 100)), form, text: "Forging blank · finished " + fx(fin, 3) + " kg + " + set.forge_pct + "% allowance", warn };
-    return { kg: r3(fin / (set.cast_yield_pct / 100)), form, text: "Casting · finished " + fx(fin, 3) + " kg ÷ " + set.cast_yield_pct + "% yield", warn };
+    if (form === "forging") return { fin, kg: r3(fin * (1 + set.forge_pct / 100)), form, text: "Forging blank · finished " + fx(fin, 3) + " kg + " + set.forge_pct + "% allowance", warn };
+    return { fin, kg: r3(fin / (set.cast_yield_pct / 100)), form, text: "Casting · finished " + fx(fin, 3) + " kg ÷ " + set.cast_yield_pct + "% yield", warn };
   }
   function plan(data, month) {
     const set = settings(data.settings), dw = Object.fromEntries((data.drawings || []).map((d) => [d.part_code, d]));
@@ -51,13 +51,18 @@
       if (!own && dwg && dwg.od) { const c = (data.materials || []).filter((m) => formOf(m) === "bar" && sizeOf(m).dia >= dwg.od + 1 - 1e-9).sort((a, b) => sizeOf(a).dia - sizeOf(b).dia)[0]; if (c) { own = c.code; sug = true; } }
       bl.forEach((b) => { const loss = num(b.loss_pct);
         if (b.rm_kg != null && b.rm_kg !== "") out.push({ material: b.material_code, kg: num(b.rm_kg), loss, source: "bom", text: "Bill of material", warn: [] });
-        else { const r = b.material_code === own ? blank(p, mats0[b.material_code], dwg, set) : null; out.push(r ? { material: b.material_code, kg: r.kg, loss, source: "drawing", text: r.text, warn: r.warn } : { material: b.material_code, kg: num(p.weight_kg), loss, source: "weight", text: "Part weight", warn: [] }); } });
-      if (own && !out.some((l) => l.material === own)) { const r = blank(p, mats0[own], dwg, set);
-        out.unshift(r ? { material: own, kg: r.kg, loss: 0, source: "drawing", text: (sug ? "Suggested " : "") + r.text, warn: r.warn, suggested: sug } : { material: own, kg: num(p.weight_kg), loss: 0, source: "weight", text: "Part weight", warn: [] }); }
+        else { const ap = approved(p, b.material_code, dwg); if (ap) { out.push(Object.assign({ material: b.material_code, loss }, ap)); return; }
+          const r = b.material_code === own ? blank(p, mats0[b.material_code], dwg, set) : null; out.push(r ? { material: b.material_code, kg: r.kg, loss, source: "drawing", text: r.text, warn: r.warn, block: !!r.hard, meta: r } : { material: b.material_code, kg: num(p.weight_kg), loss, source: "weight", text: "Part weight", warn: [] }); } });
+      if (own && !out.some((l) => l.material === own)) { const ap = approved(p, own, dwg); if (ap) out.unshift(Object.assign({ material: own, loss: 0 }, ap)); else { const r = blank(p, mats0[own], dwg, set);
+        out.unshift(r ? { material: own, kg: r.kg, loss: 0, source: "drawing", text: (sug ? "Suggested " : "") + r.text, warn: r.warn, suggested: sug, block: !!(r && r.hard), meta: r || null } : { material: own, kg: num(p.weight_kg), loss: 0, source: "weight", text: "Part weight", warn: [] }); } }
       out.forEach((l) => { if (l.source === "drawing" && dwg && formOf(mats0[l.material]) === "bar") { const cur = sizeOf(mats0[l.material]).dia, sm = (data.materials || []).filter((m) => formOf(m) === "bar" && sizeOf(m).dia >= dwg.od + 1 - 1e-9 && sizeOf(m).dia < cur).sort((x, y) => sizeOf(y).dia - sizeOf(x).dia)[0];
         if (sm) { const r2 = blank(p, sm, dwg, set); if (r2 && r2.kg && r2.kg < l.kg * 0.9) l.warn.push("Tip: bar " + sm.code + " (Ø" + sizeOf(sm).dia + ") would use " + fx(r2.kg, 3) + " kg per part instead of " + fx(l.kg, 3) + "."); } } });
       return out;
     };
+    const appr = Object.fromEntries((data.bom_master || []).filter((b) => b.data && Number(b.data.blank_kg) > 0).map((b) => [(b.data.part_no || String(b.code).split("/")[0]) + "|" + (b.data.material || String(b.code).split("/")[1]), b]));
+    const approved = (p, material, dwg) => { const a = appr[p.code + "|" + material]; if (!a) return null; const d = a.data, w = [];
+      if (dwg && dwg.rev && d.drawing_rev && String(dwg.rev) !== String(d.drawing_rev)) w.push("Drawing is now rev " + dwg.rev + "; this was approved on rev " + d.drawing_rev + " — review the figure again.");
+      return { kg: Number(d.blank_kg), source: "approved", text: "Approved BOM" + (d.revision ? " rev " + d.revision : "") + (d.approved_by ? " · " + d.approved_by : "") + (d.approved_on ? " · " + d.approved_on : "") + (d.basis ? " — " + d.basis : ""), warn: w }; };
     const basis = {}; (data.parts || []).forEach((p) => { basis[p.code] = { lines: partLines(p), drawing: dw[p.code] || null }; });
     const parts = Object.fromEntries((data.parts || []).map((p) => [p.code, p]));
     const mats = mats0;

@@ -12,10 +12,12 @@
   const demand = {}; demand[mth] = [["DP-1101", 4800, 6], ["DP-1102", 3200, 9], ["DP-1103", 1500, 12], ["DP-1104", 5200, 5], ["DP-1105", 6000, 14]].map((r) => ({ month: mth, part_code: r[0], start_qty: r[1], sales_qty: r[1], need_by: iso(r[2]), source: "capacity", published_at: new Date().toISOString() }));
   const orders = [{ id: id(), material_code: "RM-EN8-65", supplier_code: "SUP-001", month: mth, po_no: "PO-0101", qty_kg: 3000, rate: 74, order_date: iso(-8), due_date: iso(3), status: "ordered", received_kg: null }];
   const drawings = [{ part_code: "DP-1101", rev: "C", od: 42.5, len: 118, items: 24 }, { part_code: "DP-1102", rev: "B", od: 62, len: 74, items: 20 }, { part_code: "DP-1104", rev: "A", od: 24, len: 96, items: 15 }, { part_code: "DP-1105", rev: "A", od: 38, len: 22, items: 10 }];
-  let settings = {};
+  let settings = {}; const bomMaster = [];
   window.QP_DEMO = {
     kmr_rmp_settings_save(a) { settings = a.p; return null; },
-    kmr_rmp_load(a) { return { drawings, settings, parts, materials, suppliers, bom, stock, demand: demand[a.p_month] || [], months: Object.keys(demand), orders, capacity: true, today: iso(0) }; },
+    kmr_rmp_approve(a) { a.p_rows.forEach((r) => { const code = r.part_code + "/" + r.material_code, i = bomMaster.findIndex((b) => b.code === code), rev = i >= 0 ? (+bomMaster[i].data.revision || 0) + 1 : 1, o = { code, name: "", data: { part_no: r.part_code, material: r.material_code, blank_kg: +r.kg, drawing_rev: r.drawing_rev, basis: r.basis, revision: String(rev), approved_by: "demo@sample", approved_on: iso(0), status: "Approved" } }; if (i >= 0) bomMaster[i] = o; else bomMaster.push(o); }); return a.p_rows.length; },
+    kmr_rmp_unapprove(a) { const i = bomMaster.findIndex((b) => b.code === a.p_part + "/" + a.p_material); if (i >= 0) bomMaster.splice(i, 1); return null; },
+    kmr_rmp_load(a) { return { bom_master: bomMaster, drawings, settings, parts, materials, suppliers, bom, stock, demand: demand[a.p_month] || [], months: Object.keys(demand), orders, capacity: true, today: iso(0) }; },
     kmr_rmp_bom_save(a) { const p = a.p, r = { id: id(), part_code: p.part_code, material_code: p.material_code, rm_kg: p.rm_kg === "" ? null : +p.rm_kg, loss_pct: +p.loss_pct || 0, notes: p.notes }; const i = bom.findIndex((b) => b.part_code === r.part_code && b.material_code === r.material_code); if (i >= 0) bom[i] = r; else bom.push(r); return r.id; },
     kmr_rmp_bom_delete(a) { const i = bom.findIndex((b) => b.id === a.p_id); if (i >= 0) bom.splice(i, 1); return null; },
     kmr_rmp_stock_save(a) { const p = a.p; let s = stock.find((x) => x.material_code === p.material_code); if (!s) stock.push(s = { material_code: p.material_code, on_hand_kg: 0, safety_kg: 0 }); Object.keys(p).forEach((k) => { if (k !== "material_code") s[k] = p[k] === "" ? null : +p[k]; }); return null; },
