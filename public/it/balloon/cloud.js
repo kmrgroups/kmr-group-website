@@ -574,6 +574,7 @@ $("clSave").onclick=saveReport;
 
 /* ---------- Balloon Inspector → Process Documents ---------- */
 async function sendToPD(){
+  if(window.KMR_FEAT && !window.KMR_FEAT.has("balloon.data-flow-to-process-documents")){ BI.toast("Data flow to Process Documents is not part of your plan. To add it, contact KMR Group of Companies - www.kmr-groups.com/contact",9000); return; }
   if(!C.org||!BI.S.items.length){ BI.toast("Balloon the drawing first."); return; }
   const pdUrl=CFG.pdUrl||"pd.html";
   // 1) save the report so the project stays linked to it
