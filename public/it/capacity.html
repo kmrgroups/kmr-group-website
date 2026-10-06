@@ -583,19 +583,22 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
        the process before it must supply exactly what this one runs
      What the first process must run is the quantity of parts to start; the Raw Material Planning app will turn that into material.
      Static capacity skips all of this (sales quantity at every operation). */
-  function netDemand(state, plan, seqMap) {
+  function netDemand(state, plan, seqMap, o) {
+    o = o || {};
     const out = {};
     const stock = (plan && plan.stock) || {}, scrap = (plan && plan.scrap) || {}, cls = (plan && plan.cls) || {}, minq = (plan && plan.minStock) || {};
-    const cover = Math.max(0, num(plan && plan.cover, 7)), dpm = Math.max(1, num(state.settings && state.settings.daysPerMonth, 25));
+    const coverOf = c => Math.max(0, num(plan && (c === 'A' ? (plan.coverA != null ? plan.coverA : plan.cover) : c === 'B' ? plan.coverB : plan.coverC), c === 'A' ? 7 : 0));
+    const minOn = !o.noMin && !(plan && plan.minOn === false);
+    const dpm = Math.max(1, num(state.settings && state.settings.daysPerMonth, 25));
     const byPart = new Map();
     state.operations.forEach(op => { const l = byPart.get(op.partNo) || []; l.push(op); byPart.set(op.partNo, l); });
     byPart.forEach((ops, partNo) => {
       const sales = Math.max(0, num(((plan.parts || {})[partNo] || {}).qty, 0));
       const st = stock[partNo] || {}, wip = st.wip || {}, sup = st.sup || {}, insp = st.insp || {};
       const fg = Math.max(0, num(st.fg, 0));
-      // A-class parts also keep a minimum stock: typed quantity, or (when left 0) sales per working day × cover days
-      const isA = cls[partNo] === 'A';
-      const minStock = isA ? (num(minq[partNo], 0) > 0 ? Math.round(num(minq[partNo], 0)) : Math.ceil(sales / dpm * cover)) : 0;
+      // every class can keep a minimum stock: typed quantity, or (when left 0) sales per working day × the cover days of its class (A runner, B repeater, C stranger)
+      const c = cls[partNo] || 'B', isA = c === 'A';
+      const minStock = !minOn ? 0 : (num(minq[partNo], 0) > 0 ? Math.round(num(minq[partNo], 0)) : Math.ceil(sales / dpm * coverOf(c)));
       let need = Math.max(0, sales + minStock - fg);
       const needAfterFg = need;
       const steps = new Array(ops.length);
@@ -609,7 +612,10 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
         steps[k] = { opId: id, process: ops[k].process, needAfter: need, wip: w, supplier: su, inspection: iq, stockAfter, scrapPct: sp, good, produce: run };
         need = run;
       }
-      out[partNo] = { sales, fg, isA, minStock, needAfterFg, steps, material: { need }, byOp: Object.fromEntries(steps.map(x => [x.opId, x.produce])) };
+      // Static: no stock netted, but the scrap allowance is still added at every process (from the last process back)
+      let sn = sales; const sBy = {};
+      for (let k = ops.length - 1; k >= 0; k--) { const sp = Math.min(99, Math.max(0, num(scrap[ops[k].id], 0))); sn = sn > 0 ? Math.ceil(sn / (1 - sp / 100) - 1e-9) : 0; sBy[ops[k].id] = sn; }
+      out[partNo] = { sales, fg, isA, cls: c, minStock, staticByOp: sBy, needAfterFg, steps, material: { need }, byOp: Object.fromEntries(steps.map(x => [x.opId, x.produce])) };
     });
     return out;
   }
@@ -654,7 +660,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
 
     // Static: every operation makes the sales quantity. Dynamic: each operation makes only what is still needed after the stock.
     const mode = (opts.mode || state.capMode) === 'dynamic' ? 'dynamic' : 'static';
-    const net = netDemand(state, plan, seqMap);
+    const net = netDemand(state, plan, seqMap, { noMin: opts.noMin });
 
     // Split / reassign overrides: either from plan (applied) or from auto-level preview
     const splits = Object.assign({}, plan.splits || {}, opts.splitsOverride || {});
@@ -664,7 +670,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     state.operations.forEach(op => {
       const part = (plan.parts && plan.parts[op.partNo]) || {};
       const salesQty = Math.max(0, num(part.qty, 0));
-      const qty = mode === 'dynamic' ? (((net[op.partNo] || {}).byOp || {})[op.id] || 0) : salesQty;
+      const qty = mode === 'dynamic' ? (((net[op.partNo] || {}).byOp || {})[op.id] || 0) : (((net[op.partNo] || {}).staticByOp || {})[op.id] ?? salesQty);
       const due = validDue(part.due, y, m) || monthEnd;
       const pph = op.cycleTime > 0 ? (3600 / op.cycleTime) * oee : 0;
       const alloc = splits[op.id] && splits[op.id].length ? splits[op.id] : [{ machine: op.machine, share: 1 }];
@@ -1814,7 +1820,7 @@ const EDITOR_SETTINGS = ['levelTargetPct', 'lotSize', 'levelAnyMachine', 'oee', 
 function actNeeds(act) { return ADMIN_ACTS.includes(act) ? 'admin' : EDITOR_ACTS.includes(act) ? 'editor' : null; }
 function fieldNeeds(el) {
   const d = el.dataset;
-  if (d.qty || d.stk || d.cover || d.due || d.avail || d.remark || d.mfield || d.ofield) return 'editor';
+  if (d.qty || d.stk || d.cover || d.minon || d.due || d.avail || d.remark || d.mfield || d.ofield) return 'editor';
   if (d.setting) return EDITOR_SETTINGS.includes(d.setting) ? 'editor' : 'admin';
   if (d.settingBool) return EDITOR_SETTINGS.includes(d.settingBool) ? 'editor' : 'admin';
   if (d.weekoff !== undefined || el.id === 'hDate' || el.id === 'hName') return 'editor';
@@ -2202,7 +2208,8 @@ Pages.stock = () => {
   const parts = new Map();
   state.operations.forEach(o => { if (!parts.has(o.partNo)) parts.set(o.partNo, { partNo: o.partNo, partName: o.partName, ops: [] }); parts.get(o.partNo).ops.push(o); });
   const list = [...parts.values()].filter(p => !q || `${p.partNo} ${p.partName}`.toLowerCase().includes(q));
-  const sModel = E.compute(state, { mode: 'static' }), dModel = E.compute(state, { mode: 'dynamic' });
+  const sModel = E.compute(state, { mode: 'static' }), dModel = E.compute(state, { mode: 'dynamic' }), dNoMin = E.compute(state, { mode: 'dynamic', noMin: true });
+  const minDays = dModel.totals.req - dNoMin.totals.req;
   const sales = list.reduce((a, p) => a + ((plan.parts[p.partNo] || {}).qty || 0), 0);
   const sum = o => Object.values(o || {}).reduce((x, v) => x + (+v || 0), 0);
   const stockUnits = list.reduce((a, p) => { const st = stockOf(p.partNo); return a + (st.fg || 0) + sum(st.wip) + sum(st.sup) + sum(st.insp); }, 0);
@@ -2217,7 +2224,7 @@ Pages.stock = () => {
     const cell = (v, bold) => `<td class="r num"${bold ? ' style="font-weight:700;background:var(--brass-soft,#fbf3dc)"' : ''}>${fmtInt(v)}</td>`;
     const head = p.ops.map(o => th(h(o.process), h(o.machine))).join('') + th('Finished goods', 'FG stock');
     const row = (label, sub, cells) => `<tr><td><b>${label}</b>${sub ? `<div class="small muted">${sub}</div>` : ''}</td>${cells}</tr>`;
-    const clsSel = `<select class="inp" data-stk="${h(p.partNo)}" data-kind="cls" aria-label="ABC class">${['A', 'B', 'C'].map(c => `<option ${((plan.cls || {})[p.partNo] || 'B') === c ? 'selected' : ''}>${c}</option>`).join('')}</select>`;
+    const clsSel = `<select class="inp" data-stk="${h(p.partNo)}" data-kind="cls" aria-label="ABC class">${[['A', 'A · Runner'], ['B', 'B · Repeater'], ['C', 'C · Stranger']].map(c => `<option value="${c[0]}" ${((plan.cls || {})[p.partNo] || 'B') === c[0] ? 'selected' : ''}>${c[1]}</option>`).join('')}</select>`;
     const rScrap = p.ops.map(o => `<td class="r">${inp(p.partNo, 'scrap', o.id, sc[o.id], 0.1)}</td>`).join('') + '<td></td>';
     const rWip = p.ops.map(o => `<td class="r">${inp(p.partNo, 'wip', o.id, (st.wip || {})[o.id])}</td>`).join('') + `<td class="r">${inp(p.partNo, 'fg', null, st.fg)}</td>`;
     const rSup = p.ops.map(o => `<td class="r">${inp(p.partNo, 'sup', o.id, (st.sup || {})[o.id])}</td>`).join('') + '<td></td>';
@@ -2225,30 +2232,31 @@ Pages.stock = () => {
     const rNeed = n.steps.map(x => cell(x.needAfter)).join('') + cell(n.sales);
     const rGood = n.steps.map(x => cell(x.good)).join('') + cell(n.needAfterFg);
     const rRun = n.steps.map(x => cell(x.produce, true)).join('') + '<td></td>';
-    return `<section class="card"><div class="card-h"><div><h2><span class="mono">${h(p.partNo)}</span> · ${h(p.partName)}</h2><div class="sub">Sales quantity <b>${fmtInt(n.sales)}</b>${n.isA ? ` + minimum stock <b>${fmtInt(n.minStock)}</b>` : ''} → parts to start at the first process: <b>${fmtInt(n.material.need)}</b></div></div>
-        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="small muted">Class ${clsSel}</label>${(plan.cls || {})[p.partNo] === 'A' ? `<label class="small muted">Min stock qty (0 = auto) ${inp(p.partNo, 'minq', null, (plan.minStock || {})[p.partNo])}</label>` : ''}</div></div>
+    return `<section class="card"><div class="card-h"><div><h2><span class="mono">${h(p.partNo)}</span> · ${h(p.partName)}</h2><div class="sub">Sales quantity <b>${fmtInt(n.sales)}</b>${n.minStock ? ` + minimum stock <b>${fmtInt(n.minStock)}</b>` : ''} → parts to start at the first process: <b>${fmtInt(n.material.need)}</b></div></div>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><label class="small muted">Class ${clsSel}</label><label class="small muted">Min stock qty (0 = from class days) ${inp(p.partNo, 'minq', null, (plan.minStock || {})[p.partNo])}</label></div></div>
       <div class="tbl-wrap"><table class="tbl"><thead><tr><th style="min-width:190px">Process →</th>${head}</tr></thead><tbody>
         ${row('Scrap allowance %', 'type by hand for now', rScrap)}
         ${row('Stock in house (WIP)', 'good parts finished this process, waiting', rWip)}
         ${row('Stock at supplier', 'done at a supplier process', rSup)}
         ${row('Stock in inward inspection', 'back from supplier, being inspected', rIns)}
-        ${row('Needed after this process', n.isA ? 'sales + min stock − FG stock' : 'sales − FG stock', rNeed)}
+        ${row('Needed after this process', n.minStock ? 'sales + min stock − FG stock' : 'sales − FG stock', rNeed)}
         ${row('Good parts still to make', 'needed − all stock', rGood)}
         ${row('To run on the machine', 'good parts ÷ (1 − scrap %)', rRun)}</tbody></table></div></section>`;
   }).join('');
   return `
   ${dyn ? note('ok', 'info', '<b>Dynamic capacity is ON.</b> Machine loading, the load balancer and the schedule use the balance below — not the full sales quantity.')
-         : note('warn', 'info', '<b>Static capacity is ON</b> — the full sales quantity goes to every process; stock and scrap below are not used. Switch to <b>Dynamic</b> (top bar) to load the machines with the balance only.')}
-  <section class="card"><div class="card-h"><div><h2>How the balance is worked out · ${monthName()}</h2><div class="sub">Starting from the customer: <b>sales quantity + minimum stock (A-class parts only) − finished-goods stock</b> is what the last process must deliver. Each process makes only <b>what is needed after it − the stock after it</b> (in-house WIP + at supplier + in inward inspection). Then the scrap % is added on top, because rejected parts must be made again. The process before it must supply exactly what this one runs. The <b>parts to start</b> at the first process will go to the Raw Material Planning app (coming).</div></div>
+         : note('warn', 'info', '<b>Static capacity is ON</b> — the sales quantity goes to every process with the scrap allowance added; stock and minimum stock below are not used. Switch to <b>Dynamic</b> (top bar) to load the machines with the balance only.')}
+  <section class="card"><div class="card-h"><div><h2>How the balance is worked out · ${monthName()}</h2><div class="sub">Starting from the customer: <b>sales quantity + minimum stock (if switched on) − finished-goods stock</b> is what the last process must deliver. Each process makes only <b>what is needed after it − the stock after it</b> (in-house WIP + at supplier + in inward inspection). Then the scrap % is added on top, because rejected parts must be made again. The process before it must supply exactly what this one runs. The <b>parts to start</b> at the first process will go to the Raw Material Planning app (coming).</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="pasteStock">${icon('paste')}Paste stock from Excel</button><button class="btn danger" data-act="clearStock">Clear stock</button></div></div>
     <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:0 16px 14px">
       <div class="kpi"><div class="small muted">Sales quantity</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(sales)}</div></div>
       <div class="kpi"><div class="small muted">Stock (FG + all processes)</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(stockUnits)}</div></div>
       <div class="kpi"><div class="small muted">Machine days · Static</div><div class="num" style="font-size:20px;font-weight:700">${fmt(sModel.totals.req, 1)}</div></div>
       <div class="kpi"><div class="small muted">Machine days · Dynamic</div><div class="num" style="font-size:20px;font-weight:700">${fmt(dModel.totals.req, 1)} <span class="small" style="color:var(--ok,#16a34a)">${saved > 0.05 ? '− ' + fmt(saved, 1) : ''}</span></div></div>
+      <div class="kpi"><div class="small muted">Machine days for minimum stock</div><div class="num" style="font-size:20px;font-weight:700">${fmt(minDays, 1)}</div></div>
       <div class="kpi"><div class="small muted">Parts to start (first process)</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(startQty)}</div></div>
     </div>
-    <div class="toolbar">${searchBox('stock', 'Search part number or name')}<label class="small muted" title="A-class parts keep this many days of sales as minimum stock, unless a quantity is typed on the part">Minimum stock for A class: <input class="cell-inp" style="width:60px;text-align:right" type="number" min="0" step="1" data-cover="1" value="${plan.cover != null ? plan.cover : 7}"> days of sales</label><span class="grow"></span><span class="small muted">${list.length} parts</span></div>
+    <div class="toolbar">${searchBox('stock', 'Search part number or name')}<label class="small muted" title="Keep a minimum stock on top of the sales quantity">Minimum stock <select class="inp" data-minon="1"><option value="1" ${plan.minOn !== false ? 'selected' : ''}>On</option><option value="0" ${plan.minOn === false ? 'selected' : ''}>Off</option></select></label>${[['A', 'Runner', 7, plan.coverA != null ? plan.coverA : plan.cover], ['B', 'Repeater', 0, plan.coverB], ['C', 'Stranger', 0, plan.coverC]].map(c => `<label class="small muted" title="Days of sales kept as minimum stock for ${c[1]} parts">${c[0]} ${c[1]}: <input class="cell-inp" style="width:52px;text-align:right" type="number" min="0" step="1" data-cover="${c[0]}" value="${c[3] != null ? c[3] : c[2]}"> days</label>`).join('')}<span class="grow"></span><span class="small muted">${list.length} parts</span></div>
   </section>
   ${cards || '<section class="card"><div class="card-b muted">No parts yet — add parts and routings under Masters.</div></section>'}`;
 };
@@ -2487,7 +2495,8 @@ document.addEventListener('change', ev => {
   const need = fieldNeeds(el);
   if (need && !can(need)) { toast('You do not have permission to change this.'); return render(); }
   if (d.qty) { const p = ensurePlan(); const pp = p.parts[d.qty] = p.parts[d.qty] || {}; pp.qty = Math.max(0, Number(el.value) || 0); if (!pp.due) pp.due = model.monthEnd; return commit(); }
-  if (d.cover) { const p = ensurePlan(); p.cover = Math.max(0, Math.round(Number(el.value) || 0)); return commit(); }
+  if (d.minon) { const p = ensurePlan(); p.minOn = el.value === '1'; return commit(); }
+  if (d.cover) { const p = ensurePlan(); p['cover' + d.cover] = Math.max(0, Math.round(Number(el.value) || 0)); return commit(); }
   if (d.stk) {
     const p = ensurePlan();
     if (d.kind === 'cls') { p.cls = p.cls || {}; p.cls[d.stk] = el.value; return commit(); }
