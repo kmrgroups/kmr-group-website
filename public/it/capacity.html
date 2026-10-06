@@ -1433,6 +1433,11 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       if (ws && ws[0]) { this.org = ws[0].id; this.orgName = ws[0].name; return ws[0].id; }
       return null;
     },
+    async features() {
+      const rows = await this._fetch('/rest/v1/rpc/kmr_access_features', { method: 'POST', body: JSON.stringify({ p_product: 'capacity' }) }).catch(() => null);
+      const r = (rows || []).find(x => x.org_id === this.org);
+      return r && r.restricted ? new Set(r.features || []) : null;   // null = every feature
+    },
     async licence() {
       const rows = await this._fetch('/rest/v1/rpc/kmr_access', { method: 'POST', body: JSON.stringify({ p_product: 'capacity' }) }).catch(() => null);
       const r = (rows || []).find(x => x.org_id === this.org);
@@ -1545,6 +1550,12 @@ const PAGES = [
   { id: 'help', group: 'Setup', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' }
 ];
 
+/* ---------- features the customer bought (Operations: quote / invoice) ---------- */
+const FEATURE_OF = { balance: 'capacity.takt-time-levelling', 'scn:levelled': 'capacity.takt-time-levelling', 'scn:sunday': 'capacity.alternate-machines-what-if' };
+const FEATURE_NAME = { 'capacity.takt-time-levelling': 'Takt-time levelling (Load Balancer)', 'capacity.alternate-machines-what-if': 'Alternate machines & what-if (Sunday working)' };
+function isLocked(k) { const f = FEATURE_OF[k]; return !!(f && cloud.feat && !cloud.feat.has(f)); }
+function lockedNote(k) { const f = FEATURE_OF[k]; modal({ title: 'Not in your plan', body: `<p><b>${h(FEATURE_NAME[f] || 'This feature')}</b> is not part of your company's Capacity Planner subscription.</p><p>To add it, please contact KMR Group of Companies — <a href="https://www.kmr-groups.com/contact" target="_blank" rel="noopener">www.kmr-groups.com/contact</a>.</p>` }); }
+
 /* ---------- helpers ---------- */
 const $ = s => document.querySelector(s);
 const h = s => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
@@ -1565,7 +1576,7 @@ const pill = t => `<span class="pill ${t}">${TIER[t].label}</span>`;
 
 /* ---------- state ---------- */
 let state, model, ui = { page: 'overview', selMachine: null, cellFilter: 'ALL', mastersTab: 'machines', schedMachine: 'ALL', search: {}, hideZero: true };
-let cloud = { status: 'local', stamp: null, dirty: false, timer: null, poll: null, msg: '', role: null, savedHash: null, pulling: false };
+let cloud = { feat: null, status: 'local', stamp: null, dirty: false, timer: null, poll: null, msg: '', role: null, savedHash: null, pulling: false };
 
 function defaultState() { return clone(window.SEED_DATA); }
 
@@ -1672,6 +1683,7 @@ async function cloudBoot() {
     if (!(await Cloud.resolveOrg())) { showGate('noaccess'); setSync('err', 'No access'); return; }
     const lic = await Cloud.licence();
     if (lic && lic.ok === false) { showGate('error', (lic.message || 'Your company\'s access is paused.') + ' Your plan is safe and returns as soon as the subscription is renewed.'); setSync('err', 'Access paused'); return; }
+    cloud.feat = await Cloud.features();
     cloud.role = await Cloud.myRole();
     if (!cloud.role) { showGate('noaccess'); setSync('err', 'No access'); return; }
     const r = await Cloud.load();
@@ -1947,6 +1959,8 @@ function scheduleRender() {
 function render(keepFocus) {
   const active = keepFocus && document.activeElement && document.activeElement.id ? document.activeElement.id : null;
   const scrolls = {}; document.querySelectorAll('.tbl-wrap[id], .oplist[id]').forEach(el => scrolls[el.id] = [el.scrollLeft, el.scrollTop]);
+  if (isLocked('scn:' + state.scenario)) state.scenario = 'standard';
+  if (isLocked(ui.page)) ui.page = 'overview';
   const opts = {};
   if (state.scenario === 'levelled') opts.splitsOverride = E.autoLevel(state).splits;
   model = E.compute(state, opts);
@@ -1975,7 +1989,7 @@ function renderShell() {
     let g = '';
     if (p.group !== group) { group = p.group; g = `<div class="nav-group">${h(group)}</div>`; }
     const badge = p.id === 'capacity' && crit ? `<span class="badge" title="${crit} machines over capacity">${crit}</span>` : (p.id === 'schedule' && lateN ? `<span class="badge" title="${lateN} late operations">${lateN}</span>` : '');
-    return `${g}<a href="${pageHref(p.id)}" data-nav="${p.id}" class="${p.id === ui.page ? 'active' : ''}" title="${h(p.label)}" ${p.id === ui.page ? 'aria-current="page"' : ''}>${icon(p.id)}<span class="lbl-t">${h(p.label)}</span>${badge}</a>`;
+    return `${g}<a href="${pageHref(p.id)}" data-nav="${p.id}" class="${p.id === ui.page ? 'active' : ''}" title="${h(p.label)}${isLocked(p.id) ? ' — not in your plan' : ''}" ${p.id === ui.page ? 'aria-current="page"' : ''}>${icon(p.id)}<span class="lbl-t">${h(p.label)}</span>${isLocked(p.id) ? '<span class="badge" aria-label="Locked">🔒</span>' : badge}</a>`;
   }).join('');
   $('#side').innerHTML = `
     <div class="brand"><div class="logo">${logo}</div><div class="brand-text"><div class="brand-name">${h(s.companyName)}</div><div class="brand-sub">${h(s.subtitle || 'Capacity Planner')}</div></div></div>
@@ -1999,8 +2013,8 @@ function renderShell() {
       </div>
       <div class="seg" role="group" aria-label="Capacity scenario">
         <button data-scn="standard" class="${sc === 'standard' ? 'on' : ''}" title="Available days as entered (Excel basis)">Standard</button>
-        <button data-scn="sunday" class="${sc === 'sunday' ? 'on' : ''}" title="Add the ${sun} Sundays of this month">+${sun} Sundays</button>
-        <button data-scn="levelled" class="${sc === 'levelled' ? 'on' : ''}" title="Preview with Auto-Level moves applied">Levelled</button>
+        <button data-scn="sunday" class="${sc === 'sunday' ? 'on' : ''}" title="${isLocked('scn:sunday') ? 'Not in your plan' : `Add the ${sun} Sundays of this month`}">${isLocked('scn:sunday') ? '🔒 ' : ''}+${sun} Sundays</button>
+        <button data-scn="levelled" class="${sc === 'levelled' ? 'on' : ''}" title="${isLocked('scn:levelled') ? 'Not in your plan' : 'Preview with Auto-Level moves applied'}">${isLocked('scn:levelled') ? '🔒 ' : ''}Levelled</button>
       </div>
       <button class="btn primary" data-act="exportMenu">${icon('download')}<span class="hide-sm">Export</span></button>
       ${cloudActive() ? `<button class="acct" data-act="accountMenu" title="${h((Cloud.session() || {}).email)} · ${h(roleLabel())}" aria-label="My account">${h(((Cloud.session() || {}).email || '?').slice(0, 2).toUpperCase())}</button>` : ''}
@@ -2091,6 +2105,7 @@ const pageHref = (id, sub) => location.pathname + location.search + '#' + id + (
 function syncHash() { try { history.replaceState(null, '', pageHref(ui.page, ui.page === 'masters' ? ui.mastersTab : ui.page === 'settings' ? ui.settingsTab : '')); } catch (e) { /* ignore */ } }
 function go(page) {
   if (page === 'users') { page = 'settings'; }
+  if (isLocked(page)) return lockedNote(page);
   if (!pageAllowed(page)) { toast('Settings are available to admins only.'); page = 'overview'; } ui.page = page; LS.set(K_UI, { page }); render(); syncHash(); window.scrollTo(0, 0); closeModal(); }
 
 /* ==========================================================================
@@ -2702,7 +2717,7 @@ document.addEventListener('click', ev => {
   const d = t.dataset;
   if (d.nav) return go(d.nav);
   if (d.capmode) { if (!can('editor')) return toast('You have view-only access.'); state.capMode = d.capmode; commit(); toast(d.capmode === 'dynamic' ? 'Dynamic capacity: stock is taken off the sales quantity at every process.' : 'Static capacity: the sales quantity goes straight to every process.'); return; }
-  if (d.scn) { state.scenario = d.scn; commit(); toast(`Scenario: ${scenarioLabel()}`); return; }
+  if (d.scn) { if (isLocked('scn:' + d.scn)) return lockedNote('scn:' + d.scn); state.scenario = d.scn; commit(); toast(`Scenario: ${scenarioLabel()}`); return; }
   if (d.cell) { ui.cellFilter = ui.cellFilter === d.cell ? 'ALL' : d.cell; if (ui.page !== 'capacity') ui.page = 'capacity'; return render(); }
   if (d.mach) { ui.selMachine = d.mach; if (ui.page !== 'capacity') { ui.page = 'capacity'; render(); } else render(); const ins = $('#inspector'); if (ins && window.innerWidth < 1181) ins.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
   if (d.go) {

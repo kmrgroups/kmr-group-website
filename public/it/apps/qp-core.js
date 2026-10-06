@@ -59,6 +59,7 @@
     if (!ctx) throw new Error("You do not have access to this app, or the subscription is not active.");
     canEdit = ["admin", "editor"].includes(ctx.role);
     $("#co").textContent = ctx.company; $("#role").textContent = ctx.role; showBrand();
+    if (window.KMRLock && window.QP_LOCKS && !DEMO) await KMRLock.init(sb, slug, code, QP_LOCKS.map, QP_LOCKS.names);
     return ctx;
   }
 

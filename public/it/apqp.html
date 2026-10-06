@@ -34,7 +34,7 @@ tr.done td:nth-child(2) b{color:var(--mut);text-decoration:line-through}tr.na{op
 <div class="tabs"><a class="tab on" data-t="prog" href="#go=prog">Programmes</a><a class="tab" data-t="phases" href="#go=phases" id="tPh">Phases &amp; deliverables</a><a class="tab" data-t="report" href="#go=report" id="tRp">Status report</a></div>
 <main><div class="panel"><div id="msg"></div><section id="prog"></section><section id="phases" class="hide"></section><section id="report" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
-<script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{report:"apqp.deliverable-tracker-gate-sign-offs"},names:{"apqp.deliverable-tracker-gate-sign-offs":"Deliverable tracker & gate sign-offs (status report)"}};</script><script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
 <script>
 const {$,esc,iso,today,fmt,say,call,rpc,appHref,sourceInfo,stateChip}=QP;
 const S={list:[],cur:null,data:null,links:null,parts:null};
@@ -52,7 +52,7 @@ const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+
 const hrefTo=(go,prj)=>'#go='+go+(prj?'&prj='+prj:'');
 function setTabs(){const p=S.cur;$('#tPh').href=hrefTo('phases',p);$('#tRp').href=hrefTo('report',p)}
 async function route(){
-  const {go,prj}=hashOf(); if(prj&&prj!==S.cur){S.cur=prj;S.data=null;S.links=null} setTabs();
+  let {go,prj}=hashOf(); if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='prog';history.replaceState(null,'',location.pathname+location.search+'#go=prog')} if(prj&&prj!==S.cur){S.cur=prj;S.data=null;S.links=null} setTabs();
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
   ['prog','phases','report'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
   try{ if(go==='prog')await drawProg(); else if(go==='phases')await drawPhases(); else await drawReport(); }catch(e){say(e.message)}

@@ -33,7 +33,7 @@ tr.ready td:nth-child(2) b,tr.done td:nth-child(2) b{color:var(--g)}tr.na{opacit
 <div class="tabs"><a class="tab on" data-t="list" href="#go=list">Submissions</a><a class="tab" data-t="package" href="#go=package" id="tPk">Package (18 elements)</a><a class="tab" data-t="psw" href="#go=psw" id="tPs">Part Submission Warrant</a></div>
 <main><div class="panel"><div id="msg"></div><section id="list"></section><section id="package" class="hide"></section><section id="psw" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
-<script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{psw:"ppap.part-submission-warrant"},names:{"ppap.part-submission-warrant":"Part Submission Warrant"}};</script><script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
 <script>
 const {$,esc,iso,today,fmt,say,call,appHref,sourceInfo,stateChip}=QP;
 const S={list:[],cur:null,sub:null,links:null,parts:null};
@@ -73,7 +73,7 @@ const reqLabel={S:'Submit',R:'Retain',A:'As customer specifies'};
 const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return{go:m?m[1]:'list',prj:m&&m[2]?m[2]:null}};
 const hrefTo=(go,prj)=>'#go='+go+(prj?'&prj='+prj:'');
 async function route(){
-  const {go,prj}=hashOf(); if(prj&&prj!==S.cur){S.cur=prj;S.sub=null;S.links=null}
+  let {go,prj}=hashOf(); if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='list';history.replaceState(null,'',location.pathname+location.search+'#go=list')} if(prj&&prj!==S.cur){S.cur=prj;S.sub=null;S.links=null}
   $('#tPk').href=hrefTo('package',S.cur);$('#tPs').href=hrefTo('psw',S.cur);
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));['list','package','psw'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
   try{ if(go==='list')await drawList(); else {await loadSub(); if(S.sub){ if(go==='package')drawPackage(); else drawPsw(); }} }catch(e){say(e.message)}
