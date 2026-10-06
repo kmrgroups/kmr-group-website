@@ -34,7 +34,7 @@ tr.done td:nth-child(2) b{color:var(--mut);text-decoration:line-through}tr.na{op
 <div class="tabs"><a class="tab on" data-t="prog" href="#go=prog">Programmes</a><a class="tab" data-t="phases" href="#go=phases" id="tPh">Phases &amp; deliverables</a><a class="tab" data-t="report" href="#go=report" id="tRp">Status report</a></div>
 <main><div class="panel"><div id="msg"></div><section id="prog"></section><section id="phases" class="hide"></section><section id="report" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
-<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{report:"apqp.deliverable-tracker-gate-sign-offs"},names:{"apqp.deliverable-tracker-gate-sign-offs":"Deliverable tracker & gate sign-offs (status report)"}};</script><script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{report:"apqp.deliverable-tracker-gate-sign-offs"},evidence:"apqp.evidence-from-other-kmr-apps",names:{"apqp.deliverable-tracker-gate-sign-offs":"Deliverable tracker & gate sign-offs (status report)","apqp.evidence-from-other-kmr-apps":"Evidence from other KMR apps"}};</script><script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
 <script>
 const {$,esc,iso,today,fmt,say,call,rpc,appHref,sourceInfo,stateChip}=QP;
 const S={list:[],cur:null,data:null,links:null,parts:null};
@@ -87,16 +87,17 @@ async function newProg(){
 async function drawPhases(){
   const host=$('#phases'); if(!S.cur){host.innerHTML='<p class="mut">Choose a programme under <a href="#go=prog">Programmes</a>.</p>';return}
   S.data=await call('kmr_apqp_get',{p_id:S.cur}); const P=S.data.project;
-  S.links=await call('kmr_qp_links',{p_part:P.part_code}).catch(()=>({}));
+  const evOn=!window.KMRLock||KMRLock.has(QP_LOCKS.evidence);
+  S.links=evOn?await call('kmr_qp_links',{p_part:P.part_code}).catch(()=>({})):{};
   const L=S.links||{},hasPd=L.pd,tm=(P.team||[]).map(t=>t.name);
   host.innerHTML=`<div class="rep"><div class="row"><div class="grow"><h2>${esc(P.part_code)} — ${esc(P.part_name||'')}</h2><div class="mut">${esc(P.customer_name||'')} · drawing ${esc(P.drawing_no||'—')} rev ${esc(P.drawing_rev||'—')} · SOP ${fmt(P.sop_date)} · ${esc(P.program||'')}</div></div>
     ${canEdit()?'<button class="btn o sm" id="eP">Edit programme</button><button class="btn o sm" id="eT">Team</button>':''}${QP.ctx&&QP.ctx.role==='admin'?'<button class="btn o sm" id="dP" style="color:var(--r);border-color:var(--r)">Delete</button>':''}</div>
-    <div class="links"><span class="mut" style="padding:4px 0">Open in:</span>
+    ${evOn?`<div class="links"><span class="mut" style="padding:4px 0">Open in:</span>
       <a href="${appHref('ops',{hash:'ops/parts'})}">Operations Master</a>
       <a href="${hasPd?sourceInfo('pd:pfd',L).href:appHref('pd')}">Process Documents${hasPd?'':' (not started)'}</a>
       <a href="${L.balloon?sourceInfo('bi:report',L).href:appHref('balloon')}">Balloon Inspector${L.balloon?'':' (no drawing)'}</a>
-      <a href="${appHref('capacity',{hash:'capacity'})}">Capacity Planner</a><a href="${appHref('calib',{hash:'go=inst'})}">Calibration Hub</a><a href="${sourceInfo('ppap',L).href}">PPAP Submissions</a></div>
-    <div class="tiles" id="tiles"></div><p class="note">Source evidence is read live from the linked apps. “Mark done” appears when the source already holds what the deliverable needs.</p>
+      <a href="${appHref('capacity',{hash:'capacity'})}">Capacity Planner</a><a href="${appHref('calib',{hash:'go=inst'})}">Calibration Hub</a><a href="${sourceInfo('ppap',L).href}">PPAP Submissions</a></div>`:'<p class="mut">🔒 Evidence from other KMR apps (drawings, PFMEA, control plan, gauges) is not part of your plan. Contact KMR Group of Companies to add it.</p>'}
+    <div class="tiles" id="tiles"></div>${evOn?'<p class="note">Source evidence is read live from the linked apps. “Mark done” appears when the source already holds what the deliverable needs.</p>':''}
     <div id="phs"></div></div>`;
   drawBody(); bindHead(P);
 }

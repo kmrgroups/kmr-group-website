@@ -77,6 +77,7 @@
   /* what each deliverable / element reads from, as a state + text + link */
   const KIND = { ready: "ready", partial: "partial", missing: "missing", na: "na" };
   function sourceInfo(src, L, part) {
+    if (window.KMRLock && window.QP_LOCKS && QP_LOCKS.evidence && !KMRLock.has(QP_LOCKS.evidence)) return null;   // evidence from other KMR apps is an optional feature
     L = L || {};
     const pd = L.pd, bi = L.balloon, cal = L.calib, rt = L.routing, sa = L.sales, pp = (L.ppap || [])[0];
     const pdl = (doc) => appHref("pd", { project: pd && pd.id, hash: "go=" + doc + (pd && pd.id ? "&prj=" + pd.id : "") });

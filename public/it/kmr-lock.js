@@ -4,8 +4,9 @@
 (function () {
   var S = { feat: null, map: {}, names: {}, home: null };
   function locked(tab) { var k = S.map[tab]; return !!(k && S.feat && !S.feat.has(k)); }
-  function dialog(tab) {
-    var k = S.map[tab], n = (S.names[k] || 'This feature');
+  function dialog(tab) { return show(S.map[tab]); }
+  function show(k) {
+    var n = (S.names[k] || 'This feature');
     var o = document.createElement('div');
     o.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
     o.innerHTML = '<div role="dialog" aria-modal="true" style="background:#fff;color:#0f172a;max-width:420px;width:100%;border-radius:12px;padding:20px;font:14px/1.5 system-ui,sans-serif;box-shadow:0 20px 50px rgba(0,0,0,.3)"><h3 style="margin:0 0 8px;font-size:17px">Not in your plan</h3><p style="margin:0 0 8px"><b></b> is not part of your company\'s subscription.</p><p style="margin:0 0 14px">To add it, please contact KMR Group of Companies — <a href="https://www.kmr-groups.com/contact" target="_blank" rel="noopener">www.kmr-groups.com/contact</a>.</p><button style="background:#0f2d5c;color:#fff;border:0;border-radius:8px;padding:8px 18px;font:inherit;cursor:pointer">OK</button></div>';
@@ -24,7 +25,9 @@
     e.preventDefault(); e.stopImmediatePropagation(); dialog(t.dataset.t);
   }, true);
   window.KMRLock = {
-    locked: locked, dialog: dialog, mark: mark, has: function (k) { return !S.feat || S.feat.has(k); },
+    locked: locked, dialog: dialog,
+    /* a part of a screen: true if the feature is bought, otherwise shows the dialog and returns false */
+    need: function (k) { if (!S.feat || S.feat.has(k)) return true; show(k); return false; }, mark: mark, has: function (k) { return !S.feat || S.feat.has(k); },
     init: async function (sb, slug, product, map, names) {
       S.map = map || {}; S.names = names || {};
       try {
