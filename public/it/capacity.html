@@ -612,8 +612,8 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       const st = stock[partNo] || {}, wip = st.wip || {}, sup = st.sup || {}, insp = st.insp || {};
       const fg = Math.max(0, num(st.fg, 0));
       // every class can keep a minimum stock: typed quantity, or (when left 0) sales per working day × the cover days of its class (A runner, B repeater, C stranger)
-      const c = cls[partNo] || 'B', isA = c === 'A';
-      const minStock = !minOn ? 0 : (num(minq[partNo], 0) > 0 ? Math.round(num(minq[partNo], 0)) : Math.ceil(sales / dpm * coverOf(c)));
+      const c = cls[partNo] || (state.partClass || {})[partNo] || 'B', isA = c === 'A';
+      const minStock = !minOn ? 0 : (num(minq[partNo], 0) > 0 ? Math.round(num(minq[partNo], 0)) : Math.ceil(sales / dpm * (num((state.partMinDays || {})[partNo], 0) > 0 ? num(state.partMinDays[partNo], 0) : coverOf(c))));
       let need = Math.max(0, sales + minStock - fg);
       const needAfterFg = need;
       const steps = new Array(ops.length);
@@ -924,7 +924,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
 
   function verdict(state) {
     const s = state.settings, base = compute(state, { scenario: 'standard' });
-    const plan = base.plan, clsOf = p => (plan.cls || {})[p] || 'B';
+    const plan = base.plan, clsOf = p => (plan.cls || {})[p] || (state.partClass || {})[p] || 'B';
     const partName = {}; state.operations.forEach(o => { partName[o.partNo] = o.partName; });
     const opById = new Map(state.operations.map(o => [o.id, o]));
     const target = num(s.levelTargetPct, 100) / 100;
@@ -2451,7 +2451,7 @@ Pages.stock = () => {
     const cell = (v, bold) => `<td class="r num"${bold ? ' style="font-weight:700;background:var(--brass-soft,#fbf3dc)"' : ''}>${fmtInt(v)}</td>`;
     const head = p.ops.map(o => th(h(o.process), h(o.machine))).join('') + th('Finished goods', 'FG stock');
     const row = (label, sub, cells) => `<tr><td><b>${label}</b>${sub ? `<div class="small muted">${sub}</div>` : ''}</td>${cells}</tr>`;
-    const clsSel = `<select class="inp" data-stk="${h(p.partNo)}" data-kind="cls" aria-label="ABC class">${[['A', 'A · Runner'], ['B', 'B · Repeater'], ['C', 'C · Stranger']].map(c => `<option value="${c[0]}" ${((plan.cls || {})[p.partNo] || 'B') === c[0] ? 'selected' : ''}>${c[1]}</option>`).join('')}</select>`;
+    const clsSel = `<select class="inp" data-stk="${h(p.partNo)}" data-kind="cls" aria-label="ABC class">${[['A', 'A · Runner'], ['B', 'B · Repeater'], ['C', 'C · Stranger']].map(c => `<option value="${c[0]}" ${((plan.cls || {})[p.partNo] || (state.partClass || {})[p.partNo] || 'B') === c[0] ? 'selected' : ''}>${c[1]}</option>`).join('')}</select>`;
     const rScrap = p.ops.map(o => `<td class="r">${inp(p.partNo, 'scrap', o.id, sc[o.id], 0.1)}</td>`).join('') + '<td></td>';
     const rWip = p.ops.map(o => `<td class="r">${inp(p.partNo, 'wip', o.id, (st.wip || {})[o.id])}</td>`).join('') + `<td class="r">${inp(p.partNo, 'fg', null, st.fg)}</td>`;
     const rSup = p.ops.map(o => `<td class="r">${inp(p.partNo, 'sup', o.id, (st.sup || {})[o.id])}</td>`).join('') + '<td></td>';
@@ -2809,6 +2809,8 @@ function applyOpsData() {
     hoursPerDay: x.hoursPerDay == null ? null : Number(x.hoursPerDay), remarks: x.remarks || '', active: x.active !== false }));
   state.operations = (m.operations || []).map((o, i) => ({ id: i + 1, partNo: o.partNo || '', partName: o.partName || o.partNo || '', process: o.process || '',
     machine: o.machine || '', cycleTime: Number(o.cycleTime) || 0, alternates: Array.isArray(o.alternates) ? o.alternates : [] }));
+  state.partClass = {}; state.partMinDays = {};
+  (m.parts || []).forEach(x => { if (x.partNo) { state.partClass[x.partNo] = ['A', 'B', 'C'].includes(x.abcClass) ? x.abcClass : 'B'; if (x.minStockDays != null && Number(x.minStockDays) > 0) state.partMinDays[x.partNo] = Number(x.minStockDays); } });
   const st = m.standards || {}, s = state.settings;
   ['oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours', 'lotSize', 'levelTargetPct'].forEach(k => { if (st[k] !== undefined && st[k] !== '' && !isNaN(Number(st[k]))) s[k] = Number(st[k]); });
   if (st.weeklyOff !== undefined) s.weeklyOff = kmrWeeklyOff(st.weeklyOff);
