@@ -623,7 +623,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       const fg = Math.max(0, num(st.fg, 0));
       // every class can keep a minimum stock: typed quantity, or (when left 0) sales per working day × the cover days of its class (A runner, B repeater, C stranger)
       const c = cls[partNo] || (state.partClass || {})[partNo] || 'B', isA = c === 'A';
-      const minStock = !minOn ? 0 : (num(minq[partNo], 0) > 0 ? Math.round(num(minq[partNo], 0)) : Math.ceil(sales / dpm * (num((state.partMinDays || {})[partNo], 0) > 0 ? num(state.partMinDays[partNo], 0) : coverOf(c))));
+      const minStock = !minOn ? 0 : (num(minq[partNo], 0) > 0 ? Math.round(num(minq[partNo], 0)) : (plan && plan.minZero && plan.minZero[partNo]) ? 0 : Math.ceil(sales / dpm * (num((state.partMinDays || {})[partNo], 0) > 0 ? num(state.partMinDays[partNo], 0) : coverOf(c))));
       let need = Math.max(0, sales + minStock - fg);
       const needAfterFg = need;
       const steps = new Array(ops.length);
@@ -1095,7 +1095,61 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
   const fmtDate = iso => { if (!iso) return '–'; const [y, m, d] = iso.split('-').map(Number); return `${d} ${MONTHS[m - 1].slice(0, 3)}`; };
   const fmt = (n, d = 2) => (n == null || isNaN(n)) ? '–' : Number(n).toLocaleString('en-IN', { minimumFractionDigits: d, maximumFractionDigits: d });
 
-  const Engine = { MONTHS, pad, periodKey, iso, daysInMonth, buildCalendar, compute, netDemand, autoLevel, verdict, cellOf, getPlan, num };
+
+  /* ---------- SUGGEST MINIMUM STOCK from spare machine capacity -----------------------------------------
+     Minimum stock costs machine time now (it is made on top of the sales quantity). It is only worth it where the machines have
+     spare time. Starting from "no minimum stock", parts are taken in the order A runners → B repeaters → C strangers, and each gets the
+     most cover days (up to its limit) that still keeps every machine out of overload and every other part on time. The result is
+     never worse than the plan without minimum stock. Dynamic capacity only (static ignores stock). */
+  function suggestMinStock(state, o) {
+    o = o || {};
+    const maxDays = Object.assign({ A: 10, B: 5, C: 3 }, o.maxDays || {});
+    const key = periodKey(state.year, state.month);
+    const dpm = Math.max(1, num(state.settings && state.settings.daysPerMonth, 25));
+    const t = JSON.parse(JSON.stringify(state)); t.capMode = 'dynamic'; t.partMinDays = {};
+    const plan = t.plans && t.plans[key]; if (!plan) return { rows: [], note: 'No plan for this month.' };
+    plan.minOn = true; plan.minStock = {}; plan.coverA = plan.coverB = plan.coverC = 0; plan.cover = 0;
+    const sc = o.scenario || 'standard';
+    const lateSet = c => { const p = new Map(); c.rows.forEach(r => { if (r.qty > 0) { const l = p.get(r.partNo) || []; l.push(r); p.set(r.partNo, l); } });
+      const s2 = new Set(); p.forEach((rows, partNo) => { if (rows.some(r => r.overflow || !r.endDate || r.endDate > r.due)) s2.add(partNo); }); return s2; };
+    const run = () => compute(t, { scenario: sc, splitsOverride: o.splitsOverride });
+    const base = run(), baseLate = lateSet(base), baseOver = new Map(base.machines.map(m => [m.code, Math.max(0, -m.balDays)]));
+    const check = () => {                                   // null = fine; otherwise why not
+      const c = run();
+      for (const m of c.machines) { const ov = Math.max(0, -m.balDays); if (ov > (baseOver.get(m.code) || 0) + 1e-6) return { machine: m.code, days: ov - (baseOver.get(m.code) || 0) }; }
+      for (const p of lateSet(c)) if (!baseLate.has(p)) return { late: p };
+      return null;
+    };
+    const parts = []; const seen = new Set();
+    t.operations.forEach(op => { if (!seen.has(op.partNo)) { seen.add(op.partNo); parts.push({ partNo: op.partNo, partName: op.partName }); } });
+    const clsOf = pn => (plan.cls || {})[pn] || (state.partClass || {})[pn] || 'B';
+    const qtyFor = (pn, d) => { const sales = Math.max(0, num(((plan.parts || {})[pn] || {}).qty, 0)); return Math.ceil(sales / dpm * d); };
+    parts.sort((a, b) => (CLS_RANK[clsOf(a.partNo)] - CLS_RANK[clsOf(b.partNo)]) || (num(((plan.parts || {})[b.partNo] || {}).qty, 0) - num(((plan.parts || {})[a.partNo] || {}).qty, 0)));
+    // water-filling inside each class: one more day for every part of the class in turn, so no part of the class starves another
+    const info = new Map(parts.map(pt => {
+      const c = clsOf(pt.partNo), sales = Math.max(0, num(((plan.parts || {})[pt.partNo] || {}).qty, 0));
+      return [pt.partNo, { partNo: pt.partNo, partName: pt.partName, cls: c, maxDays: maxDays[c] || 0, days: 0, qty: 0, extraDays: 0, limit: sales > 0 ? '' : 'No sales this month', active: sales > 0 && (maxDays[c] || 0) > 0 }];
+    }));
+    const set = (pn, d) => { if (d > 0) plan.minStock[pn] = qtyFor(pn, d); else delete plan.minStock[pn]; };
+    let prevReq = base.totals.req;
+    ['A', 'B', 'C'].forEach(cl => {
+      const group = parts.filter(pt => clsOf(pt.partNo) === cl).map(pt => info.get(pt.partNo));
+      for (let level = 1; level <= (maxDays[cl] || 0); level++) {
+        group.forEach(r => {
+          if (!r.active) return;
+          set(r.partNo, level);
+          const bad = check();
+          if (bad) { set(r.partNo, r.days); r.active = false; r.limit = bad.machine ? bad.machine + ' has no spare time' : 'would make ' + bad.late + ' late'; }
+          else { r.days = level; r.qty = qtyFor(r.partNo, level); const req = run().totals.req; r.extraDays += Math.max(0, req - prevReq); prevReq = req; }
+        });
+      }
+    });
+    const rows = parts.map(pt => info.get(pt.partNo));
+    const fin = run();
+    return { rows, maxDays, totalExtra: fin.totals.req - base.totals.req, baseReq: base.totals.req, newReq: fin.totals.req, baseOver: [...baseOver.values()].filter(v => v > 1e-6).length, scenario: sc };
+  }
+
+  const Engine = { MONTHS, pad, periodKey, iso, daysInMonth, buildCalendar, compute, netDemand, autoLevel, verdict, suggestMinStock, cellOf, getPlan, num };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -2030,7 +2084,7 @@ function renderShell() {
 }
 
 /* ---------- lock controls the signed-in role may not use ---------- */
-const EDITOR_ACTS = ['pullSales', 'addHoliday', 'delHoliday', 'pastePlan', 'pasteStock', 'clearStock', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
+const EDITOR_ACTS = ['applyMinSug', 'pullSales', 'addHoliday', 'delHoliday', 'pastePlan', 'pasteStock', 'clearStock', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
 const ADMIN_ACTS = ['uploadLogo', 'removeLogo', 'importJson', 'resetAll', 'blankStart', 'clearPlans', 'connSave', 'connReset', 'connDownload'];
 const EDITOR_SETTINGS = ['levelTargetPct', 'lotSize', 'levelAnyMachine', 'oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours'];
 function actNeeds(act) { return ADMIN_ACTS.includes(act) ? 'admin' : EDITOR_ACTS.includes(act) ? 'editor' : null; }
@@ -2459,6 +2513,20 @@ Pages.bulletin = () => {
 };
 
 /* ---------------------------------------------------------------- STOCK & BALANCE (Dynamic capacity) */
+
+/* Suggested minimum stock: how much cover each part can carry with the machine time that is spare */
+function minSugCard(dyn) {
+  const sg = ui.minSug && ui.minSug.key === model.key ? ui.minSug.res : null, edit = can('editor');
+  const head = `<div class="card-h"><div><h2>Suggested minimum stock</h2><div class="sub">Uses only spare machine time: A runners first, then B repeaters, then C strangers — never overloading a machine or making another part late.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="suggestMin">${sg ? 'Work out again' : 'Work out'}</button>${sg && edit && sg.rows.some(r => r.days > 0) ? '<button class="btn primary" data-act="applyMinSug">Apply to the plan</button>' : ''}</div></div>`;
+  if (!sg) return `<section class="card" style="margin-top:16px">${head}<div class="card-b muted">Press <b>Work out</b>. Stock levels you typed yourself are kept until you apply the suggestion.${dyn ? '' : ' (Switch to Dynamic capacity — Static ignores stock.)'}</div></section>`;
+  const rows = sg.rows.filter(r => r.days > 0 || r.limit);
+  return `<section class="card" style="margin-top:16px">${head}
+    <div class="card-b">${note(sg.baseOver ? 'warn' : 'ok', 'info', sg.baseOver ? `<b>${sg.baseOver} machine(s) are already overloaded without any minimum stock.</b> Parts on them get no minimum stock until the overload is solved (see Verdict &amp; Actions).` : `<b>Spare machine time exists.</b> The suggestion adds <b>${fmt(sg.totalExtra, 1)} machine days</b> (${fmt(sg.baseReq, 1)} → ${fmt(sg.newReq, 1)}) and keeps every machine within its available days.`)}</div>
+    <div class="tbl-wrap"><table class="tbl fit"><thead><tr><th>Part</th><th>Class</th><th class="r">Suggested cover (days)</th><th class="r">Minimum stock (pcs)</th><th class="r">Machine days used</th><th>What limits it</th></tr></thead><tbody>
+    ${rows.map(r => `<tr><td><span class="mono">${h(r.partNo)}</span> ${h(r.partName || '')}</td><td>${h({ A: 'A · Runner', B: 'B · Repeater', C: 'C · Stranger' }[r.cls])}</td><td class="r num">${r.days}${r.days >= r.maxDays ? ' (max)' : ''}</td><td class="r num"><b>${fmtInt(r.qty)}</b></td><td class="r num">${fmt(r.extraDays, 2)}</td><td class="small muted">${h(r.days >= r.maxDays ? 'Reached the cover limit for its class' : r.limit)}</td></tr>`).join('')}</tbody></table></div>
+    <div class="card-b small muted">Cover limits: A up to ${sg.maxDays.A} days, B ${sg.maxDays.B}, C ${sg.maxDays.C} of sales. “Apply to the plan” writes each quantity into the part’s <i>Min stock qty</i> box below and sets the class cover days to 0; change any of them by hand afterwards.</div></section>`;
+}
 Pages.stock = () => {
   const plan = planOf(), stockOf = p => (plan.stock || {})[p] || {}, dyn = model.mode === 'dynamic';
   const q = (ui.search.stock || '').toLowerCase();
@@ -2505,7 +2573,7 @@ Pages.stock = () => {
          : note('warn', 'info', '<b>Static capacity is ON</b> — the sales quantity goes to every process with the scrap allowance added; stock and minimum stock below are not used. Switch to <b>Dynamic</b> (top bar) to load the machines with the balance only.')}
   <section class="card"><div class="card-h"><div><h2>How the balance is worked out · ${monthName()}</h2><div class="sub">Starting from the customer: <b>sales quantity + minimum stock (if switched on) − finished-goods stock</b> is what the last process must deliver. Each process makes only <b>what is needed after it − the stock after it</b> (in-house WIP + at supplier + in inward inspection). Then the scrap % is added on top, because rejected parts must be made again. The process before it must supply exactly what this one runs. The <b>parts to start</b> at the first process will go to the Raw Material Planning app (coming).</div></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="pasteStock">${icon('paste')}Paste stock from Excel</button><button class="btn danger" data-act="clearStock">Clear stock</button></div></div>
-    <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;padding:0 16px 14px">
+    <div class="grid kpis" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;padding:0 16px 14px">
       <div class="kpi"><div class="small muted">Sales quantity</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(sales)}</div></div>
       <div class="kpi"><div class="small muted">Stock (FG + all processes)</div><div class="num" style="font-size:20px;font-weight:700">${fmtInt(stockUnits)}</div></div>
       <div class="kpi"><div class="small muted">Machine days · Static</div><div class="num" style="font-size:20px;font-weight:700">${fmt(sModel.totals.req, 1)}</div></div>
@@ -2515,6 +2583,7 @@ Pages.stock = () => {
     </div>
     <div class="toolbar">${searchBox('stock', 'Search part number or name')}<label class="small muted" title="Keep a minimum stock on top of the sales quantity">Minimum stock <select class="inp" data-minon="1"><option value="1" ${plan.minOn !== false ? 'selected' : ''}>On</option><option value="0" ${plan.minOn === false ? 'selected' : ''}>Off</option></select></label>${[['A', 'Runner', 7, plan.coverA != null ? plan.coverA : plan.cover], ['B', 'Repeater', 0, plan.coverB], ['C', 'Stranger', 0, plan.coverC]].map(c => `<label class="small muted" title="Days of sales kept as minimum stock for ${c[1]} parts">${c[0]} ${c[1]}: <input class="cell-inp" style="width:52px;text-align:right" type="number" min="0" step="1" data-cover="${c[0]}" value="${c[3] != null ? c[3] : c[2]}"> days</label>`).join('')}<span class="grow"></span><span class="small muted">${list.length} parts</span></div>
   </section>
+  ${minSugCard(dyn)}
   ${cards || '<section class="card"><div class="card-b muted">No parts yet — add parts and routings under Masters.</div></section>'}`;
 };
 
@@ -2757,7 +2826,7 @@ document.addEventListener('change', ev => {
   if (d.stk) {
     const p = ensurePlan();
     if (d.kind === 'cls') { p.cls = p.cls || {}; p.cls[d.stk] = el.value; return commit(); }
-    if (d.kind === 'minq') { p.minStock = p.minStock || {}; p.minStock[d.stk] = Math.max(0, Math.round(Number(el.value) || 0)); return commit(); }
+    if (d.kind === 'minq') { p.minStock = p.minStock || {}; p.minStock[d.stk] = Math.max(0, Math.round(Number(el.value) || 0)); if (p.minZero) delete p.minZero[d.stk]; return commit(); }
     if (d.kind === 'scrap') { p.scrap = p.scrap || {}; p.scrap[d.op] = Math.min(99, Math.max(0, Math.round((Number(el.value) || 0) * 10) / 10)); return commit(); }
     p.stock = p.stock || {}; const ps = p.stock[d.stk] = p.stock[d.stk] || {};
     const v = Math.max(0, Math.round(Number(el.value) || 0));
@@ -2904,6 +2973,18 @@ function kmrMastersPage() {
 }
 
 const Actions = {
+  suggestMin() {
+    if (model.mode !== 'dynamic' && can('editor')) toast('Worked out for Dynamic capacity — switch to Dynamic to use it.');
+    const res = E.suggestMinStock(state);
+    ui.minSug = { key: model.key, res }; render(true);
+  },
+  applyMinSug() {
+    const sg = ui.minSug && ui.minSug.key === model.key ? ui.minSug.res : null; if (!sg) return;
+    const p = ensurePlan(); p.minStock = p.minStock || {}; p.minOn = true;
+    p.minZero = {}; p.coverA = p.coverB = p.coverC = 0; p.cover = 0;   // every part now has its own quantity, so the class cover days no longer apply
+    sg.rows.forEach(r => { if (r.days > 0) p.minStock[r.partNo] = r.qty; else { delete p.minStock[r.partNo]; p.minZero[r.partNo] = true; } });   // 0 days = no minimum stock, whatever the class cover says
+    commit(); toast('Minimum stock written to the plan.');
+  },
   async moveMasters() {
     const s = state.settings;
     const standards = { oee: s.oee, hoursPerDay: s.hoursPerDay, daysPerMonth: s.daysPerMonth, warnPct: s.warnPct, transferLagHours: s.transferLagHours, lotSize: s.lotSize, levelTargetPct: s.levelTargetPct,
