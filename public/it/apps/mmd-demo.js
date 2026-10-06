@@ -19,11 +19,11 @@
   const shifts = [{ code: "A", name: "Shift A", start: "06:00", end: "14:00" }, { code: "B", name: "Shift B", start: "14:00", end: "22:00" }, { code: "C", name: "Shift C", start: "22:00", end: "06:00" }];
   const op = (n, name, mc, type, sup, ct) => ({ seq: n, op_no: n * 10, name, machine: mc || "", type: type || "in", supplier: sup || null, ct_sec: ct || 60 });
   const routes = {
-    "DP-1101": [op(1, "Turning OP10", "CNC-T01", 0, 0, 55), op(2, "Turning OP20", "CNC-T02", 0, 0, 48), op(3, "PCD Drilling OP30", "VMC-M01", 0, 0, 62), op(4, "Heat treatment OP40", "", "supplier", "SUP-004"), op(5, "Grinding OP50", "GRN-G01", 0, 0, 40), op(6, "Final inspection OP60", "QA-01", 0, 0, 20)],
-    "DP-1102": [op(1, "Turning OP10", "CNC-T01", 0, 0, 70), op(2, "Turning OP20", "CNC-T02", 0, 0, 65), op(3, "Drilling OP30", "VMC-M01", 0, 0, 50), op(4, "Final inspection OP40", "QA-01", 0, 0, 20)],
-    "DP-1103": [op(1, "Facing & boring OP10", "CNC-T01", 0, 0, 120), op(2, "Milling OP20", "VMC-M01", 0, 0, 150), op(3, "Final inspection OP30", "QA-01", 0, 0, 30)],
-    "DP-1104": [op(1, "Turning OP10", "CNC-T02", 0, 0, 45), op(2, "Milling OP20", "VMC-M01", 0, 0, 55), op(3, "Heat treatment OP30", "", "supplier", "SUP-004"), op(4, "Grinding OP40", "GRN-G01", 0, 0, 38), op(5, "Final inspection OP50", "QA-01", 0, 0, 20)],
-    "DP-1105": [op(1, "Turning OP10", "CNC-T01", 0, 0, 30), op(2, "Drilling OP20", "VMC-M01", 0, 0, 25), op(3, "Final inspection OP30", "QA-01", 0, 0, 15)]
+    "DP-1101": [op(1, "Turning OP10", "CNC-T01", 0, 0, 55), op(2, "Turning OP20", "CNC-T02", 0, 0, 48), op(3, "PCD Drilling OP30", "VMC-M01", 0, 0, 62), op(4, "Heat treatment OP40", "", "supplier", "SUP-004"), op(5, "Grinding OP50", "GRN-G01", 0, 0, 40), op(6, "Final inspection OP60", "QA-01", 0, 0, 55)],
+    "DP-1102": [op(1, "Turning OP10", "CNC-T01", 0, 0, 70), op(2, "Turning OP20", "CNC-T02", 0, 0, 65), op(3, "Drilling OP30", "VMC-M01", 0, 0, 50), op(4, "Final inspection OP40", "QA-01", 0, 0, 55)],
+    "DP-1103": [op(1, "Facing & boring OP10", "CNC-T01", 0, 0, 120), op(2, "Milling OP20", "VMC-M01", 0, 0, 150), op(3, "Final inspection OP30", "QA-01", 0, 0, 60)],
+    "DP-1104": [op(1, "Turning OP10", "CNC-T02", 0, 0, 45), op(2, "Milling OP20", "VMC-M01", 0, 0, 55), op(3, "Heat treatment OP30", "", "supplier", "SUP-004"), op(4, "Grinding OP40", "GRN-G01", 0, 0, 38), op(5, "Final inspection OP50", "QA-01", 0, 0, 55)],
+    "DP-1105": [op(1, "Turning OP10", "CNC-T01", 0, 0, 30), op(2, "Drilling OP20", "VMC-M01", 0, 0, 25), op(3, "Final inspection OP30", "QA-01", 0, 0, 40)]
   };
   const rsL = [], tags = [], ents = [], defs = [], dcs = [], grns = [], loss = [], ctr = {};
   const T = (a, k) => a.find((x) => x.id === k);
@@ -175,39 +175,40 @@
 
   /* ---------- sample: five route sheets, in different states, over the last two weeks ---------- */
   function seed() {
+    const K = 30; // the sample plant runs a month of work, so the dashboards look like a real shop
     const N = nowMs(), H = 36e5, ago = (d, h) => N - d * DAY - (h || 0) * H, ln = (code, q, sp, ac) => [{ code, qty: q, spec: sp, actual: ac }];
     const mk = (part, qty, d, due, heat) => { const r = issue({ part_code: part, qty, heat_code: heat, mill_cert: "MTC-" + heat, due_date: isoD(N + due * DAY) }, ago(d)); return tags.find((t) => t.id === r.tag_id); };
     // 1 Drive Flange — through turning, drilling; waiting at heat treatment (supplier) → a DC is out
-    let t = mk("DP-1101", 400, 12, 4, "H-23871");
-    let r = entry({ tag_no: t.tag_no, machine: "CNC-T01", operator: "Murugan", shift: "A", ok: 392, rej_lines: ln("DF01", 5, "Ø42.5 ±0.02", "Ø42.56"), rew_lines: ln("DF04", 3, "No burr", "Burr on bore") }, ago(11, 2));
-    r = entry({ tag_no: r.tags[0].tag.tag_no, machine: "CNC-T02", operator: "Selvam", shift: "B", ok: 390, rej_lines: ln("DF03", 2, "Ra 1.6", "Ra 2.8") }, ago(10, 1));
-    r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "Kavitha", shift: "A", ok: 388, rej_lines: ln("DF02", 2, "Ø8.0 +0.05", "Ø7.93") }, ago(9, 3));
-    const d1 = dc({ tag_no: r.tags[0].tag.tag_no, qty: 388, vehicle: "TN 38 AB 4521", expected_date: isoD(N + 1 * DAY) }, ago(8)); const d1o = dcs.find((x) => x.dc_no === d1.dc_no);
-    grn({ dc_no: d1.dc_no, ok: 200, operator: "Stores", shift: "A", inv_no: "HT-2210" }, ago(2)); // part received → 200 waiting at grinding, 188 still out
-    const rw = tags.find((x) => x.kind === "REW" && x.rs_id === T(rsL, d1o.rs_id).id); rework({ tag_no: rw.tag_no, operator: "Murugan", ok: 3 }, ago(10, 0));
+    let t = mk("DP-1101", 400 * K, 12, 4, "H-23871");
+    let r = entry({ tag_no: t.tag_no, machine: "CNC-T01", operator: "Murugan", shift: "A", ok: 392 * K, rej_lines: ln("DF01", 5 * K, "Ø42.5 ±0.02", "Ø42.56"), rew_lines: ln("DF04", 3 * K, "No burr", "Burr on bore") }, ago(11, 2));
+    r = entry({ tag_no: r.tags[0].tag.tag_no, machine: "CNC-T02", operator: "Selvam", shift: "B", ok: 390 * K, rej_lines: ln("DF03", 2 * K, "Ra 1.6", "Ra 2.8") }, ago(10, 1));
+    r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "Kavitha", shift: "A", ok: 388 * K, rej_lines: ln("DF02", 2 * K, "Ø8.0 +0.05", "Ø7.93") }, ago(9, 3));
+    const d1 = dc({ tag_no: r.tags[0].tag.tag_no, qty: 388 * K, vehicle: "TN 38 AB 4521", expected_date: isoD(N + 1 * DAY) }, ago(8)); const d1o = dcs.find((x) => x.dc_no === d1.dc_no);
+    grn({ dc_no: d1.dc_no, ok: 200 * K, operator: "Stores", shift: "A", inv_no: "HT-2210" }, ago(2)); // part received → 200 waiting at grinding, 188 still out
+    const rw = tags.find((x) => x.kind === "REW" && x.rs_id === T(rsL, d1o.rs_id).id); rework({ tag_no: rw.tag_no, operator: "Murugan", ok: 3 * K }, ago(10, 0));
     // 2 Wheel Hub — complete, FG partly dispatched
-    t = mk("DP-1102", 120, 9, -2, "H-23904"); r = entry({ tag_no: t.tag_no, operator: "Selvam", shift: "A", ok: 120 }, ago(8, 2));
-    r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "Selvam", shift: "A", ok: 118, rej_lines: ln("DF05", 2, "No tool marks", "Tool mark on face") }, ago(7, 1));
-    r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "Kavitha", shift: "B", ok: 118 }, ago(6, 4)); r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "QA-Priya", shift: "B", ok: 118 }, ago(5, 2));
-    dispatch({ tag_no: r.tags[0].tag.tag_no, qty: 60, ref: "INV-8841" });
+    t = mk("DP-1102", 120 * K, 9, -2, "H-23904"); r = entry({ tag_no: t.tag_no, operator: "Selvam", shift: "A", ok: 120 * K }, ago(8, 2));
+    r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "Selvam", shift: "A", ok: 118 * K, rej_lines: ln("DF05", 2 * K, "No tool marks", "Tool mark on face") }, ago(7, 1));
+    r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "Kavitha", shift: "B", ok: 118 * K }, ago(6, 4)); r = entry({ tag_no: r.tags[0].tag.tag_no, operator: "QA-Priya", shift: "B", ok: 118 * K }, ago(5, 2));
+    dispatch({ tag_no: r.tags[0].tag.tag_no, qty: 60 * K, ref: "INV-8841" });
     // 3 Gear Housing — stuck at milling for days (the throughput alert)
-    t = mk("DP-1103", 80, 8, 2, "H-24012"); entry({ tag_no: t.tag_no, operator: "Murugan", shift: "A", ok: 80 }, ago(6, 0));
+    t = mk("DP-1103", 80 * K, 8, 2, "H-24012"); entry({ tag_no: t.tag_no, operator: "Murugan", shift: "A", ok: 80 * K }, ago(6, 0));
     // 4 Pinion Shaft — in progress at turning, partly done
-    t = mk("DP-1104", 600, 3, 9, "H-24101"); entry({ tag_no: t.tag_no, operator: "Selvam", shift: "B", ok: 250, rej_lines: ln("DF01", 6, "Ø24 ±0.02", "Ø24.07") }, ago(1, 5));
+    t = mk("DP-1104", 600 * K, 3, 9, "H-24101"); entry({ tag_no: t.tag_no, operator: "Selvam", shift: "B", ok: 250 * K, rej_lines: ln("DF01", 6 * K, "Ø24 ±0.02", "Ø24.07") }, ago(1, 5));
     // 5 Sleeve — just issued
-    mk("DP-1105", 1000, 0, 12, "H-24133");
+    mk("DP-1105", 1000 * K, 0, 12, "H-24133");
     // losses
     [["CNC-T01", "D02", 35, 11], ["CNC-T02", "D01", 120, 10], ["VMC-M01", "D03", 45, 9], ["CNC-T01", "D04", 60, 8], ["GRN-G01", "D01", 90, 6], ["VMC-M01", "D02", 25, 4], ["CNC-T02", "D05", 30, 3], ["CNC-T01", "D06", 40, 2], ["VMC-M01", "D04", 55, 1]]
-      .forEach((x) => loss.push({ id: id(), loss_date: isoD(N - x[3] * DAY), shift: "A", machine_code: x[0], d_code: x[1], d_name: loss_codes.find((l) => l.code === x[1]).name, minutes: x[2], status: "ok", operator: "Murugan", created_at: iso(N - x[3] * DAY) }));
+      .forEach((x) => loss.push({ id: id(), loss_date: isoD(N - x[3] * DAY), shift: "A", machine_code: x[0], d_code: x[1], d_name: loss_codes.find((l) => l.code === x[1]).name, minutes: x[2] * 6, status: "ok", operator: "Murugan", created_at: iso(N - x[3] * DAY) }));
   }
   seed();
 
   const tagRow = (t) => { const rs = T(rsL, t.rs_id), o = t.seq ? rs.ops[t.seq - 1] : null; return Object.assign({}, t, { rs_no: rs.rs_no, part_code: rs.part_code, part_name: rs.part_name, customer_name: rs.customer_name, due_date: rs.due_date, op_name: o && o.name, machine: o && o.machine, op_type: o && o.type, ops_n: rs.ops.length }); };
   const dcRow = (d) => { const rs = T(rsL, d.rs_id); return Object.assign({}, d, { rs_no: rs.rs_no, part_code: rs.part_code, part_name: rs.part_name, customer_name: rs.customer_name }); };
-  const entRow = (e) => { const rs = T(rsL, e.rs_id); return Object.assign({}, e, { rs_no: rs.rs_no, part_code: rs.part_code, part_name: rs.part_name, out_tags: tags.filter((t) => t.entry_id === e.id).map((t) => t.tag_no).join(", ") }); };
+  const entRow = (e) => { const rs = T(rsL, e.rs_id); return Object.assign({}, e, { ct_sec: e.seq ? (rs.ops[e.seq - 1] || {}).ct_sec || 0 : 0, rs_no: rs.rs_no, part_code: rs.part_code, part_name: rs.part_name, out_tags: tags.filter((t) => t.entry_id === e.id).map((t) => t.tag_no).join(", ") }); };
 
   window.QP_DEMO = {
-    kmr_mmd_load() { const rt = {}; parts.forEach((p) => (rt[p.code] = routes[p.code])); return { parts, materials, suppliers, machines, loss_codes, defect_codes, shifts, bom: [], routes: rt, has_rmp: false, today: isoD(nowMs()), now: iso(nowMs()) }; },
+    kmr_mmd_load() { const rt = {}; parts.forEach((p) => (rt[p.code] = routes[p.code])); return { parts, materials, suppliers, machines, loss_codes, defect_codes, shifts, bom: [], routes: rt, has_rmp: false, plant: { hoursPerDay: 16, transferLagHours: 2, oee: 80, weeklyOff: "Sunday" }, today: isoD(nowMs()), now: iso(nowMs()) }; },
     kmr_mmd_data() {
       return { rs: rsL.map((s) => Object.assign({}, s, { ops_n: s.ops.length, ops: undefined,
           wip_qty: tags.filter((t) => t.rs_id === s.id && t.status === "open" && ["op", "rework"].includes(t.loc)).reduce((a, t) => a + t.bal, 0), supplier_qty: dcs.filter((d) => d.rs_id === s.id && ["open", "part"].includes(d.status)).reduce((a, d) => a + d.qty - d.received_qty, 0),

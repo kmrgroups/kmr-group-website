@@ -25,7 +25,7 @@ a{color:var(--b1)}.num,.n{text-align:right;font-variant-numeric:tabular-nums}
 .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px}.kv div span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase}.kv div b{font-size:14px}
 .ln{display:grid;grid-template-columns:1.3fr .5fr 1fr 1fr auto;gap:6px;margin-bottom:6px}@media(max-width:640px){.ln{grid-template-columns:1fr 1fr}}
 .bar{display:flex;gap:2px;min-width:110px}.bar i{flex:1;height:8px;border-radius:3px;background:var(--line)}.bar i.d{background:var(--g)}.bar i.c{background:var(--b1)}
-.late{color:var(--r);font-weight:700}
+.late{color:var(--r);font-weight:700}.pg{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:12px}.pg .card table{min-width:0}
 /* printed documents */
 .sheet{background:#fff;color:#000;padding:8px;border-radius:8px;margin-bottom:12px;overflow-x:auto}
 .tag{width:100mm;border:2px solid var(--c);margin:0 0 10px;font-size:11px;color:#000;background:#fff;break-inside:avoid;page-break-after:always}.th{background:var(--c);color:#fff;padding:5px 8px;display:flex;justify-content:space-between;gap:8px}.th b{font-size:13px}
@@ -38,12 +38,12 @@ tr.cur td{background:#fef9c3}.sg{display:flex;justify-content:space-between;gap:
 @media print{@page{margin:8mm}body{background:#fff;color:#000;padding:0}body>*:not(.modal){display:none!important}.modal{position:static;display:block!important;background:none;padding:0}.in{box-shadow:none;width:auto;padding:0;background:#fff}.noprint{display:none!important}.sheet{padding:0;margin:0}.dt,.doc{border:0}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Material Movement</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="scan" href="#go=scan">Scan</a><a class="tab" data-t="issue" href="#go=issue">Issue raw material</a><a class="tab" data-t="rs" href="#go=rs">Route sheets</a><a class="tab" data-t="sup" href="#go=sup">Supplier DC / GRN</a><a class="tab" data-t="rej" href="#go=rej">Rejection &amp; rework</a><a class="tab" data-t="loss" href="#go=loss">Loss hours</a><a class="tab" data-t="trace" href="#go=trace">Traceability</a></div>
+<div class="tabs"><a class="tab on" data-t="scan" href="#go=scan">Scan</a><a class="tab" data-t="issue" href="#go=issue">Issue raw material</a><a class="tab" data-t="rs" href="#go=rs">Route sheets</a><a class="tab" data-t="sup" href="#go=sup">Supplier DC / GRN</a><a class="tab" data-t="wip" href="#go=wip">WIP map &amp; alerts</a><a class="tab" data-t="dash" href="#go=dash">Dashboards</a><a class="tab" data-t="rej" href="#go=rej">Rejection &amp; rework</a><a class="tab" data-t="loss" href="#go=loss">Loss hours</a><a class="tab" data-t="trace" href="#go=trace">Traceability</a></div>
 <main><div class="panel"><div id="msg"></div>
-<section id="scan"></section><section id="issue" class="hide"></section><section id="rs" class="hide"></section><section id="sup" class="hide"></section><section id="rej" class="hide"></section><section id="loss" class="hide"></section><section id="trace" class="hide"></section></div></main>
+<section id="scan"></section><section id="issue" class="hide"></section><section id="rs" class="hide"></section><section id="sup" class="hide"></section><section id="wip" class="hide"></section><section id="dash" class="hide"></section><section id="rej" class="hide"></section><section id="loss" class="hide"></section><section id="trace" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
-<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{sup:"mmd.supplier-dc-grn",loss:"mmd.loss-hours-d-codes",trace:"mmd.traceability-iatf-records"},names:{"mmd.supplier-dc-grn":"Supplier DC & GRN","mmd.loss-hours-d-codes":"Loss hours (D codes)","mmd.traceability-iatf-records":"Traceability & IATF records"}};</script><script src="/it/apps/qp-core.js"></script>
-<script src="/it/apps/qr.js"></script><script src="/it/apps/mmd-print.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/mmd-demo.js"><\/script>')}</script>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{wip:"mmd.wip-map-throughput-alerts",dash:"mmd.dashboards-pareto",sup:"mmd.supplier-dc-grn",loss:"mmd.loss-hours-d-codes",trace:"mmd.traceability-iatf-records"},names:{"mmd.wip-map-throughput-alerts":"WIP map & throughput alerts","mmd.dashboards-pareto":"Dashboards & Pareto","mmd.supplier-dc-grn":"Supplier DC & GRN","mmd.loss-hours-d-codes":"Loss hours (D codes)","mmd.traceability-iatf-records":"Traceability & IATF records"}};</script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/apps/qr.js"></script><script src="/it/apps/mmd-print.js"></script><script src="/it/apps/mmd-dash.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/mmd-demo.js"><\/script>')}</script>
 <script>
 const {$,esc,iso,today,fmt,say,call}=QP;
 const P=window.MMDPrint,N=P.N;
@@ -68,8 +68,8 @@ async function route(){
   let go=hashGo();
   if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='scan';history.replaceState(null,'',location.pathname+location.search+'#go=scan')}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
-  ['scan','issue','rs','sup','rej','loss','trace'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
-  try{await loadM();if(go!=='trace'&&go!=='issue'||!S.x)await loadX();({scan:drawScan,issue:drawIssue,rs:drawRs,sup:drawSup,rej:drawRej,loss:drawLoss,trace:drawTrace})[go]()}catch(e){say(e.message)}
+  ['scan','issue','rs','sup','wip','dash','rej','loss','trace'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  try{await loadM();if(go!=='trace'&&go!=='issue'||!S.x)await loadX();({scan:drawScan,issue:drawIssue,rs:drawRs,sup:drawSup,wip:drawWip,dash:drawDash,rej:drawRej,loss:drawLoss,trace:drawTrace})[go]()}catch(e){say(e.message)}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});
 window.addEventListener('hashchange',route);
@@ -108,6 +108,7 @@ function drawScan(){
   <form class="scan" id="sf"><input id="sc" autocomplete="off" autocapitalize="characters" placeholder="TG-2610-00012  /  DC-2610-0003  /  RS-2610-0001" autofocus><button class="btn" type="submit">Open</button>${('BarcodeDetector' in window)?'<button class="btn o" type="button" id="cam">📷 Camera</button>':''}</form>
   <div id="act"></div>
   <b>Last entries</b><div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Entry</th><th>Part</th><th>Operation</th><th class="n">OK</th><th class="n">Rej</th><th class="n">Rew</th><th>By</th><th>New tags</th>${ed()?'<th></th>':''}</tr></thead><tbody>${x.entries.slice(0,15).map(e=>`<tr${e.status==='void'?' style="opacity:.5;text-decoration:line-through"':''}><td>${dt(e.entry_at)}</td><td>${{process:'Process',rework:'Rework',dc:'DC',grn:'GRN',dispatch:'Dispatch'}[e.kind]}</td><td>${esc(e.part_code)}<div class="mut">${esc(e.rs_no)}</div></td><td>${esc(e.op_name||'—')}<div class="mut">${esc(e.machine||'')}</div></td><td class="n">${N(e.ok_qty)}</td><td class="n">${N(e.rej_qty)}</td><td class="n">${N(e.rew_qty)}</td><td>${esc(e.operator||'—')}</td><td class="mut">${esc(e.out_tags||'')}</td>${ed()?`<td>${e.status==='ok'&&e.kind!=='dispatch'?`<button class="btn s o" data-void="${e.id}">Void</button>`:''}</td>`:''}</tr>`).join('')||'<tr><td colspan="10" class="mut">No entries yet. Issue raw material to start a route sheet.</td></tr>'}</tbody></table></div>`;
+  if(hasF('mmd.wip-map-throughput-alerts')&&window.MMDDash){const n=MMDDash.stuck(S.m,x);if(n)$('#scan').insertAdjacentHTML('afterbegin',`<div class="msg"><b>${n} lot${n>1?'s are':' is'} not moving.</b> <a href="#go=wip">See the WIP map &amp; alerts</a></div>`)}
   $('#sf').onsubmit=(ev)=>{ev.preventDefault();const v=$('#sc').value;$('#sc').value='';if(v.trim())openCode(v)};
   if($('#cam'))$('#cam').onclick=startCam;
   document.querySelectorAll('[data-void]').forEach(b=>b.onclick=()=>voidDlg(b.dataset.void));
@@ -268,6 +269,15 @@ function drawSup(){
   <div style="height:16px"></div><b>At suppliers — pending receipt</b><table><thead><tr><th>DC</th><th>Sent</th><th>Supplier</th><th>Part</th><th>Process</th><th class="n">Sent qty</th><th class="n">Received</th><th class="n">Pending</th><th>Expected</th><th></th></tr></thead><tbody>${open_.map(d=>{const late=d.expected_date&&d.expected_date<x.today;return `<tr><td><b>${esc(d.dc_no)}</b></td><td>${P.D(d.dispatch_at)}</td><td>${esc(d.supplier_name||d.supplier_code)}</td><td>${esc(d.part_code)}<div class="mut">${esc(d.rs_no)}</div></td><td>${esc(d.op_name)}</td><td class="n">${N(d.qty)}</td><td class="n">${N(d.received_qty)}</td><td class="n"><b>${N(d.qty-d.received_qty)}</b></td><td class="${late?'late':''}">${P.D(d.expected_date)}${late?' — overdue':''}</td><td>${ed()?`<button class="btn s g" data-dc="${esc(d.dc_no)}">Receive (GRN)</button>`:''}</td></tr>`}).join('')||'<tr><td colspan="10" class="mut">No material is out at suppliers.</td></tr>'}</tbody></table>`;
   document.querySelectorAll('[data-go]').forEach(b=>b.onclick=async()=>{history.replaceState(null,'',location.pathname+location.search+'#go=scan');await route();openCode(b.dataset.go)});
   document.querySelectorAll('[data-dc]').forEach(b=>b.onclick=async()=>{history.replaceState(null,'',location.pathname+location.search+'#go=scan');await route();openCode(b.dataset.dc)});
+}
+
+/* ---------- WIP MAP & THROUGHPUT ALERTS ---------- */
+function drawWip(){$('#wip').innerHTML=MMDDash.wip(S.m,S.x);document.querySelectorAll('#wip [data-go]').forEach(b=>b.onclick=async()=>{history.replaceState(null,'',location.pathname+location.search+'#go=scan');await route();openCode(b.dataset.go)})}
+/* ---------- DASHBOARDS ---------- */
+async function drawDash(days,kind){
+  days=days||+store('dd')||30;kind=kind||'rej';store('dd',days);const x=await call('kmr_mmd_data',{p_days:Math.max(days,7)});
+  $('#dash').innerHTML=`<div class="row"><label class="mut">Period</label><select id="dpD" style="width:auto">${[7,30,60,90].map(d=>`<option value="${d}"${d===days?' selected':''}>Last ${d} days</option>`).join('')}</select><span class="grow"></span><button class="btn o s noprint" onclick="window.print()">Print</button></div>`+MMDDash.dash(S.m,x,days,kind);
+  $('#dpD').onchange=()=>drawDash(+$('#dpD').value,kind);$('#dpK').onchange=()=>drawDash(days,$('#dpK').value);
 }
 
 /* ---------- 5. REJECTION & REWORK ---------- */
