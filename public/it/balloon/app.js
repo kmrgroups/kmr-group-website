@@ -94,6 +94,8 @@ function limits(it){
   if(it.upper==null&&it.lower==null) return [null,null];
   const base=it.nominal??0; return [it.lower!=null?base+it.lower:null, it.upper!=null?base+it.upper:null];
 }
+/* Inspection results (measured values, pass/fail) are the optional "Inspection & first-article reports" feature */
+function inspOn(){ return !window.KMR_FEAT || window.KMR_FEAT.has("balloon.inspection-first-article-reports"); }
 function result(it){
   const a=String(it.actual??"").trim(); if(!a) return "pend";
   if(/^(ok|pass|yes|accept(ed)?)$/i.test(a)) return "pass"; if(/^(ng|nok|not ok|fail|no|reject(ed)?)$/i.test(a)) return "fail";
@@ -280,7 +282,7 @@ $("bSym").onclick=()=>setMode(S.mode==="sym"?"pan":"sym");
 function renderStats(){
   const n=S.items.length, p=S.items.filter(i=>result(i)==="pass").length, f=S.items.filter(i=>result(i)==="fail").length;
   const low=S.items.filter(i=>i.conf!=null&&i.conf<0.7).length;
-  $("stats").innerHTML=`<span class="stat"><b>${n}</b>characteristics</span><span class="stat p"><b>${p}</b>pass</span><span class="stat f"><b>${f}</b>fail</span><span class="stat"><b>${n-p-f}</b>not measured</span>${low?`<span class="stat" style="color:var(--warn)"><b>${low}</b>to check</span>`:""}${S.items.some(i=>i.cls)?`<span class="stat"><b>${S.items.filter(i=>i.cls).length}</b>SC/CC</span>`:""}${S.lang&&S.lang!=="English"?`<span class="lang" title="Translated with a built-in engineering glossary (offline). Check wording before sending.">${S.lang} → English</span>`:""}`;
+  $("stats").innerHTML=`<span class="stat"><b>${n}</b>characteristics</span>${inspOn()?`<span class="stat p"><b>${p}</b>pass</span><span class="stat f"><b>${f}</b>fail</span><span class="stat"><b>${n-p-f}</b>not measured</span>`:`<span class="stat" title="Inspection reports are not in your plan">🔒 inspection results</span>`}${low?`<span class="stat" style="color:var(--warn)"><b>${low}</b>to check</span>`:""}${S.items.some(i=>i.cls)?`<span class="stat"><b>${S.items.filter(i=>i.cls).length}</b>SC/CC</span>`:""}${S.lang&&S.lang!=="English"?`<span class="lang" title="Translated with a built-in engineering glossary (offline). Check wording before sending.">${S.lang} → English</span>`:""}`;
 }
 function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
 function renderTable(){
@@ -308,7 +310,7 @@ function renderTable(){
       <td><select data-f="unit"><option${it.unit==="mm"?" selected":""}>mm</option><option${it.unit==="in"?" selected":""}>in</option><option${it.unit==="deg"?" selected":""}>deg</option><option${it.unit==="µm"?" selected":""}>µm</option><option${it.unit==="—"?" selected":""}>—</option></select></td>
       <td><select data-f="cls" style="${it.cls?"font-weight:700;color:var(--accent)":""}"><option value=""${!it.cls?" selected":""}>—</option><option${it.cls==="SC"?" selected":""}>SC</option><option${it.cls==="CC"?" selected":""}>CC</option><option${it.cls==="KC"?" selected":""}>KC</option></select></td>
       ${gaugeCell(it)}
-      <td><input data-f="actual" value="${esc(it.actual)}" placeholder="value/OK"></td>
+      <td><input data-f="actual" value="${esc(inspOn()?it.actual:"")}" placeholder="${inspOn()?"value/OK":"🔒 not in plan"}" ${inspOn()?"":"disabled title=\"Inspection & first-article reports are not part of your plan. Contact KMR Group of Companies - www.kmr-groups.com/contact\""}></td>
       <td><span class="res ${res}">${res==="pass"?"PASS":res==="fail"?"FAIL":"—"}</span></td>
       <td><span class="conf${it.conf!=null&&it.conf<0.7?" low":""}">${it.conf==null?(it.source==="cad"?"CAD":"manual"):Math.round(it.conf*100)+"%"}</span></td>
       <td><button class="del" data-act="del" aria-label="Delete balloon ${i+1}">×</button></td></tr>`;
@@ -1257,14 +1259,14 @@ async function exportPDF(){
       doc.addImage(c.toDataURL("image/jpeg",0.9),"JPEG",M+(aw-w)/2,M+17+(ah-hh)/2,w,hh,undefined,"FAST");
     });
     // table
-    doc.addPage("a3","landscape"); hdr("Inspection report - dimensional results");
+    doc.addPage("a3","landscape"); hdr(inspOn()?"Inspection report - dimensional results":"Characteristics");
     const n=S.items.length, p=S.items.filter(i=>result(i)==="pass").length, f=S.items.filter(i=>result(i)==="fail").length;
     doc.setFontSize(10); doc.setTextColor(22,35,58);
-    doc.text(`Characteristics: ${n}     Pass: ${p}     Fail: ${f}     Not measured: ${n-p-f}     General tolerance: ${S.set.gen==="none"?"not applied":"ISO 2768-"+S.set.gen}`,M,M+20);
+    doc.text(`Characteristics: ${n}     ${inspOn()?`Pass: ${p}     Fail: ${f}     Not measured: ${n-p-f}     `:""}General tolerance: ${S.set.gen==="none"?"not applied":"ISO 2768-"+S.set.gen}`,M,M+20);
     const body=S.items.map((it,i)=>{ const [l,u]=limits(it), r=result(it);
       const spec=it.type==="GD&T"?[it.gdt,it.text,it.datum?"| "+it.datum:""].filter(Boolean).join(" "):(it.en?`${it.en} [${it.text}]`:it.text);
-      return [i+1,it.sheet+1,zone(it),it.type,pdfSafe(spec),fmt(it.nominal),fmtTol(it.upper)+(it.gen?"*":""),fmtTol(it.lower)+(it.gen?"*":""),fmt(l),fmt(u),pdfSafe(it.unit),it.cls||"",pdfSafe(it.instr),pdfSafe(it.actual),r==="pass"?"PASS":r==="fail"?"FAIL":""]; });
-    doc.autoTable({ startY:M+24, head:[["No.","Sheet","Zone","Type","Specification","Nominal","+Tol","-Tol","LSL","USL","Unit","Class","Instrument","Actual","Result"]], body,
+      return [i+1,it.sheet+1,zone(it),it.type,pdfSafe(spec),fmt(it.nominal),fmtTol(it.upper)+(it.gen?"*":""),fmtTol(it.lower)+(it.gen?"*":""),fmt(l),fmt(u),pdfSafe(it.unit),it.cls||"",pdfSafe(it.instr)].concat(inspOn()?[pdfSafe(it.actual),r==="pass"?"PASS":r==="fail"?"FAIL":""]:[]); });
+    doc.autoTable({ startY:M+24, head:[["No.","Sheet","Zone","Type","Specification","Nominal","+Tol","-Tol","LSL","USL","Unit","Class","Instrument"].concat(inspOn()?["Actual","Result"]:[])], body,
       margin:{left:M,right:M,bottom:24}, styles:{font:"helvetica",fontSize:9,cellPadding:1.8,lineColor:[190,198,205],lineWidth:0.2,textColor:[22,35,58]},
       headStyles:{fillColor:[22,35,58],textColor:255,fontStyle:"bold"}, alternateRowStyles:{fillColor:[244,246,244]},
       columnStyles:{0:{halign:"center",fontStyle:"bold",textColor:[200,16,46],cellWidth:12},1:{halign:"center",cellWidth:13},2:{cellWidth:13},4:{cellWidth:70},12:{cellWidth:48},14:{halign:"center",fontStyle:"bold",cellWidth:18}},
@@ -1282,8 +1284,8 @@ async function exportPDF(){
 }
 function exportCSV(){
   const q=s=>`"${String(s??"").replace(/"/g,'""')}"`;
-  const rows=[["No","Sheet","Zone","Type","Specification","GD&T","Datum","Nominal","UpperTol","LowerTol","LSL","USL","Unit","Class","Instrument","Actual","Result","AIConfidence"]];
-  S.items.forEach((it,i)=>{ const [l,u]=limits(it); rows.push([i+1,it.sheet+1,zone(it),it.type,it.text,it.gdt,it.datum,fmt(it.nominal),fmt(it.upper),fmt(it.lower),fmt(l),fmt(u),it.unit,it.cls,it.instr,it.actual,result(it),it.conf==null?"":Math.round(it.conf*100)]); });
+  const rows=[["No","Sheet","Zone","Type","Specification","GD&T","Datum","Nominal","UpperTol","LowerTol","LSL","USL","Unit","Class","Instrument"].concat(inspOn()?["Actual","Result"]:[]).concat(["AIConfidence"])];
+  S.items.forEach((it,i)=>{ const [l,u]=limits(it); rows.push([i+1,it.sheet+1,zone(it),it.type,it.text,it.gdt,it.datum,fmt(it.nominal),fmt(it.upper),fmt(it.lower),fmt(l),fmt(u),it.unit,it.cls,it.instr].concat(inspOn()?[it.actual,result(it)]:[]).concat([it.conf==null?"":Math.round(it.conf*100)])); });
   save(`${(S.header.partNo||S.fileName||"drawing").replace(/[^\w.-]+/g,"_")}_characteristics.csv`, "\uFEFF"+rows.map(r=>r.map(q).join(",")).join("\r\n"));
 }
 $("bPDF").onclick=exportPDF; $("bCSV").onclick=exportCSV;
