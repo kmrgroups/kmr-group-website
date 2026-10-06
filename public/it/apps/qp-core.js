@@ -64,7 +64,7 @@
   }
 
   /* ---------- the other apps: addresses of the exact screens ---------- */
-  const PATH = { pd: "/it/pd.html", balloon: "/it/balloon.html", calib: "/it/calibration.html", capacity: "/it/capacity.html", sales: "/it/sales.html", apqp: "/it/apqp.html", ppap: "/it/ppap.html" };
+  const PATH = { pd: "/it/pd.html", balloon: "/it/balloon.html", calib: "/it/calibration.html", capacity: "/it/capacity.html", sales: "/it/sales.html", rmp: "/it/rmp.html", apqp: "/it/apqp.html", ppap: "/it/ppap.html" };
   function appHref(code, o) {
     o = o || {};
     if (code === "ops") return DEMO ? "/it/apps.html#" + (o.hash || "ops") : "/it/app/" + encodeURIComponent(slug) + "#" + (o.hash || "ops");
@@ -169,7 +169,7 @@
             if (["approved", "interim"].includes(s.status) && s.apqp_id) { const p = projects.find((q) => q.id === s.apqp_id), it = p && p.items.find((i) => i.code === "4.4"); if (it && it.status !== "done") { it.status = "done"; it.done_at = today(); } } return s.id; }
           case "kmr_ppap_delete": { const i = ppaps.findIndex((s) => s.id === a.p_id); if (i >= 0) ppaps.splice(i, 1); return null; }
           case "kmr_qp_links": return J(LNK(a.p_part));
-          default: throw new Error("Not available in the sample: " + fn);
+          default: { const h = (window.QP_DEMO || {})[fn]; if (h) return J(await h(a)); throw new Error("Not available in the sample: " + fn); }
         }
       }
     };

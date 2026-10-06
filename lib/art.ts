@@ -7,7 +7,7 @@ const A = (n: string) => `/img/kmr/${n}.svg`;
 /** KMR Apps by product code; new apps without their own picture get the general software scene */
 export function appArt(code: string, uploaded?: string | null): string {
   if (uploaded) return uploaded;
-  return ["hrm", "balloon", "pd", "capacity", "sales", "calib", "apqp", "ppap"].includes(code) ? A(`app-${code}`) : A("v-software");
+  return ["hrm", "balloon", "pd", "capacity", "sales", "calib", "apqp", "ppap", "rmp"].includes(code) ? A(`app-${code}`) : A("v-software");
 }
 
 /** Business verticals by slug / link */

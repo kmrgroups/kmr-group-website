@@ -1,0 +1,149 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<title>Raw Material Planning · KMR Apps</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#141a2e;--ink:#e8ecf8;--mut:#93a0bd;--line:#26304d}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}
+header{display:flex;gap:12px;align-items:center;padding:12px 18px;background:#0c1a3a;color:#fff;flex-wrap:wrap}header h1{font-size:17px;margin:0}header small{opacity:.7;display:block}
+.tabs{display:flex;gap:4px;padding:10px 14px 0;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{text-decoration:none;display:inline-block;border:0;background:none;padding:9px 14px;font-weight:600;color:var(--mut);border-radius:10px 10px 0 0;white-space:nowrap;flex:none}.tab.on{background:var(--card);color:var(--b1);box-shadow:0 -2px 0 var(--b1) inset}
+main{padding:0 14px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:16px;overflow-x:auto}
+input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{padding:7px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);width:100%;min-width:0}
+.btn{border:0;border-radius:9px;padding:8px 14px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--b1),var(--b2));cursor:pointer;text-decoration:none;display:inline-block}.btn.o{background:none;color:var(--b1);border:1px solid var(--b1)}.sm{padding:4px 9px;font-size:12px}.btn[disabled]{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.row>.grow{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-top:3px solid var(--c,var(--b1))}.kpi b{display:block;font-size:22px}.kpi span{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;min-width:700px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--mut)}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c,#94a3b8)}.g{--c:var(--g)}.a{--c:var(--a)}.r{--c:var(--r)}.x{--c:#94a3b8}.b{--c:var(--b1)}
+.mut{color:var(--mut)}.hide{display:none}.msg{padding:9px 12px;border-radius:10px;margin-bottom:10px;background:#fee2e2;color:#991b1b}.msg.ok{background:#dcfce7;color:#166534}
+a{color:var(--b1)}
+.bar{display:flex;gap:2px;min-width:120px}.bar i{flex:1;height:8px;border-radius:3px;background:var(--line);position:relative;overflow:hidden}.bar i b{position:absolute;inset:0 auto 0 0;background:var(--g)}
+.ph{border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}.ph>h3{margin:0;padding:10px 12px;background:var(--bg);display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:15px}.ph>h3 .grow{flex:1}
+.ph table{min-width:820px}.ph input,.ph select{padding:4px 6px;font-size:13px}
+tr.done td:nth-child(2) b{color:var(--mut);text-decoration:line-through}tr.na{opacity:.55}
+.src{font-size:12px;margin-top:3px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}.src.missing a,.src.na{color:var(--mut)}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}.tile{border:1px solid var(--line);border-radius:12px;padding:10px;border-top:3px solid var(--c,var(--b1))}.tile b{font-size:20px}.tile small{display:block;color:var(--mut)}
+.links{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.links a{border:1px solid var(--line);border-radius:99px;padding:4px 11px;font-size:12px;text-decoration:none;color:var(--ink)}.links a:hover{border-color:var(--b1)}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:9;padding:10px}.modal.on{display:flex}.in{background:var(--card);border-radius:14px;width:min(720px,100%);max-height:92vh;overflow:auto;padding:16px}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}.frm label{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:2px}
+.note{font-size:12px;color:var(--mut);margin:8px 0}
+.back{position:fixed;left:12px;bottom:12px;z-index:6;background:linear-gradient(90deg,var(--b1),var(--b2));color:#fff;border-radius:99px;padding:10px 16px;font-weight:700;font-size:13px;text-decoration:none}
+.rep h2{margin:0 0 4px}.rep table{min-width:0}
+@media print{body{background:#fff;color:#000;padding:0}header,.tabs,.noprint,.kmr-foot,.kmr-demo,.back{display:none!important}.panel{border:0;padding:0}main{padding:0}.ph{break-inside:avoid}}
+.num{text-align:right;font-variant-numeric:tabular-nums}.ph table{min-width:0}.late{color:var(--r);font-weight:700}.tabs .tab.on{}
+.sup{border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}.sup>h3{margin:0;padding:10px 12px;background:var(--bg);font-size:15px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sup>h3 .grow{flex:1}
+</style></head><body>
+<header><span class="clogo" id="clogo" hidden></span><div><h1>Raw Material Planning</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<div class="tabs"><a class="tab on" data-t="req" href="#go=req">Requirement</a><a class="tab" data-t="plan" href="#go=plan">Purchase plan</a><a class="tab" data-t="orders" href="#go=orders">Orders</a><a class="tab" data-t="master" href="#go=master">Materials &amp; BOM</a><a class="tab" data-t="start" href="#go=start">Parts to start</a></div>
+<main><div class="panel"><div id="msg"></div>
+<div class="row noprint"><label class="mut">Month</label><input type="month" id="mon" style="width:auto"><span id="src"></span><span class="grow"></span><span class="mut" id="stamp"></span></div>
+<section id="req"></section><section id="plan" class="hide"></section><section id="orders" class="hide"></section><section id="master" class="hide"></section><section id="start" class="hide"></section></div></main>
+<div class="modal" id="m"><div class="in" id="mb"></div></div>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{plan:"rmp.purchase-plan-moq-lead-times",orders:"rmp.supplier-orders-receipts"},names:{"rmp.purchase-plan-moq-lead-times":"Purchase plan, MOQ & lead times","rmp.supplier-orders-receipts":"Supplier orders & receipts"}};</script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/apps/rmp-calc.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/rmp-demo.js"><\/script>')}</script>
+<script>
+const {$,esc,iso,today,fmt,say,call}=QP;
+const R=window.RMPCalc;
+const S={d:null,month:null,calc:null};
+const canEdit=()=>QP.canEdit;
+const open=(h)=>{$('#mb').innerHTML=h;$('#m').classList.add('on')},closeM=()=>$('#m').classList.remove('on');
+$('#m').addEventListener('click',e=>{if(e.target.id==='m')closeM()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+const kg=(n)=>Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:1});
+const inr=(n)=>'₹'+Number(n||0).toLocaleString('en-IN',{maximumFractionDigits:0});
+const curMonth=()=>iso(0).slice(0,7);
+const hasF=(k)=>!window.KMRLock||KMRLock.has(k);
+const matName=(c)=>{const m=(S.d.materials||[]).find(x=>x.code===c);return m&&m.name?m.name:''};
+const supName=(c)=>{const m=(S.d.suppliers||[]).find(x=>x.code===c);return m&&m.name?m.name:c||''};
+const hashGo=()=>{const m=location.hash.match(/go=([a-z]+)/);return m?m[1]:'req'};
+
+async function load(){
+  S.d=await call('kmr_rmp_load',{p_month:S.month});
+  S.calc=R.plan(S.d,S.month);
+  const cp=S.d.demand.filter(x=>x.source==='capacity').length,mn=S.d.demand.filter(x=>x.source==='manual').length;
+  $('#src').innerHTML=!S.d.demand.length?'<span class="chip x">no parts to start yet</span>':(cp?`<span class="chip b">${cp} from Capacity Planner</span> `:'')+(mn?`<span class="chip a">${mn} typed by hand</span>`:'');
+  const pub=S.d.demand.map(x=>x.published_at).filter(Boolean).sort().pop();
+  $('#stamp').textContent=pub?'Last updated '+fmt(pub):'';
+}
+async function route(){
+  let go=hashGo();
+  if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='req';history.replaceState(null,'',location.pathname+location.search+'#go=req')}
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
+  ['req','plan','orders','master','start'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  try{await load();({req:drawReq,plan:drawPlan,orders:drawOrders,master:drawMaster,start:drawStart})[go]()}catch(e){say(e.message)}
+}
+document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});
+window.addEventListener('hashchange',route);
+$('#mon').addEventListener('change',()=>{if($('#mon').value){S.month=$('#mon').value;route()}});
+
+/* ---------- 1. requirement vs stock (core) ---------- */
+function drawReq(){
+  const L=S.calc.lines,short=L.filter(x=>x.short>0);
+  $('#req').innerHTML=`<div class="kpis"><div class="kpi"><b>${L.length}</b><span>Materials needed</span></div><div class="kpi"><b>${kg(L.reduce((a,x)=>a+x.gross,0))}</b><span>Total kg needed</span></div><div class="kpi" style="--c:var(--r)"><b>${short.length}</b><span>Short of stock</span></div><div class="kpi" style="--c:var(--a)"><b>${kg(short.reduce((a,x)=>a+x.short,0))}</b><span>kg to buy</span></div></div>
+  ${S.calc.problems.length?`<div class="msg">${S.calc.problems.map(esc).join('<br>')}</div>`:''}
+  ${L.length?`<table><thead><tr><th>Material</th><th class="num">Needed (kg)</th><th class="num">In stock</th><th class="num">On order</th><th class="num">Short (kg)</th><th>Needed by</th><th>Parts</th></tr></thead><tbody>${L.map(x=>`<tr><td><b>${esc(x.code)}</b><div class="mut">${esc(matName(x.code))}</div></td><td class="num">${kg(x.gross)}</td><td class="num">${kg(x.onHand)}</td><td class="num">${kg(x.covered)}</td><td class="num">${x.short>0?`<span class="chip r">${kg(x.short)}</span>`:'<span class="chip g">covered</span>'}</td><td>${fmt(x.needBy)}</td><td class="mut">${x.parts.map(p=>esc(p.part)+' '+kg(p.kg)).join(' · ')}</td></tr>`).join('')}</tbody></table>`
+  :'<p class="note">No parts to start for this month. Publish the plan from the Capacity Planner, or type the parts to start under “Parts to start”.</p>'}
+  <p class="note">Needed kg = parts to start × kg per part (part weight, or the bill of material) × (1 + loss %). Stock and on-order come from “Materials &amp; BOM” and “Orders”.</p>`;
+}
+
+/* ---------- 2. purchase plan (MOQ, lead time, safety, order-by, value) ---------- */
+function drawPlan(){
+  const L=S.calc.lines.filter(x=>x.order>0),by={};L.forEach(x=>{(by[x.supplier||'—']=by[x.supplier||'—']||[]).push(x)});
+  const tot=L.reduce((a,x)=>a+x.value,0),late=L.filter(x=>x.late).length;
+  $('#plan').innerHTML=`<div class="kpis"><div class="kpi"><b>${L.length}</b><span>Materials to order</span></div><div class="kpi"><b>${kg(L.reduce((a,x)=>a+x.order,0))}</b><span>kg to order</span></div><div class="kpi" style="--c:var(--g)"><b>${inr(tot)}</b><span>Order value</span></div><div class="kpi" style="--c:var(--r)"><b>${late}</b><span>Order-by date passed</span></div></div>
+  <div class="row noprint">${L.length?'<button class="btn o" id="pcopy">Copy order list</button><button class="btn o" onclick="window.print()">Print</button>':''}${canEdit()&&L.length?'<button class="btn" id="pmk">Create planned orders</button>':''}</div>
+  ${L.length?Object.keys(by).sort().map(s=>`<div class="sup"><h3><span class="grow">${esc(s==='—'?'No supplier set':supName(s)+' ('+s+')')}</span><span class="mut">${inr(by[s].reduce((a,x)=>a+x.value,0))}</span></h3><table><thead><tr><th>Material</th><th class="num">Net need</th><th class="num">MOQ / pack</th><th class="num">Order (kg)</th><th class="num">Rate</th><th class="num">Value</th><th>Lead</th><th>Order by</th></tr></thead><tbody>${by[s].map(x=>`<tr><td><b>${esc(x.code)}</b><div class="mut">${esc(matName(x.code))}</div></td><td class="num">${kg(x.net)}</td><td class="num">${x.moq?kg(x.moq):'—'} / ${x.pack?kg(x.pack):'—'}</td><td class="num"><b>${kg(x.order)}</b></td><td class="num">${x.rate?'₹'+x.rate:'—'}</td><td class="num">${inr(x.value)}</td><td>${x.lead!=null?x.lead+' d':'<span class="mut">not set</span>'}</td><td>${x.orderBy?(x.late?`<span class="late">${fmt(x.orderBy)} — late</span>`:fmt(x.orderBy)):'—'}</td></tr>`).join('')}</tbody></table></div>`).join(''):'<p class="note">Nothing to order — stock plus orders already placed cover this month’s need and the safety stock.</p>'}
+  <p class="note">Net need = needed + safety stock − in stock − orders planned or placed. The order quantity is rounded up to the supplier’s MOQ and then to the pack size. Order-by = needed-by date − lead time.</p>`;
+  if($('#pcopy'))$('#pcopy').onclick=()=>{const t=Object.keys(by).sort().map(s=>(s==='—'?'No supplier':supName(s))+'\n'+by[s].map(x=>`  ${x.code} ${matName(x.code)} — ${kg(x.order)} kg${x.orderBy?' — order by '+fmt(x.orderBy):''}`).join('\n')).join('\n\n');(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>say('Order list copied.',1),()=>say('Could not copy — use Print.'))};
+  if($('#pmk'))$('#pmk').onclick=async()=>{if(window.KMRLock&&!KMRLock.need('rmp.supplier-orders-receipts'))return;
+    try{for(const x of L)await call('kmr_rmp_order_save',{p:{material_code:x.code,supplier_code:x.supplier||'',month:S.month,qty_kg:x.order,rate:x.rate||'',due_date:x.needBy||''}});say(L.length+' planned order(s) created — see Orders.',1);await load();drawPlan()}catch(e){say(e.message)}};
+}
+
+/* ---------- 3. orders ---------- */
+const OS={planned:['Planned','x'],ordered:['Ordered','b'],received:['Received','g'],cancelled:['Cancelled','x']};
+function drawOrders(){
+  const o=S.d.orders;
+  $('#orders').innerHTML=`<div class="row"><b class="grow">Supplier orders</b>${canEdit()?'<button class="btn" id="on">+ New order</button>':''}</div>
+  ${o.length?`<table><thead><tr><th>PO</th><th>Material</th><th>Supplier</th><th class="num">Qty (kg)</th><th class="num">Value</th><th>Due</th><th>Status</th><th></th></tr></thead><tbody>${o.map(x=>`<tr><td>${esc(x.po_no||'—')}</td><td><b>${esc(x.material_code)}</b><div class="mut">${esc(matName(x.material_code))}</div></td><td>${esc(supName(x.supplier_code)||'—')}</td><td class="num">${kg(x.qty_kg)}${x.status==='received'?`<div class="mut">got ${kg(x.received_kg)}</div>`:''}</td><td class="num">${x.rate?inr(x.rate*x.qty_kg):'—'}</td><td>${x.due_date&&x.status==='ordered'&&x.due_date<S.d.today?`<span class="late">${fmt(x.due_date)}</span>`:fmt(x.due_date)}</td><td><span class="chip ${OS[x.status][1]}">${OS[x.status][0]}</span></td><td>${canEdit()?orderBtns(x):''}</td></tr>`).join('')}</tbody></table>`:'<p class="note">No orders yet. Use “Create planned orders” on the Purchase plan, or add one here.</p>'}`;
+  if($('#on'))$('#on').onclick=()=>orderForm();
+}
+const orderBtns=(x)=>x.status==='planned'?`<button class="btn sm o" onclick="ordSt('${x.id}','ordered')">Mark ordered</button> <button class="btn sm o" onclick="orderForm('${x.id}')">Edit</button> <button class="btn sm o" onclick="ordDel('${x.id}')">Delete</button>`:x.status==='ordered'?`<button class="btn sm" onclick="recv('${x.id}')">Receive</button> <button class="btn sm o" onclick="orderForm('${x.id}')">Edit</button> <button class="btn sm o" onclick="ordSt('${x.id}','cancelled')">Cancel</button>`:'';
+async function ordSt(id,st,k){try{await call('kmr_rmp_order_status',{p_id:id,p_status:st,p_received_kg:k||null});closeM();say('Done.',1);await load();drawOrders()}catch(e){say(e.message)}}
+async function ordDel(id){if(!confirm('Delete this planned order?'))return;try{await call('kmr_rmp_order_delete',{p_id:id});await load();drawOrders()}catch(e){say(e.message)}}
+function recv(id){const x=S.d.orders.find(o=>o.id===id);open(`<h3 style="margin-top:0">Receive ${esc(x.material_code)}</h3><div class="frm"><div><label>Quantity received (kg)</label><input id="rk" type="number" min="0" step="any" value="${x.qty_kg}"></div></div><p class="note">The quantity is added to the stock of this material.</p><div class="row" style="justify-content:flex-end"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="rok">Receive</button></div>`);$('#rok').onclick=()=>ordSt(id,'received',+$('#rk').value)}
+function orderForm(id){
+  const x=id?S.d.orders.find(o=>o.id===id):{material_code:'',supplier_code:'',qty_kg:'',rate:'',due_date:'',po_no:''};
+  open(`<h3 style="margin-top:0">${id?'Edit':'New'} order</h3><div class="frm"><div><label>Material</label><select id="om">${(S.d.materials||[]).map(m=>`<option value="${esc(m.code)}"${m.code===x.material_code?' selected':''}>${esc(m.code)} — ${esc(m.name||'')}</option>`).join('')}</select></div>
+  <div><label>Supplier</label><select id="os"><option value="">—</option>${(S.d.suppliers||[]).map(m=>`<option value="${esc(m.code)}"${m.code===x.supplier_code?' selected':''}>${esc(m.code)} — ${esc(m.name||'')}</option>`).join('')}</select></div>
+  <div><label>PO number</label><input id="op" value="${esc(x.po_no||'')}"></div><div><label>Quantity (kg)</label><input id="oq" type="number" min="0" step="any" value="${x.qty_kg}"></div><div><label>Rate (₹/kg)</label><input id="or" type="number" min="0" step="any" value="${x.rate||''}"></div><div><label>Due on</label><input id="od" type="date" value="${esc(x.due_date||'')}"></div></div>
+  <div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="ook">Save</button></div>`);
+  const fill=()=>{const m=S.d.materials.find(z=>z.code===$('#om').value);if(m&&!id){if(m.supplier)$('#os').value=m.supplier;if(m.rate_per_kg&&!$('#or').value)$('#or').value=m.rate_per_kg}};$('#om').onchange=fill;if(!id)fill();
+  $('#ook').onclick=async()=>{try{if(!window.KMRLock||KMRLock.need('rmp.supplier-orders-receipts')){await call('kmr_rmp_order_save',{p:{id:id||null,material_code:$('#om').value,supplier_code:$('#os').value,po_no:$('#op').value,qty_kg:$('#oq').value,rate:$('#or').value,due_date:$('#od').value,month:S.month,status:'planned'}});closeM();await load();drawOrders()}}catch(e){closeM();say(e.message)}};
+}
+
+/* ---------- 4. materials & BOM ---------- */
+function drawMaster(){
+  const st=Object.fromEntries(S.d.stock.map(s=>[s.material_code,s])),ed=canEdit(),adv=hasF('rmp.purchase-plan-moq-lead-times');
+  const ro=(v,f,c)=>ed?`<input type="number" min="0" step="any" value="${v==null?'':v}" data-m="${esc(c)}" data-f="${f}" style="width:90px">`:kg(v);
+  $('#master').innerHTML=`<div class="row"><b class="grow">Stock by raw material</b></div>
+  ${(S.d.materials||[]).length?`<table><thead><tr><th>Material</th><th>Supplier</th><th>Rate ₹/kg</th><th>In stock (kg)</th>${adv?'<th>Safety (kg)</th><th>Lead (days)</th><th>MOQ (kg)</th><th>Pack (kg)</th>':''}</tr></thead><tbody>${S.d.materials.map(m=>{const s=st[m.code]||{};return `<tr><td><b>${esc(m.code)}</b><div class="mut">${esc(m.name||'')}</div></td><td>${esc(supName(m.supplier)||'—')}</td><td>${m.rate_per_kg||'—'}</td><td>${ro(s.on_hand_kg,'on_hand_kg',m.code)}</td>${adv?`<td>${ro(s.safety_kg,'safety_kg',m.code)}</td><td>${ro(s.lead_days,'lead_days',m.code)}</td><td>${ro(s.moq_kg,'moq_kg',m.code)}</td><td>${ro(s.pack_kg,'pack_kg',m.code)}</td>`:''}</tr>`}).join('')}</tbody></table>`:'<p class="note">No raw materials yet — add them in KMR Apps › Operations Master › Raw material (code, supplier, rate per kg).</p>'}
+  <p class="note">Materials, suppliers and rates are read from the Operations Master — only the stock figures are kept here.</p>
+  <div class="row" style="margin-top:18px"><b class="grow">Bill of material — kg per part</b>${ed?'<button class="btn" id="bn">+ Add / override</button>':''}</div>
+  <p class="note">By default a part uses its material and weight from the Operations Master. Add a line here to use a different weight, add a loss % (bar end, parting), or add a second material.</p>
+  ${S.d.bom.length?`<table><thead><tr><th>Part</th><th>Material</th><th class="num">kg per part</th><th class="num">Loss %</th><th>Note</th><th></th></tr></thead><tbody>${S.d.bom.map(b=>`<tr><td><b>${esc(b.part_code)}</b></td><td>${esc(b.material_code)}</td><td class="num">${b.rm_kg==null?'<span class="mut">part weight</span>':b.rm_kg}</td><td class="num">${b.loss_pct||0}</td><td class="mut">${esc(b.notes||'')}</td><td>${ed?`<button class="btn sm o" onclick="bomDel('${b.id}')">Remove</button>`:''}</td></tr>`).join('')}</tbody></table>`:'<p class="note">No overrides — every part uses its master weight.</p>'}`;
+  document.querySelectorAll('#master input[data-m]').forEach(i=>i.onchange=async()=>{try{await call('kmr_rmp_stock_save',{p:{material_code:i.dataset.m,[i.dataset.f]:i.value}});say('Saved.',1);await load()}catch(e){say(e.message)}});
+  if($('#bn'))$('#bn').onclick=()=>open(`<h3 style="margin-top:0">Bill of material line</h3><div class="frm"><div><label>Part</label><select id="bp">${S.d.parts.map(p=>`<option value="${esc(p.code)}">${esc(p.code)} — ${esc(p.name||'')}</option>`).join('')}</select></div><div><label>Material</label><select id="bm">${S.d.materials.map(p=>`<option value="${esc(p.code)}">${esc(p.code)} — ${esc(p.name||'')}</option>`).join('')}</select></div><div><label>kg per part (blank = part weight)</label><input id="bk" type="number" min="0" step="any"></div><div><label>Loss %</label><input id="bl" type="number" min="0" step="any" value="0"></div><div style="grid-column:1/-1"><label>Note</label><input id="bt"></div></div><div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn o" onclick="closeM()">Cancel</button><button class="btn" id="bok">Save</button></div>`)||($('#bp').onchange=()=>{const p=S.d.parts.find(x=>x.code===$('#bp').value);if(p&&p.material)$('#bm').value=p.material},$('#bp').onchange(),$('#bok').onclick=async()=>{try{await call('kmr_rmp_bom_save',{p:{part_code:$('#bp').value,material_code:$('#bm').value,rm_kg:$('#bk').value,loss_pct:$('#bl').value,notes:$('#bt').value}});closeM();await load();drawMaster()}catch(e){closeM();say(e.message)}});
+}
+async function bomDel(id){try{await call('kmr_rmp_bom_delete',{p_id:id});await load();drawMaster()}catch(e){say(e.message)}}
+
+/* ---------- 5. parts to start (published by the Capacity Planner, or typed) ---------- */
+function drawStart(){
+  const ed=canEdit(),dm=Object.fromEntries(S.d.demand.map(d=>[d.part_code,d]));
+  $('#start').innerHTML=`<p class="note">${S.d.capacity?'The Capacity Planner publishes these numbers every time it saves. ':'Type how many of each part will be started this month. '}A number you type here is kept as “typed by hand” and is not overwritten by the Capacity Planner.</p>
+  ${S.d.parts.length?`<table><thead><tr><th>Part</th><th>Material</th><th class="num">kg / part</th><th class="num">Parts to start</th><th>Needed by</th><th>Source</th><th></th></tr></thead><tbody>${S.d.parts.map(p=>{const d=dm[p.code]||{};return `<tr><td><b>${esc(p.code)}</b><div class="mut">${esc(p.name||'')}</div></td><td>${esc(p.material||'—')}</td><td class="num">${p.weight_kg||'<span class="late">no weight</span>'}</td><td class="num">${ed?`<input type="number" min="0" data-p="${esc(p.code)}" data-f="q" value="${d.start_qty==null?'':d.start_qty}" style="width:110px">`:kg(d.start_qty)}</td><td>${ed?`<input type="date" data-p="${esc(p.code)}" data-f="d" value="${esc(d.need_by||'')}" style="width:150px">`:fmt(d.need_by)}</td><td>${d.source==='capacity'?'<span class="chip b">Capacity</span>':d.source==='manual'?'<span class="chip a">typed</span>':''}</td><td>${ed&&d.source?`<button class="btn sm o" onclick="clearD('${esc(p.code)}')">Clear</button>`:''}</td></tr>`}).join('')}</tbody></table>`:'<p class="note">No parts in the Operations Master yet.</p>'}`;
+  document.querySelectorAll('#start input[data-p]').forEach(i=>i.onchange=async()=>{const c=i.dataset.p,r=document.querySelectorAll(`#start input[data-p="${CSS.escape(c)}"]`);let q,d;r.forEach(z=>{if(z.dataset.f==='q')q=z.value;else d=z.value});
+    try{await call('kmr_rmp_demand_save',{p_month:S.month,p_rows:[{part_code:c,start_qty:q||0,need_by:d||''}]});say('Saved.',1);await load();drawStart()}catch(e){say(e.message)}});
+}
+async function clearD(c){try{await call('kmr_rmp_demand_clear',{p_month:S.month,p_part:c});await load();drawStart()}catch(e){say(e.message)}}
+
+(async()=>{try{await QP.init('rmp');if(!QP.ctx)return;S.month=(QP.qs.get('month')||curMonth());$('#mon').value=S.month;await route()}catch(e){say(e.message)}})();
+</script></body></html>

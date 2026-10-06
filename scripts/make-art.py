@@ -394,6 +394,20 @@ def app_ppap():
     return window(a, "PPAP", b)
 
 
+def app_rmp():
+    a = "#0D9488"
+    b = heading("Raw material · this month", "Needed vs stock, in kg")
+    rows = [("EN8 bar Ø65", 9800, 3400, OK), ("EN19 bar Ø45", 7000, 600, RED), ("EN353 forging", 4650, 900, AMBER), ("SS304 bar", 2100, 2600, OK)]
+    for i, (nm, need, st, c) in enumerate(rows):
+        y = 40 + i * 44
+        b += (f"<text x='0' y='{y + 10}' {FONT} font-size='10' font-weight='700' fill='{INK}'>{nm}</text>"
+              f"<rect x='0' y='{y + 16}' width='260' height='9' rx='4.5' fill='#E6E9F0'/><rect x='0' y='{y + 16}' width='{min(260, int(260 * need / 10000))}' height='9' rx='4.5' fill='{a}' opacity='.35'/>"
+              f"<rect x='0' y='{y + 16}' width='{min(260, int(260 * st / 10000))}' height='9' rx='4.5' fill='{c}'/>"
+              f"<text x='270' y='{y + 25}' {FONT} font-size='9' fill='{MUTED}'>{need:,} kg · stock {st:,}</text>")
+    b += f"<rect x='0' y='222' width='420' height='34' rx='8' fill='#FBF3E0'/><text x='12' y='243' {FONT} font-size='10' font-weight='700' fill='{INK}'>Order 6,750 kg EN19 · MOQ 1,000 · pack 250 · order by 12 Oct</text>"
+    return window(a, "RMP", b)
+
+
 ART = {
     "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
@@ -401,6 +415,7 @@ ART = {
     "app-capacity": lambda: svg(bg("#10B981") + app_capacity(), "Capacity Planner"),
     "app-sales": lambda: svg(bg("#E11D48") + app_sales(), "Sales Flow"),
     "app-apqp": lambda: svg(bg("#0891B2") + app_apqp(), "APQP Planner"),
+    "app-rmp": lambda: svg(bg("#0D9488") + app_rmp(), "Raw Material Planning"),
     "app-ppap": lambda: svg(bg("#B45309") + app_ppap(), "PPAP Submissions"),
     "app-calib": lambda: svg(bg("#6366F1") + app_calib(), "Calibration Hub"),
     "v-shop": scene_shop, "v-software": scene_software, "v-training": scene_training, "v-trade": scene_trade, "v-invest": scene_invest,

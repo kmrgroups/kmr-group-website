@@ -1753,13 +1753,29 @@ async function cloudBoot() {
       if (b && b.name) { cloud.brand = b; state.settings.companyName = b.name; if (b.logo) state.settings.logo = b.logo; }
     } catch (e) { /* keep the plan's own name */ }
     await applyOpsMasters();   // machines, parts, cycle times, plant standards and HRM holidays
-    hideGate(); render(); startPoll();
+    hideGate(); render(); startPoll(); setTimeout(publishRmp, 1500);
     if (cloud.firstPublish) { cloud.firstPublish = false; firstPublishModal(); }
   } catch (e) {
     setSync('err', e.message);
     if (/sign in again/i.test(e.message)) showGate('signin', e.message);
     else showGate('error', e.message);
   }
+}
+/* Raw Material Planning: the parts to start this month, published for the RMP app. Best-effort and silent — nothing happens if the company has no RMP licence. */
+let rmpLast = '';
+async function publishRmp() {
+  if (!window.KMR_PLATFORM || !cloudActive() || !can('editor') || !Cloud.org) return;
+  try {
+    const m = E.compute(state, { scenario: 'standard' }), dyn = m.mode === 'dynamic', by = {};
+    m.rows.forEach(r => { if (r.qty > 0) (by[r.partNo] = by[r.partNo] || []).push(r); });
+    const rows = Object.keys(by).map(pn => {
+      const rs = by[pn].slice().sort((a, b) => a.start - b.start), n = (m.net || {})[pn] || {};
+      const q = dyn ? Number((n.material || {}).need || 0) : Math.max(...rs.map(r => Number(r.qty || 0))), d = rs.map(r => r.startDate).filter(Boolean).sort()[0] || null;
+      return { part_code: pn, start_qty: Math.round(q), sales_qty: Math.round(Number(n.sales || rs[0].qty || 0)), need_by: d };
+    }).filter(r => r.start_qty > 0);
+    const sig = m.key + JSON.stringify(rows); if (sig === rmpLast) return; rmpLast = sig;
+    await Cloud._fetch('/rest/v1/rpc/kmr_rmp_publish', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org, p_month: m.key, p_rows: rows }) });
+  } catch (e) { rmpLast = ''; }
 }
 async function cloudSave(force) {
   if (!can('editor')) return;
@@ -1768,7 +1784,7 @@ async function cloudSave(force) {
     setSync('busy', 'Saving…');
     const r = await Cloud.save(sharedPart(state), cloud.stamp, force === true);
     if (r.conflict) { cloud.dirty = true; setSync('err', 'Newer version in cloud'); conflictModal(r.remote); return; }
-    cloud.stamp = r.stamp; cloud.savedHash = hash; cloud.dirty = sharedHash() !== hash; setSync('on', 'Synced · just now');
+    cloud.stamp = r.stamp; cloud.savedHash = hash; cloud.dirty = sharedHash() !== hash; setSync('on', 'Synced · just now'); publishRmp();
   } catch (e) { setSync('err', navigator.onLine === false ? 'Offline — will save when back online' : e.message); if (!navigator.onLine) cloud.dirty = true; }
 }
 async function pullIfChanged(quiet) {
