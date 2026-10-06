@@ -139,8 +139,10 @@ function mkCtx(plan, s){
   const machines = s.strictMasters ? (s.machines||[]) : (s.machines&&s.machines.length)?s.machines:E.DEFAULT_MACHINES;
   const mById={}; machines.forEach(m=>mById[m.id]=m);
   const gName = id => gById[id] ? `${gById[id].name}${gById[id].range&&gById[id].range!=="—"?" "+gById[id].range:""}` : "";
+  // a characteristic can use several gauges (picked in Balloon Inspector): the first is the main one, the rest are listed after it
+  const gNameC = c => { const more=(c.gaugeMore||[]).map(gName).filter(Boolean); return more.length ? [gName(c.gauge),...more].filter(Boolean).join(" + ") : gName(c.gauge); };
   const freq = {cc:s.freqCC||"100% + 5 pcs / 2 hrs (SPC)", sc:s.freqSC||"5 pcs / 2 hrs", nor:s.freqNormal||"1 pc / 2 hrs", slots:+(s.patrolSlots||8)};
-  return {byNo, gById, opOf, mById, gName, freq, s, mfg:plan.ops.filter(o=>E.MFG_KEYS.includes(o.key)&&o.key!=="CUT"&&o.chars.length)};
+  return {byNo, gById, opOf, mById, gName, gNameC, freq, s, mfg:plan.ops.filter(o=>E.MFG_KEYS.includes(o.key)&&o.key!=="CUT"&&o.chars.length)};
 }
 const lc = s => String(s||"").charAt(0).toLowerCase()+String(s||"").slice(1);
 const opLabel = o => `${o.opNo} – ${o.name}`;
@@ -189,14 +191,14 @@ GEN.pfmea = (plan, x) => {
     if(o.key==="RMI"){
       const mat = ch.find(c=>c.type==="Material") || {type:"Material",label:"Material grade",spec:plan.header.material||"As per drawing",cls:"",text:""};
       CAUSES.rm.forEach(k=>push(o,`${k.we}: raw material`,`Accept only material to ${plan.header.material||"drawing specification"}`,"Supplier delivers material with valid MTC",effectFor(mat),8,"Wrong material grade / material not as per specification",k.fc,k.pc,k.o,"MTC verification per heat; spectro check per lot",5,mat.cls));
-      ch.filter(c=>c.type!=="Material").forEach(c=>{ const s=sevFor(c), dt=detFor(c,plan,x.gName(c.gauge)); push(o,"Man: inspector",`Verify ${c.label} ${c.spec}`,"Inspector verifies against specification",effectFor(c),s,fmFor(c),CAUSES.insp[0].fc,CAUSES.insp[0].pc,3,dt.dc,dt.d,c.cls); });
+      ch.filter(c=>c.type!=="Material").forEach(c=>{ const s=sevFor(c), dt=detFor(c,plan,x.gNameC(c)); push(o,"Man: inspector",`Verify ${c.label} ${c.spec}`,"Inspector verifies against specification",effectFor(c),s,fmFor(c),CAUSES.insp[0].fc,CAUSES.insp[0].pc,3,dt.dc,dt.d,c.cls); });
       return;
     }
     if(o.key==="CUT"){ push(o,`Machine: ${machineTxt}`,"Cut blank to length","Saw holds cut length","Your plant: part cannot clean up at facing – scrap.",4,"Cut length short / long","Length stop not set / shifted",`First-piece check; length stop locked`,3,"First piece & every 50 pcs with steel rule / vernier",6,""); return; }
     if(E.MFG_KEYS.includes(o.key)){
       const grind = /GRIND|HONE/.test(o.key);
       ch.forEach(c=>{
-        const s=sevFor(c), gname=x.gName(c.gauge), pg=c.pgauge?x.gName(c.pgauge):"", dt=detFor(c,plan,gname,pg), base=occFromCap(c.band,cap);
+        const s=sevFor(c), gname=x.gNameC(c), pg=c.pgauge?x.gName(c.pgauge):"", dt=detFor(c,plan,gname,pg), base=occFromCap(c.band,cap);
         const causes = (grind?CAUSES.grind:CAUSES.mach).concat(c.type==="Thread"?CAUSES.thread:[]);
         causes.forEach((k,i)=>{ const oo = k.o!=null ? Math.min(k.o, base+1) : Math.min(8, base+(k.dO||0));
           push(o, `${k.we}: ${k.we==="Machine"?machineTxt:k.we==="Method"?"setting / program":k.we==="Environment"?"coolant / temperature":"operator"}`,
@@ -232,7 +234,7 @@ GEN.cp = (plan, x) => {
     (x.s.reactNormal||"Stop; segregate & 100% inspect parts since last OK check; correct offset / tool; re-approve setup; record in rejection register");
   plan.ops.forEach(o=>{
     const ch=o.chars.map(n=>x.byNo[n]).filter(Boolean), mach=[o.machine, ...o.tools.slice(0,4).map(t=>t.desc+" "+t.spec)].filter(Boolean).join("; ");
-    ch.forEach(c=>{ const g=x.gName(c.gauge), pg=c.pgauge?x.gName(c.pgauge):"";
+    ch.forEach(c=>{ const g=x.gNameC(c), pg=c.pgauge?x.gName(c.pgauge):"";
       const cc=c.cls==="CC", sc=c.cls==="SC"||c.cls==="KC";
       const inspOp = ["RMI","HTINSP","FINAL","PDI"].includes(o.key);
       rows.push({opNo:o.opNo, name:o.name, machine:mach, charNo:c.no, product:`${c.label}`, process:"", cls:c.cls, spec:c.spec,
@@ -285,14 +287,14 @@ GEN.sop = (plan, x) => ({ sections: plan.ops.filter(o=>!["RMSTORE","FGSTORE"].in
     tools:o.tools.map(t=>`${t.id} ${t.desc} – ${t.spec}`).join("\n"), gauges:o.gauges.map(id=>`${id} ${x.gName(id)}`).join("\n"), consumables:(o.consumables||[]).join("\n"),
     ppe:ppeFor(o.key).join("\n"),
     steps: stepsFor(o.key).map((s,i)=>({no:i+1, step:s[0], key:s[1]||""})),
-    checks: ch.slice(0,60).map(c=>({charNo:c.no, char:c.label, spec:c.spec, gauge:x.gName(c.pgauge||c.gauge), freq:c.cls==="CC"?"100%":c.cls?"5 pcs / 2 hrs":"1 pc / 2 hrs", cls:c.cls})),
+    checks: ch.slice(0,60).map(c=>({charNo:c.no, char:c.label, spec:c.spec, gauge:(c.pgauge?x.gName(c.pgauge):x.gNameC(c)), freq:c.cls==="CC"?"100%":c.cls?"5 pcs / 2 hrs":"1 pc / 2 hrs", cls:c.cls})),
     params: (o.params||[]).map(p=>({name:p.name, spec:p.spec, freq:p.freq})),
     safety: (E.MFG_KEYS.includes(o.key)?"Do not open door during cycle. Keep hands away from chuck/spindle. Use hook for chip removal – never bare hands. Emergency stop location known.":o.key==="WASH"?"Handle chemicals with gloves; MSDS displayed.":"Handle parts carefully; keep work area clean.") ,
     reaction: "If any characteristic is NG: stop, inform supervisor, segregate parts since last OK check, correct and re-approve setup." };
 }) });
 
 /* ---------- Setup approval / patrol / self ---------- */
-const readRow = (c, x, n, prefix) => { const o={charNo:c.no, char:c.label, spec:c.spec, lsl:c.lsl, usl:c.usl, gauge:x.gName(c.gauge), cls:c.cls}; for(let i=1;i<=n;i++) o[prefix+i]=""; return o; };
+const readRow = (c, x, n, prefix) => { const o={charNo:c.no, char:c.label, spec:c.spec, lsl:c.lsl, usl:c.usl, gauge:x.gNameC(c), cls:c.cls}; for(let i=1;i<=n;i++) o[prefix+i]=""; return o; };
 GEN.setup = (plan, x) => ({ sections: x.mfg.map(o=>({ opNo:o.opNo, opName:o.name, machine:o.machine,
   rows:o.chars.map(n=>x.byNo[n]).filter(Boolean).map(c=>Object.assign(readRow(c,x,5,"r"),{remark:""})),
   params:(o.params||[]).map(p=>({name:p.name, spec:p.spec, actual:"", ok:""})),
@@ -314,7 +316,7 @@ GEN.pdi = (plan, x) => { const pdi = plan.ops.find(o=>o.key==="PDI"); const list
 /* ---------- SPC & MSA studies ---------- */
 GEN.spc = (plan, x) => { let pick = plan.chars.filter(c=>c.cls && c.variable && c.lsl!=null && c.usl!=null);
   if(!pick.length) pick = plan.chars.filter(c=>c.variable && c.lsl!=null && c.usl!=null).sort((a,b)=>(a.band||9)-(b.band||9)).slice(0,3);
-  return { studies: pick.map(c=>({charNo:c.no, char:c.label, spec:c.spec, lsl:c.lsl, usl:c.usl, nominal:c.nominal, gauge:x.gName(c.gauge), op:x.opOf[c.no]?opLabel(x.opOf[c.no]):"", machine:x.opOf[c.no]?x.opOf[c.no].machine:"", cls:c.cls,
+  return { studies: pick.map(c=>({charNo:c.no, char:c.label, spec:c.spec, lsl:c.lsl, usl:c.usl, nominal:c.nominal, gauge:x.gNameC(c), op:x.opOf[c.no]?opLabel(x.opOf[c.no]):"", machine:x.opOf[c.no]?x.opOf[c.no].machine:"", cls:c.cls,
     n:5, k:25, data:Array.from({length:25},()=>Array(5).fill(null)), simulated:false, period:"", studyType:"Initial process study (PPAP)" })) }; };
 GEN.msa = (plan, x) => { const ids = uniq((plan.chars.filter(c=>c.cls&&c.variable).length?plan.chars.filter(c=>c.cls&&c.variable):plan.chars.filter(c=>c.variable).sort((a,b)=>(a.band||9)-(b.band||9)).slice(0,3)).map(c=>c.gauge));
   return { studies: ids.map(id=>{ const g=x.gById[id]; const c=plan.chars.find(ch=>ch.gauge===id&&ch.lsl!=null&&ch.usl!=null) || plan.chars.find(ch=>ch.gauge===id);
@@ -324,8 +326,8 @@ GEN.charts = (plan, x) => ({ meta:{charNo:(plan.chars.find(c=>c.cls&&c.variable)
 
 /* ---------- lists ---------- */
 GEN.sc = (plan, x) => ({ rows: plan.chars.filter(c=>c.cls).map((c,i)=>{ const o=x.opOf[c.no]; return { sl:i+1, charNo:c.no, char:c.label, spec:c.spec, cls:c.cls, sym:(x.s.symbols&&x.s.symbols[c.cls])||({CC:"◆",SC:"▼",KC:"◇"}[c.cls]||""),
-  op:o?opLabel(o):"", gauge:x.gName(c.pgauge||c.gauge), control:c.cls==="CC"?"100% poka-yoke / gauging + X̄-R chart":"X̄-R chart + setup approval", freq:c.cls==="CC"?"100% + 5 pcs / 2 hrs":"5 pcs / 2 hrs", react:"Stop, segregate, 100% inspect, root cause (8D)" }; }) });
-GEN.gauges = (plan, x) => ({ rows: plan.gauges.map((g,i)=>({ sl:i+1, id:g.id, name:g.name, range:g.range, lc:g.lc, type:g.type, chars:g.chars.join(", "), ops:g.ops.join(", "), calFreq:g.calFreq, calDue:g.calDue||"", location:g.location||"", msa:g.type==="Variable"?"GR&R":"Attribute study", source:g.fromBalloon?"Balloon data":"Engine" })) });
+  op:o?opLabel(o):"", gauge:(c.pgauge?x.gName(c.pgauge):x.gNameC(c)), control:c.cls==="CC"?"100% poka-yoke / gauging + X̄-R chart":"X̄-R chart + setup approval", freq:c.cls==="CC"?"100% + 5 pcs / 2 hrs":"5 pcs / 2 hrs", react:"Stop, segregate, 100% inspect, root cause (8D)" }; }) });
+GEN.gauges = (plan, x) => ({ rows: plan.gauges.map((g,i)=>({ sl:i+1, id:g.id, name:g.name, range:g.range, lc:g.lc, type:g.type, chars:g.chars.join(", "), ops:g.ops.join(", "), calFreq:g.calFreq, calDue:g.calDue||"", location:g.location||"", msa:g.type==="Variable"?"GR&R":"Attribute study", source:g.fromBalloon?"Balloon data":"Engine", master:g.purchase?"Not in master — purchase new":g.inMaster?"In Operations Master":"" })) });
 GEN.tools = (plan, x) => { const rows=[]; plan.ops.forEach(o=>o.tools.forEach(t=>rows.push({sl:rows.length+1, id:t.id, opNo:o.opNo, op:o.name, machine:o.machine, desc:t.desc, spec:t.spec, holder:t.holder, grade:t.grade, life:t.life, remarks:t.remarks||""}))); return {rows}; };
 GEN.machines = (plan, x) => { const map={}; plan.ops.forEach(o=>{ if(!o.machine) return; const k=o.machineId||o.machine; const m=x.mById[o.machineId]||{};
   (map[k]=map[k]||{id:o.machineId||"—", name:o.machine, make:[m.make,m.model].filter(Boolean).join(" "), capacity:m.capacity||"", ops:[], location:m.location||(o.inHouse?"":"Sub-contractor"), pm:m.pm||"", cap:m.cap?`± ${fmt(m.cap)} mm`:"", status:"Available"}).ops.push(o.opNo); });
@@ -339,7 +341,7 @@ GEN.pokayoke = (plan, x) => { const rows=[]; const add=(o,desc,type,method,fm,ve
       if(ch.some(c=>c.type==="Thread")) add(o,"Thread-presence check pins on unloading station – part cannot be placed in OK bin if a thread is missing","Detection","Contact","Missing thread");
       if(ch.some(c=>c.type==="Diameter"&&c.internal)) add(o,"Tool-breakage detection (probe / laser) after drilling cycle – machine alarms on broken drill","Detection","Fixed-value","Missing hole / broken drill in hole"); }
     if(/GRIND/.test(o.key)) add(o,"In-process gauge with automatic size control – wheel retracts at size","Prevention","Fixed-value","Ground diameter oversize / undersize","Setting master at start of shift");
-    ch.filter(c=>c.cls==="CC").forEach(c=>add(o,`100% ${c.pgauge?x.gName(c.pgauge):x.gName(c.gauge)} check for #${c.no} ${c.label} ${c.spec} before OK bin (interlocked chute / NG bin)`,"Detection","Contact / fixed-value",`#${c.no} ${c.label} out of tolerance`)); });
+    ch.filter(c=>c.cls==="CC").forEach(c=>add(o,`100% ${c.pgauge?x.gName(c.pgauge):x.gNameC(c)} check for #${c.no} ${c.label} ${c.spec} before OK bin (interlocked chute / NG bin)`,"Detection","Contact / fixed-value",`#${c.no} ${c.label} out of tolerance`)); });
   if(op("PACK")) add(op("PACK"),"Weighing-scale count verification – box label prints only when weight = qty × unit weight","Detection","Fixed-value","Wrong quantity in box","Standard weight at start of shift");
   if(op("DISPATCH")) add(op("DISPATCH"),"Barcode scan of box label against invoice – mismatch alarm","Detection","Fixed-value","Wrong part dispatched","Wrong-label test at start of shift");
   return {rows}; };

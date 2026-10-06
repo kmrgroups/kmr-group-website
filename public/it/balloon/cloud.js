@@ -532,6 +532,12 @@ function chooseOrg(id){
   const m=C.memberships.find(x=>x.id===id); C.org=m; C.role=m.role; try{localStorage.setItem("bi_org"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"),id);}catch(e){}
   window.KMR_FEAT = (C.featByOrg && C.featByOrg[id]) || null;      // null = every feature
   $("clOrg").value=id; brand(); applyRole(); resetReport(); applyOrgDefaults();
+  loadGauges(id);
+}
+/* the company's gauges from KMR Apps › Operations Master (shared by every app); no list = the plain text instrument column */
+async function loadGauges(id){
+  window.KMR_GAUGES=null; try{ const r=await sb.rpc("kmr_balloon_gauges",{p_org:id}); if(!r.error&&Array.isArray(r.data)&&C.org&&C.org.id===id) window.KMR_GAUGES=r.data; }catch(e){}
+  try{ BI.renderAll(); }catch(e){}
 }
 function applyOrgDefaults(){ const s=(C.org&&C.org.settings)||{};
   if(s.gen){ BI.S.set.gen=s.gen; $("sGen").value=s.gen; } if(s.grid){ BI.S.set.grid=s.grid; $("sGrid").value=s.grid; }

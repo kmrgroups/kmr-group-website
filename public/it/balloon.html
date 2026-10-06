@@ -114,6 +114,11 @@ summary span{color:var(--muted);font:400 13px var(--body);margin-left:auto}
 .tablewrap{flex:1;overflow:auto;min-height:0}
 table{border-collapse:separate;border-spacing:0;width:100%;min-width:980px;table-layout:fixed;font-size:12.5px}
 td input,td select{text-overflow:ellipsis}
+.gcell{white-space:normal} .gchip{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:1px 7px;margin:0 3px 3px 0;font-size:11.5px;font-weight:600;border:1px solid;cursor:default}
+.gchip b{cursor:pointer;margin-left:2px;opacity:.7} .gchip b:hover{opacity:1}
+.gchip.good{background:#e3f4ec;border-color:#1f7a55;color:#14573b} .gchip.weak{background:#fff1d1;border-color:#d99a1c;color:#7a4e00} .gchip.new{background:#efe3fb;border-color:#a56fd6;color:#4b2278} .gchip.bad{background:#fde7e5;border-color:#d4574b;color:#8f1d12}
+.gnote{font-size:11px;color:#4b2278;background:#efe3fb;border-radius:6px;padding:2px 6px;margin-top:2px}
+.glegend{font-size:12px;color:var(--mute,#5b6778);margin:6px 2px;display:flex;gap:10px;flex-wrap:wrap;align-items:center} .glegend .gchip{margin:0}
 td select{-webkit-appearance:none;appearance:none;cursor:pointer}
 td.en{color:var(--muted);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .num{font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden}
@@ -224,6 +229,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
       </details>
       <div class="stats" id="stats"></div>
       </div>
+      <div class="glegend" id="glegend" hidden></div>
       <div class="tablewrap" id="tw"></div>
       <div class="hint" id="hint">Drag a balloon to move it. Select a balloon, then drag its dot to move the leader point. Tap “Add balloon”, then tap the drawing to place one by hand.</div>
     </section>

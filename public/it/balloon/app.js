@@ -122,6 +122,53 @@ function instrument(it){
   if(band<=0.3) return "Digital vernier caliper";
   return "Vernier caliper";
 }
+/* ---------- Gauges from the Operations Master (KMR platform) ----------
+   Each characteristic can use one or more gauges picked from the company's Operations Master › Gauges.
+   MSA rule of thumb: the gauge's smallest reading (least count) must be ≤ 10 % of the tolerance band (10:1).
+   Colour:  green  = master gauge, suits the size and meets 10:1  ·  amber = master gauge but too coarse
+            purple = nothing in the master suits → a suggested gauge that must be PURCHASED (not in the master list). */
+const GFAM={Diameter:/micromet|caliper|vernier|bore|plug|ring|snap|cmm|projector|air gauge|telescop|laser/i, Linear:/vernier|caliper|micromet|height|depth|cmm|projector|scale|slip|step|laser/i,
+  Thread:/thread|plug|ring/i, Radius:/radius|profile|projector|cmm/i, Angle:/angle|protractor|bevel|sine|cmm|projector/i, Chamfer:/chamfer|profile|projector|cmm|angle/i,
+  "GD&T":/height|dial|indicator|cmm|fixture|surface plate|v-block|profile|comparator|bore|round|laser/i, "Surface finish":/roughness|profilomet|surface/i};
+const gNums=s=>(String(s||"").replace(/[−–]/g,"-").match(/\d+(?:\.\d+)?/g)||[]).map(Number);
+function gaugeFit(it,g){
+  const [l,u]=limits(it), band=(l!=null&&u!=null)?(u-l):null, nom=it.nominal;
+  const fam=GFAM[it.type]; const famOk=!fam||fam.test((g.name||"")+" "+(g.type||""));
+  if(!famOk) return {s:"bad",why:"not a gauge type for "+it.type.toLowerCase()};
+  const lc=parseFloat(String(g.lc||"").replace(",","."));
+  const attr=/go\s*\/?\s*no|plug|ring|snap|thread|fixture|pin|slip/i.test((g.name||"")+" "+(g.type||""))||!(lc>0);
+  const rn=gNums(g.range); let rangeOk=true;
+  if(nom!=null&&rn.length){ if(rn.length>=2){ const lo=Math.min(rn[0],rn[1]),hi=Math.max(rn[0],rn[1]); rangeOk=nom>=lo-1e-9&&nom<=hi+1e-9; } else rangeOk=Math.abs(rn[0]-nom)<=Math.max(0.05,band||0); }
+  if(!rangeOk) return {s:"bad",why:"range "+g.range+" does not cover "+nom};
+  if(attr) return {s:"good",why:"attribute gauge (needs an attribute MSA study)"};
+  if(band==null) return {s:"good",why:"no tolerance to check against"};
+  return lc<=band/10+1e-12 ? {s:"good",why:"least count "+lc+" ≤ 10 % of tolerance "+(+band.toFixed(4))} : {s:"weak",why:"least count "+lc+" is coarser than 10 % of the tolerance ("+(+(band/10).toFixed(4))+") — fails MSA 10:1"};
+}
+function gaugeSuggest(it){
+  const [l,u]=limits(it), band=(l!=null&&u!=null)?(u-l):null, nom=it.nominal;
+  const need=band!=null?band/10:null; const steps=[0.0001,0.0002,0.0005,0.001,0.002,0.005,0.01,0.02,0.05];
+  const lc=need==null?null:([...steps].reverse().find(x=>x<=need+1e-12)||steps[0]);
+  const base=instrument(it); const sized=nom!=null&&/micromet|caliper|vernier|height/i.test(base)?(nom<=25?"0–25 mm":nom<=50?"25–50 mm":nom<=75?"50–75 mm":nom<=100?"75–100 mm":nom<=150?"0–150 mm":nom<=300?"0–300 mm":"0–600 mm"):"";
+  return {id:"",name:base,range:sized,lc:lc?String(lc):"",purchase:true,why:lc?"needs a least count of "+lc+" or finer (10:1 on a "+(+band.toFixed(4))+" tolerance)":"not in the Operations Master gauge list"};
+}
+const gUsed=it=>it.gauges||[];
+function gaugeCell(it){
+  const G=window.KMR_GAUGES; if(!Array.isArray(G)) return `<td><input data-f="instr" value="${esc(it.instr)}" title="${esc(it.instr)}"></td>`;
+  const chips=gUsed(it).map((g,i)=>{ const f=g.purchase?{s:"new"}:gaugeFit(it,g); const why=g.purchase?"Not in the Operations Master — new gauge to purchase: "+(g.why||""):f.why;
+    return `<span class="gchip ${g.purchase?"new":f.s}" title="${esc((g.id?g.id+" · ":"")+g.name+(g.range?" · "+g.range:"")+(g.lc?" · LC "+g.lc:"")+" — "+why)}">${esc(g.id||"NEW")} ${esc(g.name.length>18?g.name.slice(0,17)+"…":g.name)}<b data-act="gdel" data-gi="${i}" title="Remove this gauge">×</b></span>`; }).join("");
+  const have=new Set(gUsed(it).map(g=>g.id).filter(Boolean));
+  const fits=G.map(g=>({g,f:gaugeFit(it,g)})).filter(x=>!have.has(x.g.id));
+  const good=fits.filter(x=>x.f.s==="good"), weak=fits.filter(x=>x.f.s==="weak"), bad=fits.filter(x=>x.f.s==="bad");
+  const sug=gaugeSuggest(it), noGood=!good.length&&!gUsed(it).some(g=>!g.purchase&&gaugeFit(it,g).s==="good");
+  const opt=(x,pre)=>`<option value="${esc(x.g.id)}">${pre} ${esc(x.g.id+" "+x.g.name+(x.g.range?" · "+x.g.range:"")+(x.g.lc?" · LC "+x.g.lc:""))}</option>`;
+  const sel=`<select data-f="gaugeAdd" title="Add a gauge from the Operations Master"><option value="">＋ gauge…</option>
+    ${good.length?`<optgroup label="Suitable — meets MSA 10:1">${good.map(x=>opt(x,"🟢")).join("")}</optgroup>`:""}
+    ${weak.length?`<optgroup label="In master, but too coarse (fails 10:1)">${weak.map(x=>opt(x,"🟠")).join("")}</optgroup>`:""}
+    ${noGood?`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(sug.name+(sug.range?" · "+sug.range:"")+(sug.lc?" · LC "+sug.lc:""))}</option></optgroup>`:""}
+    ${bad.length?`<optgroup label="Other master gauges (wrong type / range)">${bad.map(x=>opt(x,"⚪")).join("")}</optgroup>`:""}</select>`;
+  return `<td class="gcell">${chips}${sel}${noGood&&!gUsed(it).length?`<div class="gnote">No master gauge suits — ${esc(sug.why)}</div>`:""}</td>`;
+}
+function setInstrFromGauges(it){ const g=gUsed(it); if(g.length){ it.instr=g.map(x=>x.name+(x.id?" ("+x.id+")":" (new)")).join(" / "); it.autoInstr=false; } else { it.instr=instrument(it); delete it.autoInstr; } }
 function zone(it){
   const sh=S.sheets[it.sheet]; if(!sh) return "";
   const c=Math.min(S.set.cols-1,Math.max(0,Math.floor(it.ax/sh.w*S.set.cols)));
@@ -241,8 +288,9 @@ function renderTable(){
   const tw=$("tw");
   if(!S.items.length){ tw.innerHTML=`<div class="emptytable">${S.sheets.length?"No balloons yet. Tap “Find dimensions” (free) to read the drawing, or “Add balloon” to place them by hand.":"Open a drawing to start the inspection table."}</div>`; return; }
   const sc=tw.scrollLeft, st=tw.scrollTop;
+  const gl=$("glegend"); if(gl){ const on=Array.isArray(window.KMR_GAUGES); gl.hidden=!on; if(on) gl.innerHTML=`<b>Gauge colours:</b> <span class="gchip good">green</span> master gauge, suits the size and meets MSA 10:1 <span class="gchip weak">amber</span> master gauge, but too coarse <span class="gchip new">purple</span> not in the master list — new gauge to purchase. Pick one or more per balloon; the choice follows into Process Documents.`; }
   const multi=S.sheets.length>1, showEn=S.lang&&S.lang!=="English"&&S.items.some(i=>i.en);
-  const cols=[["No.","40px"],[multi?"Sh·Zone":"Zone","56px"],["Type","9%"],["Specification",showEn?"13%":"18%"]].concat(showEn?[["English","12%"]]:[]).concat([["Nominal","6.5%"],["+ Tol","6%"],["− Tol","6%"],["LSL","5.5%"],["USL","5.5%"],["Unit","4.5%"],["Class","4.5%"],["Instrument","11%"],["Actual","7%"],["Result","5.5%"],["Conf.","4.5%"],["","26px"]]);
+  const cols=[["No.","40px"],[multi?"Sh·Zone":"Zone","56px"],["Type","9%"],["Specification",showEn?"13%":"18%"]].concat(showEn?[["English","12%"]]:[]).concat([["Nominal","6.5%"],["+ Tol","6%"],["− Tol","6%"],["LSL","5.5%"],["USL","5.5%"],["Unit","4.5%"],["Class","4.5%"],["Instrument",Array.isArray(window.KMR_GAUGES)?"17%":"11%"],["Actual","7%"],["Result","5.5%"],["Conf.","4.5%"],["","26px"]]);
   let h=`<table><colgroup>${cols.map(c=>`<col style="width:${c[1]}">`).join("")}</colgroup><thead><tr>${cols.map(c=>`<th title="${c[0]}">${c[0]}</th>`).join("")}</tr></thead><tbody>`;
   S.items.forEach((it,i)=>{
     const [l,u]=limits(it), res=result(it), g=it.gen?' class="gen" title="From general tolerance"':"";
@@ -259,7 +307,7 @@ function renderTable(){
       <td class="num">${fmt(l)}</td><td class="num">${fmt(u)}</td>
       <td><select data-f="unit"><option${it.unit==="mm"?" selected":""}>mm</option><option${it.unit==="in"?" selected":""}>in</option><option${it.unit==="deg"?" selected":""}>deg</option><option${it.unit==="µm"?" selected":""}>µm</option><option${it.unit==="—"?" selected":""}>—</option></select></td>
       <td><select data-f="cls" style="${it.cls?"font-weight:700;color:var(--accent)":""}"><option value=""${!it.cls?" selected":""}>—</option><option${it.cls==="SC"?" selected":""}>SC</option><option${it.cls==="CC"?" selected":""}>CC</option><option${it.cls==="KC"?" selected":""}>KC</option></select></td>
-      <td><input data-f="instr" value="${esc(it.instr)}" title="${esc(it.instr)}"></td>
+      ${gaugeCell(it)}
       <td><input data-f="actual" value="${esc(it.actual)}" placeholder="value/OK"></td>
       <td><span class="res ${res}">${res==="pass"?"PASS":res==="fail"?"FAIL":"—"}</span></td>
       <td><span class="conf${it.conf!=null&&it.conf<0.7?" low":""}">${it.conf==null?(it.source==="cad"?"CAD":"manual"):Math.round(it.conf*100)+"%"}</span></td>
@@ -273,10 +321,14 @@ $("tw").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-id]"); if(!tr) return; const id=+tr.dataset.id, act=e.target.closest("[data-act]")?.dataset.act;
   if(act==="del"){ S.items=S.items.filter(i=>i.id!==id); if(S.sel===id) S.sel=null; renderAll(); return; }
   if(act==="go"){ const it=S.items.find(i=>i.id===id); select(id); centerOn(it); return; }
+  if(act==="gdel"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; it.gauges=gUsed(it).filter((_,k)=>k!==+e.target.closest("[data-gi]").dataset.gi); setInstrFromGauges(it); renderTable(); return; }
   if(S.sel!==id){ S.sel=id; draw(); document.querySelectorAll("tr.sel").forEach(r=>r.classList.remove("sel")); tr.classList.add("sel"); }
 });
 $("tw").addEventListener("change",e=>{
   const f=e.target.dataset.f; if(!f) return; const id=+e.target.closest("tr").dataset.id, it=S.items.find(i=>i.id===id); const v=e.target.value;
+  if(f==="gaugeAdd"){ if(!v) return; it.gauges=gUsed(it).slice();
+    if(v==="__new") it.gauges.push(gaugeSuggest(it)); else { const g=(window.KMR_GAUGES||[]).find(x=>x.id===v); if(g) it.gauges.push({id:g.id,name:g.name,range:g.range||"",lc:g.lc||"",type:g.type||"",purchase:false}); }
+    setInstrFromGauges(it); renderTable(); return; }
   if(["nominal","upper","lower"].includes(f)){ it[f]=num(v.replace(/−/g,"-").replace("±","")); if(f!=="nominal") it.gen=false; if(f==="nominal") applyGen(it); }
   else if(f==="text"){ it.text=v; it.en=translate(v,S.lang); if(it.type==="GD&T"){it.gdt="";it.datum="";} }
   else it[f]=v;
@@ -1288,7 +1340,7 @@ document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".phead detail
 
 /* ---------- API used by the hosted (cloud) version ---------- */
 function getSnapshot(){ return {v:1,clean:!!S.cleaned,desk:S.sheets.map(s=>s.deskew||0),fileName:S.fileName,header:{...S.header},set:{...S.set},
-  items:S.items.map((it,i)=>{ const {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr}=it; return {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,no:i+1,zone:zone(it)}; })}; }
+  items:S.items.map((it,i)=>{ const {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges}=it; return {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges,no:i+1,zone:zone(it)}; })}; }
 function applySnapshot(p){
   S.header=Object.assign({},S.header,p.header||{}); Object.assign(S.set,p.set||{});
   $("sGen").value=S.set.gen; $("sGrid").value=S.set.grid; $("sCols").value=S.set.cols; $("sRows").value=S.set.rows; $("sSize").value=String(S.set.size); $("sTiles").value=String(S.set.tiles); $("sClean").value=String(S.set.clean??1);

@@ -577,7 +577,7 @@ async function pane(t){
 }
 
 /* ---------------- boot ---------------- */
-window.PDApp = { S, dialog, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
+window.PDApp = { S, opsPortalLink, dialog, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
 /* open the screen / project this address points at (a link opened in a new tab or window) */
 async function openPending(){ try{ const n=NAV0; if(!n) return; if(n.prj&&!(S.prj&&S.prj.id===n.prj)) await openProject(n.prj); if(n.go==="projects") projectsDialog(); else if(n.go&&n.go!=="home"&&S.prj) go(n.go); }catch(_){} }
 if(CLOUD){

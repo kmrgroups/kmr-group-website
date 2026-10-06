@@ -199,6 +199,16 @@ table.tbl { width: 100%; border-collapse: separate; border-spacing: 0; font-size
 .tbl td { padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .tbl tr:last-child td { border-bottom: 0; }
 .tbl .r { text-align: right; }
+/* fit-to-width tables: headers wrap, tighter cells, no sideways scrolling on a normal screen */
+.tbl.fit { width: 100%; table-layout: auto; }
+.tbl.fit th { white-space: normal; line-height: 1.25; padding: 8px 6px; vertical-align: bottom; }
+.tbl.fit td { padding: 8px 6px; }
+.tbl.fit th .xl { display: block; }
+.tbl.fit .cell-inp { width: 100%; min-width: 0; box-sizing: border-box; }
+.tbl.fit td.remcol { width: 22%; min-width: 120px; }
+.tbl.fit .pill { white-space: normal; }
+.tbl.fit .small { font-size: 11px; }
+.tbl-wrap.fitwrap { overflow-x: visible; }
 .tbl .c { text-align: center; }
 .tbl td.num, .tbl th.r { font-variant-numeric: tabular-nums; }
 .tbl tbody tr.click { cursor: pointer; }
@@ -443,7 +453,7 @@ details.dsp ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; } details
 
 .meter i.fill-ok { background: var(--ok); } .meter i.fill-tight { background: var(--tight); } .meter i.fill-sunday { background: var(--warn); } .meter i.fill-critical { background: var(--crit); }
 .col-stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-.grid-side { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 20px; align-items: start; }
+.grid-side { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 20px; align-items: start; }
 .tbl td.stick b, .nowrap { white-space: nowrap; }
 .mrow { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 12px; color: var(--muted); }
 .mrow .cell-inp { flex: 1 1 120px; }
@@ -2211,13 +2221,13 @@ Pages.capacity = () => {
   const sel = model.machines.find(m => m.code === ui.selMachine);
   const rows = ms.map(m => `<tr class="click ${m.code === ui.selMachine ? 'sel' : ''}" data-mach="${h(m.code)}">
       <td class="stick"><b>${h(m.code)}</b><div class="small muted">${h(m.cell)}</div></td>
-      <td class="r"><input class="cell-inp" style="width:74px;text-align:right" type="number" step="0.5" min="0" id="av-${h(m.code)}" data-avail="${h(m.code)}" value="${m.baseDays}" aria-label="Available days for ${h(m.code)}">${state.scenario === 'sunday' ? `<div class="small muted">+${model.sundaysAvailable} Sun</div>` : ''}</td>
+      <td class="r"><input class="cell-inp" style="width:68px;max-width:100%;text-align:right" type="number" step="0.5" min="0" id="av-${h(m.code)}" data-avail="${h(m.code)}" value="${m.baseDays}" aria-label="Available days for ${h(m.code)}">${state.scenario === 'sunday' ? `<div class="small muted">+${model.sundaysAvailable} Sun</div>` : ''}</td>
       <td class="r num"><b>${fmt(m.reqDays)}</b></td>
       <td class="r num ${m.balDays < 0 ? 'neg' : 'pos'}">${signed(m.balDays)}</td>
-      <td style="min-width:110px">${loadBar(m, max)}</td>
+      <td style="min-width:70px;width:14%">${loadBar(m, max)}</td>
       <td class="r num">${fmt(m.util, 1)}%</td>
       <td>${pill(m.tier)}<div class="small muted" style="margin-top:3px">Excel: ${m.excelStatus}</div></td>
-      <td style="min-width:200px"><input class="cell-inp txt" id="rm-${h(m.code)}" data-remark="${h(m.code)}" value="${h(m.remarks)}" placeholder="Add remark…" aria-label="Remarks for ${h(m.code)}"></td>
+      <td class="remcol"><input class="cell-inp txt" id="rm-${h(m.code)}" data-remark="${h(m.code)}" value="${h(m.remarks)}" placeholder="Add remark…" aria-label="Remarks for ${h(m.code)}"></td>
     </tr>`).join('');
   const cards = ms.map(m => `<div class="mcard" data-mach="${h(m.code)}"><div class="t"><span>${h(m.code)}</span>${pill(m.tier)}</div>${loadBar(m, max)}
       <div class="s"><span>Available<b>${fmt(m.availDays, 1)}</b></span><span>Required<b>${fmt(m.reqDays)}</b></span><span>Balance<b style="color:${m.balDays < 0 ? 'var(--crit)' : 'var(--ok)'}">${signed(m.balDays)}</b></span></div>
@@ -2226,7 +2236,7 @@ Pages.capacity = () => {
   <div class="grid-side">
     <section class="card"><div class="card-h"><div><h2>Machine-wise capacity</h2><div class="sub">${monthName()} · ${h(scenarioLabel())}. Available days and remarks can be edited here for this month.</div></div>
       <div class="seg" role="group" aria-label="Filter by cell"><button data-cell="ALL" class="${ui.cellFilter === 'ALL' ? 'on' : ''}">All</button>${cells.map(c => `<button data-cell="${h(c)}" class="${ui.cellFilter === c ? 'on' : ''} hide-sm">${h(c)}</button>`).join('')}</div></div>
-      <div class="tbl-wrap desk-only" id="tw-cap"><table class="tbl"><thead><tr>
+      <div class="tbl-wrap fitwrap desk-only" id="tw-cap"><table class="tbl fit"><thead><tr>
         <th class="stick">Machine<span class="xl">Excel A</span></th><th class="r">Available days<span class="xl">B</span></th><th class="r">Required days<span class="xl">C</span></th><th class="r">Balance days<span class="xl">D = B − C</span></th><th>Load</th><th class="r">Utilisation</th><th>Status<span class="xl">E</span></th><th>Remarks<span class="xl">F</span></th></tr></thead>
         <tbody>${rows}</tbody>
         <tfoot><tr><td class="stick">Total · ${ms.length} machines</td><td class="r num">${fmt(tot('availDays'))}</td><td class="r num">${fmt(tot('reqDays'))}</td><td class="r num ${tot('balDays') < 0 ? 'neg' : 'pos'}">${signed(tot('balDays'))}</td><td></td><td class="r num">${fmt(tot('availDays') ? tot('reqDays') / tot('availDays') * 100 : 0, 1)}%</td><td colspan="2" class="small muted">Excel grand total check: ${fmt(model.totals.req)} days</td></tr></tfoot></table></div>

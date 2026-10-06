@@ -243,7 +243,7 @@ V.plan = (M)=>{
     <button class="btn small" id="plAdd" ${ro()?"disabled":""}>+ Add operation</button><button class="btn small primary" id="plApply" ${ro()?"disabled":""}>Update documents</button></div>
   <p class="hintline" style="margin:-4px 0 10px">Process selection, machine, tools, consumables and gauges for every operation — worked out from the ballooning data. Edit anything, then <b>Update documents</b>.</p>
   ${plan.ops.map((o,i)=>{ const ch=o.chars.map(n=>plan.chars.find(c=>c.no===n)).filter(Boolean);
-    return `<details class="op" data-i="${i}"><summary><span class="dh" draggable="true" title="Drag to move this process up or down" style="cursor:grab;margin-right:6px;user-select:none">⠿</span><span class="no">${o.opNo}</span><span class="nm">${esc(o.name)}</span><span class="pills">${o.inHouse?"":`<span class="pill">Sub-contract</span>`}<span class="pill">${esc(o.machine||"—")}</span><span class="pill">${ch.length} chars</span><span class="pill">${o.tools.length} tools</span><span class="pill">${o.gauges.length} gauges</span>${specialPills(o,ch)}</span></summary>
+    return `<details class="op" data-i="${i}"><summary><span class="dh" draggable="true" title="Drag to move this process up or down" style="cursor:grab;margin-right:6px;user-select:none">⠿</span><span class="no">${o.opNo}</span><span class="nm">${esc(o.name)}</span><span class="pills">${o.inHouse?"":`<span class="pill">Sub-contract</span>`}<span class="pill${(o.inHouse&&(o.machineManual||(!o.machineId&&o.machine)))?" mnew":""}" title="${(o.inHouse&&(o.machineManual||(!o.machineId&&o.machine)))?"Machine not in the Operations Master — add it there":""}">${esc(o.machine||"—")}</span><span class="pill">${ch.length} chars</span><span class="pill">${o.tools.length} tools</span><span class="pill">${o.gauges.length} gauges</span>${specialPills(o,ch)}</span></summary>
     <div class="in" data-in="${i}"></div></details>`; }).join("")}`;
   M.querySelectorAll("details.op").forEach(d=>d.addEventListener("toggle",()=>{ if(d.open) opBody(+d.dataset.i); }));
   $("plApply").onclick=()=>A().regenFromPlan();
@@ -272,13 +272,26 @@ V.plan = (M)=>{
   const pillsOf=(i)=>{ const o=plan.ops[i], d=M.querySelector(`details.op[data-i="${i}"] .pills`); if(!o||!d) return; d.querySelectorAll(".pill.cc,.pill.sc").forEach(x=>x.remove()); d.insertAdjacentHTML("beforeend",specialPills(o,o.chars.map(n=>plan.chars.find(c=>c.no===n)).filter(Boolean))); };
   const opBody=(i)=>{
     const o=plan.ops[i], host=M.querySelector(`[data-in="${i}"]`); if(!host) return;
-    const mOpts=machines.map(m=>`<option value="${esc(m.id)}"${m.id===o.machineId?" selected":""}>${esc(m.id+" "+m.name)}</option>`).join("");
+    // machines come from the Operations Master; the ones typed for this process (and big enough for the part) are offered first
+    const mSuit=m=>{ const k=m.keys||[]; const type=k.includes(o.key)||(k.includes("TURN1")&&o.key==="TURN"); const dia=(m.maxDia||9999)>=((plan.ctxInfo&&plan.ctxInfo.maxOD)||0); return {type,dia,ok:type&&dia}; };
+    const mOpt=m=>`<option value="${esc(m.id)}"${m.id===o.machineId?" selected":""}>${esc(m.id+" "+m.name+(m.capacity?" · "+m.capacity:""))}</option>`;
+    const mGood=machines.filter(m=>mSuit(m).ok), mSmall=machines.filter(m=>{ const q=mSuit(m); return q.type&&!q.dia; }), mOther=machines.filter(m=>!mSuit(m).type);
+    const selM=machines.find(m=>m.id===o.machineId), selS=selM?mSuit(selM):null;
+    const isManual=!!o.inHouse&&!o.machineId&&(o.machineManual||!!o.machine);
+    const needT=(E.OPS[o.key]||{}).name||o.name;
+    const mOpts=(mGood.length?`<optgroup label="✔ Suitable for ${esc(needT)} (Operations Master)">${mGood.map(mOpt).join("")}</optgroup>`:"")
+      +(mSmall.length?`<optgroup label="Right type, but too small for Ø${esc(String((plan.ctxInfo&&plan.ctxInfo.maxOD)||""))}">${mSmall.map(mOpt).join("")}</optgroup>`:"")
+      +(mOther.length?`<optgroup label="Other machines in the master (not typed for this process)">${mOther.map(mOpt).join("")}</optgroup>`:"");
+    const mNote=isManual?`<div class="mnew-box">🟪 <b>Machine not in the Operations Master.</b> Add it under <a href="${(A().opsPortalLink||(()=>"#"))()}">Operations Master › Machines</a> so it is mapped here, in the Capacity Planner and in every linked screen. Until then it is used as typed text only.</div>`
+      :(selM&&!selS.ok)?`<div class="mwarn-box">⚠ <b>${esc(selM.name)}</b> is ${selS.type?"too small for this part":"not typed for "+esc(needT)}. Pick it only if you know it can do this job; otherwise choose a suitable machine or add a new one.</div>`
+      :(!selM&&o.inHouse&&!mGood.length)?`<div class="mwarn-box">⚠ No machine in the Operations Master is typed for <b>${esc(needT)}</b>${plan.ctxInfo&&plan.ctxInfo.maxOD?` (part Ø${esc(String(plan.ctxInfo.maxOD))})`:""}. Add one under <a href="${(A().opsPortalLink||(()=>"#"))()}">Operations Master › Machines</a> (set its “Processes it can do”), or choose “Not in master — add manually”.</div>`:"";
     host.innerHTML=`<div class="frm">
       <label class="fld">Op no.<input data-f="opNo" type="number" value="${o.opNo}" ${ro()}></label>
       <label class="fld">Operation name<input data-f="name" value="${esc(o.name)}" ${ro()}></label>
       <label class="fld">Flow symbol<select data-f="sym" ${ro()?"disabled":""}>${SC.FLOW.map(f=>`<option value="${f[0]}"${o.sym===f[0]?" selected":""}>${f[1]}</option>`).join("")}</select></label>
-      <label class="fld">Machine (from master)<select data-f="machineId" ${ro()?"disabled":""}><option value="">— other / sub-contract —</option>${mOpts}</select></label>
-      <label class="fld">Machine / equipment text<input data-f="machine" value="${esc(o.machine||"")}" ${ro()}></label>
+      <label class="fld">Machine (from Operations Master)<select data-f="machineId" ${ro()?"disabled":""}><option value=""${!o.machineId&&!isManual?" selected":""}>${o.inHouse?"— pick a machine —":"— sub-contract —"}</option>${mOpts}<option value="__manual"${isManual?" selected":""}>✎ Not in master — add manually</option></select></label>
+      <label class="fld${isManual?" mnew":""}">Machine / equipment text<input data-f="machine" value="${esc(o.machine||"")}" ${ro()}></label>
+      ${mNote?`<div style="grid-column:1/-1">${mNote}</div>`:""}
       <label class="fld">Where<select data-f="inHouse" ${ro()?"disabled":""}><option value="1"${o.inHouse?" selected":""}>In-house</option><option value="0"${o.inHouse?"":" selected"}>Sub-contract</option></select></label></div>
     <h4 style="font:600 15px var(--display);margin:14px 0 6px">Product characteristics <span class="hintline" style="font:400 13px var(--body)">– ballooned characteristics produced at this operation; set SC / CC here or on the Characteristics screen (add or move them there)</span></h4><div data-g="prod"></div>
     <h4 style="font:600 15px var(--display);margin:14px 0 6px">Process parameters & in-process checks <span class="hintline" style="font:400 13px var(--body)">– “Control plan column” decides whether it is listed as a product or a process characteristic</span></h4><div data-g="params"></div>
@@ -288,7 +301,8 @@ V.plan = (M)=>{
     <div class="addrow"><button class="btn small" data-mv="-1" ${ro()?"disabled":""}>Move up</button><button class="btn small" data-mv="1" ${ro()?"disabled":""}>Move down</button><button class="btn small danger" data-del ${ro()?"disabled":""}>Delete operation</button>${window.PDCNC&&PDCNC.isCNC(o)?`<span style="flex:1"></span><button class="btn small" data-cnc>CNC program for this operation →</button>`:""}</div>`;
     host.querySelectorAll("[data-f]").forEach(el=>el.addEventListener("change",()=>{ const f=el.dataset.f; let v=el.value;
       if(f==="opNo") v=+v||o.opNo; if(f==="inHouse") v=v==="1"; if(f==="consumables") v=v.split("\n").map(s=>s.trim()).filter(Boolean);
-      if(f==="machineId"){ const m=machines.find(x=>x.id===v); if(m){ o.machine=m.name; host.querySelector('[data-f="machine"]').value=m.name; } }
+      if(f==="machineId"){ if(v==="__manual"){ o.machineId=""; o.machineManual=true; A().changed("_plan"); opBody(i); const t=host.querySelector('[data-f="machine"]'); if(t) t.focus(); return; }
+        o.machineManual=false; const m=machines.find(x=>x.id===v); if(m){ o.machine=m.name; host.querySelector('[data-f="machine"]').value=m.name; } else if(!v){ o.machine=""; } o[f]=v; A().changed("_plan"); opBody(i); return; }
       if(f==="opNo"){ const before=snapOps(plan); o.opNo=v; plan.ops.sort((a,b)=>+a.opNo-+b.opNo); renumbered(plan,before); A().changed("_plan"); draw(); A().regenFromPlan({route:true}); return; }
       o[f]=v; A().changed("_plan"); }));
     host.querySelectorAll("[data-gauge]").forEach(cb=>cb.addEventListener("change",()=>{ const id=cb.dataset.gauge; o.gauges=o.gauges.filter(x=>x!==id); if(cb.checked) o.gauges.push(id); const g=plan.gauges.find(x=>x.id===id); if(g){ g.ops=g.ops.filter(x=>x!==o.opNo); if(cb.checked) g.ops.push(o.opNo); } A().changed("_plan"); }));
@@ -351,7 +365,7 @@ V.doc = (M, id)=>{
   grid($("g"), { rows:doc.rows, cols:spec.cols, groups:spec.groups,
     derive: id==="pfmea" ? (r=>F.derive(std,r)) : id==="pdi" ? (r=>{ r.result=rowResult(r,"s",5); }) : null,
     cellClass:(r,c)=> c.rpn ? (()=>{ const two=c.k==="rpn2", b=F.band("aiag4",two?(r.s2||r.s):r.s,two?r.o2:r.o,two?r.d2:r.d,lim); return b?"ap"+b:""; })() : c.ap ? (r[c.k]?"ap"+r[c.k]:"") : c.type==="read" ? readingClass(r,c) : (c.k==="result"&&r.result==="NG")?"ng":(c.k==="result"&&r.result==="OK")?"ok":"",
-    rowClass:(r,i)=> id==="pfmea"&&i>0&&doc.rows[i-1].opNo!==r.opNo ? "grp-first" : id==="cp"&&i>0&&doc.rows[i-1].opNo!==r.opNo ? "grp-first" : "",
+    rowClass:(r,i)=> id==="gauges"&&/purchase/i.test(r.master||"") ? "gnew" : id==="pfmea"&&i>0&&doc.rows[i-1].opNo!==r.opNo ? "grp-first" : id==="cp"&&i>0&&doc.rows[i-1].opNo!==r.opNo ? "grp-first" : "",
     onChange:()=>A().changed(id), rowsChanged:()=>A().changed(id),
     newRow:(near)=>{ const o={}; spec.cols.forEach(c=>{ if(c.k) o[c.k]=""; }); if(near&&near.opNo!=null){ o.opNo=near.opNo; if(id==="pfmea"){ o.item=near.item; o.step=near.step; o.funcItem=near.funcItem; } if(id==="cp"){ o.name=near.name; o.machine=near.machine; } } if(id==="pfd") o.sym="op"; if(o.sl!==undefined) o.sl=doc.rows.length+1; return o; }
   });

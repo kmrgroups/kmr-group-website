@@ -74,7 +74,7 @@ function normalizeSource(src){
     type: it.type||"Linear", text: String(it.text||"").trim(), en: it.en||"",
     nominal: num(it.nominal), upper: num(it.upper), lower: num(it.lower), unit: it.unit||"mm",
     gdt: it.gdt||"", datum: it.datum||"", cls: up(it.cls||""), instr: it.instr||"",
-    manualInstr: it.autoInstr===false, gen: !!it.gen, sheet: (it.sheet||0)+1, zone: it.zone||"",
+    manualInstr: it.autoInstr===false, gauges: Array.isArray(it.gauges)?it.gauges.filter(g=>g&&g.name):[], gen: !!it.gen, sheet: (it.sheet||0)+1, zone: it.zone||"",
     ax: it.ax, ay: it.ay
   }));
   if(!h.material){ const m = items.find(i=>i.type==="Material"); if(m) h.material = m.text.replace(/^material\s*:\s*/i,""); }
@@ -544,31 +544,36 @@ function buildPlan(source, masters, settings){
   // 4) gauges: pulled from ballooning data (instrument column), sized for range
   const gaugeReg = []; const gmaster = masters.gauges||[];
   const regGauge = (g, charNo, opNo) => {
-    let e = gaugeReg.find(x=>x.name===g.name && x.range===g.range);
-    if(!e){ const mm = gmaster.find(x=>norm(x.name)===norm(g.name) && norm(x.range)===norm(g.range)) || gmaster.find(x=>norm(x.name)===norm(g.name) && !x.range);
-      e = {id: mm&&mm.id || "", name:g.name, range:g.range, lc:(mm&&mm.lc)||g.lc, type:g.type, chars:[], ops:[], calFreq:(mm&&mm.calFreq)||(g.type==="Attribute"?"6 months":g.type==="Variable"?"12 months":"—"), calDue:(mm&&mm.calDue)||"", location:(mm&&mm.location)||"", fromBalloon:!!g.fromBalloon};
+    let e = g.id ? gaugeReg.find(x=>x.id===g.id) : gaugeReg.find(x=>x.name===g.name && x.range===g.range);
+    if(!e){ const mm = (g.id && gmaster.find(x=>x.id===g.id)) || (!g.purchase && (gmaster.find(x=>norm(x.name)===norm(g.name) && norm(x.range)===norm(g.range)) || gmaster.find(x=>norm(x.name)===norm(g.name) && !x.range)));
+      // purchase = a gauge that is not in the company's Operations Master (suggested by Balloon Inspector, or generated here with no match)
+      e = {id: mm&&mm.id || "", name:(mm&&mm.name)||g.name, range:g.range||(mm&&mm.range)||"", lc:(mm&&mm.lc)||g.lc, type:g.type, chars:[], ops:[], calFreq:(mm&&mm.calFreq)||(g.type==="Attribute"?"6 months":g.type==="Variable"?"12 months":"—"), calDue:(mm&&mm.calDue)||"", location:(mm&&mm.location)||"", fromBalloon:!!g.fromBalloon, inMaster:!!mm, purchase:!mm&&(!!g.purchase||!!masters.strict)};
       gaugeReg.push(e); }
     if(charNo!=null && !e.chars.includes(charNo)) e.chars.push(charNo); if(opNo!=null && !e.ops.includes(opNo)) e.ops.push(opNo); return e; };
   chars.forEach(c=>{
     let g = gaugeFor(c);
-    if(c.manualInstr && c.instr) g = {name:c.instr, range:g.range, lc:g.lc, type:g.type, fromBalloon:true};
+    const picked = (c.gauges||[]).map(b=>({id:b.id||"", name:b.name, range:b.range||g.range, lc:b.lc||"", type:(parseFloat(String(b.lc||"").replace(",","."))>0)?"Variable":"Attribute", fromBalloon:true, purchase:!!b.purchase}));
+    if(picked.length) g = picked[0];
+    else if(c.manualInstr && c.instr) g = {name:c.instr, range:g.range, lc:g.lc, type:g.type, fromBalloon:true};
     else if(c.instr){ g.balloonInstr = c.instr; g.fromBalloon = true; }
     c._gauge = g; c._pgauge = (c.cls ? productionGauge(c) : null);
     const op = ops.find(o=>o.chars.includes(c.no));
     const e = regGauge(g, c.no, op&&op.opNo); c._gaugeRef=e;
+    c._gaugeMore = picked.slice(1).map(x=>{ const e2=regGauge(x, c.no, op&&op.opNo); if(opByKey.FINAL) regGauge(x, c.no, opByKey.FINAL.opNo); return e2; });
     if(c._pgauge){ const e2=regGauge(c._pgauge, c.no, op&&op.opNo); c._pgaugeRef=e2; }
     if(opByKey.FINAL) regGauge(g, c.no, opByKey.FINAL.opNo);
   });
-  let gi = 0; gaugeReg.forEach(e=>{ if(!e.id){ do{ gi++; } while(gmaster.some(x=>x.id==="G-"+pad(gi,3))); e.id = "G-"+pad(gi,3); } });
+  // gauges not in the Operations Master get a NEW-nnn id (never a master-style id, so it cannot clash with a gauge bought later)
+  let gi = 0, ni = 0; gaugeReg.forEach(e=>{ if(!e.id){ if(e.purchase){ ni++; e.id = "NEW-"+pad(ni,3); } else { do{ gi++; } while(gmaster.some(x=>x.id==="G-"+pad(gi,3))); e.id = "G-"+pad(gi,3); } } });
   ops.forEach(op=>{ op.gauges = gaugeReg.filter(g=>g.ops.includes(op.opNo)).map(g=>g.id); });
-  if(opByKey.RMI && !opByKey.RMI.gauges.length){ const e=regGauge({name:"Digital vernier caliper",range:caliperRange(ctx.maxOD||100),lc:"0.01 mm",type:"Variable"},null,opByKey.RMI.opNo); if(!e.id){ gi++; e.id="G-"+pad(gi,3); } opByKey.RMI.gauges.push(e.id); }
+  if(opByKey.RMI && !opByKey.RMI.gauges.length){ const e=regGauge({name:"Digital vernier caliper",range:caliperRange(ctx.maxOD||100),lc:"0.01 mm",type:"Variable"},null,opByKey.RMI.opNo); if(!e.id){ if(e.purchase){ ni++; e.id="NEW-"+pad(ni,3); } else { gi++; e.id="G-"+pad(gi,3); } } opByKey.RMI.gauges.push(e.id); }
 
   // 5) tool IDs
   let ti=0; ops.forEach(op=>op.tools.forEach(t=>{ ti++; t.id="T-"+pad(ti,3); }));
 
   const charsOut = chars.map(c=>({no:c.no, type:c.type, text:c.text, label:charLabel(c), spec:specText(c), nominal:c.nominal, upper:c.upper, lower:c.lower, unit:c.unit,
     lsl:limits(c)[0], usl:limits(c)[1], gdt:c.gdt, datum:c.datum, cls:c.cls, zone:c.zone, sheet:c.sheet, internal:isInternal(c), band:tolBand(c),
-    gauge:c._gaugeRef?c._gaugeRef.id:"", pgauge:c._pgaugeRef?c._pgaugeRef.id:"", balloonInstr:c.instr||"", op:(ops.find(o=>o.chars.includes(c.no))||{}).opNo||"",
+    gauge:c._gaugeRef?c._gaugeRef.id:"", gaugeMore:(c._gaugeMore||[]).map(e=>e.id), pgauge:c._pgaugeRef?c._pgaugeRef.id:"", balloonInstr:c.instr||"", op:(ops.find(o=>o.chars.includes(c.no))||{}).opNo||"",
     variable: c._gauge && c._gauge.type==="Variable" && (limits(c)[0]!=null||limits(c)[1]!=null) }));
 
   return {
