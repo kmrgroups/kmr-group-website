@@ -947,12 +947,13 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     const frac = new Map(base.machines.map(m => [m.code, m.reqDays > 0 ? Math.min(1, m.availDays / m.reqDays) : 1]));
     byPart.forEach((rows, partNo) => {
       const pp = (plan.parts || {})[partNo] || {}, qty = Math.max(0, num(pp.qty, 0));
-      const beyond = rows.some(r => r.overflow || !r.endDate);
-      const finish = beyond ? null : rows.reduce((a, r) => (r.endDate > a ? r.endDate : a), '');
+      const placed = rows.filter(r => r.machine && r.machine !== '' && base.machines.some(m => m.code === r.machine));   // steps with no machine are a data gap, listed separately
+      const beyond = placed.some(r => r.overflow || !r.endDate);
+      const finish = beyond || !placed.length ? null : placed.reduce((a, r) => (r.endDate > a ? r.endDate : a), '');
       const due = rows[0].due;
       const lateDays = finish == null ? null : Math.max(0, daysBetween(due, finish));
-      const late = beyond || lateDays > 0;
-      const worst = rows.slice().sort((a, b) => (b.end || 0) - (a.end || 0))[0];
+      const late = placed.length ? (beyond || lateDays > 0) : false;
+      const worst = (placed.length ? placed : rows).slice().sort((a, b) => (b.end || 0) - (a.end || 0))[0];
       const f = Math.min(...rows.map(r => frac.get(r.machine) ?? 1));
       parts.push({ partNo, partName: partName[partNo] || partNo, cls: clsOf(partNo), qty, due, finish, beyond, lateDays, late, bottleneck: worst ? worst.machine : '', bottleneckOp: worst ? worst.process : '',
         achievable: Math.floor(qty * f), short: qty - Math.floor(qty * f), days: rows.reduce((a, r) => a + r.reqDays, 0) });
@@ -1083,6 +1084,10 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       bul.push({ sev: d.sev, title: `${d.partNo}: ${blocked ? 'free the overloaded machine, then run it first' : tooClose ? 'agree a new date or start earlier' : 'run it first'}`, why: d.detail + (cause ? ' ' + cap1(cause.text) + '.' : ''),
         how: d.fixes.filter(f => f.kind !== 'cause').map(f => cap1(f.text)).join('. ') + '.', result: tooClose ? 'delivery date matches what the routing really needs' : 'part reaches the customer on time' });
     });
+    const gaps = (state.planGaps || []);
+    if (gaps.length) bul.unshift({ sev: 3, title: `Complete the data first — ${gaps.length} gap${gaps.length > 1 ? 's' : ''} in the Process Plan / Operations Master`, why: 'Steps with no machine or no cycle time cannot be loaded, so the verdict below is not complete.',
+      how: gaps.slice(0, 8).map(g => `${g.partNo} · ${g.process}: ${g.issue}`).join('  ') + (gaps.length > 8 ? `  … and ${gaps.length - 8} more` : ''), result: 'every step is loaded and the verdict becomes reliable' });
+    out.gapList = gaps;
     out.bulletin = bul;
     return out;
   }
@@ -2011,7 +2016,7 @@ function renderShell() {
 }
 
 /* ---------- lock controls the signed-in role may not use ---------- */
-const EDITOR_ACTS = ['addHoliday', 'delHoliday', 'pastePlan', 'pasteStock', 'clearStock', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
+const EDITOR_ACTS = ['pullSales', 'addHoliday', 'delHoliday', 'pastePlan', 'pasteStock', 'clearStock', 'importXlsx', 'copyPrev', 'clearQty', 'applyLevel', 'clearSplits', 'addMachine', 'delMachine', 'addOp', 'delOp', 'opUp', 'alternates', 'pasteRoutings'];
 const ADMIN_ACTS = ['uploadLogo', 'removeLogo', 'importJson', 'resetAll', 'blankStart', 'clearPlans', 'connSave', 'connReset', 'connDownload'];
 const EDITOR_SETTINGS = ['levelTargetPct', 'lotSize', 'levelAnyMachine', 'oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours'];
 function actNeeds(act) { return ADMIN_ACTS.includes(act) ? 'admin' : EDITOR_ACTS.includes(act) ? 'editor' : null; }
@@ -2390,7 +2395,7 @@ Pages.plan = () => {
   ${model.mode === 'dynamic' ? note('ok', 'info', '<b>Dynamic capacity is ON.</b> Machine days below use the quantity left to make after the stock entered under <button class="btn sm" data-nav="stock">Stock & Balance</button>.') : ''}
   ${!hasPlan() ? note('warn', 'info', `<b>${monthName()} has no plan yet.</b> Start from zero, or copy last month’s quantities and due dates. ${state.plans[prevKey] ? `<button class="btn sm" data-act="copyPrev" style="margin-left:8px">Copy from ${E.MONTHS[(state.month + 11) % 12]}</button>` : ''}`) : ''}
   <section class="card"><div class="card-h"><div><h2>Quantities & due dates · ${monthName()}</h2><div class="sub">The quantity applies to every operation of the part. Leave the due date at month end if the customer has none.</div></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" data-act="pastePlan">${icon('paste')}Paste from Excel</button><button class="btn" data-act="importXlsx">${icon('excel')}Import .xlsx</button>${state.plans[prevKey] && hasPlan() ? `<button class="btn" data-act="copyPrev">${icon('copy')}Copy last month</button>` : ''}<button class="btn danger" data-act="clearQty">Clear quantities</button></div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${window.KMR_PLATFORM && cloud.ops ? `<button class="btn primary" data-act="pullSales" title="Read this month's demand per part from Sales Flow">${icon('copy')}Pull from Sales Flow</button>` : ''}<button class="btn" data-act="pastePlan">${icon('paste')}Paste from Excel</button><button class="btn" data-act="importXlsx">${icon('excel')}Import .xlsx</button>${state.plans[prevKey] && hasPlan() ? `<button class="btn" data-act="copyPrev">${icon('copy')}Copy last month</button>` : ''}<button class="btn danger" data-act="clearQty">Clear quantities</button></div></div>
     <div class="toolbar">${searchBox('plan', 'Search part number or name')}<span class="grow"></span><span class="small muted">${list.length} parts · <span class="num">${fmtInt(totQty)}</span> pcs</span></div>
     <div class="mcards">${mcards}</div>
     <div class="tbl-wrap desk-only" id="tw-plan"><table class="tbl"><thead><tr><th class="stick">Part #</th><th>Part name</th><th class="r">Monthly quantity</th><th>Customer due date</th><th>Routing (process · machine · cycle time)</th><th class="r">Machine days</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
@@ -2807,7 +2812,13 @@ async function applyOpsMasters() {
   const m = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_masters', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org }) }).catch(() => null);
   if (!m) return;                                                // not linked to a KMR customer: the planner keeps its own masters
   cloud.ops = m;
+  await loadPull();
   applyOpsData();
+}
+/* Part · process · machine come from Process Documents › Process plan, cycle times from the Operations Master, the sales quantity from Sales Flow */
+async function loadPull() {
+  cloud.pull = null;
+  try { const r = await Cloud._fetch('/rest/v1/rpc/kmr_capacity_pull', { method: 'POST', body: JSON.stringify({ p_org: Cloud.org, p_month: E.iso(state.year, state.month, 1) }) }); cloud.pull = r || null; } catch (e) { cloud.pull = null; }
 }
 /* The Operations Master is the only source for a linked planner — an empty list there means an empty list here.
    The planner's own earlier masters are kept aside (and stay in its saved file) only for the one-time "Move". */
@@ -2821,10 +2832,35 @@ function applyOpsData() {
     machine: o.machine || '', cycleTime: Number(o.cycleTime) || 0, alternates: Array.isArray(o.alternates) ? o.alternates : [] }));
   state.partClass = {}; state.partMinDays = {};
   (m.parts || []).forEach(x => { if (x.partNo) { state.partClass[x.partNo] = ['A', 'B', 'C'].includes(x.abcClass) ? x.abcClass : 'B'; if (x.minStockDays != null && Number(x.minStockDays) > 0) state.partMinDays[x.partNo] = Number(x.minStockDays); } });
+  applyProcessPlan();
   const st = m.standards || {}, s = state.settings;
   ['oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours', 'lotSize', 'levelTargetPct'].forEach(k => { if (st[k] !== undefined && st[k] !== '' && !isNaN(Number(st[k]))) s[k] = Number(st[k]); });
   if (st.weeklyOff !== undefined) s.weeklyOff = kmrWeeklyOff(st.weeklyOff);
   if (m.has_hrm) { s.holidays = m.holidays || []; s.holidayNames = m.holidayNames || {}; }
+}
+/* Operations from the Process Plan (in-house steps, machine picked from the Operations Master). A part with no process plan keeps its Operations Master routing. */
+function applyProcessPlan() {
+  state.planGaps = []; state.opSource = {};
+  const pl = cloud.pull; if (!pl || !Array.isArray(pl.plan) || !pl.plan.length) return;
+  const mcodes = new Set(state.machines.map(x => x.code)), cts = pl.cycleTimes || [];
+  const nz = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const planParts = new Map(pl.plan.map(p => [p.partNo, p]));
+  const hasIn = p => (p.ops || []).some(x => x.inHouse);
+  const keep = state.operations.filter(o => !(planParts.has(o.partNo) && hasIn(planParts.get(o.partNo))));
+  const add = [];
+  pl.plan.filter(hasIn).forEach(p => {
+    state.opSource[p.partNo] = 'plan';
+    (p.ops || []).filter(x => x.inHouse).forEach(x => {
+      const mine = cts.filter(c => c.partNo === p.partNo);
+      const rec = mine.find(c => nz(c.process) === nz(x.name) && c.machine === x.machineId) || mine.find(c => nz(c.process) === nz(x.name)) || (x.machineId ? mine.find(c => c.machine === x.machineId) : null);
+      let machine = mcodes.has(x.machineId) ? x.machineId : (rec && mcodes.has(rec.machine) ? rec.machine : '');
+      const ct = rec && rec.ct > 0 ? Number(rec.ct) : 0;
+      if (!machine) state.planGaps.push({ partNo: p.partNo, process: x.name, issue: x.machineId ? `machine ${x.machineId} is not in the Operations Master` : 'no machine chosen in the Process Plan — pick one from the Operations Master' });
+      if (!ct) state.planGaps.push({ partNo: p.partNo, process: x.name, issue: 'no cycle time in the Operations Master › Cycle times (this step loads 0 days until it is added)' });
+      add.push({ partNo: p.partNo, partName: p.partName || p.partNo, process: x.name || 'Operation', machine, cycleTime: ct, alternates: rec && rec.alternates ? String(rec.alternates).split(',').map(a => a.trim()).filter(Boolean) : [], fromPlan: true });
+    });
+  });
+  state.operations = keep.concat(add).sort((a, b) => a.partNo.localeCompare(b.partNo)).map((o, i) => Object.assign({}, o, { id: i + 1 }));
 }
 function kmrMastersPage() {
   const s = state.settings, off = (s.weeklyOff || []).map(d => ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d]).join(', ') || 'none';
@@ -2838,6 +2874,7 @@ function kmrMastersPage() {
       ${canMove ? `<div class="note warn">${icon('alert')}<div><b>This planner still has its own earlier masters</b> (${own.machines.length} machines, ${own.operations.length} operations) and the Operations Master is empty, so nothing is being planned. Move them once — nothing is lost, and from then on you maintain them in one place.<div style="margin-top:8px"><button class="btn primary" data-act="moveMasters">Move to Operations Master</button></div></div></div>` : ''}
       <div class="form-grid" style="margin-top:8px">
         <div class="field"><label>Machines</label><div><b>${state.machines.length}</b> — <a href="${kmrPortalHome('#ops/machines')}">Operations Master › Machines</a></div></div>
+        <div class="field"><label>Part · process · machine</label><div>${Object.keys(state.opSource || {}).length ? `<b>${Object.keys(state.opSource).length}</b> parts from <b>Process Documents › Process plan</b>` : 'No process plan yet — using the Operations Master routings'}${(state.planGaps || []).length ? ` · <b style="color:var(--warn)">${state.planGaps.length} to fix</b> (see Verdict &amp; Actions)` : ''}</div></div>
         <div class="field"><label>Parts & routings</label><div><b>${new Set(state.operations.map(o => o.partNo)).size}</b> parts · <b>${state.operations.length}</b> operations — Operations Master › <a href="${kmrPortalHome('#ops/parts')}">Parts</a>, <a href="${kmrPortalHome('#ops/cycle_times')}">Cycle times</a></div></div>
         <div class="field"><label>Plant standards</label><div>OEE ${h(s.oee)} % · ${h(s.hoursPerDay)} h/day · weekly off ${h(off)} — Operations Master › Plant standards</div></div>
         <div class="field"><label>Holidays / working days</label><div>${hrm ? `<b>${(s.holidays || []).length}</b> holidays from your <b>HRM holiday calendar</b>` : 'No HRM on your plan — working days use the weekly off only'}</div></div>
@@ -2923,6 +2960,15 @@ const Actions = {
     commit(); toast(`Copied ${E.MONTHS[pm]} quantities and due dates`);
   },
   clearQty() { confirmBox('Clear all quantities?', `Every quantity for ${E.MONTHS[state.month]} ${state.year} will be set to 0. Due dates are kept.`, 'Clear', () => { const p = ensurePlan(); Object.values(p.parts).forEach(x => x.qty = 0); commit(); }, true); },
+  async pullSales() {
+    if (!cloud.pull && !(await (async () => { await loadPull(); return cloud.pull; })())) return toast('This planner is not linked to a KMR customer, so there is no Sales Flow to read.');
+    await loadPull();
+    const rows = ((cloud.pull || {}).sales || []).filter(r => state.operations.some(o => o.partNo === r.partNo));
+    if (!rows.length) return toast(`Sales Flow has no plan for ${E.MONTHS[state.month]} ${state.year} (or none of its parts has a routing here).`);
+    const apply = () => { const p = ensurePlan(); rows.forEach(r => { const old = p.parts[r.partNo] || {}; const dueOk = r.due && r.due.slice(0, 7) === E.periodKey(state.year, state.month); p.parts[r.partNo] = Object.assign({}, old, { qty: Math.round(Number(r.qty) || 0), due: dueOk ? r.due : old.due }); }); commit(); toast(`Sales plan pulled for ${rows.length} parts.`); };
+    const typed = Object.values(planOf().parts || {}).some(x => (x.qty || 0) > 0);
+    if (typed) confirmBox('Replace the quantities?', `Quantities for ${rows.length} parts will be taken from Sales Flow (${E.MONTHS[state.month]} ${state.year}). Parts Sales Flow does not list keep their numbers.`, 'Pull', apply); else apply();
+  },
   pastePlan() {
     modal({
       title: 'Paste quantities from Excel',
