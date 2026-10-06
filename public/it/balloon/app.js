@@ -380,6 +380,8 @@ async function loadFile(file,opts={}){
         sheets.push({canvas:c,w:c.width,h:c.height,text});
       }
       if(pdf.numPages>20) toast("Only the first 20 sheets were opened.");
+    } else if((ext==="dxf"||ext==="dwg"||ext==="step"||ext==="stp") && window.KMR_FEAT && !window.KMR_FEAT.has("balloon.cad-formats-dxf-dwg-step")){
+      busy(""); toast("CAD files (DXF, DWG, STEP) are not part of your company's Balloon Inspector subscription. Open the drawing as a PDF, or contact KMR Group of Companies to add this feature.",9000); return;
     } else if(ext==="dxf"||ext==="dwg"){
       const txt= ext==="dwg" ? await convertDwg(await file.arrayBuffer()) : await file.text();
       busy("Drawing the sheet"); await tick();

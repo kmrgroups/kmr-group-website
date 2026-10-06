@@ -107,6 +107,8 @@ async function start(){
   } catch(e){}
   // KMR Console licence: keep only workspaces whose licence is valid (the database enforces this too)
   const acc=await sb.rpc("kmr_access",{p_product:"pd"});
+  // Features the company bought (KMR Console › Prices & invoices). No list = every feature. Needs the Console update 0051.
+  S.featByOrg={}; try{ const ft=await sb.rpc("kmr_access_features",{p_product:"pd"}); if(!ft.error) (ft.data||[]).forEach(x=>{ S.featByOrg[x.org_id]=x.restricted?new Set(x.features||[]):null; }); }catch(e){}
   if(!acc.error && !S.platform){
     const okIds=new Set((acc.data||[]).filter(a=>a.ok).map(a=>a.org_id));
     const paused=S.memberships.filter(m=>!okIds.has(m.id));
@@ -132,6 +134,7 @@ async function chooseOrg(id){
   if(S.dirty && !(await flushSave())) {}
   const m=S.memberships.find(x=>x.id===id); S.org=m; S.role=m.role; S.canEdit=m.role==="admin"||m.role==="editor"; LS.set("pd_org",id);
   S.settings=Object.assign({companyName:m.name},m.settings||{});
+  S.feat=(S.featByOrg&&S.featByOrg[id])||null;      // null = all features
   const {data}=await sb.from("pd_masters").select("kind,items").eq("org_id",id);
   S.masters={machines:[],gauges:[],customers:[],consumables:[]}; (data||[]).forEach(r=>S.masters[r.kind]=r.items||[]);
   await loadOpsMasters(id);
@@ -181,6 +184,11 @@ function navHref(go){
   if(go==="home"||go==="projects"){ const u=new URLSearchParams(location.search); u.delete("project"); const q=u.toString(); return location.pathname+(q?"?"+q:"")+(go==="projects"?"#go=projects":""); }
   return location.pathname+location.search+"#go="+encodeURIComponent(go)+(S.prj&&S.prj.id?"&prj="+S.prj.id:"");
 }
+/* Which feature (Console › Apps & features) each document belongs to; lists and project views are core */
+const DOC_FEATURE={pfmea:"pd.pfmea-aiag-vda-and-4th-edition",cp:"pd.control-plan-sop",sop:"pd.control-plan-sop",setup:"pd.setup-patrol-pdi-sheets",patrol:"pd.setup-patrol-pdi-sheets",self:"pd.setup-patrol-pdi-sheets",pdi:"pd.setup-patrol-pdi-sheets",spc:"pd.spc-studies",charts:"pd.spc-studies",msa:"pd.msa-gauge-r-r-studies"};
+const FEATURE_NAME={"pd.pfmea-aiag-vda-and-4th-edition":"PFMEA","pd.control-plan-sop":"Control plan & SOP","pd.setup-patrol-pdi-sheets":"Setup, patrol & PDI sheets","pd.spc-studies":"SPC studies","pd.msa-gauge-r-r-studies":"MSA / Gauge R&R studies"};
+function locked(id){ const k=DOC_FEATURE[id]; return !!(k&&S.feat&&!S.feat.has(k)); }
+function lockedDialog(id){ const k=DOC_FEATURE[id]; dialog("Not in your plan",`<p><b>${esc(FEATURE_NAME[k]||"This feature")}</b> is not part of your company's Process Documents subscription.</p><p>To add it, please contact KMR Group of Companies — <a href="https://www.kmr-groups.com/contact" target="_blank" rel="noopener">www.kmr-groups.com/contact</a>.</p>`,`<button class="btn" id="lkOk">OK</button>`); const b=$("lkOk"); if(b) b.onclick=closeDialog; }
 function nav(){
   const side=$("side");
   if(!S.prj){ side.innerHTML=`<h4>Start</h4><div class="nav"><a href="${navHref("home")}" data-go="home" aria-current="page"><span class="code">HOME</span>Welcome</a><a href="${navHref("projects")}" data-go="projects"><span class="code">ALL</span>Projects</a></div>`; }
@@ -188,11 +196,11 @@ function nav(){
     const ed=S.prj.doc.edited||{};
     const groups={}; D.DOCS.forEach(d=>(groups[d.group]=groups[d.group]||[]).push(d));
     side.innerHTML=`<h4>Start</h4><div class="nav"><a href="${navHref("home")}" data-go="home" title="Back to the welcome screen and all projects"><span class="code">HOME</span>Welcome · all projects</a></div><h4>Project</h4><div class="nav">${[["overview","INFO","Overview"],["chars","BALL","Characteristics"],["plan","PLAN","Process plan"],["cnc","CNC","CNC programs"]].map(x=>`<a href="${navHref(x[0])}" data-go="${x[0]}" title="${esc(x[2])}" ${S.view===x[0]?'aria-current="page"':""}><span class="code">${x[1]}</span>${x[2]}</a>`).join("")}</div>
-      ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<a href="${navHref(d.id)}" data-go="${d.id}" title="${esc(d.title)}" ${S.view===d.id?'aria-current="page"':""}><span class="code">${d.code}</span>${esc(d.title)}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</a>`).join("")}</div>`).join("")}`;
+      ${Object.keys(groups).map(g=>`<h4>${esc(g)}</h4><div class="nav">${groups[g].map(d=>`<a href="${navHref(d.id)}" data-go="${d.id}" title="${locked(d.id)?"Not in your plan — click for details":esc(d.title)}" ${S.view===d.id?'aria-current="page"':""} ${locked(d.id)?'style="opacity:.55"':""}><span class="code">${d.code}</span>${esc(d.title)}${locked(d.id)?" 🔒":""}${ed[d.id]?`<span class="ed" title="Edited on screen"></span>`:""}</a>`).join("")}</div>`).join("")}`;
   }
   side.onclick=e=>{ const b=e.target.closest("[data-go]"); if(!b) return; if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return; e.preventDefault(); document.body.classList.remove("nav-open"); const g=b.dataset.go; if(g==="projects") return projectsDialog(); if(g==="home"){ if(!S.prj) return; closeProject(); return; } go(g); };
 }
-function go(view){ S.view=view; nav(); UI.render(view); try{ history.replaceState(null,"",location.pathname+location.search+"#go="+encodeURIComponent(view)+(S.prj&&S.prj.id?"&prj="+S.prj.id:"")); }catch(e){} }
+function go(view){ if(locked(view)) return lockedDialog(view); S.view=view; nav(); UI.render(view); try{ history.replaceState(null,"",location.pathname+location.search+"#go="+encodeURIComponent(view)+(S.prj&&S.prj.id?"&prj="+S.prj.id:"")); }catch(e){} }
 /* Back to the welcome screen (closes the open project; asks first when there are unsaved changes) */
 function closeProject(){
   const sb=$("bSave"); if(sb&&/•/.test(sb.textContent||"")&&!confirm("This project has unsaved changes. Leave it anyway?")) return;

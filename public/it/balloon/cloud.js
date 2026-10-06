@@ -506,6 +506,8 @@ async function start0(){
   } catch (e) {}
   // KMR Console licence: keep only workspaces whose licence is valid (the database enforces this too)
   const acc = await sb.rpc("kmr_access",{p_product:"balloon"});
+  // Features the company bought (KMR Console › Prices & invoices); no list = every feature. Needs the Console update 0051.
+  C.featByOrg = {}; try { const ft = await sb.rpc("kmr_access_features",{p_product:"balloon"}); if(!ft.error) (ft.data||[]).forEach(x=>{ C.featByOrg[x.org_id] = x.restricted ? new Set(x.features||[]) : null; }); } catch(e) {}
   if(!acc.error && !C.platform){
     const okIds=new Set((acc.data||[]).filter(a=>a.ok).map(a=>a.org_id));
     const paused=C.memberships.filter(m=>!okIds.has(m.id));
@@ -528,6 +530,7 @@ async function start0(){
 function chooseOrg(id){
   if(C.dirty && !confirm("You have unsaved changes. Switch workspace anyway?")){ $("clOrg").value=C.org.id; return; }
   const m=C.memberships.find(x=>x.id===id); C.org=m; C.role=m.role; try{localStorage.setItem("bi_org"+"@"+(((window.BI_CONFIG||{}).supabaseUrl||"").replace(/^https?:\/\//,"").split(".")[0]||"local"),id);}catch(e){}
+  window.KMR_FEAT = (C.featByOrg && C.featByOrg[id]) || null;      // null = every feature
   $("clOrg").value=id; brand(); applyRole(); resetReport(); applyOrgDefaults();
 }
 function applyOrgDefaults(){ const s=(C.org&&C.org.settings)||{};
