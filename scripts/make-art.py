@@ -408,6 +408,22 @@ def app_rmp():
     return window(a, "RMP", b)
 
 
+def app_mmd():
+    a = "#2563EB"
+    b = heading("Route sheet RS-2610-0001", "Where the parts are, machine by machine")
+    steps = [("RM store", 400, OK), ("Turning", 392, OK), ("Drilling", 388, OK), ("Heat treat · supplier", 388, AMBER), ("Grinding", 200, a)]
+    for i, (nm, q, c) in enumerate(steps):
+        y = 38 + i * 30
+        b += (f"<circle cx='8' cy='{y + 8}' r='6' fill='{c}'/><text x='22' y='{y + 12}' {FONT} font-size='10' font-weight='700' fill='{INK}'>{nm}</text>"
+              f"<rect x='160' y='{y + 3}' width='{int(q / 400 * 100)}' height='9' rx='4.5' fill='{c}' opacity='.8'/><text x='266' y='{y + 12}' {FONT} font-size='9' fill='{MUTED}'>{q} pcs</text>")
+    qx = 318
+    cells = "".join(f"<rect x='{qx + (i % 7) * 7}' y='{58 + (i // 7) * 7}' width='6' height='6' fill='{INK}'/>" for i in range(49) if (i * 7 + i // 3) % 3 != 0 or i in (0, 6, 42))
+    b += f"<rect x='{qx - 8}' y='46' width='66' height='66' rx='6' fill='#fff' stroke='{LINE}'/>{cells}"
+    b += f"<text x='{qx - 8}' y='128' {FONT} font-size='9' font-weight='700' fill='{INK}'>TG-2610-00012</text><text x='{qx - 8}' y='140' {FONT} font-size='8' fill='{MUTED}'>OK tag · 388 pcs</text>"
+    b += f"<rect x='0' y='196' width='420' height='34' rx='8' fill='#FBE9E9'/><text x='12' y='217' {FONT} font-size='10' font-weight='700' fill='{INK}'>Moving slowly: Gear housing · 6 days at Milling</text>"
+    return window(a, "MMD", b)
+
+
 ART = {
     "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
@@ -416,6 +432,7 @@ ART = {
     "app-sales": lambda: svg(bg("#E11D48") + app_sales(), "Sales Flow"),
     "app-apqp": lambda: svg(bg("#0891B2") + app_apqp(), "APQP Planner"),
     "app-rmp": lambda: svg(bg("#0D9488") + app_rmp(), "Raw Material Planning"),
+    "app-mmd": lambda: svg(bg("#2563EB") + app_mmd(), "Material Movement"),
     "app-ppap": lambda: svg(bg("#B45309") + app_ppap(), "PPAP Submissions"),
     "app-calib": lambda: svg(bg("#6366F1") + app_calib(), "Calibration Hub"),
     "v-shop": scene_shop, "v-software": scene_software, "v-training": scene_training, "v-trade": scene_trade, "v-invest": scene_invest,

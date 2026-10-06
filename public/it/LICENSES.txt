@@ -11,3 +11,4 @@ Third-party components shipped in balloon/engines/ or loaded from public CDNs:
 - Tesseract OCR (via tesseract.js-core) + English model – Apache 2.0.
 - pdf.js (Mozilla) – Apache 2.0.   jsPDF + jspdf-autotable – MIT.
 - supabase-js – MIT.   Barlow / Barlow Condensed fonts – SIL OFL.
+- qrcode-generator (Kazuhiko Arase) – MIT. QR codes on MMD tags / DC (apps/qr.js).

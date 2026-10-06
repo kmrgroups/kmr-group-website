@@ -64,7 +64,7 @@
   }
 
   /* ---------- the other apps: addresses of the exact screens ---------- */
-  const PATH = { pd: "/it/pd.html", balloon: "/it/balloon.html", calib: "/it/calibration.html", capacity: "/it/capacity.html", sales: "/it/sales.html", rmp: "/it/rmp.html", apqp: "/it/apqp.html", ppap: "/it/ppap.html" };
+  const PATH = { pd: "/it/pd.html", balloon: "/it/balloon.html", calib: "/it/calibration.html", capacity: "/it/capacity.html", sales: "/it/sales.html", rmp: "/it/rmp.html", mmd: "/it/mmd.html", apqp: "/it/apqp.html", ppap: "/it/ppap.html" };
   function appHref(code, o) {
     o = o || {};
     if (code === "ops") return DEMO ? "/it/apps.html#" + (o.hash || "ops") : "/it/app/" + encodeURIComponent(slug) + "#" + (o.hash || "ops");
