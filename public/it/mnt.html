@@ -1,0 +1,176 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<title>Maintenance · KMR Apps</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#141a2e;--ink:#e8ecf8;--mut:#93a0bd;--line:#26304d}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}
+header{display:flex;gap:12px;align-items:center;padding:12px 18px;background:#0c1a3a;color:#fff;flex-wrap:wrap}header h1{font-size:17px;margin:0}header small{opacity:.7;display:block}
+.tabs{display:flex;gap:4px;padding:10px 14px 0;overflow-x:auto;scrollbar-width:none}.tabs::-webkit-scrollbar{display:none}.tab{text-decoration:none;display:inline-block;border:0;background:none;padding:9px 14px;font-weight:600;color:var(--mut);border-radius:10px 10px 0 0;white-space:nowrap;flex:none}.tab.on{background:var(--card);color:var(--b1);box-shadow:0 -2px 0 var(--b1) inset}
+main{padding:0 14px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:16px;overflow-x:auto}
+input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);width:100%;min-width:0}
+.btn{border:0;border-radius:9px;padding:9px 16px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--b1),var(--b2));cursor:pointer;text-decoration:none;display:inline-block}.btn.o{background:none;color:var(--b1);border:1px solid var(--b1)}.btn.s{padding:5px 10px;font-size:12px}.btn.r{background:var(--r)}.btn.g{background:var(--g)}.btn:disabled{opacity:.5}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.row>.grow{flex:1}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:14px}.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-top:3px solid var(--c,var(--b1))}.kpi b{display:block;font-size:22px}.kpi span{color:var(--mut);font-size:12px}
+table{width:100%;border-collapse:collapse;min-width:640px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}th{font-size:11px;text-transform:uppercase;color:var(--mut)}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c,#94a3b8)}.g{--c:var(--g)}.a{--c:var(--a)}.r{--c:var(--r)}.x{--c:#94a3b8}.b{--c:var(--b1)}
+.mut{color:var(--mut)}.hide{display:none}.msg{padding:9px 12px;border-radius:10px;margin-bottom:10px;background:#fee2e2;color:#991b1b}.msg.ok{background:#dcfce7;color:#166534}
+a{color:var(--b1)}.num,.n{text-align:right;font-variant-numeric:tabular-nums}
+.modal{position:fixed;inset:0;background:#0008;display:none;align-items:flex-start;justify-content:center;z-index:9;padding:10px;overflow:auto}.modal.on{display:flex}.in{background:var(--card);border-radius:14px;width:min(860px,100%);padding:16px;margin:auto}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.frm label,.lbl{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:2px}
+.note{font-size:12px;color:var(--mut);margin:8px 0}
+.back{position:fixed;left:12px;bottom:12px;z-index:6;background:linear-gradient(90deg,var(--b1),var(--b2));color:#fff;border-radius:99px;padding:10px 16px;font-weight:700;font-size:13px;text-decoration:none}
+.scan{display:flex;gap:8px;margin:6px 0 14px}.scan input{font-size:20px;padding:14px;border:2px solid var(--b1);letter-spacing:.5px}.scan .btn{white-space:nowrap}
+.card{border:1px solid var(--line);border-radius:12px;padding:12px;margin-bottom:12px}.card h3{margin:0 0 8px;font-size:15px}
+.kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 14px}.kv div span{display:block;font-size:11px;color:var(--mut);text-transform:uppercase}.kv div b{font-size:14px}
+.ln{display:grid;grid-template-columns:1.3fr .5fr 1fr 1fr auto;gap:6px;margin-bottom:6px}@media(max-width:640px){.ln{grid-template-columns:1fr 1fr}}
+.bar{display:flex;gap:2px;min-width:110px}.bar i{flex:1;height:8px;border-radius:3px;background:var(--line)}.bar i.d{background:var(--g)}.bar i.c{background:var(--b1)}
+.late{color:var(--r);font-weight:700}
+/* printed documents */
+.sheet{background:#fff;color:#000;padding:8px;border-radius:8px;margin-bottom:12px;overflow-x:auto}
+.tag{width:100mm;border:2px solid var(--c);margin:0 0 10px;font-size:11px;color:#000;background:#fff;break-inside:avoid;page-break-after:always}.th{background:var(--c);color:#fff;padding:5px 8px;display:flex;justify-content:space-between;gap:8px}.th b{font-size:13px}
+.tb{display:flex;gap:8px;padding:6px}.qr{width:28mm;flex:none;text-align:center}.qr svg{width:28mm;height:28mm;display:block}.qr small{font:700 10px monospace;display:block;margin-top:2px}.qr.s,.qr.s svg{width:22mm;height:22mm}
+.fs{flex:1;display:grid;grid-template-columns:1fr 1fr;gap:3px 8px;align-content:start}.f{min-width:0}.f.w{grid-column:span 2}.f span{display:block;font-size:8px;text-transform:uppercase;color:#555}.f b{font-size:11px;word-break:break-word}.f big{font-size:15px}
+.tf{border-top:1px solid #ccc;padding:3px 8px;font-size:9px;color:#555;display:flex;justify-content:space-between}
+.dt,.doc{background:#fff;color:#000;padding:10px;font-size:11px;border:1px solid #ccc;margin-bottom:12px;break-inside:avoid}.dt table,.doc table{min-width:0;margin:8px 0}.dt th,.dt td,.doc th,.doc td{border:1px solid #999;padding:3px 5px;color:#000}.dt th,.doc th{background:#eee}
+.hd{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.hd h2,.hd h3{margin:0}.meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:4px 12px;margin:8px 0}.meta .f{border-bottom:1px dotted #aaa}.meta .f.w{grid-column:span 2}.dt .mut,.doc .mut{color:#555}
+tr.cur td{background:#fef9c3}.sg{display:flex;justify-content:space-between;gap:20px;margin-top:26px}.sg span{border-top:1px solid #000;padding-top:3px;flex:1;text-align:center;font-size:10px}
+@media print{@page{margin:8mm}body{background:#fff;color:#000;padding:0}body>*:not(.modal){display:none!important}.modal{position:static;display:block!important;background:none;padding:0}.in{box-shadow:none;width:auto;padding:0;background:#fff}.noprint{display:none!important}.sheet{padding:0;margin:0}.dt,.doc{border:0}}
+</style></head><body>
+<header><span class="clogo" id="clogo" hidden></span><div><h1>Maintenance</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<div class="tabs"><a class="tab on" data-t="bd" href="#go=bd">Breakdowns</a><a class="tab" data-t="pm" href="#go=pm">PM schedule</a><a class="tab" data-t="an" href="#go=an">MTBF, MTTR &amp; analysis</a><a class="tab" data-t="card" href="#go=card">Machine history card</a></div>
+<main><div class="panel"><div id="msg"></div>
+<section id="bd"></section><section id="pm" class="hide"></section><section id="an" class="hide"></section><section id="card" class="hide"></section></div></main>
+<div class="modal" id="m"><div class="in" id="mb"></div></div>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{pm:"mnt.preventive-maintenance",an:"mnt.mttr-mtbf-analysis",card:"mnt.machine-history-card"},names:{"mnt.preventive-maintenance":"Preventive maintenance plan","mnt.mttr-mtbf-analysis":"MTTR, MTBF & analysis","mnt.machine-history-card":"Machine history card"}};</script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/apps/mnt-calc.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/mnt-demo.js"><\/script>')}</script>
+<script>
+const {$,esc,iso,today,fmt,say,call}=QP;
+const C=window.MNTCalc;
+const S={m:null,x:null,mc:store2('mc')};
+function store2(k,v){try{if(v===undefined)return localStorage.getItem('mnt_'+k)||'';localStorage.setItem('mnt_'+k,v)}catch(e){return ''}}
+const ed=()=>QP.canEdit;
+const N=(v,d)=>v==null||isNaN(v)?'—':Number(v).toLocaleString('en-IN',{maximumFractionDigits:d==null?0:d});
+const pc=(v)=>v==null||!isFinite(v)?'—':(v*100).toFixed(1)+'%';
+const dt=(v)=>v?new Date(v).toLocaleString('en-IN',{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit',hour12:false}):'—';
+const dd=(v)=>v?new Date(String(v).slice(0,10)+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'—';
+const hh=(h)=>h==null?'—':h<1?Math.round(h*60)+' min':N(h,1)+' h';
+const open=(h)=>{$('#mb').innerHTML=h;$('#m').classList.add('on')},closeM=()=>$('#m').classList.remove('on');
+$('#m').addEventListener('click',e=>{if(e.target.id==='m')closeM()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeM()});
+const co=()=>$('#co').textContent;
+const hasF=(k)=>!window.KMRLock||KMRLock.has(k);
+const idv=(i)=>($('#'+i)||{}).value;
+const opt=(arr,sel,f)=>arr.map(x=>`<option value="${esc(x.code)}"${x.code===sel?' selected':''}>${esc(f?f(x):x.code+' — '+(x.name||''))}</option>`).join('');
+const hashGo=()=>{const m=location.hash.match(/go=([a-z]+)/);return m?m[1]:'bd'};
+const localDT=(ms)=>{const d=new Date(ms-new Date(ms).getTimezoneOffset()*6e4);return d.toISOString().slice(0,16)};
+const toISO=(v)=>v?new Date(v).toISOString():'';
+const CATS=['Mechanical','Electrical','Hydraulic / pneumatic','Tooling','Control / software','Utilities','Operator error','Other'];
+const guessShift=()=>{const n=new Date(),mm=n.getHours()*60+n.getMinutes(),h=(s)=>{const x=/^(\d+):(\d+)/.exec(s||'');return x?+x[1]*60+ +x[2]:null};for(const s of S.m.shifts){const f=h(s.start),t=h(s.end);if(f==null||t==null)continue;if(f<t?(mm>=f&&mm<t):(mm>=f||mm<t))return s.code}return (S.m.shifts[0]||{}).code||''};
+
+async function load(){if(!S.m)S.m=await call('kmr_mnt_load');S.x=await call('kmr_mnt_data',{p_days:400})}
+async function route(){
+  let go=hashGo();
+  if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='bd';history.replaceState(null,'',location.pathname+location.search+'#go=bd')}
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
+  ['bd','pm','an','card'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  try{await load();({bd:drawBd,pm:drawPm,an:drawAn,card:drawCard})[go]()}catch(e){say(e.message)}
+}
+document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});
+window.addEventListener('hashchange',route);
+const dlg=(title,body,okLabel,fn,cls)=>{open(`<h3 style="margin:0 0 10px">${title}</h3><div id="dErr"></div>${body}<div class="row" style="margin-top:14px"><button class="btn ${cls||'g'}" id="dOk">${okLabel}</button><button class="btn o" id="dCx">Cancel</button></div>`);$('#dCx').onclick=closeM;$('#dOk').onclick=async()=>{const b=$('#dOk');b.disabled=true;try{await fn();closeM();await route()}catch(e){$('#dErr').innerHTML=`<div class="msg">${esc(e.message)}</div>`;b.disabled=false}}};
+const why=(title,fn)=>dlg(title,'<label class="lbl">Reason *</label><input id="wr" placeholder="e.g. entered against the wrong machine">','Void',()=>fn($('#wr').value),'r');
+
+/* ---------- 1. BREAKDOWNS ---------- */
+function drawBd(){
+  const x=S.x,t0=new Date(x.now).getTime(),opn=x.breakdowns.filter(b=>['open','attended'].includes(b.status)),cl=x.breakdowns.filter(b=>b.status==='closed'),s30=C.stats(x,S.m,30,null,t0);
+  const k=(v,l,c)=>`<div class="kpi" style="--c:var(--${c})"><b>${v}</b><span>${l}</span></div>`,f=S.mc;
+  $('#bd').innerHTML=`<div class="kpis">${k(opn.length,'machines down now',opn.length?'r':'g')}${k(s30.n,'breakdowns, last 30 days','b')}${k(hh(s30.down),'downtime, last 30 days','a')}${k(hh(s30.mttr),'MTTR, last 30 days','b')}${k(hh(s30.resp),'average response time','b')}</div>
+  <div class="row">${ed()?'<button class="btn r" id="bdNew">+ Report a breakdown</button>':''}<span class="grow"></span><label class="mut">Machine</label><select id="bdF" style="width:auto"><option value="">All machines</option>${opt(S.m.machines,f,m=>m.code)}</select></div>
+  ${opn.length?`<b>Open now</b><table><thead><tr><th>Breakdown</th><th>Machine</th><th>Problem</th><th>Stopped since</th><th class="n">Down for</th><th>Status</th><th></th></tr></thead><tbody>${opn.map(b=>`<tr><td><b>${esc(b.bd_no)}</b></td><td>${esc(b.machine_code)}<div class="mut">${esc(b.machine_name||'')}</div></td><td>${esc(b.problem)}<div class="mut">${esc(b.category||'')} · reported by ${esc(b.reported_by||'')}</div></td><td>${dt(b.started_at)}</td><td class="n late">${hh(C.downH(b,t0))}</td><td><span class="chip ${b.status==='open'?'r':'a'}">${b.status==='open'?'waiting for attention':'being repaired'}</span>${b.attended_at?`<div class="mut">attended ${dt(b.attended_at)}</div>`:''}</td><td style="white-space:nowrap">${ed()?`${b.status==='open'?`<button class="btn s o" data-at="${b.id}">Attended</button> `:''}<button class="btn s g" data-cl="${b.id}">Restore &amp; close</button> <button class="btn s o" data-vd="${b.id}">Void</button>`:''}</td></tr>`).join('')}</tbody></table><div style="height:14px"></div>`:'<p class="note">No machine is down right now.</p>'}
+  <b>Breakdown history</b><div style="overflow-x:auto"><table><thead><tr><th>Breakdown</th><th>Machine</th><th>Problem &amp; cause</th><th>Action taken</th><th>Stopped</th><th class="n">Response</th><th class="n">Downtime</th><th></th></tr></thead><tbody>${cl.filter(b=>!f||b.machine_code===f).slice(0,80).map(b=>`<tr><td><b>${esc(b.bd_no)}</b><div class="mut">${esc(b.category||'')}</div></td><td>${esc(b.machine_code)}</td><td>${esc(b.problem)}<div class="mut">Cause: ${esc(b.root_cause||'—')}</div></td><td>${esc(b.action_taken||'')}${b.preventive_action?`<div class="mut">Prevent: ${esc(b.preventive_action)}</div>`:''}${(b.spares||[]).length?`<div class="mut">Spares: ${(b.spares||[]).map(s=>esc(s.spare)+' ×'+esc(s.qty)).join(', ')}</div>`:''}</td><td>${dt(b.started_at)}</td><td class="n">${hh(C.respH(b))}</td><td class="n"><b>${hh(C.downH(b,t0))}</b></td><td>${ed()?`<button class="btn s o" data-vd="${b.id}">Void</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="mut">No breakdowns recorded.</td></tr>'}</tbody></table></div>`;
+  $('#bdF').onchange=()=>{S.mc=$('#bdF').value;store2('mc',S.mc);drawBd()};
+  if($('#bdNew'))$('#bdNew').onclick=reportDlg;
+  document.querySelectorAll('[data-at]').forEach(b=>b.onclick=()=>attendDlg(b.dataset.at));document.querySelectorAll('[data-cl]').forEach(b=>b.onclick=()=>closeDlg(b.dataset.cl));
+  document.querySelectorAll('[data-vd]').forEach(b=>b.onclick=()=>why('Void this breakdown',(r)=>call('kmr_mnt_bd_void',{p_id:b.dataset.vd,p_reason:r})));
+}
+function reportDlg(){
+  const busy=new Set(S.x.breakdowns.filter(b=>['open','attended'].includes(b.status)).map(b=>b.machine_code));
+  dlg('Report a breakdown',`<div class="frm"><div><label>Machine *</label><select id="rM"><option value="">Choose…</option>${opt(S.m.machines.filter(m=>!busy.has(m.code)),'',m=>m.code+' — '+(m.name||''))}</select></div><div><label>Stopped at</label><input id="rT" type="datetime-local" value="${localDT(Date.now())}"></div><div><label>Shift</label><select id="rS">${opt(S.m.shifts,guessShift(),s=>s.code+' — '+(s.name||''))}</select></div><div><label>Cause category (if known)</label><select id="rC"><option value="">—</option>${CATS.map(c=>`<option>${c}</option>`).join('')}</select></div><div style="grid-column:1/-1"><label>What is wrong? *</label><input id="rP" placeholder="e.g. spindle will not start, drive alarm"></div><div><label>Reported by</label><input id="rB" value="${esc(store2('rb'))}"></div></div>`,'Report breakdown',async()=>{store2('rb',idv('rB'));await call('kmr_mnt_bd_start',{p:{machine_code:idv('rM'),started_at:toISO(idv('rT')),shift:idv('rS'),category:idv('rC'),problem:idv('rP'),reported_by:idv('rB')}});say('Breakdown reported.',1)},'r');
+}
+function attendDlg(id){dlg('Maintenance has attended',`<div class="frm"><div><label>Attended at</label><input id="aT" type="datetime-local" value="${localDT(Date.now())}"></div><div><label>Attended by</label><input id="aB" value="${esc(store2('ab'))}"></div></div>`,'Save',async()=>{store2('ab',idv('aB'));await call('kmr_mnt_bd_attend',{p_id:id,p:{attended_at:toISO(idv('aT')),attended_by:idv('aB')}})},'g')}
+function closeDlg(id){
+  const b=S.x.breakdowns.find(x=>x.id===id),lc=S.m.loss_codes,def=(lc.find(l=>l.group==='Breakdown')||{}).code||'';
+  dlg('Restore and close '+esc(b.bd_no)+' — '+esc(b.machine_code),`<p class="note">${esc(b.problem)} · stopped ${dt(b.started_at)}</p><div class="frm"><div><label>Restored at *</label><input id="cT" type="datetime-local" value="${localDT(Date.now())}"></div><div><label>Cause category *</label><select id="cC"><option value="">Choose…</option>${CATS.map(c=>`<option${c===b.category?' selected':''}>${c}</option>`).join('')}</select></div><div><label>Loss code (D code)${S.m.has_mmd?' — books the downtime in MMD':''}</label><select id="cD"><option value="">—</option>${opt(lc,def,l=>l.code+' — '+l.name)}</select></div><div style="grid-column:1/-1"><label>Root cause *</label><input id="cR" placeholder="Why did it fail?"></div><div style="grid-column:1/-1"><label>Corrective action taken *</label><input id="cA" placeholder="What was done to restore the machine?"></div><div style="grid-column:1/-1"><label>Preventive action (so it does not happen again)</label><input id="cP"></div><div style="grid-column:1/-1"><label>Spares used (one per line: name, quantity)</label><textarea id="cS" rows="2" placeholder="Bearing set, 1"></textarea></div><div><label>Attended by</label><input id="cB" value="${esc(b.attended_by||store2('ab'))}"></div></div>`,'Restore & close',async()=>{
+    const spares=idv('cS').split('\n').map(l=>l.trim()).filter(Boolean).map(l=>{const p=l.split(/[,;\t]/);return {spare:p[0].trim(),qty:+(p[1]||1)||1}});
+    await call('kmr_mnt_bd_close',{p_id:id,p:{ended_at:toISO(idv('cT')),category:idv('cC'),d_code:idv('cD'),root_cause:idv('cR'),action_taken:idv('cA'),preventive_action:idv('cP'),spares,attended_by:idv('cB')}});say('Breakdown closed.',1)},'g');
+}
+
+/* ---------- 2. PM SCHEDULE ---------- */
+function drawPm(){
+  const x=S.x,P=C.pm(x,x.today),k=(v,l,c)=>`<div class="kpi" style="--c:var(--${c})"><b>${v}</b><span>${l}</span></div>`,ch={over:['Overdue','r'],soon:['Due this week','a'],ok:['On schedule','g']};
+  $('#pm').innerHTML=`<div class="kpis">${k(P.plans.length,'PM tasks planned','b')}${k(P.over,'overdue',P.over?'r':'g')}${k(P.soon,'due within 7 days','a')}${k(pc(P.compliance),'done on or before the due date','g')}</div>
+  <div class="row">${ed()?'<button class="btn" id="pmNew">+ Add PM task</button><button class="btn o" id="pmSeed">Create plans from the machine PM frequency</button>':''}<span class="grow"></span><span class="mut">Plans follow Operations Master › Machines › PM frequency</span></div>
+  <table><thead><tr><th>Machine</th><th>Task</th><th class="n">Every (days)</th><th>Last done</th><th>Next due</th><th>Status</th><th></th></tr></thead><tbody>${P.plans.map(p=>`<tr><td><b>${esc(p.machine_code)}</b><div class="mut">${esc(p.machine_name||'')}</div></td><td>${esc(p.task)}${p.est_min?`<div class="mut">about ${p.est_min} min</div>`:''}</td><td class="n">${p.frequency_days}</td><td>${dd(p.last_done)}</td><td class="${p.st==='over'?'late':''}">${dd(p.next_due)}${p.st==='over'?` (${-p.days} d late)`:''}</td><td><span class="chip ${ch[p.st][1]}">${ch[p.st][0]}</span></td><td style="white-space:nowrap">${ed()?`<button class="btn s g" data-dn="${p.id}">Mark done</button> <button class="btn s o" data-ed="${p.id}">Edit</button>`:''}</td></tr>`).join('')||'<tr><td colspan="7" class="mut">No PM plans yet. Use “Create plans from the machine PM frequency”.</td></tr>'}</tbody></table>
+  <div style="height:16px"></div><b>Recent PM records</b><table><thead><tr><th>Done</th><th>Machine</th><th>Task</th><th>Due was</th><th>By</th><th class="n">Minutes</th><th>Findings</th><th></th></tr></thead><tbody>${x.pm_log.slice(0,25).map(l=>`<tr><td>${dd(l.done_on)}</td><td>${esc(l.machine_code)}</td><td>${esc(l.task)}</td><td class="${l.due_on&&l.done_on>l.due_on?'late':''}">${dd(l.due_on)}</td><td>${esc(l.done_by||'')}</td><td class="n">${N(l.duration_min)}</td><td class="mut">${esc(l.findings||'')}</td><td>${ed()?`<button class="btn s o" data-vl="${l.id}">Void</button>`:''}</td></tr>`).join('')||'<tr><td colspan="8" class="mut">—</td></tr>'}</tbody></table>`;
+  if($('#pmNew'))$('#pmNew').onclick=()=>planDlg();
+  if($('#pmSeed'))$('#pmSeed').onclick=async()=>{try{const n=await call('kmr_mnt_pm_seed');say(n?n+' plan'+(n>1?'s':'')+' created from the machine PM frequency.':'Every machine with a PM frequency already has a plan.',1);await route()}catch(e){say(e.message)}};
+  document.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>doneDlg(b.dataset.dn));document.querySelectorAll('[data-ed]').forEach(b=>b.onclick=()=>planDlg(b.dataset.ed));
+  document.querySelectorAll('[data-vl]').forEach(b=>b.onclick=()=>why('Void this PM record',(r)=>call('kmr_mnt_pm_void',{p_log:b.dataset.vl,p_reason:r})));
+}
+function planDlg(id){
+  const p=id?S.x.plans.find(x=>x.id===id):{};
+  dlg(id?'Edit PM task':'Add PM task',`<div class="frm"><div><label>Machine *</label><select id="pMc"><option value="">Choose…</option>${opt(S.m.machines,p.machine_code,m=>m.code+' — '+(m.name||''))}</select></div><div style="grid-column:span 2"><label>Task *</label><input id="pT" value="${esc(p.task||'')}"></div><div><label>Every (days) *</label><input id="pF" type="number" min="1" max="1100" value="${p.frequency_days||''}"></div><div><label>Time needed (min)</label><input id="pE" type="number" min="1" value="${p.est_min||''}"></div><div><label>Next due</label><input id="pN" type="date" value="${p.next_due||''}"></div></div>`,'Save',async()=>{await call('kmr_mnt_pm_save',{p:{id:id||null,machine_code:idv('pMc'),task:idv('pT'),frequency_days:idv('pF'),est_min:idv('pE'),next_due:idv('pN')}})},'g');
+}
+function doneDlg(id){
+  const p=S.x.plans.find(x=>x.id===id);
+  dlg('PM done — '+esc(p.machine_code),`<p class="note">${esc(p.task)} · due ${dd(p.next_due)}</p><div class="frm"><div><label>Date done</label><input id="dD" type="date" value="${today()}" max="${today()}"></div><div><label>Done by</label><input id="dB" value="${esc(store2('ab'))}"></div><div><label>Minutes taken</label><input id="dM" type="number" min="1"></div><div style="grid-column:1/-1"><label>Findings / parts replaced</label><input id="dF"></div></div>`,'Save',async()=>{store2('ab',idv('dB'));await call('kmr_mnt_pm_done',{p_plan:id,p:{done_on:idv('dD'),done_by:idv('dB'),duration_min:idv('dM'),findings:idv('dF')}})},'g');
+}
+
+/* ---------- 3. ANALYSIS ---------- */
+function bars(title,rows,unit,note){
+  const L=rows.filter(r=>r.v>0).sort((a,b)=>b.v-a.v),tot=L.reduce((a,r)=>a+r.v,0),top=L.slice(0,10);let cum=0;const mx=top.length?top[0].v:1;
+  return `<div class="card"><h3>${esc(title)}</h3>${note?`<div class="mut" style="font-size:11px;margin:-4px 0 6px">${esc(note)}</div>`:''}${top.length?`<table style="min-width:0"><tbody>${top.map(r=>{const b4=cum/tot;cum+=r.v;return `<tr><td style="width:34%;word-break:break-word">${esc(r.l)}</td><td style="width:40%"><div style="height:10px;border-radius:5px;background:var(--line)"><div style="height:10px;border-radius:5px;width:${Math.max(3,r.v/mx*100)}%;background:${b4<.8?'var(--r)':'#94a3b8'}"></div></div></td><td class="n" style="white-space:nowrap">${N(r.v,1)} ${unit}</td><td class="n mut" style="white-space:nowrap">${(cum/tot*100).toFixed(0)}%</td></tr>`}).join('')}</tbody></table><div class="mut" style="font-size:11px">Red = the first 80%. Total ${N(tot,1)} ${unit}.</div>`:'<p class="note">Nothing recorded in this period.</p>'}</div>`;
+}
+function drawAn(days){
+  days=days||+store2('ad')||90;store2('ad',days);const A=C.analysis(S.x,S.m,days),p=A.plant,tg=(v,g)=>v==null?'x':v>=g?'g':v>=g*.9?'a':'r';
+  const k=(v,l,c,s)=>`<div class="kpi" style="--c:var(--${c})"><b>${v}</b><span>${l}${s?`<br><i>${s}</i>`:''}</span></div>`,mx=Math.max(1,...A.months.map(m=>m.down));
+  $('#an').innerHTML=`<div class="row"><label class="mut">Period</label><select id="anD" style="width:auto">${[30,90,180,365].map(d=>`<option value="${d}"${d===days?' selected':''}>Last ${d} days</option>`).join('')}</select><span class="grow"></span><button class="btn o s" onclick="window.print()">Print</button></div>
+  <div class="note">Scheduled time: ${N(p.H,1)} h a day × ${p.wd} working days${p.set?'':' (Plant standards not filled in — default hours used)'} per machine. Downtime = from the moment the machine stopped to the moment it was restored.</div>
+  <div class="kpis">${k(p.n,'breakdowns','b')}${k(hh(p.down),'downtime','a')}${k(hh(p.mtbf),'MTBF — mean time between failures','b','operating hours ÷ breakdowns')}${k(hh(p.mttr),'MTTR — mean time to repair','b','downtime ÷ breakdowns')}${k(pc(p.avail),'Availability (MTBF ÷ (MTBF + MTTR))',tg(p.avail,.92))}${k(hh(p.resp),'average response time','b','stopped → attended')}</div>
+  <b>Machine wise</b><div style="overflow-x:auto"><table><thead><tr><th>Machine</th><th class="n">Breakdowns</th><th class="n">Downtime</th><th class="n">MTBF</th><th class="n">MTTR</th><th class="n">Availability</th><th class="n">Response</th></tr></thead><tbody>${A.rows.map(r=>`<tr><td><b>${esc(r.code)}</b><div class="mut">${esc(r.name)}</div></td><td class="n">${r.n}</td><td class="n">${hh(r.down)}</td><td class="n">${r.n?hh(r.mtbf):'no breakdown'}</td><td class="n">${hh(r.mttr)}</td><td class="n"><span class="chip ${tg(r.avail,.92)}">${pc(r.avail)}</span></td><td class="n">${hh(r.resp)}</td></tr>`).join('')||'<tr><td colspan="7" class="mut">No breakdowns in this period.</td></tr>'}</tbody></table></div>
+  ${A.repeats.length?`<div class="card" style="border-left:4px solid var(--r);margin-top:12px"><h3>Repeat failures — the same machine and cause three or more times</h3><table style="min-width:0"><thead><tr><th>Machine</th><th>Cause</th><th class="n">Times</th><th class="n">Downtime</th><th>Last</th></tr></thead><tbody>${A.repeats.map(r=>`<tr><td><b>${esc(r.machine)}</b></td><td>${esc(r.category)}</td><td class="n">${r.n}</td><td class="n">${hh(r.down)}</td><td>${dd(r.last)}</td></tr>`).join('')}</tbody></table><div class="mut" style="font-size:11px">These need a permanent fix (root-cause analysis, IATF 16949 8.5.1.5) — not another repair.</div></div>`:''}
+  <div class="pg" style="margin-top:12px">${bars('Downtime by machine',A.byMachine,'h')}${bars('Downtime by cause',A.byCat,'h')}${S.m.has_mmd||A.other.length?bars('Other stoppages (MMD loss hours)',A.other,'h','Tooling, set-up, waiting and other D codes entered in MMD'):''}</div>
+  <div class="card"><h3>Month by month</h3>${A.months.length?`<table style="min-width:0"><thead><tr><th>Month</th><th class="n">Breakdowns</th><th class="n">Downtime</th><th style="width:40%"></th></tr></thead><tbody>${A.months.map(m=>`<tr><td>${m.m}</td><td class="n">${m.n}</td><td class="n">${hh(m.down)}</td><td><div style="height:10px;border-radius:5px;background:var(--line)"><div style="height:10px;border-radius:5px;width:${Math.max(2,m.down/mx*100)}%;background:var(--a)"></div></div></td></tr>`).join('')}</tbody></table>`:'<p class="note">Nothing recorded in this period.</p>'}</div>`;
+  $('#anD').onchange=()=>drawAn(+$('#anD').value);
+}
+
+/* ---------- 4. MACHINE HISTORY CARD ---------- */
+async function drawCard(){
+  const sel=S.mc||(S.m.machines[0]||{}).code||'';
+  $('#card').innerHTML=`<div class="row"><label class="mut">Machine</label><select id="cdM" style="width:auto;min-width:220px">${opt(S.m.machines,sel,m=>m.code+' — '+(m.name||''))}</select></div><div id="cdBody"></div>`;
+  $('#cdM').onchange=()=>{S.mc=$('#cdM').value;store2('mc',S.mc);drawCard()};
+  if(!sel){$('#cdBody').innerHTML='<p class="note">Add machines in Operations Master › Machines first.</p>';return}
+  try{const d=await call('kmr_mnt_card',{p_machine:sel});S.card=d;$('#cdBody').innerHTML=cardHtml(d,true);wireCard(d)}catch(e){say(e.message)}
+}
+function cardHtml(d,screen){
+  const m=d.machine,t0=new Date(d.now).getTime(),bd=d.breakdowns,all=C.stats({breakdowns:bd,now:d.now},S.m,3650,m.code,t0),y1=C.stats({breakdowns:bd,now:d.now},S.m,365,m.code,t0),f=(l,v)=>`<div class="f"><span>${l}</span><b>${esc(v==null||v===''?'—':v)}</b></div>`;
+  const rows=[].concat(bd.map(b=>({d:b.started_at,t:'Breakdown',txt:`${b.bd_no}: ${b.problem}${b.root_cause?' — cause: '+b.root_cause:''}${b.action_taken?' — action: '+b.action_taken:''}${(b.spares||[]).length?' — spares: '+b.spares.map(s=>s.spare+' ×'+s.qty).join(', '):''}`,by:b.attended_by||b.reported_by,x:b.status==='closed'?'down '+hh(C.downH(b,t0)):'OPEN',open:b.status!=='closed'})),
+    d.pm_log.map(l=>({d:l.done_on,t:'PM',txt:l.task+(l.findings?' — '+l.findings:''),by:l.done_by,x:l.duration_min?l.duration_min+' min':''})),
+    d.events.map(e=>({d:e.event_date,t:e.type,txt:e.description,by:e.done_by,x:e.cost?'₹'+N(e.cost):'',id:e.id}))).sort((a,b)=>String(b.d).localeCompare(String(a.d)));
+  const pm=d.plans.map(p=>`${esc(p.task.split(':')[0])} every ${p.frequency_days} d — next ${dd(p.next_due)}`).join(' · ');
+  return `<div class="${screen?'sheet':''}"><div class="dt"><div class="hd"><div><h3>MACHINE HISTORY CARD</h3><div class="mut">${esc(co())}</div></div><div><b style="font-size:16px">${esc(m.code)}</b><div>${esc(m.name||'')}</div></div></div>
+  <div class="meta">${f('Type',m.type)}${f('Make',m.make)}${f('Model',m.model)}${f('Serial no.',m.serial_no)}${f('Asset no.',m.asset_no)}${f('Installed on',m.installed_on?dd(m.installed_on):'')}${f('Cell / line',m.cell)}${f('Criticality',m.criticality)}${f('PM frequency',m.pm_frequency)}${f('Status',m.status)}</div>
+  <div class="meta">${f('Breakdowns (all time)',all.n)}${f('MTBF (last 12 months)',y1.n?hh(y1.mtbf):'no breakdown')}${f('MTTR (last 12 months)',y1.n?hh(y1.mttr):'—')}${f('Availability (12 months)',pc(y1.avail))}${f('Total downtime (all time)',hh(all.down))}</div>
+  ${pm?`<div style="font-size:11px;margin:4px 0">Preventive maintenance: ${pm}</div>`:''}
+  <table><thead><tr><th>Date</th><th>Type</th><th>Description</th><th>By</th><th>Downtime / cost</th>${screen&&ed()?'<th class="noprint"></th>':''}</tr></thead><tbody>${rows.map(r=>`<tr${r.open?' style="background:#fee2e2"':''}><td>${r.t==='Breakdown'?dt(r.d):dd(r.d)}</td><td>${esc(r.t)}</td><td>${esc(r.txt)}</td><td>${esc(r.by||'')}</td><td>${esc(r.x)}</td>${screen&&ed()?`<td class="noprint">${r.id?`<button class="btn s o" data-ve="${r.id}">Void</button>`:''}</td>`:''}</tr>`).join('')||'<tr><td colspan="6">No history yet.</td></tr>'}</tbody></table>
+  <div class="sg"><span>Prepared by</span><span>Maintenance in-charge</span></div><div class="mut" style="font-size:10px">Printed ${dd(new Date().toISOString())}</div></div></div>
+  ${screen?`<div class="row noprint" style="margin-top:8px">${ed()?'<button class="btn o" id="evNew">+ Add history entry</button>':''}<button class="btn" id="cdPrint">Print card</button></div>`:''}`;
+}
+function wireCard(d){
+  $('#cdPrint').onclick=()=>{open(`<div class="row noprint"><b class="grow">Machine history card — ${esc(d.machine.code)}</b><button class="btn" id="prn">Print</button><button class="btn o" id="cls">Close</button></div><div class="sheet">${cardHtml(d,false)}</div>`);$('#prn').onclick=()=>window.print();$('#cls').onclick=closeM};
+  if($('#evNew'))$('#evNew').onclick=()=>dlg('Add a history entry',`<div class="frm"><div><label>Type *</label><select id="eT">${['Overhaul','Modification','Spare replaced','Relocation','Accuracy / calibration check','Other'].map(t=>`<option>${t}</option>`).join('')}</select></div><div><label>Date</label><input id="eD" type="date" value="${today()}"></div><div><label>Cost (₹)</label><input id="eC" type="number" min="0"></div><div style="grid-column:1/-1"><label>What was done *</label><input id="eX"></div><div><label>Done by</label><input id="eB" value="${esc(store2('ab'))}"></div></div>`,'Save',async()=>{await call('kmr_mnt_event_save',{p:{machine_code:d.machine.code,type:idv('eT'),event_date:idv('eD'),cost:idv('eC'),description:idv('eX'),done_by:idv('eB')}})},'g');
+  document.querySelectorAll('[data-ve]').forEach(b=>b.onclick=()=>why('Void this history entry',(r)=>call('kmr_mnt_event_void',{p_id:b.dataset.ve,p_reason:r})));
+}
+(async()=>{try{await QP.init('mnt');if(!QP.ctx)return;await route()}catch(e){say(e.message)}})();
+</script></body></html>

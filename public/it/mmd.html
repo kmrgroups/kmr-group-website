@@ -88,8 +88,8 @@ function resultDoc(title,res,extra){
 /* ---------- reason lines (rejection / rework): reason + specification + actual + qty — all required ---------- */
 function linesBox(id,kind){return `<div class="card" style="border-left:4px solid var(--${kind==='rej'?'r':'a'})"><div class="row" style="margin:0 0 6px"><b class="grow">${kind==='rej'?'Rejected':'Sent for rework'} — reason, specification, actual</b><button class="btn s o" type="button" data-add="${id}" data-k="${kind}">+ Add reason</button></div><div id="${id}"></div></div>`}
 function addLine(id,kind){
-  const dcs=S.m.defect_codes||[],pref=kind==='rej'?'Rejection':'Rework',o=(t)=>dcs.filter(d=>(d.type||'')===t||(t==='Other'&&!d.type));
-  const g=[pref,pref==='Rejection'?'Rework':'Rejection'].map(t=>{const l=dcs.filter(d=>d.type===t);return l.length?`<optgroup label="${t} codes">${opt(l,'',d=>d.code+' — '+d.name)}</optgroup>`:''}).join('')+(o('Other').length?`<optgroup label="Other">${opt(o('Other'))}</optgroup>`:'');
+  const dcs=S.m.defect_codes||[],pref=kind==='rej'?'Rejection':'Rework';
+  const mine=dcs.filter(d=>d.type===pref||d.type==='Either'),rest=dcs.filter(d=>!mine.includes(d)),g=(mine.length?`<optgroup label="${pref} codes">${opt(mine,'',d=>d.code+' — '+d.name)}</optgroup>`:'')+(rest.length?`<optgroup label="Other reasons">${opt(rest,'',d=>d.code+' — '+d.name)}</optgroup>`:'');
   const d=document.createElement('div');d.className='ln';
   d.innerHTML=`<select data-f="code"><option value="">Reason…</option>${g}</select><input data-f="qty" type="number" min="1" step="1" placeholder="Qty" inputmode="numeric"><input data-f="spec" placeholder="Specification e.g. Ø42.5 ±0.02"><input data-f="actual" placeholder="Actual e.g. Ø42.56"><button class="btn s r" type="button">✕</button>`;
   d.querySelector('button').onclick=()=>{d.remove();sum()};d.querySelector('[data-f=qty]').oninput=sum;$('#'+id).appendChild(d);

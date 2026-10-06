@@ -5,7 +5,7 @@
   "use strict";
   var q = location.search;
   var demo = /[?&]demo=1(&|$)/.test(q), direct = /[?&]direct=1(&|$)/.test(q), fromPortal = /[?&]kmr=1(&|$)/.test(q);
-  var tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : /sales\.html/.test(location.pathname) ? "sales" : /calibration/.test(location.pathname) ? "calib" : /apqp\.html/.test(location.pathname) ? "apqp" : /ppap\.html/.test(location.pathname) ? "ppap" : /rmp\.html/.test(location.pathname) ? "rmp" : /mmd\.html/.test(location.pathname) ? "mmd" : "tool";
+  var tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : /sales\.html/.test(location.pathname) ? "sales" : /calibration/.test(location.pathname) ? "calib" : /apqp\.html/.test(location.pathname) ? "apqp" : /ppap\.html/.test(location.pathname) ? "ppap" : /rmp\.html/.test(location.pathname) ? "rmp" : /mmd\.html/.test(location.pathname) ? "mmd" : /mnt\.html/.test(location.pathname) ? "mnt" : "tool";
   function portal() { var p = null; try { p = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {} return p; }
   function portalUrl() { var p = portal(), co = (q.match(/[?&]co=([a-z0-9-]{2,61})/i) || [])[1], s = (p && p.slug) || co;
     // come back to this exact screen after signing in (e.g. a gauge opened from its QR label)

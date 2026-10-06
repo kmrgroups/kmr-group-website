@@ -424,6 +424,18 @@ def app_mmd():
     return window(a, "MMD", b)
 
 
+def app_mnt():
+    a = "#EA580C"
+    b = heading("Machine health · last 90 days", "Breakdowns, MTBF and MTTR")
+    for i, (nm, mtbf, mttr, c) in enumerate([("CNC Turning 1", 612, 2.4, OK), ("VMC 1", 380, 3.2, OK), ("Gear Hobbing 1", 150, 5.1, AMBER), ("Press 100T", 62, 7.5, RED)]):
+        y = 40 + i * 38
+        b += (f"<text x='0' y='{y + 10}' {FONT} font-size='10' font-weight='700' fill='{INK}'>{nm}</text>"
+              f"<rect x='110' y='{y + 2}' width='{int(min(200, mtbf / 3))}' height='9' rx='4.5' fill='{c}'/><text x='{118 + int(min(200, mtbf / 3))}' y='{y + 10}' {FONT} font-size='9' fill='{MUTED}'>MTBF {mtbf} h</text>"
+              f"<text x='110' y='{y + 26}' {FONT} font-size='9' fill='{MUTED}'>MTTR {mttr} h</text>")
+    b += f"<rect x='0' y='196' width='420' height='34' rx='8' fill='#FBE9E9'/><text x='12' y='217' {FONT} font-size='10' font-weight='700' fill='{INK}'>Press 100T: 3 hydraulic failures — fix the cause</text>"
+    return window(a, "MNT", b)
+
+
 ART = {
     "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
@@ -433,6 +445,7 @@ ART = {
     "app-apqp": lambda: svg(bg("#0891B2") + app_apqp(), "APQP Planner"),
     "app-rmp": lambda: svg(bg("#0D9488") + app_rmp(), "Raw Material Planning"),
     "app-mmd": lambda: svg(bg("#2563EB") + app_mmd(), "Material Movement"),
+    "app-mnt": lambda: svg(bg("#EA580C") + app_mnt(), "Maintenance"),
     "app-ppap": lambda: svg(bg("#B45309") + app_ppap(), "PPAP Submissions"),
     "app-calib": lambda: svg(bg("#6366F1") + app_calib(), "Calibration Hub"),
     "v-shop": scene_shop, "v-software": scene_software, "v-training": scene_training, "v-trade": scene_trade, "v-invest": scene_invest,
