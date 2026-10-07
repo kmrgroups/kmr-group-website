@@ -171,4 +171,4 @@ function drawStart(){
 async function clearD(c){try{await call('kmr_rmp_demand_clear',{p_month:S.month,p_part:c});await load();drawStart()}catch(e){say(e.message)}}
 
 (async()=>{try{await QP.init('rmp');if(!QP.ctx)return;S.month=(QP.qs.get('month')||curMonth());$('#mon').value=S.month;await route()}catch(e){say(e.message)}})();
-</script></body></html>
+</script><script src="/it/apps/back.js"></script></body></html>
