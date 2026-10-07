@@ -30,6 +30,8 @@ const nextConfig = {
       beforeFiles: [
         { source: "/it/hrm", destination: `${HRM_ORIGIN}/it/hrm` },
         { source: "/it/hrm/:path*", destination: `${HRM_ORIGIN}/it/hrm/:path*` },
+        // biometric machines (eSSL / ZKTeco "Cloud Server Setting") always call /iclock/... on the root of the address and cannot be given a path
+        { source: "/iclock/:path*", destination: `${HRM_ORIGIN}/it/hrm/iclock/:path*` },
         // one link per customer: www.kmr-groups.com/it/app/<customer> → the KMR Apps portal page
         { source: "/it/app/:customer", destination: "/it/apps.html" },
         { source: "/it/console", destination: `${CONSOLE_ORIGIN}/it/console` },
