@@ -37,8 +37,21 @@
     if (!document.querySelector(".kmr-foot")) {
       const f = document.createElement("div"); f.className = "kmr-foot";
       const back = portal && portal.slug ? '<a class="kmr-back" href="/it/app/' + encodeURIComponent(portal.slug) + '">← ' + (portal.name ? String(portal.name).replace(/[<>&]/g, "") + " · " : "") + 'KMR Apps</a>' : "";
-      f.innerHTML = '<span class="kmr-slot">' + back + '</span><span>Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></span><span class="kmr-slot"></span>';
+      f.innerHTML = '<span class="kmr-slot">' + back + '</span><span>Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></span><span class="kmr-slot" style="justify-content:flex-end" id="kmrPlant"></span>';
       document.body.append(f);
+      // Plant switcher (customers with more than one plant): same app, another plant's data
+      const pl = portal && Array.isArray(portal.plants) ? portal.plants : [];
+      if (pl.length > 1) {
+        const cur = new URLSearchParams(location.search).get("co") || portal.slug;
+        const sel = document.createElement("select"); sel.title = "Plant"; sel.style.cssText = "font:600 12px 'Segoe UI',Arial;border:1px solid #E3E8EF;border-radius:8px;padding:2px 6px;max-width:100%";
+        sel.innerHTML = pl.map((x) => '<option value="' + encodeURIComponent(x.slug) + '"' + (x.slug === cur ? " selected" : "") + ">Plant: " + String(x.main ? "Main" : x.code).replace(/[<>&"]/g, "") + " · " + String(x.name).split(" – ").pop().replace(/[<>&"]/g, "") + "</option>").join("");
+        sel.onchange = () => {
+          const to = pl.find((x) => encodeURIComponent(x.slug) === sel.value);
+          try { portal.slug = to.slug; portal.name = to.name; localStorage.setItem("kmr-portal", JSON.stringify(portal)); } catch (e) {}
+          const u = new URL(location.href); u.searchParams.set("co", to.slug); u.hash = ""; location.href = u.toString();
+        };
+        f.querySelector("#kmrPlant").append(sel);
+      }
     }
     if (demo) {
       // Sample-data mode: explore the sample only; real work (own files, import, export, new work) needs a subscription

@@ -141,6 +141,8 @@ const CFG = {
 };
 const qs = new URLSearchParams(location.search), DEMO = qs.has('demo');
 let slug = (qs.get('co') || '').toLowerCase();
+const ALL = qs.get('scope') === 'all';   // all-plants summary (read-only)
+let PLANTS = [];
 
 /* ======== helpers ======== */
 const $ = s => document.querySelector(s), esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -193,7 +195,8 @@ function calc(l) {
 
 /* ======== load / save ======== */
 async function load() {
-  const r = await api.rpc('kmr_sf_month', { p_slug: slug, p_month: M + '-01' });
+  const r = await api.rpc(ALL ? 'kmr_sf_month_all' : 'kmr_sf_month', { p_slug: slug, p_month: M + '-01' });
+  if (ALL) { $('#co').textContent = r.company + ' · all plants'; PLANTS = r.plants || []; }
   lines = r.lines; desp = {};
   r.despatch.forEach(d => { (desp[d.line_id] ||= {})[d.day] = +d.qty; });
   draft = []; render();
@@ -314,6 +317,7 @@ function renderDash() {
     </div>
     <div class="legend"><span><span class="chip g">On track</span> ≥ ${CFG.AMBER_BELOW * 100}% of expected by today</span><span><span class="chip a">Slipping</span> ${CFG.RED_BELOW * 100}–${CFG.AMBER_BELOW * 100}%</span><span><span class="chip r">Behind / Overdue</span></span><span><span class="chip b">Completed</span></span><span><span class="chip x">Not due yet</span></span><span><span class="chip u">Unplanned sale</span> despatched with plan qty 0</span>
       <span>· On track ${cnt('g')} · Slipping ${cnt('a')} · Behind/Overdue ${cnt('r')} · Completed ${cnt('b')}</span></div>
+    ${ALL ? plantTable(rows) : ''}
     ${ANALYSIS}
     <div class="grid2">
       <div class="box"><h3>Cumulative sales value — plan vs actual · ${monthLabel(M)}</h3>${chart}</div>
@@ -321,11 +325,19 @@ function renderDash() {
       <div class="box" style="grid-column:1/-1"><h3>Unplanned sales (despatched, not in the customer demand)</h3>
         ${unpRows ? `<table><thead><tr><th>Customer</th><th>Part</th><th class="n">Despatched qty</th><th class="n">Value</th></tr></thead><tbody>${unpRows}</tbody></table>` : '<p class="mut">No unplanned sales this month.</p>'}</div>
     </div>`;
-  const pills = `<div class="pills">${[['over', 'Overview & ABC'], ['loss', 'Sales loss analysis'], ['act', 'Action plan status']].map(([k, n]) => `<button class="pill ${dashView === k ? 'on' : ''}" data-dv="${k}">${n}${k === 'act' && actOverdue() ? ` <span class="chip r">${actOverdue()}</span>` : ''}</button>`).join('')}</div>`;
-  $('#dash').innerHTML = pills + (dashView === 'loss' ? lossDash() : dashView === 'act' ? actDash() : OVER);
+  const pills = ALL ? '' : `<div class="pills">${[['over', 'Overview & ABC'], ['loss', 'Sales loss analysis'], ['act', 'Action plan status']].map(([k, n]) => `<button class="pill ${dashView === k ? 'on' : ''}" data-dv="${k}">${n}${k === 'act' && actOverdue() ? ` <span class="chip r">${actOverdue()}</span>` : ''}</button>`).join('')}</div>`;
+  $('#dash').innerHTML = pills + (ALL ? OVER : dashView === 'loss' ? lossDash() : dashView === 'act' ? actDash() : OVER);
 }
 
 let dashView = 'over';
+/* All-plants summary: one row per plant */
+function plantTable(rows) {
+  const by = {}; rows.forEach(({ l, c }) => { const o = by[l.plant_code] ||= { d: 0, a: 0, p: 0, e: 0, rs: [] }; o.d += c.demand; o.a += c.done; o.p += c.pending; o.e += c.expected; o.rs.push({ l, c }); });
+  const body = Object.entries(by).map(([n, o]) => { const p = o.d ? Math.min(o.a / o.d, 1) : 0, r = o.e ? o.a / o.e : 1, cl = r >= CFG.AMBER_BELOW ? 'var(--green)' : r >= CFG.RED_BELOW ? 'var(--amber)' : 'var(--red)';
+    const pl = PLANTS.find(x => x.code === n);
+    return `<tr><td><a href="?co=${encodeURIComponent(pl ? pl.slug : slug)}#go=dash"><b>${esc(n)}</b></a><br><span class="mut">${esc(pl ? String(pl.name).split(' – ').pop() : '')}</span></td><td class="n">${fmt(o.d)}</td><td class="n">${fmt(o.a)}</td><td class="n">${fmt(o.p)}</td><td class="n">${moneySum(o.rs, r => r.c.pending * r.l.price)}</td><td style="width:28%"><div class="bar" style="--c:${cl}"><i style="width:${p * 100}%"></i></div></td><td class="n">${fmt(p * 100)}%</td></tr>`; }).join('');
+  return `<div class="box" style="margin:12px 0"><h3>Plant-wise summary · ${monthLabel(M)}</h3><table><thead><tr><th>Plant</th><th class="n">Demand</th><th class="n">Despatched</th><th class="n">Pending</th><th class="n">Pending value</th><th>Progress</th><th class="n">%</th></tr></thead><tbody>${body || '<tr><td colspan="7" class="mut">No plan this month in any plant.</td></tr>'}</tbody></table><p class="mut" style="margin:6px 0 0">Click a plant to open its own Sales Flow. The cards and charts below add up all plants.</p></div>`;
+}
 const schedText = l => l.sched_type === 'date' ? 'On ' + (l.sched_date || '—').split('-').reverse().join('-') : l.sched_type === 'daily' ? 'Daily (Mon–Sat)' : 'Every ' + ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][l.sched_weekday];
 
 function schedInputs(l, i, isDraft) {
@@ -747,10 +759,27 @@ async function findKey() {
 /* the customer's logo + name (set in KMR Console / Administration), same as every KMR app; also the tab icon */
 async function showBrand(){let b={name:(ctx&&ctx.company)||'',logo:null};try{const pp=JSON.parse(localStorage.getItem('kmr-portal')||'null');if(pp&&(DEMO||pp.slug===slug))b.logo=pp.logo||null}catch(e){}
 if(!DEMO&&sb&&slug){try{const{data}=await sb.rpc('kmr_portal_brand',{p_slug:slug});if(data&&data[0]){b.logo=data[0].logo_url||b.logo;b.name=data[0].name||b.name}}catch(e){}
-try{localStorage.setItem('kmr-portal',JSON.stringify({slug,name:b.name,logo:b.logo||null}))}catch(e){}}
+try{const old=JSON.parse(localStorage.getItem('kmr-portal')||'null')||{};localStorage.setItem('kmr-portal',JSON.stringify({...old,slug,name:b.name,logo:b.logo||null}))}catch(e){}}
 const el=document.getElementById('clogo');if(!el)return;const safe=String(b.logo||'').replace(/["<>]/g,'');
 el.innerHTML=safe?'<img src="'+safe+'" alt="">':String(b.name||'K').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase().replace(/[<>&]/g,'');el.hidden=false;
 if(safe){document.querySelectorAll('link[rel~="icon"]').forEach(l=>l.remove());const ic=document.createElement('link');ic.rel='icon';ic.href=safe;document.head.append(ic)}}
+
+/* ======== plant picker (customers with more than one plant) ======== */
+let PLANTS0 = [];
+function plantPicker() {
+  if (PLANTS0.length < 2) return;
+  const sel = document.createElement('select'); sel.title = 'Plant'; sel.style.cssText = 'padding:5px 8px;border-radius:8px;font-weight:600';
+  const opts = PLANTS0.map(x => `<option value="${esc(x.slug)}" ${!ALL && x.slug === slug ? 'selected' : ''}>${esc(x.is_main ? 'Main' : x.plant_code)} · ${esc(String(x.name).split(' – ').pop())}</option>`);
+  opts.push(`<option value="__all" ${ALL ? 'selected' : ''}>All plants · summary</option>`);
+  sel.innerHTML = opts.join('');
+  sel.onchange = () => {
+    const u = new URL(location.href); u.hash = '';
+    if (sel.value === '__all') { u.searchParams.set('scope', 'all'); } else { u.searchParams.delete('scope'); u.searchParams.set('co', sel.value); }
+    try { const pp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); const to = PLANTS0.find(x => x.slug === sel.value); if (pp && to) { pp.slug = to.slug; pp.name = to.name; localStorage.setItem('kmr-portal', JSON.stringify(pp)); } } catch (e) {}
+    location.href = u.toString();
+  };
+  document.querySelector('header .sp').after(sel);
+}
 
 /* ======== start ======== */
 async function boot() {
@@ -773,13 +802,16 @@ async function boot() {
         if (!slug) throw new Error('No Sales Flow access found for this login. Ask your administrator to give you access (Administration › Users & access).');
       }
     }
-    ctx = await api.rpc('kmr_sf_context', { p_slug: slug });
+    if (!DEMO) { try { PLANTS0 = await api.rpc('kmr_plants', { p_slug: slug }) || []; } catch (e) { PLANTS0 = []; } }   // empty until 0061_plants.sql is run
+    ctx = ALL ? { role: 'viewer', company: '' } : await api.rpc('kmr_sf_context', { p_slug: slug });
     if (!ctx) throw new Error('You do not have access to Sales Flow, or your company’s subscription is not active. Ask your administrator (Administration › Users & access).');
     canEdit = ['admin', 'editor'].includes(ctx.role);
     $('#co').textContent = ctx.company; $('#role').textContent = ctx.role;
-    if (!DEMO && window.KMRLock) await KMRLock.init(sb, slug, 'sales', { daily: 'sales.daily-despatch-abc-analysis', loss: 'sales.loss-reasons-action-plans', act: 'sales.loss-reasons-action-plans' }, { 'sales.daily-despatch-abc-analysis': 'Daily despatch & ABC analysis', 'sales.loss-reasons-action-plans': 'Loss reasons & action plans' });
+    plantPicker();
+    if (ALL) document.querySelectorAll('.tabs .tab:not([data-t=dash])').forEach(t => t.hidden = true);
+    if (!DEMO && !ALL && window.KMRLock) await KMRLock.init(sb, slug, 'sales', { daily: 'sales.daily-despatch-abc-analysis', loss: 'sales.loss-reasons-action-plans', act: 'sales.loss-reasons-action-plans' }, { 'sales.daily-despatch-abc-analysis': 'Daily despatch & ABC analysis', 'sales.loss-reasons-action-plans': 'Loss reasons & action plans' });
     showBrand();   // logo + company name top-left, tab icon, and the shared footer's ← KMR Apps target
-    await load(); try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
+    await load(); if (ALL) return; try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
     const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (['dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
   } catch (err) { say(err.message); $('#co').textContent = ''; }
 }
@@ -807,6 +839,7 @@ function demoApi() {
   return { async rpc(fn, a) {
     if (fn === 'kmr_sf_context') return { role: 'admin', company: 'Demo Engineering (sample data)' };
     if (fn === 'kmr_sf_parts') return parts;
+    if (fn === 'kmr_sf_month_all') { const A = JSON.parse(JSON.stringify(L)).map(x => ({ ...x, plant_code: 'P1', plant_slug: 'demo-p1' })), B = JSON.parse(JSON.stringify(L)).map((x, i) => ({ ...x, id: x.id + 'b', plant_code: 'P2', plant_slug: 'demo-p2', demand_qty: Math.round(x.demand_qty * (0.6 + i % 3 * 0.2)) })); return { company: 'Demo Engineering', plants: [{ slug: 'demo-p1', code: 'P1', name: 'Demo – Plant-1' }, { slug: 'demo-p2', code: 'P2', name: 'Demo – Plant-2' }], lines: A.concat(B), despatch: JSON.parse(JSON.stringify(D)).concat(JSON.parse(JSON.stringify(D)).map(x => ({ ...x, line_id: x.line_id + 'b', qty: Math.round(x.qty * 0.7) }))) }; }
     if (fn === 'kmr_sf_month') return { lines: JSON.parse(JSON.stringify(L)), despatch: JSON.parse(JSON.stringify(D)) };
     if (fn === 'kmr_sf_save_lines') { a.p.forEach(r => { const i = L.findIndex(x => x.id === r.id); if (i >= 0) L[i] = { ...L[i], ...r }; else L.push({ ...r, id: 'n' + Math.random() }); }); return a.p.length; }
     if (fn === 'kmr_sf_save_loss') { a.p_rows.forEach(r => { const x = L.find(y => y.id === r.id); if (x) { x.loss_reason = r.loss_reason || null; x.loss_other = r.loss_reason === 'Others' ? r.loss_other : null; } }); return a.p_rows.length; }
