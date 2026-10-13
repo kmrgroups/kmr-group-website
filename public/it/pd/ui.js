@@ -179,7 +179,7 @@ V.overview = (M)=>{
         <tr><td>Surface treatment</td><td>${plan.notes.surf?esc(plan.notes.surfType+(plan.notes.coat?" "+plan.notes.coat:"")):"Not required"}</td></tr>
         <tr><td>Process route</td><td style="text-align:left">${plan.ops.map(o=>o.opNo).join(" → ")}</td></tr></table></div>
       <div class="box"><h3>Source</h3><table class="stats">
-        <tr><td>Received from</td><td>${P.bi_report_id?"Balloon Inspector":esc(src.fileName?"File "+src.fileName:"Manual / sample")}</td></tr>
+        <tr><td>Received from</td><td>${P.bi_report_id?"Balloon Inspector":esc(src.manual?"Entered manually":src.fileName?"File "+src.fileName:"Manual / sample")}</td></tr>
         <tr><td>Drawing file</td><td>${esc(src.fileName||"—")}</td></tr>
         <tr><td>Generated</td><td>${esc((P.doc.generatedAt||"").replace("T"," ").slice(0,16))}</td></tr>
         <tr><td>Documents</td><td>${D.DOCS.length}</td></tr></table>
@@ -198,8 +198,9 @@ V.chars = (M)=>{
   const S=A().S, plan=S.plan;
   const opOpts=[["","—"]].concat(plan.ops.map(o=>[String(o.opNo),`${o.opNo} ${o.name}`]));
   const gOpts=[["","—"]].concat(plan.gauges.map(g=>[g.id,`${g.id} ${g.name} ${g.range||""}`]));
-  M.innerHTML = `<div class="toolbar"><h2>Characteristics (from ballooning)</h2><span class="grow"></span><button class="btn small primary" id="chApply" ${ro()?"disabled":""}>Update documents</button></div>
-  <p class="hintline" style="margin:-4px 0 10px">Balloon numbers, specifications and classes come from Balloon Inspector. Change the operation, gauge or class here, then <b>Update documents</b>.</p>
+  const manual=!!(S.prj&&S.prj.source&&S.prj.source.manual);
+  M.innerHTML = `<div class="toolbar"><h2>Characteristics ${manual?"(entered manually)":"(from ballooning)"}</h2><span class="grow"></span><button class="btn small primary" id="chApply" ${ro()?"disabled":""}>Update documents</button></div>
+  <p class="hintline" style="margin:-4px 0 10px">${manual?"These characteristics were typed in when the project was created. Add rows or edit any cell, set the operation, gauge or class, then":"Balloon numbers, specifications and classes come from Balloon Inspector. Change the operation, gauge or class here, then"} <b>Update documents</b>.</p>
   <div id="chGrid"></div>`;
   grid($("chGrid"), { rows:plan.chars, cols:[
     {k:"no",label:"Balloon",w:4,type:"num"},{k:"type",label:"Type",w:7,type:"sel",opts:["Linear","Diameter","Radius","Angle","Chamfer","Thread","GD&T","Surface finish","Material","Note"]},

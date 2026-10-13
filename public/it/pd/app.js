@@ -218,6 +218,7 @@ function bindTop(){
   menu("bNew","newMenu",()=>[
     {id:"bi",label:"From Balloon Inspector",sub:CLOUD?"Pick a saved ballooning report":"Needs the cloud version",run:biDialog,disabled:!CLOUD||!S.canEdit},
     {id:"csv",label:"Import ballooning file",sub:"Balloon Inspector CSV or JSON export",run:()=>$("fileCSV").click(),disabled:!S.canEdit},
+    {id:"manual",label:"Create manually",sub:"Type the part details and characteristics – no drawing needed",run:manualDialog,disabled:!S.canEdit},
     ...(CLOUD?[]:[{id:"sample",label:"Try the sample drawing",sub:"Drive flange DF-2040 – 24 characteristics",run:()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null),disabled:!S.canEdit}]),
     "-",{id:"open",label:"Open Balloon Inspector",sub:"Balloon a new drawing, then Send to Process Documents",run:()=>window.open(CFG.balloonUrl||"balloon.html","_blank")}]);
   menu("bExport","expMenu",()=>{ const d=D.DOCS.find(x=>x.id===S.view); return [
@@ -242,12 +243,55 @@ function bindTop(){
    ====================================================================== */
 function welcomeHTML(){
   return `<div class="empty"><div class="card"><h2>Create process documents from a ballooned drawing</h2>
-    <p>Send a ballooned drawing from Balloon Inspector, or import its CSV. Everything else is automatic: process route, machines, tools, consumables, gauges and all ${D.DOCS.length} documents. You can edit any cell on screen and export to PDF or Excel.</p>
-    <div class="row">${CLOUD?`<button class="btn primary" id="wBI">From Balloon Inspector</button>`:""}<button class="btn" id="wCSV">Import CSV / JSON</button>${CLOUD?"":`<button class="btn primary" id="wSample">Try the sample drawing</button>`}<button class="btn" id="wList">Open a project</button></div>
+    <p>Send a ballooned drawing from Balloon Inspector, import its CSV, or type the characteristics in yourself with <b>Create manually</b>. Everything else is automatic: process route, machines, tools, consumables, gauges and all ${D.DOCS.length} documents. You can edit any cell on screen and export to PDF or Excel.</p>
+    <div class="row">${CLOUD?`<button class="btn primary" id="wBI">From Balloon Inspector</button>`:""}<button class="btn" id="wCSV">Import CSV / JSON</button><button class="btn" id="wManual">Create manually</button>${CLOUD?"":`<button class="btn primary" id="wSample">Try the sample drawing</button>`}<button class="btn" id="wList">Open a project</button></div>
     <div class="steps3"><div><b>1 · Balloon</b>Balloon Inspector reads the drawing and lists every characteristic with its tolerance, SC/CC class and gauge.</div><div><b>2 · Automate</b>This platform selects the process, machines, tools, consumables and gauges, then generates every document.</div><div><b>3 · Review & export</b>Edit on screen, approve, and export PDF / Excel with your logo.</div></div></div></div>`;
 }
-function bindWelcome(){ if($("wBI")) $("wBI").onclick=biDialog; $("wCSV").onclick=()=>$("fileCSV").click(); if($("wSample")) $("wSample").onclick=()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null); $("wList").onclick=projectsDialog;
-  [$("wBI"),$("wCSV"),$("wSample")].forEach(b=>{ if(b&&!S.canEdit) b.disabled=true; }); }
+/* ---- Create a project by typing the part details and characteristics (no drawing / Balloon Inspector needed) ---- */
+const MAN_TYPES=["Linear","Diameter","Radius","Angle","Chamfer","Thread","GD&T","Surface finish","Material","Note"];
+function manualDialog(){
+  if(!S.canEdit){ toast("Viewers can't create projects."); return; }
+  const blank=()=>({type:"Diameter",text:"",nominal:"",upper:"",lower:"",cls:"",instr:""});
+  let rows=[blank(),blank(),blank()];
+  const fi="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--field);color:inherit;font:inherit;min-width:0";
+  const ci="width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--field);color:inherit;font:inherit;min-width:0";
+  const hdr=[["mnPart","Part no. *","partNo",""],["mnName","Part name","partName",""],["mnDwg","Drawing no.","drawingNo",""],["mnRev","Revision","rev",""],["mnCust","Customer","customer",""],["mnMat","Material","material",""]];
+  const body=`<p class="hintline" style="margin-top:0">Enter the part and its characteristics. The process route, machines, tools, gauges and all documents are generated automatically, exactly as from a ballooned drawing. You can add or change characteristics later on the Characteristics screen.</p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px">${hdr.map(h=>`<label class="fld">${h[1]}<input id="${h[0]}" style="${fi}" autocomplete="off"></label>`).join("")}</div>
+    <div style="overflow:auto;max-height:46vh"><table class="plist" style="min-width:760px"><thead><tr><th>#</th><th>Type</th><th>Specification (as on drawing)</th><th>Nominal</th><th>Upper tol.</th><th>Lower tol.</th><th>Class</th><th>Instrument</th><th></th></tr></thead><tbody id="mnT"></tbody></table></div>
+    <div class="addrow"><button class="btn small" id="mnAdd">+ Add row</button><span class="hintline">Tolerances as numbers: upper “+0.03”, lower “-0.02” (or 0). Leave Instrument empty to pick it automatically.</span></div>`;
+  dialog("Create manually",body,`<button class="btn" id="mnCancel">Cancel</button><button class="btn primary" id="mnGo">Create documents</button>`,true);
+  const draw=()=>{ $("mnT").innerHTML=rows.map((r,i)=>`<tr data-r="${i}"><td>${i+1}</td>
+    <td><select data-k="type" style="${ci}">${MAN_TYPES.map(t=>`<option${t===r.type?" selected":""}>${esc(t)}</option>`).join("")}</select></td>
+    <td><input data-k="text" value="${esc(r.text)}" placeholder="e.g. Ø62 H7" style="${ci};min-width:150px" autocomplete="off"></td>
+    <td><input data-k="nominal" value="${esc(r.nominal)}" inputmode="decimal" style="${ci};width:72px" autocomplete="off"></td>
+    <td><input data-k="upper" value="${esc(r.upper)}" inputmode="decimal" style="${ci};width:72px" autocomplete="off"></td>
+    <td><input data-k="lower" value="${esc(r.lower)}" inputmode="decimal" style="${ci};width:72px" autocomplete="off"></td>
+    <td><select data-k="cls" style="${ci}">${["","SC","CC","KC"].map(c=>`<option value="${c}"${c===r.cls?" selected":""}>${c||"—"}</option>`).join("")}</select></td>
+    <td><input data-k="instr" value="${esc(r.instr)}" placeholder="auto" style="${ci};min-width:110px" autocomplete="off"></td>
+    <td><button class="btn small" data-del title="Remove this row" aria-label="Remove row ${i+1}">✕</button></td></tr>`).join(""); };
+  draw();
+  const T=$("mnT");
+  T.oninput=T.onchange=e=>{ const el=e.target.closest("[data-k]"); if(!el) return; const tr=el.closest("tr"); rows[+tr.dataset.r][el.dataset.k]=el.value; };
+  T.onclick=e=>{ const b=e.target.closest("[data-del]"); if(!b) return; rows.splice(+b.closest("tr").dataset.r,1); if(!rows.length) rows.push(blank()); draw(); };
+  $("mnAdd").onclick=()=>{ rows.push(Object.assign(blank(),{type:(rows[rows.length-1]||{}).type||"Diameter"})); draw(); const last=T.querySelector("tr:last-child input[data-k=text]"); if(last) last.focus(); };
+  $("mnCancel").onclick=closeDialog;
+  $("mnGo").onclick=()=>{
+    const hv=k=>($(k).value||"").trim();
+    if(!hv("mnPart")){ toast("Enter the part number.",5000); $("mnPart").focus(); return; }
+    const used=rows.filter(r=>r.text.trim()||String(r.nominal).trim()!=="");
+    if(!used.length){ toast("Add at least one characteristic (specification or nominal).",6000); return; }
+    const toNum=(v,what,n)=>{ const s=String(v).trim().replace(",","."); if(s==="") return null; if(isNaN(+s)){ throw new Error(`Row ${n}: ${what} must be a number (you typed “${v}”).`); } return +s; };
+    let items; try{
+      items=used.map((r,k)=>({no:k+1,sheet:0,type:r.type,text:r.text.trim(),nominal:toNum(r.nominal,"Nominal",k+1),upper:toNum(r.upper,"Upper tol.",k+1),lower:toNum(r.lower,"Lower tol.",k+1),unit:"mm",cls:r.cls,instr:r.instr.trim(),autoInstr:!r.instr.trim()}));
+    }catch(err){ toast(err.message,7000); return; }
+    const src={v:1,manual:true,fileName:"",set:{gen:"m"},header:{partNo:hv("mnPart"),partName:hv("mnName"),drawingNo:hv("mnDwg"),rev:hv("mnRev"),customer:hv("mnCust"),material:hv("mnMat")},items};
+    closeDialog(); newFromSource(src,null);
+  };
+  $("mnPart").focus();
+}
+function bindWelcome(){ if($("wBI")) $("wBI").onclick=biDialog; $("wCSV").onclick=()=>$("fileCSV").click(); $("wManual").onclick=manualDialog; if($("wSample")) $("wSample").onclick=()=>newFromSource(JSON.parse(JSON.stringify(window.PD_SAMPLE)),null); $("wList").onclick=projectsDialog;
+  [$("wBI"),$("wCSV"),$("wManual"),$("wSample")].forEach(b=>{ if(b&&!S.canEdit) b.disabled=true; }); }
 
 async function projectsDialog(){
   const v=dialog("Projects",`<input id="pjQ" placeholder="Search part no., name, customer…" style="width:100%;border:1px solid var(--line);border-radius:8px;padding:9px 11px;margin-bottom:10px;background:var(--field)"><div id="pjL" style="max-height:60vh;overflow:auto">Loading…</div>`,"",true);
@@ -255,7 +299,7 @@ async function projectsDialog(){
   if(CLOUD){ const {data,error}=await sb.from("pd_projects").select("id,part_no,part_name,rev,customer,status,updated_at,bi_report_id").eq("org_id",S.org.id).order("updated_at",{ascending:false}).limit(500); if(error){ $("pjL").textContent=error.message; return; } rows=data||[]; }
   else rows=(LS.get("pd_projects",[])).map(p=>({id:p.id,part_no:p.part_no,part_name:p.part_name,rev:p.rev,customer:p.customer,status:p.status,updated_at:p.updated_at,bi_report_id:p.bi_report_id}));
   const draw=()=>{ const q=($("pjQ").value||"").toLowerCase(); const r=rows.filter(x=>[x.part_no,x.part_name,x.customer].join(" ").toLowerCase().includes(q));
-    $("pjL").innerHTML = r.length?`<table class="plist"><thead><tr><th>Part no.</th><th>Part name</th><th>Rev</th><th>Customer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${r.map(x=>`<tr data-open="${x.id}"><td><a class="rowlink" href="${projectHref(x.id)}"><b>${esc(x.part_no||"—")}</b></a></td><td>${esc(x.part_name||"")}</td><td>${esc(x.rev||"")}</td><td>${esc(x.customer||"")}</td><td><span class="status ${x.status}">${esc(x.status)}</span></td><td>${esc(String(x.updated_at||"").slice(0,16).replace("T"," "))}</td><td>${S.role==="admin"?`<button class="btn small danger" data-del="${x.id}">Delete</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<p class="hintline">No projects yet. Use <b>New</b> to create one from Balloon Inspector data.</p>`; };
+    $("pjL").innerHTML = r.length?`<table class="plist"><thead><tr><th>Part no.</th><th>Part name</th><th>Rev</th><th>Customer</th><th>Status</th><th>Updated</th><th></th></tr></thead><tbody>${r.map(x=>`<tr data-open="${x.id}"><td><a class="rowlink" href="${projectHref(x.id)}"><b>${esc(x.part_no||"—")}</b></a></td><td>${esc(x.part_name||"")}</td><td>${esc(x.rev||"")}</td><td>${esc(x.customer||"")}</td><td><span class="status ${x.status}">${esc(x.status)}</span></td><td>${esc(String(x.updated_at||"").slice(0,16).replace("T"," "))}</td><td>${S.role==="admin"?`<button class="btn small danger" data-del="${x.id}">Delete</button>`:""}</td></tr>`).join("")}</tbody></table>`:`<p class="hintline">No projects yet. Use <b>New</b> to create one from Balloon Inspector data, or type the characteristics in with <b>Create manually</b>.</p>`; };
   draw(); $("pjQ").oninput=draw; $("pjQ").focus();
   $("pjL").onclick=async e=>{ const d=e.target.closest("[data-del]"); if(d){ e.stopPropagation(); if(!confirm("Delete this project and all its documents?")) return; await deleteProject(d.dataset.del); rows=rows.filter(x=>x.id!==d.dataset.del); draw(); return; }
     const t=e.target.closest("[data-open]"); if(t){ if(e.target.closest("a")){ if(e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey) return; e.preventDefault(); } closeDialog(); openProject(t.dataset.open); } };
