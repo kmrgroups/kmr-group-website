@@ -125,7 +125,7 @@
     $("#root").innerHTML = `<div class="app">
       <aside class="side">
         <a class="who" href="${viewHref("")}" title="Your apps">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></a>
-        ${plants.length > 1 ? `<label style="display:block;padding:6px 10px"><small style="display:block;opacity:.7;margin-bottom:3px">Plant</small><select id="plantSel" style="width:100%;padding:6px;border-radius:8px">${plants.map((x) => `<option value="${esc(x.slug)}"${x.slug === SLUG ? " selected" : ""}>${esc(x.is_main ? "Main · " + x.name : x.plant_code + " · " + x.name.split(" – ").pop())}</option>`).join("")}</select></label>` : ""}
+        ${plants.length > 1 ? `<label style="display:block;padding:6px 10px"><small style="display:block;opacity:.7;margin-bottom:3px">Plant</small><select id="plantSel" style="width:100%;padding:6px;border-radius:8px">${plants.map((x) => `<option value="${esc(x.slug)}"${x.slug === SLUG ? " selected" : ""}>${esc(x.is_main ? "Main · " + x.name : x.plant_code + " · " + x.name.split(" – ").pop())}</option>`).join("")}${plants[0].is_all ? `<option value="__all"${view === "plants" ? " selected" : ""}>★ All plants · dashboard</option>` : ""}</select></label>` : ""}
         <h4>Your apps</h4>${mine.map((r) => `<a href="${appHref(r.product_code)}" data-open="${r.product_code}"><i style="background:${META[r.product_code]?.color || "#999"}"></i>${esc(r.product_name)}${r.ok ? "" : '<span class="lock">Paused</span>'}</a>`).join("") || `<small style="padding:0 10px;opacity:.6">No apps yet</small>`}
         ${ops || isAdmin ? `<h4>Masters</h4>` : ""}${ops ? `<a href="${viewHref("ops")}" data-ops="1"><i style="background:#0EA5E9"></i>Operations Master</a>` : ""}${isAdmin ? `<a href="${viewHref("data")}" data-datam="1"><i style="background:#0EA5E9"></i>Data Master</a><a href="${viewHref("grand")}" data-grand="1"><i style="background:#B45309"></i>Grand Master</a>` : ""}
         ${isAdmin ? `<h4>Administration</h4><a href="${viewHref("company")}" data-admin="company"><i style="background:#F3C55A"></i>Company details &amp; logo</a><a href="${viewHref("users")}" data-admin="users"><i style="background:#F3C55A"></i>Users &amp; access</a><a href="${viewHref("invoices")}" data-admin="invoices"><i style="background:#F3C55A"></i>Invoices &amp; payments</a>` : ""}
@@ -146,7 +146,7 @@
     onLink("[data-grand]", () => grandView());
     onLink("[data-ops]", () => opsView());
     onLink(".side .who", () => appView());
-    if ($("#plantSel")) $("#plantSel").onchange = (e) => { location.href = "/it/app/" + encodeURIComponent(e.target.value); };
+    if ($("#plantSel")) $("#plantSel").onchange = (e) => { if (e.target.value === "__all") plantsView(); else location.href = "/it/app/" + encodeURIComponent(e.target.value); };
     document.querySelectorAll("[data-soon]").forEach((b) => b.addEventListener("click", () => dialog(`${b.dataset.name} — coming soon`, "This module of the KMR Intelligent Digital Manufacturing platform is on its way. Register your interest and we'll invite you to the pilot.", `<a class="btn" href="${buyUrl(b.dataset.soon)}">Register interest</a>`)));
     $("#out").onclick = async () => { await sb.auth.signOut(); try { localStorage.removeItem("kmr-portal"); } catch (e) {} loginView(); };
     $("#pw").onclick = () => {
@@ -177,6 +177,22 @@
   let SAMPLE_OK = true;
   const ctxOf = () => ({ sb, slug: SLUG, main: document.querySelector(".main"), dialog, base: BASE, setView, sampleOk: SAMPLE_OK });
   function dataView() { if (!window.KMR_DATA) return; setView("data"); return window.KMR_DATA.overview(ctxOf()); }
+  /* All plants on one screen: each plant's apps and numbers side by side */
+  async function plantsView() {
+    setView("plants");
+    const main = document.querySelector(".main");
+    main.innerHTML = `<h1>All plants</h1><p class="sub">${esc(brand.name.split(" – ")[0])} · every plant at a glance. Pick a plant in the menu to work in it.</p><p class="sub">Loading…</p>`;
+    const res = await Promise.all(plants.map(async (x) => {
+      const [pr, st] = await Promise.all([sb.rpc("kmr_portal", { p_slug: x.slug }), sb.rpc("kmr_portal_stats", { p_slug: x.slug })]);
+      return { x, rows: (pr.data || []).filter((r) => r.purchased), stats: (st && st.data) || {} };
+    }));
+    const salesSlug = (plants.find((x) => x.is_main) || plants[0]).slug;
+    main.innerHTML = `<h1>All plants</h1><p class="sub">${esc(brand.name.split(" – ")[0])} · every plant at a glance. Pick a plant in the menu to work in it.</p>
+      <p><a class="btn" href="/it/sales.html?kmr=1&co=${encodeURIComponent(salesSlug)}&scope=all">Sales Flow · all-plants dashboard</a></p>
+      <div class="cards">${res.map(({ x, rows: rs, stats: stt }) => `<div class="card" style="--c:#0B2A6F"><h3>${esc(x.is_main ? "Main" : x.plant_code)} · ${esc(x.name.split(" – ").pop())}</h3>
+        ${rs.length ? rs.map((r) => `<p style="margin:6px 0"><b>${esc(r.product_name)}</b> <span class="pill ${r.ok ? "ok" : "warn"}">${esc(r.status)}</span><br><small>${Object.entries(stt[r.product_code] || {}).map(([k, v]) => `${esc(k)}: <b>${esc(v)}</b>`).join(" · ") || "—"}</small></p>`).join("") : `<p><small>No apps switched on for this plant yet.</small></p>`}
+        <a class="btn ghost" href="/it/app/${encodeURIComponent(x.slug)}">Open ${esc(x.is_main ? "main" : x.plant_code)}</a></div>`).join("")}</div>`;
+  }
   function grandView() { if (!window.KMR_GRAND) return; setView("grand"); return window.KMR_GRAND.overview(ctxOf()); }
   async function opsView(kind) {
     if (!window.KMR_OPS || !ops) return;
@@ -326,6 +342,7 @@
     else if ((HASH === "users" || HASH === "admin") && isAdmin) usersView();
     else if (HASH === "company" && isAdmin) companyView();
     else if (HASH === "invoices" && isAdmin) invoicesView();
+    else if (HASH === "plants" && plants.length > 1 && plants[0].is_all) plantsView();
     else if (HASH === "grand" && isAdmin) grandView();
     else if (HASH === "data" && isAdmin) dataView();
     else if (/^ops(\/|$)/.test(HASH) && ops) opsView(HASH.split("/")[1] || "");
