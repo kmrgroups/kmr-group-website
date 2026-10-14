@@ -66,7 +66,7 @@
 
   /* ================= meeting list ================= */
   function meetTable(rows) {
-    if (!rows.length) return '<p class="mut">No meetings yet.</p>';
+    if (!rows.length) return '<div class="empty"><b>No meetings yet.</b><br>Press <b>+ New meeting</b> to start. You will type or speak the discussion and the app arranges it as 5W1H points.</div>';
     return `<table><thead><tr><th>Meeting no.</th><th>Date</th><th>Subject</th><th>Type</th><th>Chair</th><th class="n">Points</th><th class="n">Open</th><th>Status</th></tr></thead><tbody>${rows.map((m) =>
       `<tr><td><a href="#go=meet&m=${m.id}" data-open="${m.id}"><b>${esc(m.meeting_no)}</b></a>${m.sample ? ' <span class="chip x">sample</span>' : ""}</td><td>${dd(m.meeting_date)}</td><td>${esc(m.title)}</td><td>${esc(m.mtype || "")}</td><td>${esc(m.chairperson || "")}</td><td class="n">${m.points || 0}</td><td class="n">${m.open_points || 0}</td><td><span class="chip ${m.status === "closed" ? "g" : m.status === "void" ? "x" : "a"}">${m.status === "open" ? "In progress" : m.status === "closed" ? "Finalised" : "Void"}</span></td></tr>`).join("")}</tbody></table>`;
   }
@@ -91,33 +91,39 @@
 
   /* ================= meeting editor ================= */
   async function openMeeting(id) {
-    if (!S.det || S.det.meeting.id !== id) { S.det = await call("kmr_mom_get", { p_id: id }); S.q = lsGet(id); }
+    if (!S.det || S.det.meeting.id !== id) { S.det = await call("kmr_mom_get", { p_id: id }); S.q = lsGet(id); const D0 = S.det; S.step = D0.meeting.status !== "open" || D0.points.length || D0.segments.length ? 3 : 1; }
     drawEditor();
   }
   const lsKey = (id) => "mom_q_" + id; function lsGet(id) { try { return JSON.parse(localStorage.getItem(lsKey(id)) || "[]"); } catch (e) { return []; } } function lsSet(id, a) { try { if (a.length) localStorage.setItem(lsKey(id), JSON.stringify(a)); else localStorage.removeItem(lsKey(id)); } catch (e) { /* ignore */ } }
   function drawEditor() {
     const D = S.det, m = D.meeting, w = canWrite(), ro = w ? "" : " disabled", people = S.load.people || [];
     const att = m.attendees || [];
+const step = S.step || 3, N = [[1, "Meeting info", "who, when, where"], [2, "Discuss", "speak or type"], [3, "Points", D.points.length + " recorded"]], GUIDE = { 1: "Fill in the basics and tick who attended. Then press “Save and continue”.", 2: "Capture the discussion: press the microphone and speak, or type a point. You can use both.", 3: "Check the points. Mark actions Done as they finish. When everything is right, press “Finalise minutes”." };
+    const bar = `<div class="steps noprint">${N.map(([n, t, sm]) => `<button class="stp${step === n ? " on" : ""}" data-step="${n}"><b>${n}</b><span>${t}<small>${sm}</small></span></button>`).join("")}</div><p class="guide noprint" id="guide">${GUIDE[step]}</p>`;
+    const sp = (n, h) => `<div data-sp="${n}"${step === n ? "" : ' class="hide"'}>${h}</div>`;
     $("#meet").innerHTML = `<div class="row noprint"><a class="btn o s" href="#go=meet" id="back">← All meetings</a><b style="font-size:17px">${esc(m.meeting_no)}</b><span class="chip ${m.status === "closed" ? "g" : m.status === "void" ? "x" : "a"}">${m.status === "open" ? "In progress" : m.status === "closed" ? "Finalised" : "Void"}</span><span class="grow"></span>
-      <button class="btn o" id="prn">Print minutes</button>${ed() && m.status === "open" ? '<button class="btn" id="fin">Finalise minutes</button>' : ""}${ed() && m.status === "closed" ? '<button class="btn" id="reo">✎ Edit minutes</button>' : ""}${QP.ctx && QP.ctx.role === "admin" && m.status !== "void" ? '<button class="btn o" id="vd">Void</button>' : ""}${QP.ctx && QP.ctx.role === "admin" ? '<button class="btn o" id="del" style="color:#b91c1c;border-color:#b91c1c">Delete</button>' : ""}</div>
-    ${m.status === "closed" ? '<div class="msg ok">These minutes are finalised. Points are locked; action status and remarks can still be updated.</div>' : ""}
-    <div class="card"><h3>Meeting details</h3><div class="frm">
-      <div style="grid-column:1/-1"><label>Subject / title *</label><input id="h_title" value="${esc(m.title)}"${ro}></div>
-      <div><label>Type</label><select id="h_type" data-add${ro}>${opts(TYPES.includes(m.mtype) || !m.mtype ? TYPES : [...TYPES, m.mtype], m.mtype)}</select></div>
+      <button class="btn o" id="prn">🖨 Print</button>${ed() && m.status === "open" ? '<button class="btn" id="fin">✔ Finalise minutes</button>' : ""}${ed() && m.status === "closed" ? '<button class="btn" id="reo">✎ Edit minutes</button>' : ""}${QP.ctx && QP.ctx.role === "admin" ? `<details class="mm"><summary class="btn o">⋯</summary><div>${m.status !== "void" ? '<button class="btn o" id="vd">Void this meeting</button>' : ""}<button class="btn o" id="del" style="color:#b91c1c;border-color:#b91c1c">Delete permanently</button></div></details>` : ""}</div>
+    ${m.status === "closed" ? '<div class="msg ok">These minutes are finalised and locked. You can still update the status, target date and remarks of each point. To change anything else press “Edit minutes”.</div>' : ""}
+${bar}
+    ${sp(1, `    <div class="card"><h3>Meeting info</h3><div class="frm">
+      <div style="grid-column:1/-1"><label>Meeting subject *</label><input id="h_title" value="${esc(m.title)}"${ro}></div>
       <div><label>Date *</label><input id="h_date" type="date" value="${esc(String(m.meeting_date || "").slice(0, 10))}"${ro}></div>
       <div><label>Start</label><input id="h_st" type="time" value="${tm(m.start_time)}"${ro}></div><div><label>End</label><input id="h_en" type="time" value="${tm(m.end_time)}"${ro}></div>
-      <div><label>Venue / link</label><input id="h_venue" value="${esc(m.venue || "")}"${ro}></div>
+      <div><label>Place / online link</label><input id="h_venue" value="${esc(m.venue || "")}"${ro}></div>
       <div><label>Chairperson</label><input id="h_chair" list="h_dl" value="${esc(m.chairperson || "")}"${ro}></div><div><label>Minute-taker</label><input id="h_scribe" list="h_dl" value="${esc(m.scribe || "")}"${ro}></div>
-      <div><label>Main language</label><select id="h_lang"${ro}>${langOpts(m.language || "en-IN")}</select></div>
+      <div><label>Language of the meeting</label><select id="h_lang"${ro}>${langOpts(m.language || "en-IN")}</select></div>
+</div>
+      <details class="opt"><summary>More details (optional): meeting type, agenda, previous minutes, next meeting, who gets the minutes</summary><div class="frm" style="margin-top:8px">      <div><label>Type</label><select id="h_type" data-add${ro}>${opts(TYPES.includes(m.mtype) || !m.mtype ? TYPES : [...TYPES, m.mtype], m.mtype)}</select></div>
       <div><label>Previous minutes (ref.)</label><input id="h_prev" value="${esc(m.prev_ref || "")}" placeholder="e.g. MOM-2610-0003"${ro}></div><div><label>Next meeting</label><input id="h_next" type="date" value="${esc(String(m.next_date || "").slice(0, 10))}"${ro}></div>
       <div style="grid-column:1/-1"><label>Agenda</label><textarea id="h_agenda" rows="2"${ro}>${esc(m.agenda || "")}</textarea></div>
-      <div style="grid-column:1/-1"><label>Distribution (who receives the minutes)</label><input id="h_dist" value="${esc(m.distribution || "")}" placeholder="e.g. All HODs, Customer quality, Purchase"${ro}></div></div><datalist id="h_dl">${people.map((p) => `<option value="${esc(p.name)}">`).join("")}</datalist>
-      <h3 style="margin-top:14px">Attendees</h3><table id="atn"><thead><tr><th>Name</th><th>Function / role</th><th>E-mail</th><th>Present</th><th></th></tr></thead><tbody>${att.map((a, i) => attRow(a, i, w)).join("")}</tbody></table>
+      <div style="grid-column:1/-1"><label>Distribution (who receives the minutes)</label><input id="h_dist" value="${esc(m.distribution || "")}" placeholder="e.g. All HODs, Customer quality, Purchase"${ro}></div></div></details><datalist id="h_dl">${people.map((p) => `<option value="${esc(p.name)}">`).join("")}</datalist>
+      <h3 style="margin-top:14px">Who attended</h3><table id="atn"><thead><tr><th>Name</th><th>Function / role</th><th>E-mail</th><th>Present</th><th></th></tr></thead><tbody>${att.map((a, i) => attRow(a, i, w)).join("")}</tbody></table>
       ${w ? `<div class="row" style="margin-top:8px"><button class="btn o s" id="atAdd">+ Add attendee</button><select id="atPick" data-multi style="max-width:320px"><option value="">Add from the CFT team…</option>${people.map((p) => `<option value="${esc(p.code)}">${esc(p.name)}${p.role ? " · " + esc(p.role) : ""}</option>`).join("")}</select><button class="btn o s" id="atPickGo">Add selected</button></div>` : ""}
-      ${w ? '<div class="row" style="margin-top:12px"><button class="btn" id="hsave">Save details</button></div>' : ""}</div>
-    ${capturePanel(m, w)}
-    <div class="card"><div class="row"><h3 style="margin:0">Discussion points · 5W1H</h3><span class="grow"></span>${w ? '<button class="btn" id="pnew">⌨ Type a point</button>' : ""}${hasF("mom.translation") && D.points.length ? '<button class="btn o" id="trAll">Translate all points</button>' : ""}</div>
-      <p class="note">What was discussed or decided · Why · Who is responsible · When (target date) · Where · How. Recording the voice fills the transcript below; turn any part of it into a point with one click.</p>${pointsTable()}</div>`;
+      ${w ? '<div class="row" style="margin-top:12px"><button class="btn" id="hsave">Save and continue →</button></div>' : ""}</div><div class="row noprint" style="margin-top:10px">${!w ? '<button class="btn" data-step="2">Next: Discuss →</button>' : ""}</div>`)}
+    ${sp(2, `    <div class="card"><div class="row"><h3 style="margin:0">⌨ Or type a point</h3><span class="grow"></span>${w ? '<button class="btn" id="pnew">+ Add point (5W1H)</button>' : ""}</div>
+      <p class="note">Fill in What, Why, Who, When, Where and How. Only “What” is needed.</p></div>${capturePanel(m, w)}<div class="row noprint"><button class="btn o" data-step="1">← Back</button><button class="btn" data-step="3">Next: Points →</button></div>`)}
+    ${sp(3, `    <div class="card"><div class="row"><h3 style="margin:0">Points · what was decided</h3><span class="grow"></span>${w ? '<button class="btn" id="pnew2">+ Add point</button>' : ""}${hasF("mom.translation") && D.points.length ? '<button class="btn o" id="trAll">🌐 Translate all</button>' : ""}</div>
+      <p class="note">Each point answers six questions: <b>What</b> · <b>Why</b> · <b>Who</b> · <b>When</b> · <b>Where</b> · <b>How</b>. Press Edit on a point to change it or to mark it Done.</p>${pointsTable()}</div><div class="row noprint" style="margin-top:10px"><button class="btn o" data-step="2">← Back to Discuss</button>${ed() && m.status === "open" ? '<button class="btn" id="fin2">✔ Finalise minutes</button>' : ""}</div>`)}`;
     bindEditor();
   }
   const attRow = (a, i, w) => `<tr data-ai="${i}"><td><input data-af="name" value="${esc(a.name || "")}"${w ? "" : " disabled"}></td><td><input data-af="function" value="${esc(a.function || "")}"${w ? "" : " disabled"}></td><td><input data-af="email" value="${esc(a.email || "")}"${w ? "" : " disabled"}></td><td style="text-align:center"><input type="checkbox" class="tw" data-af="present" ${a.present === false ? "" : "checked"}${w ? "" : " disabled"}></td><td>${w ? `<button class="btn o s" data-ad="${i}">✕</button>` : ""}</td></tr>`;
@@ -125,14 +131,14 @@
   function capturePanel(m, w) {
     if (!w) return S.det.segments.length ? `<div class="card"><h3>Voice transcript (${S.det.segments.length} segments)</h3>${segList(false)}</div>` : "";
     const voiceOK = hasF("mom.voice-capture");
-    return `<div class="vp${S.state === "listening" ? " rec" : ""}" id="vp"><div class="row"><h3 style="margin:0">🎙 Record the discussion (voice → text)</h3><span class="grow"></span>${S.state === "listening" ? '<span><span class="dot"></span>Recording</span>' : ""}</div>
-      ${!voiceOK ? '<div class="lock">Voice capture &amp; languages is not part of your plan. Typing points works as usual.</div>' : !LG.supported ? '<div class="lock">Voice capture needs Chrome, Edge or Safari on this device. You can still type the points.</div>' : `
-      <div class="frm"><div><label>Language(s) spoken — choose up to 3; the app moves to the next one when it cannot match the speech</label><select id="vlang" data-multi>${langOpts(S.vl || m.language || "en-IN")}</select></div>
-        <div><label>Speaker (tag the next segments)</label><select id="vspk"><option value="">Not specified</option>${(m.attendees || []).map((a) => `<option${a.name === S.lastSpeaker ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div></div>
+    return `<div class="vp${S.state === "listening" ? " rec" : ""}" id="vp"><div class="row"><h3 style="margin:0">🎙 Speak — the app writes it down</h3><span class="grow"></span>${S.state === "listening" ? '<span><span class="dot"></span>Recording</span>' : ""}</div>
+      ${!voiceOK ? '<div class="lock">Voice is not part of your plan. You can still type the points.</div>' : !LG.supported ? '<div class="lock">Voice needs Chrome, Edge or Safari. You can still type the points.</div>' : `
+      <div class="frm"><div><label>Language spoken (choose up to 3 if people switch languages)</label><select id="vlang" data-multi>${langOpts(S.vl || m.language || "en-IN")}</select></div>
+        <div><label>Who is speaking (optional)</label><select id="vspk"><option value="">Not specified</option>${(m.attendees || []).map((a) => `<option${a.name === S.lastSpeaker ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" id="vgo"${S.state === "listening" ? " disabled" : ""}>${S.state === "paused" ? "▶ Resume" : "● Start recording"}</button><button class="btn o" id="vpause"${S.state === "listening" ? "" : " disabled"}>⏸ Pause</button><button class="btn o" id="vstop"${S.state === "stopped" ? " disabled" : ""}>■ Stop</button><span class="mut" id="vstat">${vstat()}</span></div>
-      <div class="live" id="live">${S.interim ? esc(S.interim) : '<i>The words appear here as people speak, and are saved automatically while the meeting goes on.</i>'}</div>
-      <p class="note">The browser’s speech service listens to the microphone (in Chrome this is processed by Google). Keep the screen on and the page open while recording. Spoken text is stored in this meeting’s transcript; check names and numbers before relying on it.</p>`}
-      <h3 style="margin:12px 0 4px">Transcript <span class="mut" id="segcount">(${S.det.segments.length})</span></h3>${canWrite() && hasF("mom.voice-capture") ? '<div class="row noprint" style="margin-bottom:6px"><input id="sgNew" placeholder="Type a line of the discussion (no microphone needed)…" style="flex:1;min-width:200px"><button class="btn o s" id="sgAdd">+ Add line</button></div>' : ""}<div id="segs">${segList(true)}</div>${S.det.segments.length ? '<div class="row" style="margin-top:8px"><button class="btn o" id="segMake">Make one 5W1H point from the ticked lines</button></div>' : ""}</div>`;
+      <div class="live" id="live">${S.interim ? esc(S.interim) : '<i>Press “Start recording” and speak. Your words appear here and are saved automatically.</i>'}</div>
+      <p class="note">Allow the microphone when the browser asks. Keep this page open while recording. Check names and numbers afterwards. (Chrome sends the audio to Google to convert it to text.)</p>`}
+      <h3 style="margin:12px 0 4px">What was said <span class="mut" id="segcount">(${S.det.segments.length})</span></h3>${S.det.segments.length ? '<p class="note">Press “→ 5W1H” on a line to turn it into a point. Or tick several lines and press the button at the bottom.</p>' : ""}${canWrite() && hasF("mom.voice-capture") ? '<div class="row noprint" style="margin-bottom:6px"><input id="sgNew" placeholder="Type a line of the discussion (no microphone needed)…" style="flex:1;min-width:200px"><button class="btn o s" id="sgAdd">+ Add line</button></div>' : ""}<div id="segs">${segList(true)}</div>${S.det.segments.length ? '<div class="row" style="margin-top:8px"><button class="btn o" id="segMake">Make one point from the ticked lines</button></div>' : ""}</div>`;
   }
   const vstat = () => `${S.state === "listening" ? "Listening in " + esc(lname(S.rec ? S.rec.lang : "")) : S.state === "paused" ? "Paused" : "Not recording"} · saved ${S.saved}${S.q.length ? " · waiting to save " + S.q.length : ""}`;
   function segList(w) {
@@ -142,11 +148,13 @@
       <div style="display:flex;gap:4px">${hasF("mom.translation") ? `<button class="btn o s" data-segtrb="${g.id || g.client_id}" title="Translate this line">🌐</button>` : ""}${w && g.id ? `<button class="btn o s" data-segpt="${g.id}" title="Make a 5W1H point">→ 5W1H</button><button class="btn o s" data-segdel="${g.id}" title="Delete">✕</button>` : ""}</div></div>`).join("");
   }
   function pointsTable() {
-    const P = S.det.points, w = canWrite(), ed2 = ed(); if (!P.length) return '<p class="mut">No points yet. Type one, or record the discussion and turn transcript lines into points.</p>';
-    return `<table><thead><tr><th>Topic</th><th>What</th><th>Why</th><th>Who</th><th>When</th><th>Where</th><th>How</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>${P.map((p) => {
+    const P = S.det.points, w = canWrite(), ed2 = ed(); if (!P.length) return '<div class="empty"><b>No points yet.</b><br>Go to <a href="#" data-step="2">step 2 · Discuss</a> to speak or type the discussion, or press <b>+ Add point</b>.</div>';
+    const sub = (l, v) => (v ? `<div class="sub"><span>${l}</span> ${esc(v)}</div>` : "");
+    return `<table class="pts"><thead><tr><th>What was discussed / decided</th><th>Who</th><th>When</th><th>Status</th><th></th></tr></thead><tbody>${P.map((p) => {
       const tr = p.translations || {}, keys = Object.keys(tr);
-      return `<tr data-pt="${p.id}"><td class="t5">${esc(p.topic || "")}</td><td class="t5"><b>${esc(p.what)}</b>${p.source === "voice" ? ' <span title="Taken from the voice record">🎙</span>' : ""}${keys.length ? `<div>${keys.map((k) => `<span class="pill" data-showtr="${p.id}|${k}" style="cursor:pointer" title="Show translation">${esc(lname(k))}</span>`).join("")}</div><small class="tr" data-trbox="${p.id}"></small>` : ""}</td><td class="t5">${esc(p.why || "")}</td><td class="t5">${esc(p.who || "")}</td><td>${dueChip(p.when_on, p.status)}${p.when_note ? `<div class="mut">${esc(p.when_note)}</div>` : ""}</td><td class="t5">${esc(p.where_at || "")}</td><td class="t5">${esc(p.how || "")}</td><td>${esc(p.ptype || "")}</td><td>${stChip(p.status)}</td>
-        <td style="white-space:nowrap">${ed2 ? `<button class="btn o s" data-pe="${p.id}">${w ? "Edit" : "Update"}</button>` : ""}${hasF("mom.translation") ? ` <button class="btn o s" data-pt-tr="${p.id}" title="Translate">🌐</button>` : ""}${w ? ` <button class="btn o s" data-pd="${p.id}">✕</button>` : ""}</td></tr>`;
+      return `<tr data-pt="${p.id}"><td class="t5">${p.topic ? `<div class="mut" style="font-size:12px">${esc(p.topic)}</div>` : ""}<b>${esc(p.what)}</b>${p.source === "voice" ? ' <span title="Taken from the voice record">🎙</span>' : ""}${sub("Why", p.why)}${sub("Where", p.where_at)}${sub("How", p.how)}${keys.length ? `<div>${keys.map((k) => `<span class="pill" data-showtr="${p.id}|${k}" style="cursor:pointer" title="Show translation">${esc(lname(k))}</span>`).join("")}</div><small class="tr" data-trbox="${p.id}"></small>` : ""}</td>
+        <td class="t5">${esc(p.who || "")}</td><td>${dueChip(p.when_on, p.status)}${p.when_note ? `<div class="mut">${esc(p.when_note)}</div>` : ""}</td><td>${stChip(p.status)}<div class="mut" style="font-size:11px">${esc(p.ptype || "")}</div></td>
+        <td style="white-space:nowrap">${ed2 ? `<button class="btn o s" data-pe="${p.id}">${w ? "Edit" : "Update"}</button>` : ""}${hasF("mom.translation") ? ` <button class="btn o s" data-pt-tr="${p.id}" title="Translate this point">🌐</button>` : ""}${w ? ` <button class="btn o s" data-pd="${p.id}" title="Delete this point">✕</button>` : ""}</td></tr>`;
     }).join("")}</tbody></table>`;
   }
 
@@ -157,14 +165,19 @@
     if ($("#reo")) $("#reo").onclick = async () => { try { await call("kmr_mom_reopen", { p_id: m.id }); S.det = null; await openMeeting(m.id); say("Minutes opened for editing. Press Finalise when done.", true); } catch (e) { say(e.message); } };
     if ($("#del")) $("#del").onclick = () => { if (!confirm("Delete " + m.meeting_no + " permanently, with all its points and transcript? This cannot be undone.\n\n(To keep the record, use Void instead.)")) return; call("kmr_mom_delete", { p_id: m.id }).then(() => { S.det = null; return loadAll().then(() => { go("go=meet"); say("Meeting deleted.", true); }); }).catch((e) => say(e.message)); };
     if ($("#vd")) $("#vd").onclick = () => { const r = prompt("Reason for voiding this meeting record?"); if (r === null) return; call("kmr_mom_void", { p_id: m.id, p_reason: r }).then(() => go("go=meet")).catch((e) => say(e.message)); };
-    if ($("#hsave")) $("#hsave").onclick = saveHeader;
+    if ($("#hsave")) $("#hsave").onclick = () => saveHeader(true);
     if ($("#atAdd")) $("#atAdd").onclick = () => { $("#atn tbody").insertAdjacentHTML("beforeend", attRow({ present: true }, 99, true)); };
     if ($("#atPickGo")) $("#atPickGo").onclick = () => { const codes = V("atPick").split(", ").filter(Boolean); const have = attendees().map((a) => a.name); codes.forEach((c) => { const p = (S.load.people || []).find((x) => x.code === c); if (p && !have.includes(p.name)) $("#atn tbody").insertAdjacentHTML("beforeend", attRow({ name: p.name, function: p.function || p.role || "", email: p.email || "", present: true }, 99, true)); }); $("#atPick").value = ""; };
     $("#atn").addEventListener("click", (e) => { const b = e.target.closest("[data-ad]"); if (b) b.closest("tr").remove(); });
     if ($("#pnew")) $("#pnew").onclick = () => pointDialog(null);
+    if ($("#pnew2")) $("#pnew2").onclick = () => pointDialog(null);
+    if ($("#fin2")) $("#fin2").onclick = finalise;
+    bindSteps();
     if ($("#trAll")) $("#trAll").onclick = () => translateDialog(D.points.map((p) => p.id));
     bindPoints(); bindVoice(); bindSegs();
   }
+  function setStep(n) { S.step = n; document.querySelectorAll("[data-sp]").forEach((d) => d.classList.toggle("hide", +d.dataset.sp !== n)); document.querySelectorAll(".stp").forEach((b) => b.classList.toggle("on", +b.dataset.step === n)); const g = $("#guide"); if (g) g.textContent = { 1: "Fill in the basics and tick who attended. Then press “Save and continue”.", 2: "Capture the discussion: press the microphone and speak, or type a point. You can use both.", 3: "Check the points. Mark actions Done as they finish. When everything is right, press “Finalise minutes”." }[n]; window.scrollTo(0, 0); }
+  function bindSteps() { document.querySelectorAll("[data-step]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); setStep(+b.dataset.step); })); }
   function bindPoints() {
     document.querySelectorAll("[data-pe]").forEach((b) => (b.onclick = () => pointDialog(S.det.points.find((p) => p.id === b.dataset.pe))));
     document.querySelectorAll("[data-pt-tr]").forEach((b) => (b.onclick = () => translateDialog([b.dataset.ptTr])));
@@ -172,11 +185,11 @@
     document.querySelectorAll("[data-showtr]").forEach((b) => (b.onclick = () => { const [id, k] = b.dataset.showtr.split("|"), p = S.det.points.find((x) => x.id === id), t = (p.translations || {})[k] || {}, box = document.querySelector(`[data-trbox="${id}"]`); box.innerHTML = `<b>${esc(lname(k))}:</b> ${esc(t.what || "")}${t.why ? " — " + esc(t.why) : ""}${t.how ? " | " + esc(t.how) : ""}`; }));
   }
   async function refresh() { const keep = S.det.segments.filter((g) => !g.id); S.det = await call("kmr_mom_get", { p_id: S.det.meeting.id }); S.det.segments.push(...keep); const y = window.scrollY; drawEditor(); window.scrollTo(0, y); }
-  async function saveHeader() {
+  async function saveHeader(next) {
     try {
       const m = S.det.meeting;
       await call("kmr_mom_save", { p: { id: m.id, title: V("h_title"), mtype: V("h_type"), meeting_date: V("h_date"), start_time: V("h_st") || null, end_time: V("h_en") || null, venue: V("h_venue"), chairperson: V("h_chair"), scribe: V("h_scribe"), language: V("h_lang"), prev_ref: V("h_prev"), next_date: V("h_next") || null, agenda: V("h_agenda"), distribution: V("h_dist"), attendees: attendees() } });
-      const keep = S.det.segments.filter((g) => !g.id); S.det = await call("kmr_mom_get", { p_id: m.id }); S.det.segments.push(...keep); say("Details saved.", true); const y = window.scrollY; drawEditor(); window.scrollTo(0, y);
+      const keep = S.det.segments.filter((g) => !g.id); S.det = await call("kmr_mom_get", { p_id: m.id }); S.det.segments.push(...keep); say("Details saved.", true); const y = window.scrollY; if (next === true) S.step = 2; drawEditor(); window.scrollTo(0, next === true ? 0 : y);
     } catch (e) { say(e.message); }
   }
   async function finalise() {
@@ -191,18 +204,21 @@
     const w = canWrite(), fieldsRo = w ? "" : " disabled", m = S.det.meeting, names = (m.attendees || []).map((a) => a.name);
     p = p || Object.assign({ ptype: "Discussion", status: "Open", lang: m.language || "en-IN", source: "typed" }, pre || {});
     open(`<h3>${p.id ? (w ? "Edit point" : "Update point") : "New point"} · 5W1H</h3>${!w && p.id ? '<p class="note">The minutes are finalised — only status, remarks and the target date can change.</p>' : ""}
-      <div class="w5"><div class="f1"><label>Topic / agenda item</label><input id="p_topic" value="${esc(p.topic || "")}"${fieldsRo}></div>
-      <div class="f1"><label><span>What</span> was discussed / decided / to be done *</label><textarea id="p_what" rows="3"${fieldsRo}>${esc(p.what || "")}</textarea></div>
+      <div class="w5">
+      <div class="f1"><label><span>What</span> was discussed / decided / to be done *</label><textarea id="p_what" rows="3" placeholder="e.g. Replace the worn deburring tool"${fieldsRo}>${esc(p.what || "")}</textarea></div>
       <div class="f1"><label><span>Why</span> (reason, problem, benefit)</label><textarea id="p_why" rows="2"${fieldsRo}>${esc(p.why || "")}</textarea></div>
       <div><label><span>Who</span> is responsible</label><input id="p_who" list="p_dl" value="${esc(p.who || "")}"${fieldsRo}></div>
       <div><label><span>When</span> (target date)</label><input id="p_when" type="date" value="${esc(String(p.when_on || "").slice(0, 10))}"></div>
-      <div><label>When — note</label><input id="p_wnote" value="${esc(p.when_note || "")}" placeholder="e.g. before next review"${fieldsRo}></div>
-      <div><label><span>Where</span></label><input id="p_where" value="${esc(p.where_at || "")}" placeholder="line / machine / department / site"${fieldsRo}></div>
+      <div><label><span>Where</span> (line / machine / department)</label><input id="p_where" value="${esc(p.where_at || "")}"${fieldsRo}></div>
       <div class="f1"><label><span>How</span> (method, steps, resources)</label><textarea id="p_how" rows="2"${fieldsRo}>${esc(p.how || "")}</textarea></div>
-      <div><label>Type</label><select id="p_type"${fieldsRo}>${opts(PT, p.ptype)}</select></div><div><label>Status</label><select id="p_status">${opts(ST, p.status)}</select></div>
-      <div><label>Language of the text</label><select id="p_lang"${fieldsRo}>${langOpts(p.lang || "en-IN")}</select></div>
-      <div class="f1"><label>Remarks / follow-up</label><input id="p_rem" value="${esc(p.remarks || "")}"></div></div><datalist id="p_dl">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
-      <div class="row" style="margin-top:12px"><button class="btn" id="p_ok">Save</button>${w && !p.id ? '<button class="btn o" id="p_more">Save and add another</button>' : ""}${w ? '<button class="btn o" id="p_sug" title="Fill Who and When from the words in What">Suggest Who / When</button>' : ""}<button class="btn o" id="p_x">Cancel</button></div><div id="p_err"></div>`);
+      <div><label>Status</label><select id="p_status">${opts(ST, p.status)}</select></div>
+      <div class="f1"><details class="opt"><summary>More options: topic, type, language, remarks</summary><div class="w5" style="margin-top:8px">
+        <div><label>Topic / agenda item</label><input id="p_topic" value="${esc(p.topic || "")}"${fieldsRo}></div>
+        <div><label>Type</label><select id="p_type"${fieldsRo}>${opts(PT, p.ptype)}</select></div>
+        <div><label>Language of the text</label><select id="p_lang"${fieldsRo}>${langOpts(p.lang || "en-IN")}</select></div>
+        <div><label>When — note</label><input id="p_wnote" value="${esc(p.when_note || "")}" placeholder="e.g. before next review"${fieldsRo}></div>
+        <div class="f1"><label>Remarks / follow-up</label><input id="p_rem" value="${esc(p.remarks || "")}"></div></div></details></div></div><datalist id="p_dl">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+      <div class="row" style="margin-top:12px"><button class="btn" id="p_ok">Save</button>${w && !p.id ? '<button class="btn o" id="p_more">Save and add another</button>' : ""}${w ? '<button class="btn o" id="p_sug" title="Fill Who and When from the words in What">Fill Who / When for me</button>' : ""}<button class="btn o" id="p_x">Cancel</button></div><div id="p_err"></div>`);
     $("#p_x").onclick = closeM;
     if ($("#p_what") && w) $("#p_what").addEventListener("input", () => { const d = LG.detect($("#p_what").value); if (d.tag && d.certain) $("#p_lang").value = d.tag; });
     if ($("#p_sug")) $("#p_sug").onclick = () => { const t = V("p_what") + " " + V("p_how"); if (!V("p_who")) $("#p_who").value = LG.guessWho(t, names); if (!V("p_when")) $("#p_when").value = LG.guessWhen(t, today()); };
