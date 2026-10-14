@@ -315,6 +315,17 @@
     document.querySelectorAll("[data-edit]").forEach((b) => (b.onclick = () => edit((list || []).find((x) => x.email === b.dataset.edit))));
   }
 
+  function plantPickView(pl) {
+    const open = OPEN ? "?open=" + encodeURIComponent(OPEN) : "";
+    $("#root").innerHTML = `<div class="split" style="grid-template-columns:1fr"><section class="panel" style="border:0"><div class="form">
+      <div class="co" style="margin-bottom:14px">${logo(brand)}<div>${esc(brand.name)}<small>${esc(user.email)}</small></div></div>
+      <h1>Choose your plant</h1><p class="sub">Each plant has its own apps and data.</p>
+      ${pl.map((x) => `<p><a class="btn block" href="/it/app/${encodeURIComponent(x.slug)}${open}">${esc(x.plant_code ? x.plant_code + " · " : "")}${esc(String(x.name).split(" – ").pop())}</a></p>`).join("")}
+      ${pl[0].is_all ? `<p><a class="btn block ghost" href="/it/app/${encodeURIComponent(pl[0].slug)}#plants">★ All plants · dashboard</a></p>` : ""}
+      <p><button class="btn ghost block" id="pkOut">Sign out</button></p></div></section></div>`;
+    $("#pkOut").onclick = async () => { await sb.auth.signOut(); try { localStorage.removeItem("kmr-portal"); } catch (e) {} loginView(); };
+  }
+
   async function start() {
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return loginView();
@@ -325,6 +336,16 @@
       await sb.auth.signOut(); return loginView("This login is not linked to any company's KMR Apps. Please use the link and login sent to you by KMR.");
     }
     user = session.user;
+    // Company link of a customer with plants: after signing in the person chooses a plant (only the plants they may open)
+    try {
+      const pr = await sb.rpc("kmr_plants", { p_slug: SLUG });
+      const pl = !pr.error && Array.isArray(pr.data) ? pr.data : [];
+      if (pl.length && pl[0].at_parent && HASH !== "plants") {
+        if (pl.length === 1 && !pl[0].is_all) { location.replace(`/it/app/${encodeURIComponent(pl[0].slug)}${OPEN ? "?open=" + encodeURIComponent(OPEN) : ""}`); return; }
+        return plantPickView(pl);
+      }
+      if (pl.length && pl[0].at_parent && HASH === "plants") { location.replace(`/it/app/${encodeURIComponent(pl[0].slug)}#plants`); return; }
+    } catch (e) { /* 0061/0063 not applied yet: behave as before */ }
     const { data, error } = await sb.rpc("kmr_portal", { p_slug: SLUG });
     if (error) return loginView("Could not load your apps right now. Please try again.");
     if (!data || !data.length) { await sb.auth.signOut(); return loginView(`This login does not belong to ${brand.name}. Use the email your company's apps were set up with.`); }
