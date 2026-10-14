@@ -1,5 +1,7 @@
 /* KMR shared UI helpers (all apps): 1) PDFs open in a viewer first, download on request  2) right-click / long-press "Open in new tab / window" on menus and buttons. */
 (function () {
+  /* number boxes ignore the mouse wheel; spell-check + synonyms in every text box */
+  if (!window.__kmrText && !document.querySelector('script[src*="kmr-text.js"]')) { const t = document.createElement("script"); t.src = "/it/apps/kmr-text.js"; document.head.appendChild(t); }
   /* ---------- PDF viewer ---------- */
   function view(blob, name) {
     const url = URL.createObjectURL(blob), v = document.createElement("div");
