@@ -53,7 +53,11 @@ td input[type=number]{width:96px;text-align:right}
 .box{border:1px solid var(--line);border-radius:12px;padding:14px}.box h3{margin:0 0 10px;font-size:13px}
 .scroll{overflow:auto;max-height:68vh}
 .heat td{padding:3px;text-align:center;font-size:11px;min-width:30px;border:1px solid var(--bg)}
-.heat td.l{text-align:left;min-width:150px;font-size:12px;position:sticky;left:0;background:var(--card)}
+.heat td.l{text-align:left;min-width:150px;font-size:12px;position:sticky;left:44px;background:var(--card);z-index:1}
+.heat td.s,.heat th.s{position:sticky;left:0;min-width:44px;width:44px;text-align:center;background:var(--card);z-index:1;color:var(--mut)}
+.heat thead th{position:sticky;top:0;z-index:2;background:var(--card);line-height:1.15}.heat thead th.s,.heat thead th.l{z-index:3;left:0}.heat thead th.l{left:44px;text-align:left}
+.heat th small{display:block;font-weight:600;font-size:9px;opacity:.75}
+.heat .sat{background:#FFD9A8!important;color:#7C2D12}.heat .sun{background:#FECACA!important;color:#7F1D1D}
 .modal{position:fixed;inset:0;background:#0008;display:none;align-items:center;justify-content:center;z-index:9}
 .modal.on{display:flex}.modal .in{background:var(--card);border-radius:14px;width:min(860px,94vw);max-height:86vh;display:flex;flex-direction:column}
 .modal .hd,.modal .ft{padding:14px 18px;display:flex;gap:10px;align-items:center}.modal .bd{padding:0 18px;overflow:auto;flex:1}
@@ -390,17 +394,18 @@ function renderDaily() {
       <td class="n"><input type="number" min="0" step="1" data-dl="${l.id}" value="${got || ''}" placeholder="0" ${canEdit && day <= todayStr() ? '' : 'disabled'}></td>
       <td><span class="chip ${c.st}">${c.label}</span></td></tr>`; }).join('');
   const ds = days(M), t = todayStr();
-  const heat = rows.map(({ l, c }) => `<tr><td class="l">${esc(l.part_code)} <span class="mut">${esc(l.buyer_name).slice(0, 14)}</span></td>${ds.map(d => {
-    const p = c.plan[d] || 0, a = (desp[l.id] || {})[d] || 0; let bg = 'transparent', tx = '';
+  const WK = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], wcls = d => isoDow(d) === 6 ? 'sat' : isoDow(d) === 7 ? 'sun' : '';
+  const heat = rows.map(({ l, c }, ri) => `<tr><td class="s">${ri + 1}</td><td class="l">${esc(l.part_code)} <span class="mut">${esc(l.buyer_name).slice(0, 14)}</span></td>${ds.map(d => {
+    const p = c.plan[d] || 0, a = (desp[l.id] || {})[d] || 0; let bg = 'transparent', tx = '', wk = wcls(d);
     if (a) { bg = a >= p && p ? 'var(--green)' : p ? 'var(--amber)' : 'var(--blue)'; tx = '#fff'; }
     else if (p && d < t) { bg = 'var(--red)'; tx = '#fff'; } else if (p) bg = '#94a3b833';
-    return `<td style="background:${bg};color:${tx}" title="${d}: planned ${fmt(p, Number.isInteger(p) ? 0 : 2)} · despatched ${fmt(a)}">${a ? fmt(a) : p ? '·' : ''}</td>`; }).join('')}</tr>`).join('');
+    return `<td class="${bg === 'transparent' || bg === '#94a3b833' ? wk : ''}" style="background:${bg};color:${tx}" title="${d}: planned ${fmt(p, Number.isInteger(p) ? 0 : 2)} · despatched ${fmt(a)}">${a ? fmt(a) : p ? '·' : ''}</td>`; }).join('')}</tr>`).join('');
   $('#daily').innerHTML = `<div class="row"><b>Daily despatch</b><input type="date" id="dday" min="${M}-01" max="${M}-${dim(M)}" value="${day}">
       <span class="mut">Enter what actually left the plant on this date.</span><div style="flex:1"></div>${canEdit ? '<button class="btn ghost" id="addu">＋ Add part not in plan</button><button class="btn" id="saved">Save day</button>' : ''}</div>
     ${rows.length ? `<p class="mut" style="margin:-6px 0 10px;font-size:12px"><b>Planned this day</b> = the month’s customer demand spread over its delivery schedule: <b>Daily</b> → demand ÷ working days (Mon–Sat) · <b>Weekly</b> → demand ÷ number of that weekday in the month · <b>Specific date</b> → the full quantity on that date. Shown in whole pieces; the days always add up to the demand.</p><div class="scroll" style="max-height:40vh"><table><thead><tr><th>Customer</th><th>Part</th><th class="n" title="Month demand spread over the delivery schedule (see the note above)">Planned this day ⓘ</th><th class="n">Month despatched / demand</th><th class="n">Pending</th><th class="n">Despatched this day</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
     <h3 style="margin:18px 0 6px;font-size:13px">Month tracker</h3>
     <div class="legend"><span><span class="chip g">n</span> met plan</span><span><span class="chip a">n</span> less than plan</span><span><span class="chip b">n</span> unplanned day</span><span><span class="chip r">·</span> planned, nothing despatched</span><span>· = planned, upcoming</span></div>
-    <div class="scroll" style="max-height:34vh"><table class="heat"><thead><tr><th class="l">Part</th>${ds.map(d => `<th style="text-align:center;padding:3px">${+d.slice(8)}</th>`).join('')}</tr></thead><tbody>${heat}</tbody></table></div>` : '<p class="mut">No parts yet. Add parts in <b>Sales plan</b>, or use <b>Add part not in plan</b> for an unplanned sale.</p>'}`;
+    <div class="scroll" style="max-height:34vh"><table class="heat"><thead><tr><th class="s">S.No</th><th class="l">Part</th>${ds.map(d => `<th class="${wcls(d)}" style="text-align:center;padding:3px">${+d.slice(8)}<small>${WK[isoDow(d)]}</small></th>`).join('')}</tr></thead><tbody>${heat}</tbody></table></div>` : '<p class="mut">No parts yet. Add parts in <b>Sales plan</b>, or use <b>Add part not in plan</b> for an unplanned sale.</p>'}`;
 }
 
 /* ======== events ======== */
