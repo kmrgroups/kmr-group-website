@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/company-config.js"></script>
 <title>Maintenance · KMR Apps</title>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
@@ -38,9 +38,9 @@ tr.cur td{background:#fef9c3}.sg{display:flex;justify-content:space-between;gap:
 @media print{@page{margin:8mm}body{background:#fff;color:#000;padding:0}body>*:not(.modal){display:none!important}.modal{position:static;display:block!important;background:none;padding:0}.in{box-shadow:none;width:auto;padding:0;background:#fff}.noprint{display:none!important}.sheet{padding:0;margin:0}.dt,.doc{border:0}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Maintenance</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="bd" href="#go=bd">Breakdowns</a><a class="tab" data-t="pm" href="#go=pm">PM schedule</a><a class="tab" data-t="an" href="#go=an">MTBF, MTTR &amp; analysis</a><a class="tab" data-t="card" href="#go=card">Machine history card</a></div>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="bd" href="#go=bd">Breakdowns</a><a class="tab" data-t="pm" href="#go=pm">PM schedule</a><a class="tab" data-t="an" href="#go=an">MTBF, MTTR &amp; analysis</a><a class="tab" data-t="card" href="#go=card">Machine history card</a></div>
 <main><div class="panel"><div id="msg"></div>
-<section id="bd"></section><section id="pm" class="hide"></section><section id="an" class="hide"></section><section id="card" class="hide"></section></div></main>
+<section id="std"></section><section id="bd" class="hide"></section><section id="pm" class="hide"></section><section id="an" class="hide"></section><section id="card" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
 <script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{pm:"mnt.preventive-maintenance",an:"mnt.mttr-mtbf-analysis",card:"mnt.machine-history-card"},names:{"mnt.preventive-maintenance":"Preventive maintenance plan","mnt.mttr-mtbf-analysis":"MTTR, MTBF & analysis","mnt.machine-history-card":"Machine history card"}};</script><script src="/it/apps/qp-core.js"></script>
 <script src="/it/apps/mnt-calc.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/mnt-demo.js"><\/script>')}</script>
@@ -62,7 +62,7 @@ const co=()=>$('#co').textContent;
 const hasF=(k)=>!window.KMRLock||KMRLock.has(k);
 const idv=(i)=>($('#'+i)||{}).value;
 const opt=(arr,sel,f)=>arr.map(x=>`<option value="${esc(x.code)}"${x.code===sel?' selected':''}>${esc(f?f(x):x.code+' — '+(x.name||''))}</option>`).join('');
-const hashGo=()=>{const m=location.hash.match(/go=([a-z]+)/);return m?m[1]:'bd'};
+const hashGo=()=>{const m=location.hash.match(/go=([a-z]+)/);return m?m[1]:'std'};
 const localDT=(ms)=>{const d=new Date(ms-new Date(ms).getTimezoneOffset()*6e4);return d.toISOString().slice(0,16)};
 const toISO=(v)=>v?new Date(v).toISOString():'';
 const CATS=['Mechanical','Electrical','Hydraulic / pneumatic','Tooling','Control / software','Utilities','Operator error','Other'];
@@ -71,9 +71,10 @@ const guessShift=()=>{const n=new Date(),mm=n.getHours()*60+n.getMinutes(),h=(s)
 async function load(){if(!S.m)S.m=await call('kmr_mnt_load');S.x=await call('kmr_mnt_data',{p_days:400})}
 async function route(){
   let go=hashGo();
-  if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='bd';history.replaceState(null,'',location.pathname+location.search+'#go=bd')}
+  if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='std';history.replaceState(null,'',location.pathname+location.search+'#go=std')}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
-  ['bd','pm','an','card'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  ['std','bd','pm','an','card'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  if(go==='std'){KMRStd.draw($('#std'),'mnt');return}
   try{await load();({bd:drawBd,pm:drawPm,an:drawAn,card:drawCard})[go]()}catch(e){say(e.message)}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});

@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/company-config.js"></script>
 <title>PPAP Submissions · KMR Apps</title>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#b45309;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
@@ -30,8 +30,8 @@ tr.ready td:nth-child(3) b,tr.done td:nth-child(3) b{color:var(--g)}tr.na{opacit
 @media print{body{background:#fff;color:#000;padding:0}header,.tabs,.noprint,.kmr-foot,.kmr-demo,.back{display:none!important}.panel{border:0;padding:0}main{padding:0}table{min-width:0}.sheet{border-width:1.5px}.sheet input,.sheet select,.sheet textarea{border:0;border-bottom:1px solid #999;border-radius:0;padding:2px}tr{break-inside:avoid}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>PPAP Submissions</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="list" href="#go=list">Submissions</a><a class="tab" data-t="package" href="#go=package" id="tPk">Package (18 elements)</a><a class="tab" data-t="psw" href="#go=psw" id="tPs">Part Submission Warrant</a></div>
-<main><div class="panel"><div id="msg"></div><section id="list"></section><section id="package" class="hide"></section><section id="psw" class="hide"></section></div></main>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="list" href="#go=list">Submissions</a><a class="tab" data-t="package" href="#go=package" id="tPk">Package (18 elements)</a><a class="tab" data-t="psw" href="#go=psw" id="tPs">Part Submission Warrant</a></div>
+<main><div class="panel"><div id="msg"></div><section id="std"></section><section id="list" class="hide"></section><section id="package" class="hide"></section><section id="psw" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
 <script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{psw:"ppap.part-submission-warrant"},evidence:"ppap.evidence-assembly-from-kmr-apps",names:{"ppap.part-submission-warrant":"Part Submission Warrant","ppap.evidence-assembly-from-kmr-apps":"Evidence assembly from KMR apps"}};</script><script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
 <script>
@@ -70,12 +70,13 @@ const req=(e,lv)=>e.lv[lv-1]==='*'?'A':e.lv[lv-1];   // A = "*" as the customer 
 const reqLabel={S:'Submit',R:'Retain',A:'As customer specifies'};
 
 /* ---------------- routing (every screen has an address) ---------------- */
-const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return{go:m?m[1]:'list',prj:m&&m[2]?m[2]:null}};
+const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return{go:m?m[1]:'std',prj:m&&m[2]?m[2]:null}};
 const hrefTo=(go,prj)=>'#go='+go+(prj?'&prj='+prj:'');
 async function route(){
-  let {go,prj}=hashOf(); if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='list';history.replaceState(null,'',location.pathname+location.search+'#go=list')} if(prj&&prj!==S.cur){S.cur=prj;S.sub=null;S.links=null}
+  let {go,prj}=hashOf(); if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='std';history.replaceState(null,'',location.pathname+location.search+'#go=std')} if(prj&&prj!==S.cur){S.cur=prj;S.sub=null;S.links=null}
   $('#tPk').href=hrefTo('package',S.cur);$('#tPs').href=hrefTo('psw',S.cur);
-  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));['list','package','psw'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));['std','list','package','psw'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  if(go==='std'){KMRStd.draw($('#std'),'ppap');return}
   try{ if(go==='list')await drawList(); else {await loadSub(); if(S.sub){ if(go==='package')drawPackage(); else drawPsw(); }} }catch(e){say(e.message)}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route();window.scrollTo(0,0)});

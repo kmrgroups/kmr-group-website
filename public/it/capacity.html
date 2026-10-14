@@ -3,7 +3,7 @@
 <head>
 <script src="/it/company-config.js"></script>
 <script src="/it/apps/sso.js"></script>
-<script src="/it/apps/kmr-ui.js"></script>
+<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script>
 <script>window.KMR_PLATFORM = true; document.write('<style>.kmr-company{display:none!important}</style>');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
@@ -1591,6 +1591,7 @@ const ICONS = {
 const icon = (n, cls) => `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[n] || ''}"/></svg>`;
 
 const PAGES = [
+  { id: 'standards', group: 'Plan', label: 'Standards alignment', title: 'Standards alignment', desc: 'The standards and clauses this app supports.' },
   { id: 'bulletin', group: 'Plan', label: 'Verdict & Actions', title: 'Verdict & Action Bulletin', desc: 'Can we make the sales plan? Can we deliver on time? Every problem, how to overcome it, and what to do first.' },
   { id: 'overview', group: 'Plan', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
   { id: 'plan', group: 'Plan', label: 'Monthly Plan', title: 'Monthly Plan', desc: 'Enter this month’s quantity and customer due date for each part.' },
@@ -1629,7 +1630,7 @@ const TIER = {
 const pill = t => `<span class="pill ${t}">${TIER[t].label}</span>`;
 
 /* ---------- state ---------- */
-let state, model, ui = { page: 'overview', selMachine: null, cellFilter: 'ALL', mastersTab: 'machines', schedMachine: 'ALL', search: {}, hideZero: true };
+let state, model, ui = { page: 'standards', selMachine: null, cellFilter: 'ALL', mastersTab: 'machines', schedMachine: 'ALL', search: {}, hideZero: true };
 let cloud = { feat: null, status: 'local', stamp: null, dirty: false, timer: null, poll: null, msg: '', role: null, savedHash: null, pulling: false };
 
 function defaultState() { return clone(window.SEED_DATA); }
@@ -2198,6 +2199,9 @@ function loadBar(m, scaleMax) {
 const scaleMax = () => Math.max(30, ...model.machines.map(m => Math.max(m.reqDays, m.availDays))) * 1.05;
 
 /* ---------------------------------------------------------------- OVERVIEW */
+Pages.standards = () => '<div id="stdhost"></div>';
+window.PageAfter = window.PageAfter || {};
+window.PageAfter.standards = () => { if (window.KMRStd) KMRStd.draw(document.getElementById('stdhost'), 'capacity'); };
 Pages.overview = () => {
   if (!state.machines.length && window.KMR_PLATFORM && cloud.ops) return `${note('warn', 'info', '<b>No machines in your Operations Master yet.</b> Add machines, parts, cycle times and plant standards in <b>KMR Apps › Operations Master</b> (or load its sample data there); this planner uses them straight away.')}<div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn primary" href="${kmrPortalHome('#ops')}">Open Operations Master ${icon('arrow')}</a></div>`;
   if (!state.machines.length) return `${note('warn', 'info', '<b>No machines yet.</b> Start in <b>Masters</b>: add machines, then parts and routings, and set the plant standards. Or import a capacity workbook from <b>Monthly Plan › Import .xlsx</b>.')}<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-nav="masters">Open Masters ${icon('arrow')}</button><button class="btn" data-nav="plan">Open Monthly Plan</button></div>`;
@@ -3733,8 +3737,7 @@ ui.deployDone = LS.get('cp4_deploy_done') || {};
   applyTheme();
   state = loadLocal();
   const brand = LS.get('cp4_brand'); if (brand && !LS.get(K_STATE)) Object.assign(state.settings, brand);
-  const u = LS.get(K_UI); if (u && u.page && PAGES.some(p => p.id === u.page)) ui.page = u.page;
-  const [hp, hs] = (location.hash || '').replace(/^#(go=)?/, '').split('/'); if (PAGES.some(p => p.id === hp)) { ui.page = hp; if (hp === 'masters' && hs) ui.mastersTab = hs; if (hp === 'settings' && hs) ui.settingsTab = hs; }
+    const [hp, hs] = (location.hash || '').replace(/^#(go=)?/, '').split('/'); if (PAGES.some(p => p.id === hp)) { ui.page = hp; if (hp === 'masters' && hs) ui.mastersTab = hs; if (hp === 'settings' && hs) ui.settingsTab = hs; }
   render();
   Cloud.loadSiteConfig().then(() => { cloudBoot(); render(); });
 })();
