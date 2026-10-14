@@ -61,6 +61,7 @@
     kmr_mom_seg_delete(a) { const s = segs.find((x) => x.id === a.p_id); if (!s) return null; if (find(s.meeting_id).status !== "open") err("This meeting is finalised."); segs.splice(segs.indexOf(s), 1); return null; },
     kmr_mom_translate_save(a) { const r = findP(a.p_id); if (!T(a.p_lang)) err("Choose the language."); r.translations = Object.assign({}, r.translations, { [a.p_lang]: a.p_tr || {} }); return null; },
     kmr_mom_close(a) { const m = find(a.p_id); if (m.status !== "open") err("Only an open meeting can be finalised."); if (!points.some((p) => p.meeting_id === m.id) && !segs.some((s) => s.meeting_id === m.id)) err("Record at least one discussion point before finalising."); m.status = "closed"; return view(m); },
+    kmr_mom_delete(a) { const m = find(a.p_id); points.filter((p) => p.meeting_id === m.id).forEach((p) => points.splice(points.indexOf(p), 1)); segs.filter((x) => x.meeting_id === m.id).forEach((x) => segs.splice(segs.indexOf(x), 1)); meetings.splice(meetings.indexOf(m), 1); return null; },
     kmr_mom_reopen(a) { const m = find(a.p_id); if (m.status !== "closed") err("Only a finalised meeting can be re-opened."); m.status = "open"; return view(m); },
     kmr_mom_void(a) { if (!T(a.p_reason)) err("Give the reason for voiding the meeting."); const m = find(a.p_id); if (m.status === "void") err("Already void."); m.status = "void"; m.void_reason = T(a.p_reason); return null; },
     kmr_mom_actions() {
