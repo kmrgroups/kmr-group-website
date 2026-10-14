@@ -1,4 +1,4 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/company-config.js"></script>
 <title>APQP Planner · KMR Apps</title>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
@@ -31,8 +31,8 @@ tr.done td:nth-child(3) b{color:var(--mut);text-decoration:line-through}tr.na{op
 @media print{body{background:#fff;color:#000;padding:0}header,.tabs,.noprint,.kmr-foot,.kmr-demo,.back{display:none!important}.panel{border:0;padding:0}main{padding:0}.ph{break-inside:avoid}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>APQP Planner</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="prog" href="#go=prog">Programmes</a><a class="tab" data-t="phases" href="#go=phases" id="tPh">Phases &amp; deliverables</a><a class="tab" data-t="report" href="#go=report" id="tRp">Status report</a></div>
-<main><div class="panel"><div id="msg"></div><section id="prog"></section><section id="phases" class="hide"></section><section id="report" class="hide"></section></div></main>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="prog" href="#go=prog">Programmes</a><a class="tab" data-t="phases" href="#go=phases" id="tPh">Phases &amp; deliverables</a><a class="tab" data-t="report" href="#go=report" id="tRp">Status report</a></div>
+<main><div class="panel"><div id="msg"></div><section id="std"></section><section id="prog" class="hide"></section><section id="phases" class="hide"></section><section id="report" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
 <script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{report:"apqp.deliverable-tracker-gate-sign-offs"},evidence:"apqp.evidence-from-other-kmr-apps",names:{"apqp.deliverable-tracker-gate-sign-offs":"Deliverable tracker & gate sign-offs (status report)","apqp.evidence-from-other-kmr-apps":"Evidence from other KMR apps"}};</script><script src="/it/apps/qp-template.js"></script><script src="/it/apps/qp-core.js"></script>
 <script>
@@ -48,13 +48,14 @@ const pct=(d,t)=>t?Math.round(d*100/t):0;
 const bar=(ph)=>'<div class="bar">'+[1,2,3,4,5].map(n=>{const p=ph&&ph[n];return `<i title="Phase ${n}: ${p?p.done+'/'+p.total:'—'}"><b style="width:${p?pct(p.done,p.total):0}%"></b></i>`}).join('')+'</div>';
 
 /* ---------------- routing: every screen has an address (#go=…&prj=…) so right-click › open in new tab works ---------------- */
-const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return {go:m?m[1]:'prog',prj:m&&m[2]?m[2]:null}};
+const hashOf=()=>{const m=location.hash.match(/go=([a-z]+)(?:&prj=([0-9a-zA-Z-]+))?/);return {go:m?m[1]:'std',prj:m&&m[2]?m[2]:null}};
 const hrefTo=(go,prj)=>'#go='+go+(prj?'&prj='+prj:'');
 function setTabs(){const p=S.cur;$('#tPh').href=hrefTo('phases',p);$('#tRp').href=hrefTo('report',p)}
 async function route(){
-  let {go,prj}=hashOf(); if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='prog';history.replaceState(null,'',location.pathname+location.search+'#go=prog')} if(prj&&prj!==S.cur){S.cur=prj;S.data=null;S.links=null} setTabs();
+  let {go,prj}=hashOf(); if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='std';history.replaceState(null,'',location.pathname+location.search+'#go=std')} if(prj&&prj!==S.cur){S.cur=prj;S.data=null;S.links=null} setTabs();
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
-  ['prog','phases','report'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  ['std','prog','phases','report'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  if(go==='std'){KMRStd.draw($('#std'),'apqp');return}
   try{ if(go==='prog')await drawProg(); else if(go==='phases')await drawPhases(); else await drawReport(); }catch(e){say(e.message)}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route();window.scrollTo(0,0)});

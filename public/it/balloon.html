@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <script src="/it/apps/sso.js"></script>
-<script src="/it/apps/kmr-ui.js"></script>
+<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Balloon Inspector</title>
@@ -74,7 +74,8 @@ html,body{height:100%}
 .sheets button[aria-pressed="true"]{background:var(--ink);color:var(--surface)}
 .zoom{position:absolute;right:10px;bottom:10px;display:flex;gap:4px;z-index:2}
 .zoom .btn{min-width:38px;justify-content:center;background:var(--surface)}
-.empty{position:absolute;inset:0;display:grid;place-items:center;padding:24px;text-align:center}
+.empty{position:absolute;inset:0;display:grid;place-items:center;align-content:start;overflow:auto;padding:24px;text-align:center}
+.empty .stdhost{justify-self:stretch;text-align:left;margin-bottom:20px}
 .empty .card{max-width:420px;background:var(--surface);border:1.5px dashed var(--muted);border-radius:10px;padding:28px 24px}
 .empty h2{font:600 26px/1.1 var(--display);margin:0 0 8px}
 .empty p{color:var(--muted);margin:0 0 16px}
@@ -187,6 +188,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
       </div>
       <div class="busy" id="busy"><div class="spin"></div><span id="busyMsg">Working</span><button id="busyStop" hidden>Stop</button></div>
       <div class="empty" id="empty">
+        <div class="stdhost" id="stdhost"></div>
         <div class="card">
           <h2>Open an engineering drawing</h2>
           <p>PNG, JPG, PDF (multi-sheet), DXF, DWG or STEP. DWG and STEP are converted to a drawing right here. Opening, converting and reading — dimensions, tolerances, GD&amp;T frames and the title block — all happen in your browser, free. The drawing is never sent anywhere.</p>
@@ -249,5 +251,6 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
 <script src="balloon/cloud.js"></script>
 
 <script src="/it/apps/back.js"></script>
+<script>try{KMRStd.draw(document.getElementById("stdhost"),"balloon")}catch(e){}</script>
 </body>
 </html>

@@ -147,11 +147,12 @@ const numOrNull = v => v===""||v==null||isNaN(+v) ? null : +v;
 const V = {};
 function render(view){
   const S=A().S, M=$("main"); closeMenus();
-  if(!S.prj){ M.innerHTML=A().welcomeHTML(); A().bindWelcome(); return; }
+  if(!S.prj){ M.innerHTML='<div id="stdhost" style="padding:4px 4px 18px"></div>'+A().welcomeHTML(); A().bindWelcome(); if(window.KMRStd) KMRStd.draw($("stdhost"),"pd"); M.scrollTop=0; return; }
   (V[view]||V.doc)(M, view);
   M.scrollTop=0;
 }
 
+V.standards = (M)=>{ M.innerHTML='<div id="stdhost" style="padding:4px 4px 18px"></div>'; if(window.KMRStd) KMRStd.draw($("stdhost"),"pd"); };
 /* ---------- overview ---------- */
 V.overview = (M)=>{
   const S=A().S, P=S.prj, plan=S.plan, h=plan.header, docs=S.docs;

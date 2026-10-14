@@ -83,6 +83,7 @@
       ctx.main.innerHTML = `<h1>Operations Master</h1><p class="sub">One set of master data for your company, used by every KMR app. ${ctx.role === "viewer" ? "You can view it." : "You can add, change and import."}</p>
         ${error ? `<p class="msg">${esc(error.message)}</p>` : ""}
         ${note ? `<div class="card" style="border-color:#1E7B4A;background:#E7F8EF;margin-bottom:12px">${note}</div>` : ""}
+        <details open style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;font-size:15px;margin-bottom:6px">Standards alignment</summary><div id="opsStd"></div></details>
         ${sampleBar}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px">
           <button class="btn ghost" id="opsXlsxExp" style="height:42px">Download all (Excel)</button>
@@ -126,6 +127,7 @@
         if (res.error) { btn.disabled = false; alert(res.error.message); return this.overview(ctx); }
         this.overview(ctx, done(res.data));
       };
+      if (window.KMRStd) KMRStd.draw(ctx.main.querySelector("#opsStd"), "ops");
       const xExp = ctx.main.querySelector("#opsXlsxExp"), xImp = ctx.main.querySelector("#opsXlsxImp");
       if (xExp) xExp.onclick = () => this.exportWorkbook(ctx, xExp);
       if (xImp) xImp.onchange = (e) => this.importWorkbook(ctx, e.target.files[0], xImp);

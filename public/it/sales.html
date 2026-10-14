@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="/it/apps/sso.js"></script>
-<script src="/it/apps/kmr-ui.js"></script>
+<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script>
 <script src="/it/company-config.js"></script>
 <script src="/it/kmr-lock.js"></script>
 <title>Sales Flow · KMR Apps</title>
@@ -93,7 +93,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
   <span class="chip x" id="role"></span>
 </header>
 <div class="tabs">
-  <a class="tab on" data-t="dash" href="#go=dash">Dashboard</a>
+  <a class="tab on" data-t="std" href="#go=std">Standards alignment</a>
+  <a class="tab" data-t="dash" href="#go=dash">Dashboard</a>
   <a class="tab" data-t="plan" href="#go=plan">Sales plan</a>
   <a class="tab" data-t="daily" href="#go=daily">Daily despatch</a>
   <a class="tab" data-t="loss" href="#go=loss">Sales loss</a>
@@ -101,7 +102,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
 </div>
 <main><div class="panel">
   <div id="msg"></div>
-  <section id="dash"></section>
+  <section id="std"></section>
+  <section id="dash" class="hide"></section>
   <section id="plan" class="hide"></section>
   <section id="daily" class="hide"></section>
   <section id="loss" class="hide"></section>
@@ -412,7 +414,7 @@ function renderDaily() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const tab = t.closest('.tab');
-  if (tab) { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); try { history.replaceState(null, '', location.pathname + location.search + '#go=' + tab.dataset.t); } catch (x) { /* ignore */ } document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === tab)); ['dash', 'plan', 'daily', 'loss', 'act'].forEach(s => $('#' + s).classList.toggle('hide', s !== tab.dataset.t)); return; }
+  if (tab) { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); try { history.replaceState(null, '', location.pathname + location.search + '#go=' + tab.dataset.t); } catch (x) { /* ignore */ } document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === tab)); ['std', 'dash', 'plan', 'daily', 'loss', 'act'].forEach(s => $('#' + s).classList.toggle('hide', s !== tab.dataset.t)); return; }
   try {
     if (t.id === 'addp') { await openParts('plan'); }
     else if (t.id === 'addu') { await openParts('daily'); }
@@ -815,8 +817,8 @@ async function boot() {
     if (ALL) document.querySelectorAll('.tabs .tab:not([data-t=dash])').forEach(t => t.hidden = true);
     if (!DEMO && !ALL && window.KMRLock) await KMRLock.init(sb, slug, 'sales', { daily: 'sales.daily-despatch-abc-analysis', loss: 'sales.loss-reasons-action-plans', act: 'sales.loss-reasons-action-plans' }, { 'sales.daily-despatch-abc-analysis': 'Daily despatch & ABC analysis', 'sales.loss-reasons-action-plans': 'Loss reasons & action plans' });
     showBrand();   // logo + company name top-left, tab icon, and the shared footer's ← KMR Apps target
-    await load(); if (ALL) return; try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
-    const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (['dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
+    await load(); if (ALL) { document.querySelector('[data-t=dash]').click(); return; } try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
+    const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (window.KMRStd) KMRStd.draw($('#std'), 'sales'); if (['std', 'dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
   } catch (err) { say(err.message); $('#co').textContent = ''; }
 }
 
