@@ -520,7 +520,8 @@ async function pane(t){
   }
   if(t==="cnc"){
     P.innerHTML=`<p class="hintline" style="margin-top:0">Settings used when CNC programs are generated for this company's machines. Programs are <b>drafts</b>: always prove them out with a dry run / single block before cutting.</p><div class="frm">
-      <label class="fld">Control<input value="Fanuc-compatible G-code (Fanuc 0i / 31i, Haas, Mitsubishi and most Fanuc-style controls with Macro B)" readonly></label>
+      <label class="fld">Default control (used when a machine has no control system set in Operations Master)<select data-s="cncControl">${["Fanuc 0i-MF Plus","Fanuc 0i-TF Plus","Fanuc 31i-B","Haas NGC","Mitsubishi M80","Siemens Sinumerik 828D","Siemens Sinumerik 840D sl","Heidenhain TNC 640","Mazak Mazatrol SmoothG","Okuma OSP-P300"].map(v=>`<option${(st.cncControl||"Fanuc 0i-MF Plus")===v?" selected":""}>${v}</option>`).join("")}</select></label>
+      <p class="hintline" style="grid-column:1/-1;margin:0">Each machine's own control comes from Operations Master › Machines › Control system. Fanuc, Haas, Mitsubishi and other ISO controls get Fanuc-style G-code; Siemens Sinumerik gets cycle-based code (.MPF); Heidenhain TNC gets plain-language code (.H, milling only).</p>
       <label class="fld">First program number<input data-s="cncProgStart" type="number" min="1" max="9999" value="${esc(st.cncProgStart||1000)}"></label>
       <label class="fld">Lathe spindle speed limit (rpm)<input data-s="cncMaxRpmLathe" type="number" value="${esc(st.cncMaxRpmLathe||3000)}"></label>
       <label class="fld">VMC spindle speed limit (rpm)<input data-s="cncMaxRpmMill" type="number" value="${esc(st.cncMaxRpmMill||8000)}"></label>

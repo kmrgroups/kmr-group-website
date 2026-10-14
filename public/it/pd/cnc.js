@@ -48,6 +48,8 @@ function head(o){
   L.push(cm(`OP ${o.op.opNo} ${o.op.name}`));
   if(o.op.machine) L.push(cm("MACHINE "+o.op.machine));
   L.push(cm(`MATERIAL ${o.h.material||"-"} ${o.matTxt}`));
+  if(o.ctl) L.push(cm("CONTROL: "+o.ctl.name));
+  if(o.ctl&&NOTES[o.ctl.fam]) L.push(cm(NOTES[o.ctl.fam]));
   if(o.s.cncHeader) L.push(cm(o.s.cncHeader));
   L.push(cm(`GENERATED ${new Date().toISOString().slice(0,10)} DRAFT`));
   L.push("(*** DRAFT - PROVE OUT WITH DRY RUN AND SINGLE BLOCK ***)");
@@ -267,13 +269,41 @@ function milling(o){
   return tail(o,L,["G91 G28 Z0.","G28 Y0.","G90","M05"]);
 }
 
+/* ---------- control system (from Operations Master > Machines > Control system) ---------- */
+function family(name){
+  const n=String(name||"").toLowerCase();
+  if(/siemens|sinumerik|\b8[0-4]\d[dsc]?\b/.test(n)) return "siemens";
+  if(/heidenhain|tnc/.test(n)) return "heidenhain";
+  if(/mitsubishi|meldas|\bm[78]0v?\b|\bm700\b|\be70\b|\bc70\b/.test(n)) return "mitsubishi";
+  if(/haas/.test(n)) return "haas";
+  if(/fanuc|\b0i|\b3[0-5]i|\b1[68]i|\b21i|doosan|hyundai/.test(n)) return "fanuc";
+  if(n) return "iso";            // Mazak, Okuma, Brother, Fagor, Syntec, KND, GSK ... run in ISO G-code mode
+  return "fanuc";
+}
+const NOTES={
+  mitsubishi:"MITSUBISHI - CONFIRM THE G-CODE FORMAT/LIST SET IN THE MACHINE PARAMETERS (FANUC-STYLE CODE BELOW)",
+  haas:"HAAS - MACRO OPTION NEEDED FOR # VARIABLES; CHECK TOOL OFFSETS H/D BEFORE RUNNING",
+  iso:"ISO G-CODE (FANUC-STYLE) - CONFIRM CYCLES AND MACRO SUPPORT ON THIS CONTROL BEFORE RUNNING",
+  fanuc:""
+};
+function ctlOf(op,s){ const name=(op&&op.control)||(s&&s.cncControl)||"Fanuc"; return {name, fam:family(name)}; }
+function fileInfo(op, settings, progNo){
+  const c=ctlOf(op,settings||{}), n=String(progNo||1000).padStart(4,"0");
+  if(c.fam==="siemens") return {prefix:"P", ext:"MPF", name:"P"+n, ctl:c};
+  if(c.fam==="heidenhain") return {prefix:"P", ext:"H", name:"P"+n, ctl:c};
+  return {prefix:"O", ext:"nc", name:"O"+n, ctl:c};
+}
+
 /* ---------- public ---------- */
 function generate(op, plan, settings, progNo){
   const s=settings||{}, h=plan.header||{}, mc=(plan.ctxInfo&&plan.ctxInfo.matCls)||"P";
   const o={op,plan,s,h,progNo:progNo||1000,T:toolIndex(op.tools),ch:charsOf(op,plan),vc:(E.VC&&E.VC[mc])||[180,220],matTxt:(E.MATCLS_TXT&&E.MATCLS_TXT[mc])||"",lock:String(s.cncLock??"1")!=="0"};
+  o.ctl=ctlOf(op,s);
+  const X=window.PDCNCExt&&window.PDCNCExt[o.ctl.fam];
+  if(X){ const f=/^TURN/.test(op.key)?X.turning:X.milling; if(f) return f(o,{N,I,cm,clamp,rpm,findT,E,num}); }
   return /^TURN/.test(op.key) ? turning(o) : milling(o);
 }
 function progNumbers(plan, settings){ const start=+((settings||{}).cncProgStart)||1000; const map={}; let i=0; plan.ops.filter(isCNC).forEach(o=>{ map[o.opNo]=start+i*10; i++; }); return map; }
 
-window.PDCNC = { isCNC, generate, progNumbers };
+window.PDCNC = { isCNC, generate, progNumbers, family, fileInfo, ctlOf };
 })();

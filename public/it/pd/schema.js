@@ -38,7 +38,7 @@ const COLS = {
 };
 /* masters in Admin */
 const MASTER_COLS = {
-  machines:[{k:"id",label:"ID",w:5},{k:"name",label:"Machine",w:16},{k:"make",label:"Make",w:8},{k:"model",label:"Model",w:8},{k:"capacity",label:"Capacity",w:14},{k:"keys",label:"Processes it can do",w:14,type:"keys"},{k:"maxDia",label:"Max size (mm)",w:6,type:"num"},{k:"cap",label:"Capability ± mm",w:6,type:"num"},{k:"location",label:"Location",w:8},{k:"pm",label:"PM frequency",w:7}],
+  machines:[{k:"id",label:"ID",w:5},{k:"name",label:"Machine",w:16},{k:"make",label:"Make",w:8},{k:"model",label:"Model",w:8},{k:"control",label:"Control system",w:10},{k:"capacity",label:"Capacity",w:14},{k:"keys",label:"Processes it can do",w:14,type:"keys"},{k:"maxDia",label:"Max size (mm)",w:6,type:"num"},{k:"cap",label:"Capability ± mm",w:6,type:"num"},{k:"location",label:"Location",w:8},{k:"pm",label:"PM frequency",w:7}],
   gauges:[{k:"id",label:"Gauge ID",w:6},{k:"name",label:"Gauge name (as generated)",w:16},{k:"range",label:"Size / range",w:10},{k:"lc",label:"Least count",w:6},{k:"calFreq",label:"Calibration freq.",w:7},{k:"calDue",label:"Calibration due",w:7,type:"date"},{k:"location",label:"Location",w:8}],
   customers:[{k:"name",label:"Customer name",w:14},{k:"code",label:"Supplier code (given by customer)",w:9},{k:"address",label:"Address",w:18,type:"long"},{k:"contact",label:"Contact person / e-mail",w:12},{k:"ccSym",label:"CC symbol",w:5},{k:"scSym",label:"SC symbol",w:5},{k:"approval",label:"Customer engineering approval",w:10}],
   consumables:[{k:"key",label:"Process",w:8,type:"sel"},{k:"items",label:"Consumables (one per line)",w:30,type:"long"}]
