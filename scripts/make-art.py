@@ -436,6 +436,18 @@ def app_mnt():
     return window(a, "MNT", b)
 
 
+def app_mom():
+    a = "#7C3AED"
+    b = heading("Weekly quality review · MOM-2610-0004", "Discussion points in 5W1H")
+    rows = [("What", "Burr on bore, part 4471-B", INK), ("Why", "Deburring tool worn beyond life", INK), ("Who", "Production Manager", INK), ("When", "Fri 17 Oct", INK), ("Where", "CNC turning cell", INK), ("How", "Tool life limit 800 pcs", INK)]
+    for i, (k, v, c) in enumerate(rows):
+        y = 38 + i * 24
+        b += (f"<rect x='0' y='{y}' width='46' height='18' rx='9' fill='{a}'/><text x='23' y='{y + 12.5}' text-anchor='middle' {FONT} font-size='9' font-weight='700' fill='#fff'>{k}</text>"
+              f"<text x='56' y='{y + 12.5}' {FONT} font-size='10' fill='{c}'>{v}</text>")
+    b += f"<rect x='0' y='188' width='420' height='42' rx='8' fill='#F1ECFE'/><circle cx='20' cy='209' r='8' fill='{a}'/><text x='36' y='206' {FONT} font-size='10' font-weight='700' fill='{INK}'>Listening · Hindi, English</text><text x='36' y='220' {FONT} font-size='9' fill='{MUTED}'>कल तक मशीन दो की मरम्मत पूरी करनी है।</text>"
+    return window(a, "MOM", b)
+
+
 ART = {
     "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
@@ -445,6 +457,7 @@ ART = {
     "app-apqp": lambda: svg(bg("#0891B2") + app_apqp(), "APQP Planner"),
     "app-rmp": lambda: svg(bg("#0D9488") + app_rmp(), "Raw Material Planning"),
     "app-mmd": lambda: svg(bg("#2563EB") + app_mmd(), "Material Movement"),
+    "app-mom": lambda: svg(bg("#7C3AED") + app_mom(), "Minutes Of Meetings"),
     "app-mnt": lambda: svg(bg("#EA580C") + app_mnt(), "Maintenance"),
     "app-ppap": lambda: svg(bg("#B45309") + app_ppap(), "PPAP Submissions"),
     "app-calib": lambda: svg(bg("#6366F1") + app_calib(), "Calibration Hub"),
