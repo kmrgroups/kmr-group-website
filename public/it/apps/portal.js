@@ -290,16 +290,16 @@
         <label class="f">Name<div class="in"><input id="uN" value="${esc(u.name || "")}"></div></label>
         ${tools.map((t) => `<label class="f">${esc(t.name)}<div class="in"><select id="uR_${t.code}">${(t.code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).map((o) => `<option value="${o[0]}" ${((u.roles || {})[t.code] || "") === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></div></label>`).join("")}
         <label style="display:flex;gap:8px;align-items:center;margin:4px 0 12px"><input type="checkbox" id="uA" ${u.is_admin ? "checked" : ""}> Company administrator (Administration pages, users, company details)</label>
-        ${isNew ? `<label class="f">Password for a new login<div class="in"><input id="uP" type="text" placeholder="At least 8 characters — only if this email has no KMR login yet"></div></label>` : (u.login_owned ? `<label class="f">New password (optional)<div class="in"><input id="uP" type="text" placeholder="Leave empty to keep the current password"></div></label>` : "")}
+        ${isNew || u.has_login === false ? `<label class="f">Password for a new login<div class="in"><input id="uP" type="text" placeholder="${isNew ? "At least 8 characters — only if this email has no KMR login yet" : "This person has no login yet — set a password (at least 8 characters)"}"></div></label>` : (u.login_owned ? `<label class="f">New password (optional)<div class="in"><input id="uP" type="text" placeholder="Leave empty to keep the current password"></div></label>` : "")}
         <span class="msg" id="uM"></span>`,
         `<button class="btn" id="uSave">Save</button>${isNew ? "" : `<button class="btn ghost" id="uDel" style="color:#B00E28">Remove from all apps</button>`}`);
       $("#uSave").onclick = async () => {
         const msg = $("#uM"); msg.className = "msg"; msg.textContent = "Saving…";
         const roles = {}; tools.forEach((t) => (roles[t.code] = $("#uR_" + t.code).value));
         const pw = $("#uP") ? $("#uP").value.trim() : "";
-        const r = await sb.rpc("kmr_admin_save_user", { p_slug: SLUG, p: { email: $("#uE").value.trim(), name: $("#uN").value.trim(), is_admin: $("#uA").checked, roles, password: isNew ? pw : "" } });
+        const r = await sb.rpc("kmr_admin_save_user", { p_slug: SLUG, p: { email: $("#uE").value.trim(), name: $("#uN").value.trim(), is_admin: $("#uA").checked, roles, password: isNew || u.has_login === false ? pw : "" } });
         if (r.error) { msg.textContent = r.error.message; return; }
-        if (!isNew && pw) { const rp = await sb.rpc("kmr_admin_reset_password", { p_slug: SLUG, p_email: u.email, p_password: pw }); if (rp.error) { msg.textContent = rp.error.message; return; } }
+        if (!isNew && u.has_login !== false && pw) { const rp = await sb.rpc("kmr_admin_reset_password", { p_slug: SLUG, p_email: u.email, p_password: pw }); if (rp.error) { msg.textContent = rp.error.message; return; } }
         document.querySelector(".veil")?.remove();
         const em = esc($("#uE") ? $("#uE").value : u.email);
         usersView(r.data && r.data.new_login ? `<b>Saved.</b> Send this person the link <b>${esc(location.origin + "/it/app/" + SLUG)}</b>, their email and the password you set. They can change it under "Change password".` : `<b>Saved.</b> Access updated in every app.${isNew ? " This email already had a KMR login — they use their existing password." : ""}`);
