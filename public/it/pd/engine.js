@@ -530,7 +530,7 @@ function buildPlan(source, masters, settings){
   ops.forEach(op=>{
     const oc = op.chars.map(no=>ctx.byNo[no]);
     const m = pickMachine(op, machines, ctx);
-    if(m){ op.machineId=m.id; op.machine=m.name; }
+    if(m){ op.machineId=m.id; op.machine=m.name; op.control=m.control||""; }
     else if(!op.inHouse){ op.machine="Approved sub-contractor"; }
     else if(["RMSTORE","FGSTORE"].includes(op.key)) op.machine="Racks / bins (identified area)";
     else if(op.key==="DISPATCH") op.machine="Truck / tempo";
