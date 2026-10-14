@@ -307,9 +307,11 @@
           <thead><tr style="background:#F5F7FB;text-align:left">${shown.map((c) => `<th style="padding:10px 12px;white-space:nowrap">${esc(c[1])}</th>`).join("")}${K.file ? '<th style="padding:10px 12px">File</th>' : ""}<th></th></tr></thead>
           <tbody id="opsBody"></tbody></table></div>`;
       const body = ctx.main.querySelector("#opsBody");
-      const val = (r, k) => (k === "code" ? r.code : k === "name" ? r.name : (r.data || {})[k]);
+      const cname = {};
+      if (K.fields.some((f) => f.k === "customer") && K.kind !== "customers") { const cr = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: "customers" }); const cl = Array.isArray(cr.data) ? cr.data : ((cr.data && cr.data.records) || []); cl.forEach((x) => { cname[x.code] = x.name; }); }
+      const val = (r, k) => (k === "code" ? r.code : k === "name" ? r.name : k === "customer" ? (cname[(r.data || {}).customer] || (r.data || {}).customer) : (r.data || {})[k]);
       const draw = (q) => {
-        const f = rows.filter((r) => !q || JSON.stringify([r.code, r.name, r.data]).toLowerCase().includes(q.toLowerCase()));
+        const f = rows.filter((r) => !q || JSON.stringify([r.code, r.name, r.data, val(r, "customer")]).toLowerCase().includes(q.toLowerCase()));
         body.innerHTML = f.map((r) => `<tr style="border-top:1px solid var(--line)${r.active === false ? ";opacity:.5" : ""}">${shown.map((c) => `<td style="padding:9px 12px">${c[0] === "code" ? `<b>${esc(val(r, c[0]))}</b>${r.sample ? ' <span class="pill">Sample</span>' : ""}` : esc(val(r, c[0]) ?? "")}</td>`).join("")}
           ${K.file ? `<td style="padding:9px 12px">${r.data && r.data.file_path ? `<button class="btn ghost" data-file="${esc(r.data.file_path)}" style="height:32px">Open</button>` : '<small style="color:var(--muted)">—</small>'}</td>` : ""}
           <td style="padding:9px 12px;text-align:right"><button class="btn ghost" data-id="${r.id}" style="height:32px">${edit ? "Edit" : "View"}</button></td></tr>`).join("") || `<tr><td colspan="9" style="padding:18px;color:var(--muted)">${rows.length ? "No match." : "No records yet."}</td></tr>`;
