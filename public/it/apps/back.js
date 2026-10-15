@@ -33,6 +33,10 @@
     setIcon();
     new MutationObserver(setIcon).observe(document.head, { childList: true, subtree: true, attributes: true, attributeFilter: ["href"] });   // tools that set their own icon keep the customer's
   }
+  /* Every screen shows who is signed in (the login id), not just the role: the role chip becomes the e-mail, the role stays as its tooltip. */
+  const loginId = () => { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sb-.+-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); const u = v && (v.user || (v.currentSession && v.currentSession.user)); if (u && u.email) return u.email; } } } catch (e) {} return ""; };
+  const showLogin = () => { const el = document.getElementById("role"); if (!el || demo) return; const em = loginId(); if (!em || !el.textContent.trim() || el.textContent === em) return; el.title = "Role: " + el.textContent.trim(); el.textContent = em; el.style.textTransform = "none"; };
+  document.addEventListener("DOMContentLoaded", () => { showLogin(); new MutationObserver(showLogin).observe(document.body, { childList: true, subtree: true, characterData: true }); });
   document.addEventListener("DOMContentLoaded", function () {
     // the standard KMR footer on every tool
     if (!document.querySelector(".kmr-foot")) {
