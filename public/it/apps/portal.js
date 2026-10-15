@@ -34,7 +34,7 @@
     calib: { color: "#6366F1", desc: "Instrument register, calibration due control, gauge history, MSA and out-of-tolerance cases.", demo: "/it/calibration.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["maint", "Maintenance"], ["proc", "Procurement"], ["crm", "CRM & RFQ"], ["mmd", "MMD"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["fmea", "AIAG-VDA FMEA"], ["spc", "SPC & MSA"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
-  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [];
+  let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
   const ART = { hrm: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1 };
@@ -99,6 +99,7 @@
       location.href = meta.demo + (meta.demo.includes("?") ? "&" : "?") + "from=" + encodeURIComponent(SLUG);
       return;
     }
+    remember(code);
     if (!r.has_access) {
       if (!r.is_contact && !isAdmin) return dialog(`No access to ${r.product_name}`, "Your company has this app, but you have not been given access to it. Your company administrator can add it under Administration › Users & access.", "");
       const j = await sb.rpc("kmr_portal_join", { p_slug: SLUG, p_product: code });
@@ -130,11 +131,28 @@
     const nm = esc(String(r.product_name || "").toLowerCase()), tip = esc((m.desc || "") + (Object.keys(st).length ? "  ·  " + Object.entries(st).map(([k, v]) => v + " " + k).join(", ") : ""));
     return noAcc ? `<div class="tile off" title="${tip}" data-name="${nm}" style="--c:${m.color}">${inner}</div>` : `<a class="tile${locked ? " lk" : ""}" title="${tip}" href="${appHref(r.product_code)}" data-open="${r.product_code}" data-name="${nm}" style="--c:${m.color}">${inner}</a>`;
   }
+  /* Home-screen themes (apps/portal-themes.js). Theme "a" is the standard launcher below; a theme is chosen per customer in the Console. */
+  const recentKey = () => "kmr-recent-" + (SLUG || "all");
+  const recent = () => { try { return JSON.parse(localStorage.getItem(recentKey()) || "[]"); } catch (e) { return []; } };
+  const remember = (code) => { try { localStorage.setItem(recentKey(), JSON.stringify([code].concat(recent().filter((x) => x !== code)).slice(0, 6))); } catch (e) { /* ignore */ } };
+  function themeCtx(mine, others) {
+    const sub = (r) => !r.ok ? (r.status || "Paused") : (r.valid_until ? "Trial · until " + r.valid_until : (r.status || "Active"));
+    const link = (r, cls, inner, locked) => {
+      const m = META[r.product_code] || {}, noAcc = !locked && r.ok && !r.has_access && !r.is_contact && !isAdmin;
+      const nm = esc(String(r.product_name || "").toLowerCase()), tip = esc(m.desc || "");
+      return noAcc ? `<div class="${cls} off" title="${tip}" data-name="${nm}" style="--c:${m.color}">${inner}</div>`
+        : `<a class="${cls}${locked ? " lk" : ""}" title="${tip}" href="${appHref(r.product_code)}" data-open="${r.product_code}" data-name="${nm}" style="--c:${m.color}">${inner}</a>`;
+    };
+    const known = GROUPS.flatMap((g) => g[2]), rest = mine.filter((r) => !known.includes(r.product_code));
+    const groups = GROUPS.map(([name, color, codes]) => ({ name, color, items: mine.filter((r) => codes.includes(r.product_code)) })).concat(rest.length ? [{ name: "Other apps", color: "#64748B", items: rest }] : []).filter((g) => g.items.length);
+    return { mine, others, groups, plants, isAdmin, ops, stats, brand, user, esc, META, imgOf, appHref, viewHref, sub, link, recent, logoHtml: logo(brand) };
+  }
   function appView() {
     window.scrollTo(0, 0); setView("");
     const mine = rows.filter((r) => r.purchased), others = rows.filter((r) => !r.purchased);
     const pill = (r) => r.ok ? `<span class="pill ok">${esc(r.status)}${r.valid_until ? " · until " + esc(r.valid_until) : ""}</span>` : `<span class="pill warn">${esc(r.status)}</span>`;
-    $("#root").innerHTML = `<div class="app">
+    const TH = THEME && THEME !== "a" && window.KMR_THEMES && window.KMR_THEMES[THEME] ? window.KMR_THEMES[THEME] : null;
+    $("#root").innerHTML = `<div class="app${TH && TH.full ? " nosb" : ""}">
       <aside class="side">
         <a class="who" href="${viewHref("")}" title="Your apps">${logo(brand)}<div><b>${esc(brand.name)}</b><small>${esc(user.email)}</small></div></a>
         ${plants.length > 1 ? `<label style="display:block;padding:6px 10px"><small style="display:block;opacity:.7;margin-bottom:3px">Plant</small><select id="plantSel" style="width:100%;padding:6px;border-radius:8px">${plants.map((x) => `<option value="${esc(x.slug)}"${x.slug === SLUG ? " selected" : ""}>${esc(x.is_main ? "Main · " + x.name : x.plant_code + " · " + x.name.split(" – ").pop())}</option>`).join("")}${plants[0].is_all ? `<option value="__all"${view === "plants" ? " selected" : ""}>★ All plants · dashboard</option>` : ""}</select></label>` : ""}
@@ -146,7 +164,7 @@
         <button id="pw">Change password</button>
         <button class="out" id="out">Sign out</button>
       </aside>
-      <main class="main">
+      <main class="main${TH ? " th th-" + THEME + (TH.full ? " th-full" : "") : ""}">${TH ? TH.html(themeCtx(mine, others)) : `
         <header class="hero"><div><h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p></div>
           <label class="find"><input id="appFind" type="search" placeholder="Find an app…" autocomplete="off"></label></header>
         <div class="chips"><span><b>${mine.length}</b> apps in your plan</span>${plants.length > 1 ? `<span><b>${plants.length}</b> plants</span>` : ""}${isAdmin ? "<span>Administrator</span>" : ""}</div>
@@ -155,9 +173,15 @@
         ${ops || isAdmin ? `<section class="grp" style="--g:#0EA5E9"><h2><i></i>Masters<small>${(ops ? 1 : 0) + (isAdmin ? 2 : 0)}</small></h2><div class="tiles">
           ${ops ? `<a class="tile mini" href="${viewHref("ops")}" data-ops="1" data-name="operations master" style="--c:#0EA5E9"><span class="ic">⚙</span><h3>Operations Master</h3><small class="on">Open</small></a>` : ""}
           ${isAdmin ? `<a class="tile mini" href="${viewHref("data")}" data-datam="1" data-name="data master" style="--c:#0EA5E9"><span class="ic">🗄</span><h3>Data Master</h3><small class="on">Open</small></a><a class="tile mini" href="${viewHref("grand")}" data-grand="1" data-name="grand master" style="--c:#B45309"><span class="ic">★</span><h3>Grand Master</h3><small class="on">Open</small></a>` : ""}</div></section>` : ""}
-        ${others.length ? `<section class="grp" style="--g:#94A3B8"><h2><i></i>Try more of the platform<small>${others.length}</small></h2><div class="tiles">${others.map((r) => tile(r, true)).join("")}</div></section>` : ""}
+        ${others.length ? `<section class="grp" style="--g:#94A3B8"><h2><i></i>Try more of the platform<small>${others.length}</small></h2><div class="tiles">${others.map((r) => tile(r, true)).join("")}</div></section>` : ""}`}
       </main></div>`;
-    { const f = $("#appFind"); if (f) f.oninput = () => { const q = f.value.toLowerCase().trim(); document.querySelectorAll(".tile").forEach((t) => { t.style.display = !q || (t.dataset.name + " " + t.textContent.toLowerCase()).includes(q) ? "" : "none"; }); document.querySelectorAll(".grp").forEach((g) => { g.style.display = [...g.querySelectorAll(".tile")].some((t) => t.style.display !== "none") ? "" : "none"; }); }; }
+    if (TH && TH.bind) TH.bind(themeCtx(mine, others), document.querySelector(".main"));
+    { const t = $("#sbToggle"), ap = document.querySelector(".app"); if (t) { t.onclick = (e) => { e.stopPropagation(); ap.classList.toggle("sb"); }; document.querySelector(".main").addEventListener("click", () => ap.classList.remove("sb")); } }
+    onLink("[data-home]", () => appView());
+    { const f = $("#appFind"); if (f) f.oninput = () => { const q = f.value.toLowerCase().trim(), mn = document.querySelector(".main");
+      if (q && TH) { const all = mn.querySelector('.tabs [data-t=""]'); if (all && !all.classList.contains("on")) all.click(); }
+      mn.querySelectorAll("[data-name]").forEach((t) => { if (t.closest(".tb")) return; t.style.display = !q || (t.dataset.name + " " + t.textContent.toLowerCase()).includes(q) ? "" : "none"; });
+      mn.querySelectorAll(".grp:not(.pane)").forEach((g) => { g.style.display = [...g.querySelectorAll("[data-name]")].some((t) => t.style.display !== "none") ? "" : "none"; }); }; }
     onLink("[data-open]", (b) => open(b.dataset.open));
     onLink("[data-admin]", (b) => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView()));
     onLink("[data-datam]", () => dataView());
@@ -394,6 +418,7 @@
   (async () => {
     if (SLUG) { const { data } = await sb.rpc("kmr_portal_brand", { p_slug: SLUG }); if (data && data[0]) brand = data[0];
       try { const w = await sb.rpc("kmr_workspace_info", { p_slug: SLUG }); if (!w.error && w.data && w.data.kind) SAMPLE_OK = w.data.kind === "demo"; } catch (e) { /* 0049 not applied yet */ } }
+    if (SLUG) { try { const t = await sb.rpc("kmr_portal_theme", { p_slug: SLUG }); if (!t.error && typeof t.data === "string") THEME = t.data; } catch (e) { /* 0068 not applied yet: standard look */ } }
     if (brand.logo_url) setIcon(brand.logo_url);
     else { const k = await sb.rpc("kmr_platform_brand"); if (k.data && k.data.logo_url) { setIcon(k.data.logo_url); if (!SLUG) brand = { name: brand.name, logo_url: k.data.logo_url }; } }
     document.title = `${brand.name} · KMR Apps`;
