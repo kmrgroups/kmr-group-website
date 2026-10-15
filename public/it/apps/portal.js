@@ -119,6 +119,17 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["balloon", "pd", "apqp", "ppap", "calib"]], ["Planning & production", "#10B981", ["capacity", "sales", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrm", "mom"]]];
+  function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
+  function tile(r, locked) {
+    const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};
+    const chips = Object.entries(st).slice(0, 3).map(([k, v]) => `<span><b>${esc(v)}</b> ${esc(k)}</span>`).join("");
+    const noAcc = !locked && r.ok && !r.has_access && !r.is_contact && !isAdmin;
+    const state = locked ? `<span class="pill off">Not in your plan</span>` : r.ok ? `<span class="pill ok">${esc(r.status)}${r.valid_until ? " · until " + esc(r.valid_until) : ""}</span>` : `<span class="pill warn">${esc(r.status)}</span>`;
+    const inner = `<span class="ic">${im ? `<img src="${im}" alt="" loading="lazy">` : esc((r.product_name || "?")[0])}</span><div><h3>${esc(r.product_name)}</h3><p>${esc(m.desc || "")}</p><div class="meta">${state}${chips}</div></div><em>${noAcc ? "No access" : locked ? "Try sample →" : r.ok ? "Open →" : "Try sample →"}</em>`;
+    const nm = esc(String(r.product_name || "").toLowerCase());
+    return noAcc ? `<div class="tile off" data-name="${nm}" style="--c:${m.color}">${inner}</div>` : `<a class="tile${locked ? " lk" : ""}" href="${appHref(r.product_code)}" data-open="${r.product_code}" data-name="${nm}" style="--c:${m.color}">${inner}</a>`;
+  }
   function appView() {
     window.scrollTo(0, 0); setView("");
     const mine = rows.filter((r) => r.purchased), others = rows.filter((r) => !r.purchased);
@@ -136,11 +147,17 @@
         <button class="out" id="out">Sign out</button>
       </aside>
       <main class="main">
-        <h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p>
-        <div class="cards">${mine.map((r) => `<div class="card" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="kpis">${Object.entries(stats[r.product_code] || {}).map(([k, v]) => `<div><b>${esc(v)}</b><small>${esc(k)}</small></div>`).join("")}</div><div class="st">${pill(r)}</div>${r.ok && !r.has_access && !r.is_contact && !isAdmin ? `<span class="pill off">No access — ask your administrator</span>` : `<a class="btn" href="${appHref(r.product_code)}" data-open="${r.product_code}">${r.ok ? "Open " + esc(r.product_name) : "Try with sample data"}</a>`}</div>`).join("")}</div>
-        <h2 style="margin:34px 0 0;font-size:18px">Try more of the platform</h2>
-        <div class="cards">${others.map((r) => `<div class="card locked" style="--c:${META[r.product_code]?.color}">${mediaHtml(r)}<h3>${esc(r.product_name)}</h3><p>${esc(META[r.product_code]?.desc || "")}</p><div class="st"><span class="pill off">Not in your plan</span></div><a class="btn ghost" href="${appHref(r.product_code)}" data-open="${r.product_code}">Try with sample data</a></div>`).join("")}</div>
+        <header class="hero"><div><h1>Welcome back</h1><p class="sub">Open any app your company uses. The same login works everywhere.</p></div>
+          <label class="find"><input id="appFind" type="search" placeholder="Find an app…" autocomplete="off"></label></header>
+        <div class="chips"><span><b>${mine.length}</b> apps in your plan</span>${plants.length > 1 ? `<span><b>${plants.length}</b> plants</span>` : ""}${isAdmin ? "<span>Administrator</span>" : ""}</div>
+        ${GROUPS.map(([gname, gcolor, codes]) => { const gm = mine.filter((r) => codes.includes(r.product_code)); return gm.length ? `<section class="grp" style="--g:${gcolor}"><h2><i></i>${gname}<small>${gm.length}</small></h2><div class="tiles">${gm.map(tile).join("")}</div></section>` : ""; }).join("")}
+        ${(() => { const known = GROUPS.flatMap((g) => g[2]); const rest = mine.filter((r) => !known.includes(r.product_code)); return rest.length ? `<section class="grp" style="--g:#64748B"><h2><i></i>Other apps<small>${rest.length}</small></h2><div class="tiles">${rest.map(tile).join("")}</div></section>` : ""; })()}
+        ${ops || isAdmin ? `<section class="grp" style="--g:#0EA5E9"><h2><i></i>Masters<small>${(ops ? 1 : 0) + (isAdmin ? 2 : 0)}</small></h2><div class="tiles">
+          ${ops ? `<a class="tile mini" href="${viewHref("ops")}" data-ops="1" data-name="operations master" style="--c:#0EA5E9"><span class="ic">⚙</span><div><h3>Operations Master</h3><p>Parts, machines, gauges, tools, cycle times, shifts and more — shared by every app.</p></div><em>Open →</em></a>` : ""}
+          ${isAdmin ? `<a class="tile mini" href="${viewHref("data")}" data-datam="1" data-name="data master" style="--c:#0EA5E9"><span class="ic">🗄</span><div><h3>Data Master</h3><p>Backup, export and import of every app's data.</p></div><em>Open →</em></a><a class="tile mini" href="${viewHref("grand")}" data-grand="1" data-name="grand master" style="--c:#B45309"><span class="ic">★</span><div><h3>Grand Master</h3><p>All plants together — one view for management.</p></div><em>Open →</em></a>` : ""}</div></section>` : ""}
+        ${others.length ? `<section class="grp" style="--g:#94A3B8"><h2><i></i>Try more of the platform<small>${others.length}</small></h2><div class="tiles">${others.map((r) => tile(r, true)).join("")}</div></section>` : ""}
       </main></div>`;
+    { const f = $("#appFind"); if (f) f.oninput = () => { const q = f.value.toLowerCase().trim(); document.querySelectorAll(".tile").forEach((t) => { t.style.display = !q || (t.dataset.name + " " + t.textContent.toLowerCase()).includes(q) ? "" : "none"; }); document.querySelectorAll(".grp").forEach((g) => { g.style.display = [...g.querySelectorAll(".tile")].some((t) => t.style.display !== "none") ? "" : "none"; }); }; }
     onLink("[data-open]", (b) => open(b.dataset.open));
     onLink("[data-admin]", (b) => (b.dataset.admin === "company" ? companyView() : b.dataset.admin === "invoices" ? invoicesView() : usersView()));
     onLink("[data-datam]", () => dataView());
