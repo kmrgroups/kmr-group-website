@@ -3,6 +3,7 @@
    • in sample-data mode (?demo=1): a banner, and "Use my company's data" opens the subscription screen */
 (function () {
   "use strict";
+  { const sc = document.createElement("script"); sc.src = "/it/apps/kmr-table.js"; sc.defer = true; document.head.append(sc); }
   let portal = null; try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {}
   const demo = /[?&]demo=1(&|$)/.test(location.search);
   const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : /sales\.html/.test(location.pathname) ? "sales" : /calibration/.test(location.pathname) ? "calib" : /apqp\.html/.test(location.pathname) ? "apqp" : /ppap\.html/.test(location.pathname) ? "ppap" : /rmp\.html/.test(location.pathname) ? "rmp" : /mmd\.html/.test(location.pathname) ? "mmd" : /mnt\.html/.test(location.pathname) ? "mnt" : /mom\.html/.test(location.pathname) ? "mom" : "";
