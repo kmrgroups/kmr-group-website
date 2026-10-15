@@ -287,13 +287,15 @@
     const edit = (u) => {
       const isNew = !u; u = u || { email: "", name: "", is_admin: false, roles: {} };
       dialog(isNew ? "Add a person" : `Edit ${u.name || u.email}`, `
-        <label class="f">Email<div class="in"><input id="uE" type="email" value="${esc(u.email)}" ${isNew ? "" : "readonly"}></div></label>
+        <div class="ug"><label class="f">Email<div class="in"><input id="uE" type="email" value="${esc(u.email)}" ${isNew ? "" : "readonly"}></div></label>
         <label class="f">Name<div class="in"><input id="uN" value="${esc(u.name || "")}"></div></label>
         ${tools.map((t) => `<label class="f">${esc(t.name)}<div class="in"><select id="uR_${t.code}">${(t.code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).map((o) => `<option value="${o[0]}" ${((u.roles || {})[t.code] || "") === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></div></label>`).join("")}
+        </div>
         <label style="display:flex;gap:8px;align-items:center;margin:4px 0 12px"><input type="checkbox" id="uA" ${u.is_admin ? "checked" : ""}> Company administrator (Administration pages, users, company details)</label>
         ${isNew || u.has_login === false ? `<label class="f">Password for a new login<div class="in"><input id="uP" type="text" placeholder="${isNew ? "At least 8 characters — only if this email has no KMR login yet" : "This person has no login yet — set a password (at least 8 characters)"}"></div></label>` : (u.login_owned ? `<label class="f">New password (optional)<div class="in"><input id="uP" type="text" placeholder="Leave empty to keep the current password"></div></label>` : "")}
         <span class="msg" id="uM"></span>`,
         `<button class="btn" id="uSave">Save</button>${isNew ? "" : `<button class="btn ghost" id="uDel" style="color:#B00E28">Remove from all apps</button>`}`);
+      const dl = document.querySelector(".veil .dlg"); if (dl) dl.classList.add("wide");
       $("#uSave").onclick = async () => {
         const msg = $("#uM"); msg.className = "msg"; msg.textContent = "Saving…";
         const roles = {}; tools.forEach((t) => (roles[t.code] = $("#uR_" + t.code).value));

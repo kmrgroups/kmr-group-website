@@ -67,7 +67,9 @@ footer a{color:#0b2a6f;font-weight:700;text-decoration:none;margin-left:4px}
 .pill{display:inline-block;font:700 11px Arial;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:3px 9px;background:#EEF2FF;color:#4338CA}
 .pill.ok{background:#E7F8EF;color:#1E7B4A}.pill.warn{background:#FFF4E0;color:#9A5B00}.pill.off{background:#F1F3F7;color:#6B788C}
 .veil{position:fixed;inset:0;background:rgba(10,7,32,.55);backdrop-filter:blur(4px);display:grid;place-items:center;padding:20px;z-index:50}
-.dlg{background:#fff;border-radius:18px;max-width:440px;width:100%;padding:28px;box-shadow:0 30px 80px rgba(0,0,0,.35);position:relative}
+.dlg{background:#fff;border-radius:18px;max-width:440px;width:100%;padding:28px;box-shadow:0 30px 80px rgba(0,0,0,.35);position:relative;max-height:calc(100vh - 40px);overflow-y:auto}
+.dlg .row{position:sticky;bottom:-28px;background:#fff;padding:12px 0 2px;margin-top:4px}
+.dlg.wide{max-width:860px}.dlg .ug{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:0 16px}.dlg .ug label.f{margin-bottom:10px}.dlg .ug label.f .in input,.dlg .ug label.f .in select{padding-top:9px;padding-bottom:9px}
 .dlg::before{content:"";position:absolute;left:0;right:0;top:0;height:4px;border-radius:18px 18px 0 0;background:linear-gradient(90deg,#22D3EE,#7C3AED,#EC4899,#F59E0B)}
 .dlg h3{margin:4px 0 8px;font-size:22px}.dlg p{color:var(--muted);margin:0 0 18px}.dlg .row{display:flex;gap:10px;flex-wrap:wrap}
 @keyframes shine{to{background-position:200% 0}}@keyframes hue{to{filter:blur(60px) saturate(1.3) hue-rotate(360deg)}}
