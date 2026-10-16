@@ -56,15 +56,17 @@
     const q = (S.q || "").toLowerCase(), fs = S.fs || "";
     const L = S.list.filter((d) => (fs ? d.status === fs : d.status !== "superseded") && (!q || [d.number, d.title, d.part_no, d.customer, d.rev].join(" ").toLowerCase().includes(q)));
     $("#list").innerHTML = `<div class="row"><input class="grow" id="lq" placeholder="Search number, title, part, customer" value="${esc(S.q || "")}"><select id="lf" style="width:auto"><option value="">Current (all but superseded)</option>${Object.entries(ST).map(([k, v]) => `<option value="${k}"${k === fs ? " selected" : ""}>${v}</option>`).join("")}</select>
-      ${ed() ? '<button class="btn" id="lnew">+ New drawing</button><button class="btn o" id="limp">Import DXF</button>' : ""}${admin() ? '<button class="btn o" id="lexp">Export all (JSON)</button><button class="btn o" id="lrest">Restore JSON</button>' : ""}</div>
+      ${ed() ? '<button class="btn" id="lnew">+ New drawing</button><button class="btn o" id="limp">Import DXF</button>' : ""}<button class="btn o" id="lpub" title="Tick drawings below, then print all their sheets at once">Print ticked drawings</button>${admin() ? '<button class="btn o" id="lexp">Export all (JSON)</button><button class="btn o" id="lrest">Restore JSON</button>' : ""}</div>
       ${L.length ? `<div class="cards">${L.map((d) => `<div class="dcard"><a href="#go=ed&id=${d.id}"><img src="${d.thumb || ""}" alt="" loading="lazy"></a><div><b>${esc(d.number)} · rev ${esc(d.rev)}</b>${esc(d.title)}<br><span class="mut">${esc([d.part_no, d.customer].filter(Boolean).join(" · ") || "—")}</span><br>${chip(d.status)} ${d.sample ? '<span class="chip" style="background:#7c3aed">sample</span>' : ""} <span class="mut" style="font-size:12px">${when(d.updated_at)}${d.updated_by ? " · " + esc(d.updated_by) : ""}</span></div>
-        <div class="acts"><a class="btn s" href="#go=ed&id=${d.id}">Open</a><button class="btn s o" data-info="${d.id}">Details</button>${ed() ? `<button class="btn s o" data-flow="${d.id}">Status</button>` : ""}</div></div>`).join("")}</div>` : `<div class="empty">${S.list.length ? "No drawing matches the filter." : "No drawings yet."}</div>`}
+        <div class="acts"><label class="note" style="margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" data-pick="${d.id}" style="width:auto"${(S.pick || new Set()).has(d.id) ? " checked" : ""}>tick</label><a class="btn s" href="#go=ed&id=${d.id}">Open</a><button class="btn s o" data-info="${d.id}">Details</button>${ed() ? `<button class="btn s o" data-flow="${d.id}">Status</button>` : ""}</div></div>`).join("")}</div>` : `<div class="empty">${S.list.length ? "No drawing matches the filter." : "No drawings yet."}</div>`}
       <p class="note">Each drawing has a number, a revision and a status. A released drawing is locked; to change it make a new revision — the earlier revision is kept as superseded (document control, ISO 9001 7.5.3 / IATF 16949 7.5.3.2.2).</p>`;
     const lq = $("#lq"); lq.oninput = () => { S.q = lq.value; drawList(); const i = $("#lq"); i.focus(); i.selectionStart = i.value.length; };
     $("#lf").onchange = (e) => { S.fs = e.target.value; drawList(); };
     if ($("#lnew")) $("#lnew").onclick = newDlg;
     if ($("#limp")) $("#limp").onclick = importDxf;
     if ($("#lexp")) $("#lexp").onclick = exportAll;
+    S.pick = S.pick || new Set(); document.querySelectorAll("[data-pick]").forEach((c) => (c.onchange = () => { if (c.checked) S.pick.add(c.dataset.pick); else S.pick.delete(c.dataset.pick); }));
+    $("#lpub").onclick = publishMany;
     if ($("#lrest")) $("#lrest").onclick = restoreAll;
     document.querySelectorAll("[data-info]").forEach((b) => (b.onclick = () => infoDlg(b.dataset.info)));
     document.querySelectorAll("[data-flow]").forEach((b) => (b.onclick = () => flowDlg(b.dataset.flow)));
@@ -115,6 +117,19 @@
     }));
   }
   const nextRev = (r) => { r = String(r || "A").trim(); if (/^\d+$/.test(r)) return String(+r + 1).padStart(r.length, "0"); if (/^[A-Z]$/i.test(r)) { const c = r.toUpperCase(); return c === "Z" ? "AA" : String.fromCharCode(c.charCodeAt(0) + 1).replace(/[IO]/, (x) => String.fromCharCode(x.charCodeAt(0) + 1)); } const m = r.match(/^(.*?)(\d+)$/); return m ? m[1] + (+m[2] + 1) : r + "1"; };
+  async function publishMany() {
+    const ids = Array.from(S.pick || []); if (!ids.length) return say("Tick the drawings to print first.");
+    try {
+      const pages = [];
+      for (const id of ids) {
+        const d = await call("kmr_cad_get", { p_id: id }), doc = Object.assign(K.newDoc(false), d.data || {}); doc.layouts = doc.layouts || [];
+        if (doc.layouts.length) for (const l of doc.layouts) pages.push(K.layoutSVG(doc, doc.ents || [], l));
+        else { const W = 420, H = 297, b = K.extents(doc, doc.ents || []); if (!b) continue; const m = 8, k = Math.min((W - 2 * m) / Math.max(1e-9, b.x1 - b.x0), (H - 2 * m) / Math.max(1e-9, b.y1 - b.y0)), cx = (b.x0 + b.x1) / 2, cy = (b.y0 + b.y1) / 2; pages.push({ W, H, svg: K.toSVG(doc, { box: { x0: cx - W / 2 / k, x1: cx + W / 2 / k, y0: cy - H / 2 / k, y1: cy + H / 2 / k }, widthMm: W, heightMm: H, k, mono: true, plot: true, bg: "#fff" }) }); }
+      }
+      if (!pages.length) return say("The ticked drawings are empty.");
+      K.printPages(null, pages, "Drawings " + new Date().toISOString().slice(0, 10)); say(pages.length + " sheet(s) sent to the print dialog — choose Save as PDF for one PDF.", true);
+    } catch (e) { say(e.message); }
+  }
   async function exportAll() {
     try { const rows = []; for (const d of S.list) rows.push(await call("kmr_cad_get", { p_id: d.id })); K.download("kmr-cad-drawings-" + new Date().toISOString().slice(0, 10) + ".json", JSON.stringify({ app: "cad", exported_at: new Date().toISOString(), drawings: rows }, null, 1), "application/json"); say(rows.length + " drawing(s) exported.", true); }
     catch (e) { say(e.message); }

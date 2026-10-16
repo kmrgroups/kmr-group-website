@@ -46,7 +46,7 @@
   const colorSel = (v, id) => `<select data-k="${id}">${COLS.map(([n, c]) => `<option value="${c}"${(v || "") === c ? " selected" : ""}>${n}</option>`).join("")}${v && !COLS.some((c) => c[1] === v) ? `<option value="${v}" selected>${v}</option>` : ""}<option value="__more">More…</option></select>`;
   const ltSel = (v, id, by = true) => `<select data-k="${id}">${by ? `<option value=""${!v ? " selected" : ""}>ByLayer</option>` : ""}${Object.keys(K.LT).map((n) => `<option${n === v ? " selected" : ""}>${n}</option>`).join("")}</select>`;
   const lwSel = (v, id, by = true) => `<select data-k="${id}">${by ? `<option value=""${v == null ? " selected" : ""}>ByLayer</option>` : ""}${K.LW.map((w) => `<option value="${w}"${w === v ? " selected" : ""}>${w.toFixed(2)} mm</option>`).join("")}</select>`;
-  const TN = { fcf: "Geometric tolerance", table: "Table", attdef: "Attribute definition", line: "Line", pline: "Polyline", circle: "Circle", arc: "Arc", ellipse: "Ellipse", spline: "Spline", text: "Text", mtext: "Mtext", dim: "Dimension", leader: "Leader", hatch: "Hatch", insert: "Block reference", point: "Point", xline: "Construction line" };
+  const TN = { vport: "Viewport", fcf: "Geometric tolerance", table: "Table", attdef: "Attribute definition", line: "Line", pline: "Polyline", circle: "Circle", arc: "Arc", ellipse: "Ellipse", spline: "Spline", text: "Text", mtext: "Mtext", dim: "Dimension", leader: "Leader", hatch: "Hatch", insert: "Block reference", point: "Point", xline: "Construction line" };
   K.typeName = (e) => (e.t === "dim" ? { lin: "Linear dimension", ali: "Aligned dimension", rad: "Radius dimension", dia: "Diameter dimension", ang: "Angular dimension", ord: "Ordinate dimension" }[e.kind] : TN[e.t]) || e.t;
   K.measures = (e, doc) => {
     const out = [], d = doc.dim.dec, F = (v) => K.fmt(v, d);
@@ -99,13 +99,13 @@
         h += `<h4>Geometry</h4><div class="cx-pg">${g}</div>${ms.length ? `<div class="cx-kv">${ms.map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join("")}</div>` : ""}`;
       }
       h += `<div class="cx-pa"><button class="cx-b o" data-run="SELECTSIMILAR">Select similar</button><button class="cx-b o" data-run="ERASE">Erase</button><button class="cx-b o" data-desel>Deselect</button></div>`;
-      el.innerHTML = h; bind(E, el, ids);
+      el.innerHTML = h; bind(E, el, ids); if (K.propsHook) K.propsHook(E, el, ents);
     },
     layers(E, el) {
       const cnt = {}; E.doc.ents.forEach((e) => (cnt[e.layer] = (cnt[e.layer] || 0) + 1)); const q = (E._lq || "").toLowerCase();
       el.innerHTML = `<div class="cx-la"><button class="cx-b" data-lnew>Add layer</button><input data-lq placeholder="Filter" value="${esc(E._lq || "")}"></div>
-        <div class="cx-lt"><div class="cx-lh"><span></span><span>Name</span><span title="On / off">On</span><span title="Freeze">Frz</span><span title="Lock">Lock</span><span>Colour</span><span>Linetype</span><span>Weight</span><span></span></div>
-        ${E.doc.layers.filter((l) => !q || l.name.toLowerCase().includes(q)).map((l) => { const i = E.doc.layers.indexOf(l); return `<div class="cx-lr${l.name === E.cur.layer ? " cur" : ""}" data-li="${i}"><button data-lcur title="Make current">${l.name === E.cur.layer ? "✔" : "○"}</button><input data-lname value="${esc(l.name)}"${l.name === "0" ? " disabled" : ""} title="${cnt[l.name] || 0} object(s)"><button data-lon title="On / off">${l.on === false ? "◌" : "💡"}</button><button data-lfrz title="Freeze / thaw">${l.frozen ? "❄" : "☀"}</button><button data-llock title="Lock / unlock">${l.lock ? "🔒" : "🔓"}</button><button data-lcol style="background:${l.color}" title="${l.color}"></button>${ltSel(l.lt, "llt", false)}${lwSel(l.lw, "llw", false)}<button data-ldel title="Remove layer"${l.name === "0" ? " disabled" : ""}>✕</button></div>`; }).join("")}</div>
+        <div class="cx-lt"><div class="cx-lh"><span></span><span>Name</span><span title="On / off">On</span><span title="Freeze">Frz</span><span title="Lock">Lock</span><span title="Plot">Plot</span><span>Colour</span><span>Linetype</span><span>Weight</span><span></span></div>
+        ${E.doc.layers.filter((l) => !q || l.name.toLowerCase().includes(q)).map((l) => { const i = E.doc.layers.indexOf(l); return `<div class="cx-lr${l.name === E.cur.layer ? " cur" : ""}" data-li="${i}"><button data-lcur title="Make current">${l.name === E.cur.layer ? "✔" : "○"}</button><input data-lname value="${esc(l.name)}"${l.name === "0" ? " disabled" : ""} title="${cnt[l.name] || 0} object(s)"><button data-lon title="On / off">${l.on === false ? "◌" : "💡"}</button><button data-lfrz title="Freeze / thaw">${l.frozen ? "❄" : "☀"}</button><button data-llock title="Lock / unlock">${l.lock ? "🔒" : "🔓"}</button><button data-lplot title="Plot / do not plot">${l.plot === false ? "⊘" : "🖨"}</button><button data-lcol style="background:${l.color}" title="${l.color}"></button>${ltSel(l.lt, "llt", false)}${lwSel(l.lw, "llw", false)}<button data-ldel title="Remove layer"${l.name === "0" ? " disabled" : ""}>✕</button></div>`; }).join("")}</div>
         <p class="cx-note">Layer “0” cannot be renamed or deleted. A layer with objects is deleted together with them only after you confirm. Locked layers can be seen and snapped to but not edited.</p>`;
       const L = (b) => E.doc.layers[+b.closest("[data-li]").dataset.li];
       const edit = (label, fn) => E.tx(label, () => { E.doc.layers = E.doc.layers.map((l) => Object.assign({}, l)); fn(); });
@@ -117,6 +117,7 @@
         row.querySelector("[data-lon]").onclick = () => edit("layer on/off", () => { E.doc.layers[i].on = E.doc.layers[i].on === false; });
         row.querySelector("[data-lfrz]").onclick = () => { if (E.doc.layers[i].name === E.cur.layer) return E.err("The current layer cannot be frozen."); edit("freeze", () => { E.doc.layers[i].frozen = !E.doc.layers[i].frozen; }); };
         row.querySelector("[data-llock]").onclick = () => edit("lock", () => { E.doc.layers[i].lock = !E.doc.layers[i].lock; });
+        row.querySelector("[data-lplot]").onclick = () => edit("plot flag", () => { E.doc.layers[i].plot = E.doc.layers[i].plot === false ? undefined : false; });
         row.querySelector("[data-lcol]").onclick = () => E.pickColor(E.doc.layers[i].color, (c) => edit("layer colour", () => { E.doc.layers[i].color = c; }));
         row.querySelector("[data-k=llt]").onchange = (ev) => edit("layer linetype", () => { E.doc.layers[i].lt = ev.target.value; });
         row.querySelector("[data-k=llw]").onchange = (ev) => edit("layer lineweight", () => { E.doc.layers[i].lw = +ev.target.value; });
@@ -318,7 +319,9 @@
   /* =============================== print / PDF =============================== */
   const PAPER = { A4: [297, 210], A3: [420, 297], A2: [594, 420], A1: [841, 594], A0: [1189, 841], Letter: [279.4, 215.9], Tabloid: [431.8, 279.4] };
   const UNITMM = { mm: 1, cm: 10, m: 1000, in: 25.4, ft: 304.8 };
+  K.PAPER = PAPER; K.UNITMM = UNITMM;
   cmd("PLOT", { a: ["PRINT"], d: "Print or save as PDF at a set scale on a paper size", norepeat: true, fn: async (E) => {
+    if (E.space && E.space.lay && K.plotLayout) return K.plotLayout(E);
     const M = (E.mem = E.mem || {}), st = Object.assign({ paper: "A3", orient: "landscape", area: "ext", scale: "fit", mono: true, margin: 7 }, M.plot || {});
     let win = null;
     const build = (o) => {
@@ -348,16 +351,16 @@
   } });
 
   /* =============================== title block (ISO 7200 style) =============================== */
-  cmd("TITLEBLOCK", { a: ["TB", "FRAME", "SHEET"], d: "Drawing sheet with border and title block (A4–A0), at the drawing scale", fn: async (E) => {
-    const I = E.info || {}, M = (E.mem = E.mem || {}), last = M.tb || {};
+  cmd("TITLEBLOCK", { a: ["TB", "FRAME", "SHEET"], d: "Drawing sheet with border and title block (A4–A0), at the drawing scale", fn: async (E, args) => {
+    args = args || {}; const I = E.info || {}, M = (E.mem = E.mem || {}), last = Object.assign({}, M.tb || {}, args.sheet ? { sheet: args.sheet, orient: args.orient, k: 1 } : {});
     const F = (id, label, v) => `<label>${label}<input id="${id}" value="${esc(v || "")}"></label>`;
     const r = await E.dialog("Title block", `<div class="cx-frm"><label>Sheet<select id="ts">${Object.keys(PAPER).filter((p) => p[0] === "A").map((p) => `<option${p === (last.sheet || "A3") ? " selected" : ""}>${p}</option>`).join("")}</select></label><label>Orientation<select id="to"><option value="landscape">Landscape</option><option value="portrait"${last.orient === "portrait" ? " selected" : ""}>Portrait</option></select></label><label>Scale 1 :<input id="tk" type="number" step="any" min="0" value="${last.k || 1}"></label><label>Projection<select id="tp"><option value="1">First angle (ISO E)</option><option value="3"${last.proj === "3" ? " selected" : ""}>Third angle (ISO A)</option></select></label></div>
       <div class="cx-frm">${F("t1", "Company", last.co || I.company || "")}${F("t2", "Title", I.title || "")}${F("t3", "Drawing number", I.number || "")}${F("t4", "Revision", I.rev || "A")}${F("t5", "Material", last.mat || "")}${F("t6", "General tolerance", last.tol || "ISO 2768-m")}${F("t7", "Drawn by", last.dr || I.drawn || "")}${F("t8", "Checked by", last.ck || "")}${F("t9", "Approved by", last.ap || "")}${F("t10", "Date", new Date().toISOString().slice(0, 10))}${F("t11", "Customer / part number", last.cust || I.part || "")}${F("t12", "Sheet", "1 of 1")}</div><p class="cx-note">The border is drawn in model space at the scale you enter (for 1:2 it is twice the paper size). The values are separate text objects, so you can double-click to change them later.</p>`,
       (b) => { const v = (id) => b.querySelector("#" + id).value.trim(); const k = +v("tk"); if (!(k > 0)) throw new Error("Enter the scale, e.g. 1 for 1:1 or 2 for 1:2."); return { sheet: v("ts"), orient: v("to"), k, proj: v("tp"), co: v("t1"), title: v("t2"), num: v("t3"), rev: v("t4"), mat: v("t5"), tol: v("t6"), dr: v("t7"), ck: v("t8"), ap: v("t9"), date: v("t10"), cust: v("t11"), sh: v("t12") }; }, { width: "min(760px,96vw)" });
     if (!r) return; M.tb = Object.assign({}, r);
     const sz = PAPER[r.sheet], W = r.orient === "landscape" ? Math.max(...sz) : Math.min(...sz), H = r.orient === "landscape" ? Math.min(...sz) : Math.max(...sz);
-    const s = r.k / (UNITMM[E.doc.units] || 1);
-    const base = need(await E.getPoint("Specify lower-left corner of the sheet <0,0>:", { dflt: [0, 0], preview: (q) => [{ t: "pline", closed: true, pts: [[q[0], q[1]], [q[0] + W * s, q[1]], [q[0] + W * s, q[1] + H * s], [q[0], q[1] + H * s]] }] }));
+    const s = args.paper ? 1 : r.k / (UNITMM[E.doc.units] || 1);
+    const base = args.base ? args.base : need(await E.getPoint("Specify lower-left corner of the sheet <0,0>:", { dflt: [0, 0], preview: (q) => [{ t: "pline", closed: true, pts: [[q[0], q[1]], [q[0] + W * s, q[1]], [q[0] + W * s, q[1] + H * s], [q[0], q[1] + H * s]] }] }));
     const lay = "Title block";
     const B = [], T = [], ln = (a, b, lw = 0.35) => B.push({ t: "line", layer: "0", lw, a, b }), rect = (x0, y0, x1, y1, lw = 0.7) => B.push({ t: "pline", layer: "0", lw, closed: true, pts: [[x0, y0, 0], [x1, y0, 0], [x1, y1, 0], [x0, y1, 0]] });
     const lab = (x, y, s2) => B.push({ t: "text", layer: "0", p: [x, y], h: 1.8, s: s2, rot: 0, ha: 0, va: 0 }), val = (x, y, s2, h = 3.5, ha = 0) => s2 && T.push({ t: "text", layer: lay, p: [base[0] + x * s, base[1] + y * s], h: h * s, s: s2, rot: 0, ha, va: 0 });
@@ -387,6 +390,6 @@
       for (const t of T) E.add(Object.assign({ color: null, lt: null, lw: null }, t), true);
     });
     if (E.opts.onInfo) E.opts.onInfo(E, { title: r.title, number: r.num, rev: r.rev });
-    E.zoomExt();
+    if (!args.base) E.zoomExt();
   } });
 })((window.KCAD = window.KCAD || {}));

@@ -51,7 +51,7 @@
 <div class="cx-main"><div class="cx-cw"><canvas class="cx-c0"></canvas><canvas class="cx-c1" tabindex="-1"></canvas><div class="cx-dyn"></div><div class="cx-menu"></div><div class="cx-hint"></div></div>
 <aside class="cx-side"><div class="cx-stabs"><button data-p="props" class="on">Properties</button><button data-p="layers">Layers</button><button data-p="blocks">Blocks</button><button data-p="cmds">Commands</button></div><div class="cx-panel"></div></aside></div>
 <div class="cx-cmd"><div class="cx-hist"></div><div class="cx-line"><span class="cx-pr">Command:</span><span class="cx-kws"></span><input class="cx-in" data-nospell autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Type a command or pick a tool"></div><div class="cx-ac"></div></div>
-<div class="cx-status"><span class="cx-xy">0.00, 0.00</span><span class="cx-tg"></span><span class="cx-info"></span></div>
+<div class="cx-status"><span class="cx-spaces"></span><span class="cx-xy">0.00, 0.00</span><span class="cx-tg"></span><span class="cx-info"></span></div>
 <div class="cx-modal"><div class="cx-dlg"></div></div>`;
     const $ = (s) => root.querySelector(s);
     const c0 = $(".cx-c0"), c1 = $(".cx-c1"), x0 = c0.getContext("2d"), x1 = c1.getContext("2d"), inp = $(".cx-in"), hist = $(".cx-hist"), ac = $(".cx-ac"), dyn = $(".cx-dyn"), menu = $(".cx-menu"), hint = $(".cx-hint");
@@ -71,13 +71,15 @@
     new ResizeObserver(resize).observe(c0.parentElement);
     E.pushView = () => { viewStack.push({ cx: E.view.cx, cy: E.view.cy, s: E.view.s }); if (viewStack.length > 30) viewStack.shift(); };
     E.zoomBox = (b, margin = 0.06) => { if (!b) return; E.pushView(); const w = Math.max(b.x1 - b.x0, 1e-6), h = Math.max(b.y1 - b.y0, 1e-6); E.view.s = Math.min(E.view.W / w, E.view.H / h) * (1 - 2 * margin); if (!isFinite(E.view.s) || E.view.s <= 0) E.view.s = 1; E.view.cx = (b.x0 + b.x1) / 2; E.view.cy = (b.y0 + b.y1) / 2; redraw(); };
-    E.zoomExt = () => { const b = K.extents(E.doc); if (b) { if (b.x1 - b.x0 < 1e-9 && b.y1 - b.y0 < 1e-9) { b.x0 -= 50; b.x1 += 50; b.y0 -= 50; b.y1 += 50; } E.zoomBox(b); } else E.zoomBox({ x0: 0, y0: 0, x1: 297, y1: 210 }); };
+    E.zoomExt = () => {
+      if (E.space && E.space.lay && !E.space.ms && K.paperWH) { const [W, H] = K.paperWH(E.layoutOf(E.space.lay)); return E.zoomBox({ x0: 0, y0: 0, x1: W, y1: H }, 0.04); }
+      if (E.space && E.space.ms && E.fitVp) return E.fitVp(); const b = K.extents(E.doc); if (b) { if (b.x1 - b.x0 < 1e-9 && b.y1 - b.y0 < 1e-9) { b.x0 -= 50; b.x1 += 50; b.y0 -= 50; b.y1 += 50; } E.zoomBox(b); } else E.zoomBox({ x0: 0, y0: 0, x1: 297, y1: 210 }); };
     E.zoomPrev = () => { const v = viewStack.pop(); if (v) { Object.assign(E.view, v); redraw(); } };
     E.zoomAt = (sp, f) => { const w = s2w(sp); E.view.s = Math.min(1e6, Math.max(1e-6, E.view.s * f)); const w2 = s2w(sp); E.view.cx += w[0] - w2[0]; E.view.cy += w[1] - w2[1]; redraw(); };
 
     /* ---------------- document + undo ---------------- */
-    const snapshot = () => ({ ents: E.doc.ents.slice(), layers: JSON.parse(JSON.stringify(E.doc.layers)), blocks: Object.assign({}, E.doc.blocks), dim: Object.assign({}, E.doc.dim), text: Object.assign({}, E.doc.text), units: E.doc.units, ltscale: E.doc.ltscale, pdmode: E.doc.pdmode, pdsize: E.doc.pdsize, cur: Object.assign({}, E.cur) });
-    const restore = (s) => { Object.assign(E.doc, { ents: s.ents, layers: s.layers, blocks: s.blocks, dim: s.dim, text: s.text, units: s.units, ltscale: s.ltscale, pdmode: s.pdmode, pdsize: s.pdsize }); E.cur = s.cur; if (!E.doc.layers.find((l) => l.name === E.cur.layer)) E.cur.layer = E.doc.layers[0].name; };
+    const snapshot = () => ({ _active: E.doc._active, modelEnts: E.doc.modelEnts, layouts: (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: (l.ents || []).slice() })), dimstyles: E.doc.dimstyles, dimcur: E.doc.dimcur, annoScale: E.doc.annoScale, ents: E.doc.ents.slice(), layers: JSON.parse(JSON.stringify(E.doc.layers)), blocks: Object.assign({}, E.doc.blocks), dim: Object.assign({}, E.doc.dim), text: Object.assign({}, E.doc.text), units: E.doc.units, ltscale: E.doc.ltscale, pdmode: E.doc.pdmode, pdsize: E.doc.pdsize, cur: Object.assign({}, E.cur) });
+    const restore = (s) => { if (s._active !== E.doc._active && E.onSpaceRestore) E.onSpaceRestore(s._active); Object.assign(E.doc, { _active: s._active, modelEnts: s.modelEnts, layouts: s.layouts, dimstyles: s.dimstyles, dimcur: s.dimcur, annoScale: s.annoScale, ents: s.ents, layers: s.layers, blocks: s.blocks, dim: s.dim, text: s.text, units: s.units, ltscale: s.ltscale, pdmode: s.pdmode, pdsize: s.pdsize }); E.cur = s.cur; if (!E.doc.layers.find((l) => l.name === E.cur.layer)) E.cur.layer = E.doc.layers[0].name; };
     let inTx = 0, txSnap = null, txLabel = "";
     E.begin = (label) => { if (E.readOnly && !inTx) throw new Error(E.readOnly); if (!inTx++) { txSnap = snapshot(); txLabel = label || E.lastCmd || "edit"; } };
     E.end = () => { if (--inTx === 0) { undoS.push(Object.assign(txSnap, { label: txLabel })); if (undoS.length > 200) undoS.shift(); redoS.length = 0; txSnap = null; changed(); } };
@@ -87,6 +89,7 @@
     const changed = () => { E.dirty = true; idx = null; redraw(); refreshSide(); refreshLayerBox(); setSaved(); if (opts.onChange) opts.onChange(E); };
     E.changed = changed;
     let idx = null; // id → entity
+    E.reindex = () => { idx = null; };
     E.byId = (id) => { if (!idx) { idx = new Map(); for (const e of E.doc.ents) idx.set(e.id, e); } return idx.get(id); };
     E.layerOf = (e) => K.layer(E.doc, e.layer);
     E.editable = (e) => { const L = E.layerOf(e); return L.on !== false && !L.frozen && !L.lock; };
@@ -105,11 +108,17 @@
       E.doc = Object.assign(K.newDoc(false), doc); E.doc.dim = Object.assign(K.newDoc().dim, doc.dim || {}); E.doc.text = Object.assign({ h: 2.5 }, doc.text || {});
       if (!E.doc.layers || !E.doc.layers.length) E.doc.layers = K.newDoc().layers;
       E.doc.ents = (E.doc.ents || []).map((e) => (e.id ? e : Object.assign(e, { id: K.uid() })));
+      E.doc.layouts = (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: (l.ents || []).map((e) => (e.id ? e : Object.assign(e, { id: K.uid() }))) })); E.doc._active = "model"; delete E.doc.modelEnts; if (E.onLoad) E.onLoad();
       E.info = info || E.info || {}; E.sel = []; undoS.length = 0; redoS.length = 0; idx = null; E.cur = { layer: E.doc.layers[0].name, color: null, lt: null, lw: null };
       if (E.doc.cur && E.doc.layers.find((l) => l.name === E.doc.cur)) E.cur.layer = E.doc.cur;
       E.dirty = false; resize(); E.zoomExt(); viewStack.length = 0; refreshSide(); refreshLayerBox(); setTitle(); setSaved();
     };
-    E.data = () => Object.assign({}, E.doc, { cur: E.cur.layer });
+    E.data = () => {
+      const d = Object.assign({}, E.doc, { cur: E.cur.layer }), act = E.doc._active || "model";
+      d.ents = act === "model" ? E.doc.ents : E.doc.modelEnts || [];
+      d.layouts = (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: act === l.id ? E.doc.ents : l.ents || [] }));
+      delete d._active; delete d.modelEnts; return d;
+    };
     E.setTitle = (t) => { E.info = Object.assign(E.info || {}, { title: t }); setTitle(); };
     const setTitle = () => { $(".cx-title").textContent = (E.info && (E.info.number ? E.info.number + " · " : "") + (E.info.title || "Untitled")) || "Untitled"; };
     const setSaved = () => { $(".cx-saved").textContent = E.dirty ? "● not saved" : E.savedAt ? "saved " + E.savedAt : ""; $(".cx-saved").classList.toggle("dirty", !!E.dirty); };
@@ -347,8 +356,10 @@
     const drawOverlay = () => { if (!raf1) raf1 = requestAnimationFrame(() => { raf1 = 0; drawOverlayNow(); }); };
     E.drawOverlay = drawOverlay;
     const bg = () => (E.set.light ? "#ffffff" : "#1e2833"), fg = () => (E.set.light ? "#111111" : "#ffffff");
+    E.fg = fg; E.bg = bg; E.drawGrid = (ctx) => drawGrid(ctx);
     const drawBase = () => {
       const ctx = x0, V = E.view; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = bg(); ctx.fillRect(0, 0, V.W, V.H);
+      if (E.baseHook && E.baseHook(ctx)) { ctx.setLineDash([]); drawUCS(ctx); return; }
       if (E.set.grid) drawGrid(ctx);
       const w0 = s2w([0, V.H]), w1 = s2w([V.W, 0]), m = 2 / V.s;
       const P = K.canvasPainter(ctx, V, { fg: fg(), light: E.set.light, lwt: E.set.lwt, ltscale: E.doc.ltscale });
@@ -532,7 +543,7 @@
     c1.addEventListener("pointerenter", () => { mouse.inside = true; });
     c1.addEventListener("dblclick", (ev) => {
       if (ev.button === 1) { E.zoomExt(); return; }
-      if (R || cmdRunning) return; const e = E.pick(s2w(spOf(ev))); if (!e) return;
+      if (R || cmdRunning) return; win = null; drawOverlay(); if (E.dblHook && E.dblHook(s2w(spOf(ev)))) return; const e = E.pick(s2w(spOf(ev))); if (!e) return;
       if (["text", "mtext", "dim", "leader"].includes(e.t)) E.run("TEXTEDIT", { id: e.id });
       else if (e.t === "table") E.run("TABLEDIT", { id: e.id }); else if (e.t === "fcf") E.run("TOLEDIT", { id: e.id });
       else if (e.t === "insert" && ((E.doc.blocks[e.name] || {}).ents || []).some((s) => s.t === "attdef")) E.run("ATTEDIT", { id: e.id }); else { E.sel = [e.id]; showSide("props"); drawOverlay(); refreshSide(); }
@@ -702,6 +713,7 @@
     setTimeout(resize, 0);
     E.focus = () => c1.focus();
     E.destroy = () => document.removeEventListener("keydown", onKey);
+    for (const h of K.editorHooks || []) h(E);
     return E;
   };
 })((window.KCAD = window.KCAD || {}));

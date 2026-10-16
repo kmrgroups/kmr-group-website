@@ -111,10 +111,11 @@
           }
           case "LEADER": { const xs = all(g, 10), ys = all(g, 20); if (xs.length > 1) e = { t: "leader", pts: xs.map((x, k) => [x, ys[k]]), s: "" }; break; }
           case "HATCH": e = readHatch(g); break;
-          case "VIEWPORT": case "ATTRIB_END": case "SEQEND": break;
+          case "VIEWPORT": if (parseInt(g[69] || 0, 10) > 1 && n(g, 41) > 0 && n(g, 45) > 0) { const c = [n(g, 10), n(g, 20)], w = n(g, 40), h = n(g, 41); e = { t: "vport", p0: [c[0] - w / 2, c[1] - h / 2], p1: [c[0] + w / 2, c[1] + h / 2], cx: n(g, 12), cy: n(g, 22), sc: h / n(g, 45) }; } break;
+          case "ATTRIB_END": case "SEQEND": break;
           default: W(v);
         }
-        if (e) { dest.push(common(g, e)); if (e.t === "insert") lastIns = e; else if (v !== "ATTRIB") lastIns = null; }
+        if (e) { (dest === doc.ents && parseInt(g[67] || 0, 10) === 1 ? (doc._paper = doc._paper || []) : dest).push(common(g, e)); if (e.t === "insert") lastIns = e; else if (v !== "ATTRIB") lastIns = null; }
       }
     };
     const readHatch = (g) => {
@@ -188,6 +189,12 @@
     for (const e of doc.ents) if (!doc.layers.find((l) => l.name === e.layer)) doc.layers.push({ name: e.layer, color: "#ffffff", lt: "CONTINUOUS", lw: 0.25, on: true, frozen: false, lock: false });
     for (const b of Object.values(doc.blocks)) for (const e of b.ents) if (!doc.layers.find((l) => l.name === e.layer)) doc.layers.push({ name: e.layer, color: "#ffffff", lt: "CONTINUOUS", lw: 0.25, on: true, frozen: false, lock: false });
     doc.ents.forEach((e) => (e.id = K.uid()));
+    if (doc._paper && doc._paper.length) {
+      const P = doc._paper; delete doc._paper; P.forEach((e) => (e.id = K.uid()));
+      const b = K.extents(Object.assign({}, doc, { ents: P }), P) || { x0: 0, y0: 0, x1: 420, y1: 297 }, w = b.x1 - b.x0, h = b.y1 - b.y0, land = w >= h;
+      const paper = (K.PAPER ? Object.entries(K.PAPER).filter(([k]) => k[0] === "A").sort((a, c) => a[1][0] - c[1][0]).find(([, s]) => Math.max(...s) >= Math.max(w, h) - 1 && Math.min(...s) >= Math.min(w, h) - 1) : null) || ["A0"];
+      doc.layouts = [{ id: K.uid(), name: "Layout1", paper: paper[0], orient: land ? "landscape" : "portrait", ps: "mono", ents: P }];
+    }
     return { doc, warn };
   };
 
