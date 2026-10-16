@@ -4,7 +4,7 @@
   const G = K.geom, D2R = Math.PI / 180, TAU = G.TAU, cmd = K.cmd;
   const isP = (v) => Array.isArray(v);
   const pr = (msg, kws, dflt) => msg + (kws && kws.length ? " [" + kws.join("/") + "]" : "") + (dflt != null ? " <" + dflt + ">" : "") + ":";
-  const mem = (E) => (E.mem = E.mem || { r: 10, off: 10, fil: 0, cham: [5, 5], hatch: { pat: "ANSI31", sc: 1, ang: 0 }, poly: 6, polyI: "Inscribed", ttr: 10, filTrim: true, txtRot: 0 });
+  const mem = (E) => { if (!E.mem || !E.mem._d) E.mem = Object.assign({ r: 10, off: 10, fil: 0, cham: [5, 5], hatch: { pat: "ANSI31", sc: 1, ang: 0 }, poly: 6, polyI: "Inscribed", ttr: 10, filTrim: true, txtRot: 0, _d: true }, E.mem || {}); return E.mem; };
   const f = (v, E) => K.fmt(v, E.doc.dim.dec);
   const need = (v) => { if (v == null) throw K.CANCEL; return v; };
   const ccwLoop = (pts) => (G.area(pts) < 0 ? pts.slice().reverse() : pts);

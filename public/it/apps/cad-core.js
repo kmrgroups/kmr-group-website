@@ -193,7 +193,9 @@
   /** the dimension style of a dimension: Standard (doc.dim) ← named style ← its own overrides; annotative scale applied */
   K.dimStyle = (e, doc) => { const D = Object.assign({}, doc.dim, (doc.dimstyles || {})[e.sty] || {}, e.st || {}); if (e.anno || D.anno) D.scale = (D.scale || 1) * K.annoF(); return D; };
   /** annotative factor: model units per paper mm at the current annotation scale (1 when not used) */
+  K.view = K.view || { anno: 1 };
   K.annoF = () => (K.view && K.view.anno ? K.view.anno : 1);
+  K.noPlot = (doc, e) => { const L = K.layer(doc, e.layer); return L.plot === false || /^defpoints$/i.test(L.name); };
   K.dimText = (e, doc) => {
     const D = K.dimStyle(e, doc), fm = (v) => (D.pre || "") + K.fmt(v * (D.lfac || 1), D.dec) + (D.sfx || "");
     let v = "";
@@ -270,7 +272,7 @@
 
   /* ---------- leaders and multiline text ---------- */
   K.leaderGeom = (e, doc) => {
-    const out = [], as = (doc.dim.as || 2.5) * (doc.dim.scale || 1), P = e.pts;
+    const out = [], as = (doc.dim.as || 2.5) * (doc.dim.scale || 1) * (e.annoK || 1), P = e.pts;
     for (let i = 0; i < P.length - 1; i++) out.push({ t: "line", a: P[i], b: P[i + 1] });
     if (P.length > 1) out.push(arrow(P[0], G.unit(G.sub(P[0], P[1])), as));
     if (e.style === "balloon" && P.length > 1) {
@@ -354,6 +356,7 @@
 
   /* ---------- segments of anything (selection, extents) ---------- */
   K.segs = (e, doc) => {
+    if (e.anno) e = K.annoEnt(e);
     switch (e.t) {
       case "line": case "circle": case "arc": case "pline": case "ellipse": case "spline": return G.prims(e);
       case "xline": { const L = 1e7; return [{ k: "s", a: e.ray ? e.p : G.sub(e.p, G.mul(e.dir, L)), b: G.add(e.p, G.mul(e.dir, L)) }]; }
@@ -371,12 +374,13 @@
   const bbCache = new WeakMap();
   K.bbox = (e, doc) => {
     if (e.t === "xline") return null;
-    let b = bbCache.get(e); if (b !== undefined) return b; b = null;
+    let b = e.anno ? undefined : bbCache.get(e); if (b !== undefined) return b; b = null;
     for (const s of K.segs(e, doc)) b = G.mergeBounds(b, G.primBounds(s));
-    bbCache.set(e, b); return b;
+    if (!e.anno) bbCache.set(e, b); return b;
   };
   K.extents = (doc, ents) => { let b = null; for (const e of ents || doc.ents) { const L = K.layer(doc, e.layer); if (L.on === false || L.frozen) continue; b = G.mergeBounds(b, K.bbox(e, doc)); } return b; };
   K.hitDist = (e, p, doc) => {
+    if (e.anno) e = K.annoEnt(e);
     if (K.EXT[e.t]) { let d = Infinity; for (const w of K.EXT[e.t].geom(e, doc)) { const v = K.hitDist(w, p, doc); if (v < d) d = v; } return d; }
     if (e.t === "insert") { let d = Infinity; for (const w of K.expand(e, doc)) { const v = K.hitDist(w, p, doc); if (v < d) d = v; if (d === 0) break; } return d; }
     if (e.t === "hatch") { let inside = false; for (const l of e.loops) if (G.inPoly(p, l)) inside = !inside; if (inside) return 0; }
@@ -442,7 +446,17 @@
 
   /* ---------- painting ---------- */
   /** paint entities into a painter: P.style({color,lt,lw}), P.line, P.poly(pts,closed), P.arc(c,r,a0,a1), P.circle(c,r), P.text(base,h,s,rot,ha), P.fill(loops), P.point(p) */
+  /* annotative objects: heights are paper heights, drawn × the annotation factor (model units per paper mm) */
+  const annoCache = new WeakMap();
+  K.annoEnt = (e) => {
+    if (!e.anno || !["text", "mtext", "fcf", "leader"].includes(e.t)) return e;
+    const f = K.annoF(); if (f === 1) return e;
+    let c = annoCache.get(e); if (c && c.f === f) return c.e;
+    let n; if (e.t === "leader") n = Object.assign({}, e, { h: (e.h || 2.5) * f, annoK: f }); else { n = K.xform(e, K.M.scale(e.p, f)); n.id = e.id; }
+    annoCache.set(e, { f, e: n }); return n;
+  };
   K.paint = (P, e, doc, inh) => {
+    if (e.anno) e = K.annoEnt(e);
     const L = K.layer(doc, e.layer);
     if (!inh) { if (L.on === false || L.frozen) return; }
     const col = e.color && e.color !== "byblock" ? e.color : inh && (!e.color || e.color === "byblock") && (!e.layer || e.layer === "0") ? inh.color : L.color;
@@ -520,7 +534,8 @@
   K.svgPainter = (o) => {
     o = o || {}; const out = [], f = (v) => (+v.toFixed(4)).toString();
     let att = "";
-    const col = (c) => (o.mono ? "#000" : !c || /^#(ffffff|fff)$/i.test(c) ? "#000" : c);
+    const gray = (c) => { const h = c.replace("#", ""), r = parseInt(h.slice(0, 2), 16), g = parseInt(h.slice(2, 4), 16), b = parseInt(h.slice(4, 6), 16), y = Math.round(Math.min(200, 0.3 * r + 0.59 * g + 0.11 * b) * 0.75); return "#" + [y, y, y].map((v) => v.toString(16).padStart(2, "0")).join(""); };
+    const col = (c) => (o.mono ? "#000" : !c || /^#(ffffff|fff)$/i.test(c) ? "#000" : o.gray && /^#[0-9a-f]{6}$/i.test(c) ? gray(c) : c);
     const P = {
       tol: o.tol || 0.05, out,
       style(st) {
@@ -544,8 +559,8 @@
     o = o || {}; const box = o.box || K.extents(doc) || { x0: 0, y0: 0, x1: 100, y1: 100 };
     const bw = Math.max(box.x1 - box.x0, 1e-6), bh = Math.max(box.y1 - box.y0, 1e-6);
     const Wmm = o.widthMm || bw, Hmm = o.heightMm || bh, k = o.k || Math.min(Wmm / bw, Hmm / bh);
-    const P = K.svgPainter({ k, mono: o.mono, ltscale: doc.ltscale, tol: 0.2 / k, diag: (bw + bh) * 2 });
-    for (const e of doc.ents) K.paint(P, e, doc);
+    const P = K.svgPainter({ k, mono: o.mono, gray: o.gray, ltscale: doc.ltscale, tol: 0.2 / k, diag: (bw + bh) * 2 });
+    for (const e of o.ents || doc.ents) { if (o.plot && K.noPlot(doc, e)) continue; K.paint(P, e, doc); }
     const tx = (Wmm - bw * k) / 2 - box.x0 * k, ty = (Hmm - bh * k) / 2 + box.y1 * k;
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${Wmm}mm" height="${Hmm}mm" viewBox="0 0 ${Wmm} ${Hmm}">${o.bg ? `<rect width="100%" height="100%" fill="${o.bg}"/>` : ""}<g transform="matrix(${k} 0 0 ${-k} ${tx} ${ty})" stroke-linecap="round" stroke-linejoin="round">${P.out.join("")}</g>${o.extra || ""}</svg>`;
   };
