@@ -447,6 +447,24 @@
     return n;
   };
 
+  /* ---------- raster image (a scanned or PDF sheet under a stage drawing): {t:"image", p (lower-left), w, h, rot, src} ----------
+     src is a data URL, or "img:<key>" for a picture kept once in doc.images (several sheets can share one picture) */
+  K.imgSrc = (doc, e) => (/^img:/.test(e.src || "") ? ((doc && doc.images) || {})[e.src.slice(4)] || "" : e.src || "");
+  const imgCache = new Map(); K.imgListeners = K.imgListeners || [];
+  K.imgEl = (src) => {
+    if (!src) return null; let im = imgCache.get(src); if (im) return im;
+    im = new Image(); im.onload = () => { for (const f of K.imgListeners) try { f(); } catch (e) { /* ignore */ } }; im.src = src; imgCache.set(src, im);
+    if (imgCache.size > 40) imgCache.delete(imgCache.keys().next().value);
+    return im;
+  };
+  /** resolves when every picture used by these entities has loaded (before printing / exporting) */
+  K.imgReady = (doc, ents) => Promise.all((ents || doc.ents).filter((e) => e.t === "image").map((e) => { const im = K.imgEl(K.imgSrc(doc, e)); return !im || (im.complete && im.naturalWidth) ? null : im.decode().catch(() => null); }));
+  K.EXT.image = {
+    geom(e) { const c = Math.cos(e.rot || 0), s = Math.sin(e.rot || 0), T = (x, y) => [e.p[0] + x * c - y * s, e.p[1] + x * s + y * c, 0]; return [{ t: "pline", closed: true, pts: [T(0, 0), T(e.w, 0), T(e.w, e.h), T(0, e.h)] }]; },
+    xform(e, m, d, n) { n.p = M.ap(m, e.p); n.w = e.w * d.s; n.h = e.h * d.s; n.rot = (e.rot || 0) + d.phi; return n; },
+    grips: (e) => [e.p],
+  };
+
   /* ---------- painting ---------- */
   /** paint entities into a painter: P.style({color,lt,lw}), P.line, P.poly(pts,closed), P.arc(c,r,a0,a1), P.circle(c,r), P.text(base,h,s,rot,ha), P.fill(loops), P.point(p) */
   /* annotative objects: heights are paper heights, drawn × the annotation factor (model units per paper mm) */
@@ -464,7 +482,7 @@
     if (!inh) { if (L.on === false || L.frozen) return; }
     const col = e.color && e.color !== "byblock" ? e.color : inh && (!e.color || e.color === "byblock") && (!e.layer || e.layer === "0") ? inh.color : L.color;
     const lt = e.lt && e.lt !== "BYLAYER" && e.lt !== "BYBLOCK" ? e.lt : L.lt, lw = e.lw != null && e.lw >= 0 ? e.lw : L.lw;
-    const st = { color: col, lt, lw, w: e.w || 0 };
+    const st = { color: col, lt, lw, w: e.t === "pline" ? e.w || 0 : 0 };   // w is a polyline's width; on text it is the wrap width
     const sub = (arr, styleOverride) => { for (const g of arr) { const s2 = Object.assign({}, st, styleOverride || {}); P.style(Object.assign({}, s2, { lt: g.t === "hatch" || g.t === "text" ? "CONTINUOUS" : s2.lt })); draw(g); } };
     const draw = (g) => {
       switch (g.t) {
@@ -487,6 +505,7 @@
         case "leader": sub(K.leaderGeom(g, doc), { lt: "CONTINUOUS" }); P.style(st); break;
         case "insert": for (const w of K.expand(g, doc)) K.paint(P, w, doc, { color: col }); break;
         case "attdef": P.text(K.textBase(g), g.h, g.tag || "TAG", g.rot || 0, g.ha === 2 ? 2 : g.ha === 1 ? 1 : 0); break;
+        case "image": if (P.image) P.image(K.imgSrc(doc, g), g); else sub(K.EXT.image.geom(g), { lt: "CONTINUOUS" }); break;
         default: if (K.EXT[g.t]) { if (K.EXT[g.t].items) { for (const w of K.EXT[g.t].items(g, doc)) K.paint(P, w, doc, { color: col }); } else { sub(K.EXT[g.t].geom(g, doc), { lt: "CONTINUOUS" }); } P.style(st); }
       }
     };
@@ -517,6 +536,13 @@
       text(b, h, str, rot, ha) {
         const px = h * s / 0.716; if (px < 1.2) { if (px * str.length > 2) { ctx.save(); ctx.globalAlpha = 0.5; const w = G.textW(str, h); const e2 = G.add(b, G.rotp([ha === 1 ? w / 2 : ha === 2 ? 0 : w, 0], [0, 0], rot)), s2 = G.add(b, G.rotp([ha === 1 ? -w / 2 : ha === 2 ? -w : 0, 0], [0, 0], rot)); ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(X(s2), Y(s2)); ctx.lineTo(X(e2), Y(e2)); ctx.stroke(); ctx.restore(); } return; }
         ctx.save(); ctx.translate(X(b), Y(b)); ctx.rotate(-rot); ctx.font = px.toFixed(2) + "px Arial, Helvetica, sans-serif"; ctx.textBaseline = "alphabetic"; ctx.textAlign = ha === 1 ? "center" : ha === 2 ? "right" : "left"; ctx.fillText(str, 0, 0); ctx.restore();
+      },
+      image(src, g) {
+        const im = K.imgEl(src), x = X(g.p), y = Y(g.p), w = g.w * s, h = g.h * s;
+        ctx.save(); ctx.translate(x, y); ctx.rotate(-(g.rot || 0));
+        if (im && im.complete && im.naturalWidth) { ctx.imageSmoothingQuality = "high"; ctx.drawImage(im, 0, -h, w, h); }
+        else { ctx.setLineDash([4, 3]); ctx.strokeRect(0, -h, w, h); ctx.setLineDash(dashed); }
+        ctx.restore();
       },
       fill(loops) { ctx.beginPath(); for (const l of loops) { if (l.length < 3) continue; ctx.moveTo(X(l[0]), Y(l[0])); for (let i = 1; i < l.length; i++) ctx.lineTo(X(l[i]), Y(l[i])); ctx.closePath(); } ctx.fill("evenodd"); },
       point(p, mode, size) {
@@ -553,6 +579,7 @@
       arc(c, r, a0, a1) { const sw = G.sweep(a0, a1), p = G.polar(c, a0, r), q = G.polar(c, a1, r); out.push(`<path d="M${f(p[0])} ${f(p[1])}A${f(r)} ${f(r)} 0 ${sw > Math.PI ? 1 : 0} 1 ${f(q[0])} ${f(q[1])}" fill="none" ${att}/>`); },
       text(b, h, s, rot, ha) { const e = String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); out.push(`<text transform="translate(${f(b[0])} ${f(b[1])}) rotate(${f(rot / D2R)}) scale(1 -1)" font-size="${f(h / 0.716)}" font-family="Arial, Helvetica, sans-serif" text-anchor="${ha === 1 ? "middle" : ha === 2 ? "end" : "start"}" fill="${P.fillc}" stroke="none">${e}</text>`); },
       fill(loops) { out.push(`<path d="${loops.map((l) => "M" + l.map((p) => f(p[0]) + " " + f(p[1])).join("L") + "Z").join("")}" fill="${P.fillc}" fill-rule="evenodd" stroke="none"/>`); },
+      image(src, g) { if (!src) return; out.push(`<image href="${String(src).replace(/"/g, "&quot;")}" x="0" y="0" width="${f(g.w)}" height="${f(g.h)}" preserveAspectRatio="none" transform="translate(${f(g.p[0])} ${f(g.p[1])}) rotate(${f((g.rot || 0) / D2R)}) translate(0 ${f(g.h)}) scale(1 -1)"/>`); },
       point(p, mode) { const r = 1; if (!mode) out.push(`<circle cx="${f(p[0])}" cy="${f(p[1])}" r="${f(0.3)}" fill="${P.fillc}" stroke="none"/>`); else { P.line([p[0] - r, p[1] - r], [p[0] + r, p[1] + r]); P.line([p[0] - r, p[1] + r], [p[0] + r, p[1] - r]); } },
     };
     return P;

@@ -50,6 +50,7 @@ function blocksFor(id){
     case "sop": {
       doc.sections.forEach((s,i)=>{ B.push({kind:"section", title:`Op ${s.opNo} – ${s.opName}`, newPage:i>0});
         B.push(kv([["Operation",`${s.opNo} – ${s.opName}`],["Machine / equipment",s.machine||""],["SOP no.",s.docNo||(doc.docNo+"/"+s.opNo)]],3));
+        if(window.PDStage) PDStage.blocks(s).forEach(b=>B.push(b));
         B.push({kind:"image", src:s.img||""}); B.push({kind:"boxes", items:[["Tools",s.tools],["Gauges / instruments",s.gauges],["Consumables",s.consumables],["Personal protective equipment",s.ppe]]});
         B.push({kind:"label",text:"Work sequence"}); B.push(tableBlock([{k:"no",label:"Step",w:3},{k:"step",label:"Work step",w:22},{k:"key",label:"Key point / reason",w:16}], s.steps));
         if(s.checks.length){ B.push({kind:"label",text:"Quality checks at this operation"}); B.push(tableBlock([{k:"charNo",label:"Balloon",w:4},{k:"char",label:"Characteristic",w:10},{k:"spec",label:"Specification",w:13},{k:"cls",label:"Class",w:4},{k:"gauge",label:"Gauge",w:14},{k:"freq",label:"Frequency",w:8}], s.checks)); }
@@ -109,7 +110,7 @@ async function pdf(ids){
     for(const b of blocks){
       if(b.kind==="section"){ if(b.newPage&&!firstSection){ doc.addPage(fmt,ori); y=hdr(); } firstSection=false; need(10);
         doc.setFillColor(230,238,251); doc.setDrawColor(21,35,59); doc.setLineWidth(0.2); doc.rect(10,y,PW()-20,7,"FD"); doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.setTextColor(21,35,59); doc.text(T(b.title),12,y+4.8); y+=9; continue; }
-      if(b.kind==="image"){ if(!b.src) continue; const bh=95, bw=PW()-20; need(bh+4); doc.setDrawColor(170,180,195); doc.setLineWidth(0.2); doc.rect(10,y,bw,bh); try{ const ip=doc.getImageProperties(b.src), r=Math.min((bw-2)/ip.width,(bh-2)/ip.height), w=ip.width*r, hh=ip.height*r; doc.addImage(b.src,ip.fileType||"JPEG",10+(bw-w)/2,y+(bh-hh)/2,w,hh,undefined,"FAST"); }catch(e){} y+=bh+3; continue; }
+      if(b.kind==="image"){ if(!b.src) continue; const bw=PW()-20; let bh=95; if(b.stage){ try{ const ip0=doc.getImageProperties(b.src); bh=Math.min(PH()-40,(bw-2)*ip0.height/ip0.width+2); }catch(e){ bh=180; } } need(bh+4); doc.setDrawColor(170,180,195); doc.setLineWidth(0.2); doc.rect(10,y,bw,bh); try{ const ip=doc.getImageProperties(b.src), r=Math.min((bw-2)/ip.width,(bh-2)/ip.height), w=ip.width*r, hh=ip.height*r; doc.addImage(b.src,ip.fileType||"JPEG",10+(bw-w)/2,y+(bh-hh)/2,w,hh,undefined,"FAST"); }catch(e){} y+=bh+3; continue; }
       if(b.kind==="label"){ need(8); doc.setFont("helvetica","bold"); doc.setFontSize(9); doc.setTextColor(21,35,59); doc.text(T(b.text),10,y+4); y+=6; continue; }
       if(b.kind==="text"){ need(8); doc.setFont("helvetica","normal"); doc.setFontSize(9); doc.setTextColor(90,100,115); doc.text(T(b.text),10,y+4); y+=8; continue; }
       if(b.kind==="sim"){ need(9); doc.setFillColor(255,243,220); doc.setDrawColor(168,105,15); doc.rect(10,y,PW()-20,7,"FD"); doc.setTextColor(168,105,15); doc.setFont("helvetica","bold"); doc.setFontSize(9.5); doc.text("SIMULATED DATA - FOR TRAINING ONLY - NOT FOR PPAP SUBMISSION",PW()/2,y+4.8,{align:"center"}); y+=9;
@@ -241,6 +242,10 @@ async function xlsx(ids){
             const hc=ws.getCell(r,c1); hc.value=it[0]; hc.font={bold:true}; hc.fill={type:"pattern",pattern:"solid",fgColor:{argb:"FFEAF0F7"}}; const bc=ws.getCell(r+1,c1); bc.value=it[1]||""; bc.alignment={wrapText:true,vertical:"top"};
             for(let c=c1;c<=c2;c++){ ws.getCell(r,c).border=border; ws.getCell(r+1,c).border=border; } });
           const lines=Math.max(...[b.items[i],b.items[i+1]].filter(Boolean).map(x=>String(x[1]||"").split("\n").length)); ws.getRow(r+1).height=Math.min(300,Math.max(30,lines*14)); r+=3; } continue; }
+      if(b.kind==="image"){ if(!b.src) continue; const m=/^data:image\/(png|jpe?g);base64,(.*)$/i.exec(b.src); if(!m) continue;
+        const iw=await new Promise(res=>{ const im=new Image(); im.onload=()=>res([im.naturalWidth,im.naturalHeight]); im.onerror=()=>res(null); im.src=b.src; }); if(!iw) continue;
+        const id3=wb.addImage({base64:m[2],extension:m[1].toLowerCase()==="png"?"png":"jpeg"}); const wpx=Math.min(colsPx(ws,1,N),b.stage?1100:700), hpx=Math.min(b.stage?780:360,iw[1]*(wpx/iw[0])), w2=iw[0]*(hpx/iw[1]);
+        ws.addImage(id3,{tl:{col:0,row:r-1},ext:{width:Math.min(wpx,w2),height:hpx}}); r+=Math.ceil(hpx/20)+1; continue; }
       if(b.kind==="chart"){ const png=CH.toPNG(b.model,2); const id2=wb.addImage({base64:png,extension:"png"}); const wpx=Math.min(colsPx(ws,1,N),900), hpx=b.model.h*(wpx/b.model.w);
         ws.addImage(id2,{tl:{col:0,row:r-1},ext:{width:wpx,height:hpx}}); r+=Math.ceil(hpx/20)+1; continue; }
       if(b.kind==="table"){

@@ -98,7 +98,14 @@
             if (cols > 1 || rows > 1) { e.cols = cols; e.rows = rows; e.dc = n(g, 44); e.dr = n(g, 45); }
             break;
           }
-          case "DIMENSION": if (g[2]) e = { t: "insert", name: String(g[2]), p: [0, 0], sx: 1, sy: 1, rot: 0, dimblock: true }; break;
+          case "DIMENSION": {
+            const nm = g[2] ? String(g[2]) : "", B = nm && doc.blocks[nm];
+            if (B && (B.ents || []).length) { e = { t: "insert", name: nm, p: [0, 0], sx: 1, sy: 1, rot: 0, dimblock: true }; if (g[11] !== undefined) e.dxtp = [n(g, 11), n(g, 21)]; break; }
+            // no picture block (some programs write *NONE): keep the dimension's words at its text point
+            const mv = g[42] !== undefined ? String(+n(g, 42).toFixed(4)) : "", raw = mtextClean(txtClean(g[1] || "")).replace(/\n/g, " ").trim(), s2 = raw ? raw.replace("<>", mv) : mv;
+            if (s2 && g[11] !== undefined) e = { t: "text", p: [n(g, 11), n(g, 21)], h: 2.5, s: s2, rot: n(g, 53) * D2R, ha: 1, va: 2, dimtext: true };
+            break;
+          }
           case "ELLIPSE": {
             const c = [n(g, 10), n(g, 20)], mx = n(g, 11), my = n(g, 21), ratio = n(g, 40, 1), rx = Math.hypot(mx, my), a0 = n(g, 41, 0), a1 = n(g, 42, Math.PI * 2);
             e = { t: "ellipse", c, rx, ry: rx * ratio, rot: Math.atan2(my, mx) };
@@ -109,6 +116,15 @@
             const xs = all(g, 10), ys = all(g, 20), fx = all(g, 11), fy = all(g, 21), knots = all(g, 40), deg = parseInt(g[71] || 3, 10), closed = !!(parseInt(g[70] || 0, 10) & 1);
             if (xs.length && knots.length) e = { t: "spline", ctrl: xs.map((x, k) => [x, ys[k]]), knots, deg, pts: xs.map((x, k) => [x, ys[k]]), closed };
             else if (fx.length) e = { t: "spline", pts: fx.map((x, k) => [x, fy[k]]), closed };
+            break;
+          }
+          case "TOLERANCE": {   // feature control frame written with the GDT font: {\Fgdt;j}%%v{\Fgdt;n}0.05{\Fgdt;m}%%vA%%vB
+            const SYM = { a: "angularity", b: "perpendicularity", c: "flatness", d: "profile_surface", e: "circularity", f: "parallelism", g: "cylindricity", h: "runout", i: "symmetry", j: "position", k: "profile_line", r: "concentricity", t: "total_runout", u: "straightness" };
+            const row = String(g[1] || "").split(/\^J|\\P/)[0], parts = row.split(/%%v/i).map((x) => x.replace(/\{\\Fgdt;([a-z])\}/gi, (m, c) => "§" + c.toLowerCase()).replace(/[{}]/g, ""));
+            const sm = (parts[0] || "").match(/§([a-z])/), t1 = parts[1] || "", mod = (t1.match(/§([mls])/) || [])[1] || "";
+            const tol = t1.replace(/§[nmls]/g, "").replace(/§[a-z]/g, "").trim();
+            if (sm && SYM[sm[1]]) e = { t: "fcf", p: [n(g, 10), n(g, 20)], h: n(g, 40, 2.5) || 2.5, rot: 0, rows: [{ sym: SYM[sm[1]], dia: /§n/.test(t1), tol, mod: mod.toUpperCase(), datums: parts.slice(2).map((x) => ({ d: x.replace(/§[a-z]/g, "").trim() })).filter((d) => d.d) }] };
+            else W(v);
             break;
           }
           case "LEADER": { const xs = all(g, 10), ys = all(g, 20); if (xs.length > 1) e = { t: "leader", pts: xs.map((x, k) => [x, ys[k]]), s: "" }; break; }

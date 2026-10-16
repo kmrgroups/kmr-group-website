@@ -590,7 +590,8 @@ function loadDxf(txt){
       }
     }
   }
-  return {sheet:{canvas:c,w:W,h:H,text:texts,isCad:true}, items, unit};
+  // cadT: drawing units → sheet pixels (px = (x-x0)·k+pad, py = H-((y-y0)·k+pad)), so KMR CAD Draft can place balloons on the vector drawing
+  return {sheet:{canvas:c,w:W,h:H,text:texts,isCad:true,cadT:{x0:B.x0,y0:B.y0,k,pad,H}}, items, unit};
 }
 function dimText(e){
   const dt=GN(e,70)&7; let meas=GN(e,42,NaN); if(dt===2||dt===5) meas=meas*180/Math.PI;
@@ -1341,7 +1342,7 @@ document.querySelectorAll(".phead details").forEach(d=>d.addEventListener("toggl
 document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".phead details")) document.querySelectorAll(".phead details[open]").forEach(d=>d.open=false); });
 
 /* ---------- API used by the hosted (cloud) version ---------- */
-function getSnapshot(){ return {v:1,clean:!!S.cleaned,desk:S.sheets.map(s=>s.deskew||0),fileName:S.fileName,header:{...S.header},set:{...S.set},
+function getSnapshot(){ return {v:1,clean:!!S.cleaned,desk:S.sheets.map(s=>s.deskew||0),sheets:S.sheets.map(s=>({w:s.w,h:s.h,cad:s.cadT||null})),fileName:S.fileName,header:{...S.header},set:{...S.set},
   items:S.items.map((it,i)=>{ const {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges}=it; return {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges,no:i+1,zone:zone(it)}; })}; }
 function applySnapshot(p){
   S.header=Object.assign({},S.header,p.header||{}); Object.assign(S.set,p.set||{});

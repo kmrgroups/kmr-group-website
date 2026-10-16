@@ -53,6 +53,35 @@
   const get = (pid) => D.find((d) => d.id === pid) || err("Drawing not found.");
   const lock = (d) => { if (["released", "superseded", "obsolete"].includes(d.status)) err(`Drawing ${d.number} rev ${d.rev} is ${d.status} and locked. Make a new revision to change it.`); };
   const thumbs = {};
+  /* ---------- Process Documents in the sample: one frozen project for the drive flange above, plus the projects
+     made in Process Documents' own sample in this browser (stage drawings are written back there) ---------- */
+  const PDKEY = "pd_projects@local";
+  const lsGet = () => { try { return JSON.parse(localStorage.getItem(PDKEY) || "[]") || []; } catch (e) { return []; } };
+  const lsSet = (L) => { try { localStorage.setItem(PDKEY, JSON.stringify(L)); } catch (e) { err("This browser's storage is full, so the stage drawings could not be kept. Clear some sample data and try again."); } };
+  const pdSample = (() => {
+    const C = (no, type, text, spec, nominal, lsl, usl, cls, gauge) => ({ no, type, text, label: type, spec, nominal, upper: usl != null && nominal != null ? +(usl - nominal).toFixed(4) : null, lower: lsl != null && nominal != null ? +(lsl - nominal).toFixed(4) : null, lsl, usl, cls: cls || "", gauge: gauge || "" });
+    const chars = [C(1, "Diameter", "Ø120", "Ø120 ±0.1", 120, 119.9, 120.1, "", "G-001"), C(2, "Diameter", "Ø40", "Ø40 +0.025/0", 40, 40, 40.025, "SC", "G-002"), C(3, "Diameter", "Ø60 h7", "Ø60 h7 (0/-0.030)", 60, 59.97, 60, "CC", "G-003"),
+      C(4, "Linear", "20", "20 ±0.1", 20, 19.9, 20.1, "", "G-004"), C(5, "Linear", "35", "35 ±0.1", 35, 34.9, 35.1, "", "G-004"), C(6, "Diameter", "6x Ø11 THRU", "6x Ø11 THRU on PCD Ø90", 11, 11, 11.2, "", "G-005"),
+      C(7, "Note", "REMOVE ALL BURRS AND SHARP EDGES 0.5 x 45°", "Remove all burrs and sharp edges 0.5 x 45°", null, null, null, "", "")];
+    const ops = [{ opNo: 10, key: "CUT", name: "Bar cutting", machine: "Bandsaw BS-01", chars: [] }, { opNo: 20, key: "TURN", name: "CNC turning – 1st setup", machine: "CNC lathe LT-01", chars: [1, 2, 4] }, { opNo: 30, key: "TURN2", name: "CNC turning – 2nd setup", machine: "CNC lathe LT-02", chars: [3, 5] },
+      { opNo: 40, key: "VMC", name: "VMC drilling", machine: "VMC-01", chars: [6] }, { opNo: 50, key: "DEBURR", name: "Deburring", machine: "Deburring bench", chars: [] }, { opNo: 60, key: "FINAL", name: "Final inspection", machine: "Inspection table", chars: [] }];
+    const gauges = [{ id: "G-001", name: "Outside micrometer", range: "100–125 mm" }, { id: "G-002", name: "Bore gauge", range: "35–50 mm" }, { id: "G-003", name: "Outside micrometer", range: "50–75 mm" }, { id: "G-004", name: "Digital vernier caliper", range: "0–150 mm" }, { id: "G-005", name: "Pin gauge", range: "Ø11.0 / Ø11.2" }];
+    const gn = (id) => { const g = gauges.find((x) => x.id === id); return g ? g.id + " " + g.name : ""; };
+    const map = {}, spec = {}; ops.forEach((o) => { if (o.chars.length) map[String(o.opNo)] = o.chars.slice(); }); chars.forEach((c) => { spec[String(c.no)] = [c.type, c.spec, c.cls].join(" | "); });
+    return { id: "pd-sample-dp1101", part_no: "DP-1101", part_name: "Drive flange", rev: "C", drawing_no: "DRG-2609-0001", customer: "Deccan Motors Ltd", status: "approved", sample: true,
+      header: { partNo: "DP-1101", partName: "Drive flange", drawingNo: "DRG-2609-0001", drawingRev: "C", customer: "Deccan Motors Ltd", material: "EN8 (080M40)", supplier: "Sample Engineering Pvt Ltd" },
+      freeze: { rev: 1, at: ago(3), by: "Ravi Kumar", note: "Route agreed in the CFT review", map, spec }, chars, ops, gauges,
+      sop: { docNo: "SOP-DP1101", sections: ops.filter((o) => o.chars.length).map((o) => ({ opNo: o.opNo, docNo: "SOP-DP1101/" + o.opNo, checks: o.chars.map((n) => { const c = chars.find((x) => x.no === n); return { charNo: n, gauge: gn(c.gauge), freq: c.cls === "CC" ? "100%" : "5 pcs / 2 hrs" }; }) })) },
+      source: { fileName: "", items: [] }, bi: null, stages: null };
+  })();
+  const pdShape = (r) => { const pl = (r.doc && r.doc.plan) || {}, sp = (r.doc && r.doc.docs && r.doc.docs.sop) || {};
+    return { id: r.id, part_no: r.part_no, part_name: r.part_name, rev: r.rev, drawing_no: r.drawing_no, customer: r.customer, status: r.status, header: pl.header || {}, freeze: pl.freeze || null, chars: pl.chars || [],
+      ops: (pl.ops || []).map((o) => ({ opNo: o.opNo, key: o.key, name: o.name, machine: o.machine, chars: o.chars })), gauges: (pl.gauges || []).map((g) => ({ id: g.id, name: g.name, range: g.range })),
+      sop: { docNo: sp.docNo, rev: sp.rev, sections: (sp.sections || []).map((s) => ({ opNo: s.opNo, docNo: s.docNo, checks: s.checks })) },
+      source: { fileName: (r.source || {}).fileName, items: (r.source || {}).items || [], sheets: (r.source || {}).sheets, desk: (r.source || {}).desk, manual: (r.source || {}).manual }, bi: null,
+      stages: r.stages ? { at: r.stages.at, by: r.stages.by, freezeRev: String(r.stages.freezeRev) } : null }; };
+  const pdRow = (p) => ({ id: p.id, part_no: p.part_no, part_name: p.part_name, rev: p.rev, drawing_no: p.drawing_no, customer: p.customer, status: p.status, updated_at: p.updated_at || now(),
+    freeze: p.freeze ? { rev: p.freeze.rev, at: p.freeze.at, by: p.freeze.by, note: p.freeze.note } : null, ops: (p.ops || []).length, chars: (p.chars || []).length, stages_at: p.stages && p.stages.at, stages_rev: p.stages && String(p.stages.freezeRev), bi: false });
   window.QP_DEMO = {
     kmr_cad_list: () => D.map((d) => Object.assign({}, d, { data: undefined, thumb: thumbs[d.id] || (thumbs[d.id] = mkThumb(d.data)), revs: D.filter((x) => x.number === d.number).length })),
     kmr_cad_get: (a) => JSON.parse(JSON.stringify(get(a.p_id))),
@@ -81,6 +110,17 @@
       if (D.some((o) => o.number === d.number && ["draft", "review"].includes(o.status))) err(`Revision ${D.find((o) => o.number === d.number && ["draft", "review"].includes(o.status)).rev} of ${d.number} is already being prepared.`);
       const n2 = Object.assign(JSON.parse(JSON.stringify(d)), { id: id(), rev: a.p_rev, status: "draft", sample: false, updated_at: now(), updated_by: "You (demo)" }); n2.history = d.history.concat([{ rev: a.p_rev, status: "draft", at: now(), by: "You (demo)", note: a.p_note }]);
       D.push(n2); return { id: n2.id, rev: n2.rev };
+    },
+    kmr_cad_pd_list: () => [pdRow(pdSample)].concat(lsGet().filter((r) => r.doc && r.doc.plan).map((r) => Object.assign(pdRow(pdShape(r)), { updated_at: r.updated_at }))),
+    kmr_cad_pd_get: (a) => { if (a.p_id === pdSample.id) return JSON.parse(JSON.stringify(pdSample)); const r = lsGet().find((x) => x.id === a.p_id); if (!r) err("Process Documents project not found."); return pdShape(r); },
+    kmr_cad_pd_stages: (a) => {
+      const st = a.p_stages || {}; if (!st.ops || typeof st.ops !== "object") err("The stage drawings are not valid.");
+      const at = now(), full = Object.assign({}, st, { at, by: "You (demo)" });
+      if (a.p_id === pdSample.id) { if (String(st.freezeRev) !== String(pdSample.freeze.rev) || (st.freezeAt && st.freezeAt !== pdSample.freeze.at)) err(`The dimensions are now frozen as rev ${pdSample.freeze.rev} in Process Documents. Make the stage drawings again.`); pdSample.stages = full; return { at, ops: Object.keys(st.ops).length }; }
+      const L = lsGet(), r = L.find((x) => x.id === a.p_id); if (!r) err("Process Documents project not found.");
+      const fz = r.doc && r.doc.plan && r.doc.plan.freeze; if (!fz) err("Freeze the dimensions in Process Documents first (Process plan › Freeze dimensions).");
+      if (String(st.freezeRev) !== String(fz.rev) || (st.freezeAt && st.freezeAt !== fz.at)) err(`The dimensions are now frozen as rev ${fz.rev} in Process Documents. Make the stage drawings again.`);
+      r.stages = full; lsSet(L); return { at, ops: Object.keys(st.ops).length };
     },
     kmr_cad_delete: (a) => { const d = get(a.p_id); if (d.status === "released") err("A released drawing cannot be deleted — mark it obsolete."); D.splice(D.indexOf(d), 1); return null; },
   };

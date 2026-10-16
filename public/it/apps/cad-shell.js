@@ -23,11 +23,13 @@
     const g = hashGo();
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.t === g));
     ["std", "dash", "list"].forEach((s) => $("#" + s).classList.toggle("hide", s !== g));
-    $("#edsec").classList.toggle("hide", g !== "ed");
-    document.body.style.paddingBottom = g === "ed" ? "32px" : "";
+    $("#edsec").classList.toggle("hide", g !== "ed" && g !== "stage");
+    document.body.style.paddingBottom = g === "ed" || g === "stage" ? "32px" : "";
     try {
       if (g === "std") return KMRStd.draw($("#std"), "cad", { evidence: evidence() });
       if (g === "ed") { fit(); await openEditor(hashId()); return; }
+      // from Process Documents: make the stage drawings of this project (#go=stage&pd=<project>)
+      if (g === "stage") { const pd = (location.hash.match(/[&?]pd=([0-9a-zA-Z-]+)/) || [])[1] || ""; history.replaceState(null, "", location.pathname + location.search + "#go=ed"); fit(); await openEditor(""); const E = S.E; if (!ed()) { E.err("You have view-only access, so you cannot make stage drawings."); return; } setTimeout(() => E.run("STAGEDWG", pd ? { pd } : undefined), 120); return; }
       await loadList();
       if (g === "dash") drawDash(); else drawList();
     } catch (e) { say(e.message); }
@@ -170,13 +172,14 @@
     const E = editor();
     if (!id) {
       if (S.cur) { setBar(); setTimeout(() => E.focus(), 50); return; }
+      if (E._stage && E.doc.info && E.doc.info.stage && K.stageBar) { K.stageBar(E); E.readOnly = null; setTimeout(() => E.focus(), 50); return; }
       $("#edbar").classList.remove("hide"); $("#edbar").className = "edbar"; $("#edbar").innerHTML = `No drawing is open. <a href="#go=list">Open one from the register</a>${ed() ? ' or <a href="#" id="ednew">create a new drawing</a>' : ""}. You can try every tool here — this scratch sheet is not saved.`;
       const n = $("#ednew"); if (n) n.onclick = (ev) => { ev.preventDefault(); newDlg(); };
       if (!E._scratch) { E.load(K.newDoc(), { title: "Scratch sheet (not saved)" }); E._scratch = true; } E.readOnly = null; return;
     }
     if (S.cur && S.cur.id === id) { setBar(); return; }
     if (S.cur && E.dirty && !E.readOnly) { if (!confirm("The open drawing has changes that are not saved. Leave it? (A local draft is kept on this device.)")) { history.replaceState(null, "", "#go=ed&id=" + S.cur.id); return; } }
-    const d = await call("kmr_cad_get", { p_id: id }); S.cur = d; E._scratch = false;
+    const d = await call("kmr_cad_get", { p_id: id }); S.cur = d; E._scratch = false; E._stage = null;
     E.load(d.data || K.newDoc(), { title: d.title, number: d.number, rev: d.rev, part: d.part_no, company: QP.ctx && QP.ctx.company });
     E.readOnly = d.status === "released" || d.status === "superseded" || d.status === "obsolete" || !ed() ? (!ed() ? "You have view-only access to drawings." : `Drawing ${d.number} rev ${d.rev} is ${ST[d.status].toLowerCase()} and locked. Make a new revision to change it (Drawings → Status).`) : null;
     setBar();
@@ -189,8 +192,9 @@
   function setBar() {
     const d = S.cur, E = S.E, bar = $("#edbar"); if (!d) return;
     bar.className = "edbar" + (E.readOnly ? " ro" : ""); bar.classList.remove("hide");
-    bar.innerHTML = `<b>${esc(d.number)} · rev ${esc(d.rev)}</b> ${chip(d.status)} <span>${esc(d.title)}</span><span style="flex:1"></span>${E.readOnly ? `<span>🔒 ${esc(E.readOnly)}</span>` : `<span class="mut">Ctrl+S saves · a local draft is kept every few seconds</span><button class="btn s" id="bsave">Save</button>`}${ed() ? `<button class="btn s o" id="bflow">Status / revision</button>` : ""}<a class="btn s o" href="#go=list">Register</a>`;
+    bar.innerHTML = `<b>${esc(d.number)} · rev ${esc(d.rev)}</b> ${chip(d.status)} <span>${esc(d.title)}</span><span style="flex:1"></span>${E.readOnly ? `<span>🔒 ${esc(E.readOnly)}</span>` : `<span class="mut">Ctrl+S saves · a local draft is kept every few seconds</span><button class="btn s" id="bsave">Save</button>`}${E.doc.info && E.doc.info.stage ? '<button class="btn s o" id="bstg" title="Draw these stage sheets again as pictures and send them to the SOP in Process Documents">Send to SOP</button>' : ""}${ed() ? `<button class="btn s o" id="bflow">Status / revision</button>` : ""}<a class="btn s o" href="#go=list">Register</a>`;
     if ($("#bsave")) $("#bsave").onclick = () => save(false);
+    if ($("#bstg")) $("#bstg").onclick = () => E.run("STAGESEND");
     if ($("#bflow")) $("#bflow").onclick = async () => { if (E.dirty && !E.readOnly) await save(false); flowDlg(d.id); };
     fit();
   }
@@ -204,7 +208,7 @@
       try { localStorage.removeItem(draftKey(S.cur.id)); } catch (e) { /* ignore */ }
     } catch (e) { E.err("Not saved: " + e.message); }
   }
-  window.addEventListener("beforeunload", (ev) => { if (S.E && S.E.dirty && S.cur && !S.E.readOnly) { draftSave(); ev.preventDefault(); ev.returnValue = ""; } });
+  window.addEventListener("beforeunload", (ev) => { if (S.E && S.E.dirty && S.cur && !S.E.readOnly) { draftSave(); ev.preventDefault(); ev.returnValue = ""; } else if (S.E && S.E._stage && S.E.dirty) { ev.preventDefault(); ev.returnValue = ""; } });
 
   /* ================= start ================= */
   (async () => {

@@ -176,5 +176,5 @@
   })();
 
   window.QP = { DEMO, qs, $, esc, iso, today, fmt, say, rpc, call, init, appHref, sourceInfo, stateChip, KIND,
-    get slug() { return slug; }, get ctx() { return ctx; }, get canEdit() { return canEdit; } };
+    get slug() { return slug; }, get ctx() { return ctx; }, get canEdit() { return canEdit; }, get sb() { return sb; } };
 })();

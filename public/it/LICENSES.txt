@@ -16,4 +16,4 @@ Third-party components shipped in balloon/engines/ or loaded from public CDNs:
   Garrett Johnson). Bundled in apps/vendor/cad3d-vendor.js for the KMR CAD Draft
   3D view, boolean operations, hidden-line drawing views and STL export.
   The DWG and STEP readers above are also used by KMR CAD Draft (Open / Import DWG,
-  STEP in).
+  STEP in), and pdf.js by KMR CAD Draft to draw stage drawings on a ballooned PDF.

@@ -202,7 +202,8 @@ V.chars = (M)=>{
   const manual=!!(S.prj&&S.prj.source&&S.prj.source.manual);
   M.innerHTML = `<div class="toolbar"><h2>Characteristics ${manual?"(entered manually)":"(from ballooning)"}</h2><span class="grow"></span><button class="btn small primary" id="chApply" ${ro()?"disabled":""}>Update documents</button></div>
   <p class="hintline" style="margin:-4px 0 10px">${manual?"These characteristics were typed in when the project was created. Add rows or edit any cell, set the operation, gauge or class, then":"Balloon numbers, specifications and classes come from Balloon Inspector. Change the operation, gauge or class here, then"} <b>Update documents</b>.</p>
-  <div id="chGrid"></div>`;
+  ${window.PDStage?PDStage.bar("chars"):""}<div id="chGrid"></div>`;
+  if(window.PDStage) PDStage.bind(M);
   grid($("chGrid"), { rows:plan.chars, cols:[
     {k:"no",label:"Balloon",w:4,type:"num"},{k:"type",label:"Type",w:7,type:"sel",opts:["Linear","Diameter","Radius","Angle","Chamfer","Thread","GD&T","Surface finish","Material","Note"]},
     {k:"text",label:"As on drawing",w:12},{k:"label",label:"Characteristic",w:9},{k:"spec",label:"Specification",w:12,type:"ro"},{k:"nominal",label:"Nominal",w:5.5,type:"num"},{k:"upper",label:"Upper tol.",w:5.5,type:"num"},{k:"lower",label:"Lower tol.",w:5.5,type:"num"},
@@ -244,10 +245,12 @@ V.plan = (M)=>{
   M.innerHTML = `<div class="toolbar"><h2>Process plan</h2><span class="grow"></span>
     <button class="btn small" id="plAdd" ${ro()?"disabled":""}>+ Add operation</button><button class="btn small primary" id="plApply" ${ro()?"disabled":""}>Update documents</button></div>
   <p class="hintline" style="margin:-4px 0 10px">Process selection, machine, tools, consumables and gauges for every operation — worked out from the ballooning data. Edit anything, then <b>Update documents</b>.</p>
+  ${window.PDStage?PDStage.bar("plan"):""}
   ${plan.ops.map((o,i)=>{ const ch=o.chars.map(n=>plan.chars.find(c=>c.no===n)).filter(Boolean);
     return `<details class="op" data-i="${i}"><summary><span class="dh" draggable="true" title="Drag to move this process up or down" style="cursor:grab;margin-right:6px;user-select:none">⠿</span><span class="no">${o.opNo}</span><span class="nm">${esc(o.name)}</span><span class="pills">${o.inHouse?"":`<span class="pill">Sub-contract</span>`}<span class="pill${(o.inHouse&&(o.machineManual||(!o.machineId&&o.machine)))?" mnew":""}" title="${(o.inHouse&&(o.machineManual||(!o.machineId&&o.machine)))?"Machine not in the Operations Master — add it there":""}">${esc(o.machine||"—")}</span><span class="pill">${ch.length} chars</span><span class="pill">${o.tools.length} tools</span><span class="pill">${o.gauges.length} gauges</span>${specialPills(o,ch)}</span></summary>
     <div class="in" data-in="${i}"></div></details>`; }).join("")}`;
   M.querySelectorAll("details.op").forEach(d=>d.addEventListener("toggle",()=>{ if(d.open) opBody(+d.dataset.i); }));
+  if(window.PDStage) PDStage.bind(M);
   $("plApply").onclick=()=>A().regenFromPlan();
   // move a process; numbers keep their order (10, 20, 30…), characteristics follow their process, then every document is rebuilt from the plan
   const reorder=(from,to)=>{ if(from===to||from<0||to<0||from>=plan.ops.length||to>=plan.ops.length) return; const before=snapOps(plan); const nums=plan.ops.map(o=>+o.opNo).sort((a,b)=>a-b); const [m]=plan.ops.splice(from,1); plan.ops.splice(to,0,m); plan.ops.forEach((o,k)=>{ o.opNo=nums[k]; }); renumbered(plan,before); A().changed("_plan"); draw(); A().toast("Process moved — numbers updated. Updating all documents…"); A().regenFromPlan({route:true}); };
@@ -418,6 +421,7 @@ V.d_sop = (M,id)=>{
   M.innerHTML = toolbar(d.title, `<button class="btn small" data-regen ${ro()?"disabled":""}>Regenerate</button>`)+`<div class="paper">${head(id, `Op ${s.opNo} – ${s.opName}`)}
     <div class="optabs">${doc.sections.map((x,i)=>`<button data-sec="${i}" aria-pressed="${i===si}">Op ${x.opNo} · ${esc(x.opName)}</button>`).join("")}</div>
     <div class="meta"><label>Operation<input data-s="opName" value="${esc(s.opName)}" ${ro()}></label><label>Machine / equipment<input data-s="machine" value="${esc(s.machine||"")}" ${ro()}></label><label>SOP no.<input data-s="docNo" value="${esc(s.docNo||(doc.docNo+"/"+s.opNo))}" ${ro()}></label></div>
+    ${window.PDStage?PDStage.bar("sop")+PDStage.sopBox(s):""}
     <div class="box" style="margin:10px 0"><h3>Drawing / photo for this operation</h3><div id="sopImg" style="width:100%;height:260px;border:2px dashed var(--line,#cbd5e1);border-radius:10px;display:flex;align-items:center;justify-content:center;overflow:hidden;background:#f8fafc;text-align:center;color:#64748b">${s.img?`<img src="${s.img}" style="max-width:100%;max-height:100%;object-fit:contain" alt="Operation drawing or photo">`:`<span>Drag &amp; drop an image here, or use the button below</span>`}</div>
       ${ro()?"":`<div style="display:flex;gap:8px;margin-top:8px"><label class="btn small" style="cursor:pointer">Choose image…<input id="sopFile" type="file" accept="image/*" hidden></label>${s.img?`<button class="btn small" id="sopDel">Remove image</button>`:""}<span class="hintline" style="align-self:center">Fits the box automatically · printed above the Tools / Gauges table.</span></div>`}</div>
     <div class="cols2"><div class="box"><h3>Tools</h3><textarea data-s="tools" ${ro()}>${esc(s.tools)}</textarea></div><div class="box"><h3>Gauges / instruments</h3><textarea data-s="gauges" ${ro()}>${esc(s.gauges)}</textarea></div>
@@ -429,6 +433,7 @@ V.d_sop = (M,id)=>{
     ${sign(id)}</div>`;
   bindHead(M,id); bindToolbar(M,id);
   M.querySelectorAll("[data-sec]").forEach(b=>b.onclick=()=>{ secIdx.sop=+b.dataset.sec; render(id); });
+  if(window.PDStage) PDStage.bind(M);
   const setImg=f=>{ if(!f||!/^image\//.test(f.type)) return; const fr=new FileReader(); fr.onload=()=>{ const im=new Image(); im.onload=()=>{ const k=Math.min(1,1600/Math.max(im.width,im.height)), c=document.createElement("canvas"); c.width=Math.round(im.width*k); c.height=Math.round(im.height*k); const g=c.getContext("2d"); g.fillStyle="#fff"; g.fillRect(0,0,c.width,c.height); g.drawImage(im,0,0,c.width,c.height); s.img=c.toDataURL("image/jpeg",0.85); A().changed(id); render(id); }; im.src=fr.result; }; fr.readAsDataURL(f); };
   const box=M.querySelector("#sopImg"), inp=M.querySelector("#sopFile"), del=M.querySelector("#sopDel");
   if(inp) inp.onchange=()=>setImg(inp.files[0]); if(del) del.onclick=()=>{ s.img=""; A().changed(id); render(id); };

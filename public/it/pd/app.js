@@ -365,6 +365,8 @@ function generate(P, keepHeader){
   const plan=E.buildPlan(P.source, S.masters, s);
   if(keepHeader) ["preparedBy","reviewedBy","approvedBy","keyContact","coreTeam","model","annualVolume","customerCode","phase","docRev","origDate","supplierCode","plant","customerPartNo"].forEach(k=>{ if(keepHeader[k]) plan.header[k]=keepHeader[k]; });
   const oldPlan=P.doc&&P.doc.plan; if(oldPlan&&oldPlan.ops) plan.ops.forEach(o=>{ const po=oldPlan.ops.find(x=>x.opNo===o.opNo&&x.key===o.key); if(po&&po.cnc&&po.cnc.edited) o.cnc=po.cnc; });
+  // the dimension freeze and its history survive a re-run: if the new plan differs it shows as "changed after freeze"
+  if(oldPlan&&oldPlan.freeze){ plan.freeze=oldPlan.freeze; plan.freezeLog=oldPlan.freezeLog||[]; }
   S.plan=plan; applyCustomer(plan); applyHeaderDefaults(plan.header,false);
   const docs=D.genAll(plan, genSettings());
   const old=P.doc&&P.doc.docs; if(old) preserve(old, docs, D.DOCS.map(d=>d.id));
@@ -427,7 +429,9 @@ async function save(manual){
   try{
     if(CLOUD){ if(!P.id){ const {data,error}=await sb.from("pd_projects").insert(row).select("id").single(); if(error) throw error; P.id=data.id; }
       else { const {error}=await sb.from("pd_projects").update(row).eq("id",P.id); if(error) throw error; } }
-    else { if(!P.id) P.id=uuid(); P.updated_at=new Date().toISOString(); const list=LS.get("pd_projects",[]).filter(x=>x.id!==P.id); list.unshift(Object.assign({},row,{id:P.id,updated_at:P.updated_at})); LS.set("pd_projects",list.slice(0,40)); }
+    else { if(!P.id) P.id=uuid(); P.updated_at=new Date().toISOString(); const all=LS.get("pd_projects",[]), prev=all.find(x=>x.id===P.id), list=all.filter(x=>x.id!==P.id);
+      // stage drawings are written by KMR CAD Draft into the same record: keep the newest copy
+      const stg=(prev&&prev.stages)||P.stages||null; list.unshift(Object.assign({},row,{id:P.id,updated_at:P.updated_at},stg?{stages:stg}:{})); LS.set("pd_projects",list.slice(0,40)); }
     S.dirty=false; try{ history.replaceState(null,"",projectUrl(P.id)); }catch(e){}
     if(manual) toast("Saved.");
     return true;
@@ -622,7 +626,7 @@ async function pane(t){
 }
 
 /* ---------------- boot ---------------- */
-window.PDApp = { S, opsPortalLink, dialog, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
+window.PDApp = { S, sb, CLOUD, LS, opsPortalLink, dialog, openAdmin, partFromOps, pick, applyHeaderDefaults, setFavicon, changed, refreshChip, regenFromPlan, rerun, regenOne, save, exportDoc, exportAll, toast, busy, welcomeHTML, bindWelcome, go };
 /* open the screen / project this address points at (a link opened in a new tab or window) */
 async function openPending(){ try{ const n=NAV0; if(!n) return; if(n.prj&&!(S.prj&&S.prj.id===n.prj)) await openProject(n.prj); if(n.go==="projects") projectsDialog(); else if(n.go&&n.go!=="home"&&S.prj) go(n.go); }catch(_){} }
 if(CLOUD){
