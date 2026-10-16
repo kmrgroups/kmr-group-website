@@ -540,7 +540,7 @@
       image(src, g) {
         const im = K.imgEl(src), x = X(g.p), y = Y(g.p), w = g.w * s, h = g.h * s;
         ctx.save(); ctx.translate(x, y); ctx.rotate(-(g.rot || 0));
-        if (im && im.complete && im.naturalWidth) { ctx.imageSmoothingQuality = "high"; ctx.drawImage(im, 0, -h, w, h); }
+        if (im && im.complete && im.naturalWidth) { ctx.imageSmoothingQuality = "high"; if (g.alpha != null) ctx.globalAlpha = g.alpha; ctx.drawImage(im, 0, -h, w, h); }
         else { ctx.setLineDash([4, 3]); ctx.strokeRect(0, -h, w, h); ctx.setLineDash(dashed); }
         ctx.restore();
       },
@@ -579,7 +579,7 @@
       arc(c, r, a0, a1) { const sw = G.sweep(a0, a1), p = G.polar(c, a0, r), q = G.polar(c, a1, r); out.push(`<path d="M${f(p[0])} ${f(p[1])}A${f(r)} ${f(r)} 0 ${sw > Math.PI ? 1 : 0} 1 ${f(q[0])} ${f(q[1])}" fill="none" ${att}/>`); },
       text(b, h, s, rot, ha) { const e = String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); out.push(`<text transform="translate(${f(b[0])} ${f(b[1])}) rotate(${f(rot / D2R)}) scale(1 -1)" font-size="${f(h / 0.716)}" font-family="Arial, Helvetica, sans-serif" text-anchor="${ha === 1 ? "middle" : ha === 2 ? "end" : "start"}" fill="${P.fillc}" stroke="none">${e}</text>`); },
       fill(loops) { out.push(`<path d="${loops.map((l) => "M" + l.map((p) => f(p[0]) + " " + f(p[1])).join("L") + "Z").join("")}" fill="${P.fillc}" fill-rule="evenodd" stroke="none"/>`); },
-      image(src, g) { if (!src) return; out.push(`<image href="${String(src).replace(/"/g, "&quot;")}" x="0" y="0" width="${f(g.w)}" height="${f(g.h)}" preserveAspectRatio="none" transform="translate(${f(g.p[0])} ${f(g.p[1])}) rotate(${f((g.rot || 0) / D2R)}) translate(0 ${f(g.h)}) scale(1 -1)"/>`); },
+      image(src, g) { if (!src) return; out.push(`<image href="${String(src).replace(/"/g, "&quot;")}" x="0" y="0" width="${f(g.w)}" height="${f(g.h)}" preserveAspectRatio="none"${g.alpha != null ? ` opacity="${g.alpha}"` : ""} transform="translate(${f(g.p[0])} ${f(g.p[1])}) rotate(${f((g.rot || 0) / D2R)}) translate(0 ${f(g.h)}) scale(1 -1)"/>`); },
       point(p, mode) { const r = 1; if (!mode) out.push(`<circle cx="${f(p[0])}" cy="${f(p[1])}" r="${f(0.3)}" fill="${P.fillc}" stroke="none"/>`); else { P.line([p[0] - r, p[1] - r], [p[0] + r, p[1] + r]); P.line([p[0] - r, p[1] + r], [p[0] + r, p[1] - r]); } },
     };
     return P;

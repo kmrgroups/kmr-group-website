@@ -24,7 +24,8 @@
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.t === g));
     ["std", "dash", "list"].forEach((s) => $("#" + s).classList.toggle("hide", s !== g));
     $("#edsec").classList.toggle("hide", g !== "ed" && g !== "stage");
-    document.body.style.paddingBottom = g === "ed" || g === "stage" ? "32px" : "";
+    document.body.classList.toggle("fs", (g === "ed" || g === "stage") && pref("fs") !== "0"); if (g === "ed" || g === "stage") { const b = document.querySelector(".cx-fsb[data-fs]"); if (b) b.querySelector("span").textContent = isFs() ? "Exit full screen" : "Full screen"; }
+    document.body.style.paddingBottom = (g === "ed" || g === "stage") && !isFs() ? "32px" : "";
     try {
       if (g === "std") return KMRStd.draw($("#std"), "cad", { evidence: evidence() });
       if (g === "ed") { fit(); await openEditor(hashId()); return; }
@@ -58,7 +59,7 @@
     const q = (S.q || "").toLowerCase(), fs = S.fs || "";
     const L = S.list.filter((d) => (fs ? d.status === fs : d.status !== "superseded") && (!q || [d.number, d.title, d.part_no, d.customer, d.rev].join(" ").toLowerCase().includes(q)));
     $("#list").innerHTML = `<div class="row"><input class="grow" id="lq" placeholder="Search number, title, part, customer" value="${esc(S.q || "")}"><select id="lf" style="width:auto"><option value="">Current (all but superseded)</option>${Object.entries(ST).map(([k, v]) => `<option value="${k}"${k === fs ? " selected" : ""}>${v}</option>`).join("")}</select>
-      ${ed() ? '<button class="btn" id="lnew">+ New drawing</button><button class="btn o" id="limp">Import DXF</button>' : ""}<button class="btn o" id="lpub" title="Tick drawings below, then print all their sheets at once">Print ticked drawings</button>${admin() ? '<button class="btn o" id="lexp">Export all (JSON)</button><button class="btn o" id="lrest">Restore JSON</button>' : ""}</div>
+      ${ed() ? '<button class="btn" id="lnew">+ New drawing</button><button class="btn o" id="limp" title="DXF, DWG, PDF or a picture of a drawing">Import DXF / PDF / picture</button>' : ""}<button class="btn o" id="lpub" title="Tick drawings below, then print all their sheets at once">Print ticked drawings</button>${admin() ? '<button class="btn o" id="lexp">Export all (JSON)</button><button class="btn o" id="lrest">Restore JSON</button>' : ""}</div>
       ${L.length ? `<div class="cards">${L.map((d) => `<div class="dcard"><a href="#go=ed&id=${d.id}"><img src="${d.thumb || ""}" alt="" loading="lazy"></a><div><b>${esc(d.number)} · rev ${esc(d.rev)}</b>${esc(d.title)}<br><span class="mut">${esc([d.part_no, d.customer].filter(Boolean).join(" · ") || "—")}</span><br>${chip(d.status)} ${d.sample ? '<span class="chip" style="background:#7c3aed">sample</span>' : ""} <span class="mut" style="font-size:12px">${when(d.updated_at)}${d.updated_by ? " · " + esc(d.updated_by) : ""}</span></div>
         <div class="acts"><label class="note" style="margin:0;display:flex;gap:4px;align-items:center"><input type="checkbox" data-pick="${d.id}" style="width:auto"${(S.pick || new Set()).has(d.id) ? " checked" : ""}>tick</label><a class="btn s" href="#go=ed&id=${d.id}">Open</a><button class="btn s o" data-info="${d.id}">Details</button>${ed() ? `<button class="btn s o" data-flow="${d.id}">Status</button>` : ""}</div></div>`).join("")}</div>` : `<div class="empty">${S.list.length ? "No drawing matches the filter." : "No drawings yet."}</div>`}
       <p class="note">Each drawing has a number, a revision and a status. A released drawing is locked; to change it make a new revision — the earlier revision is kept as superseded (document control, ISO 9001 7.5.3 / IATF 16949 7.5.3.2.2).</p>`;
@@ -92,7 +93,7 @@
   }
   async function importDxf() {
     const f = await K.pickFile(".dxf,.json"); if (!f) return;
-    try { const r = await K.readDrawingFile(f); newDlg(r); const w = Object.keys(r.warn || {}); if (w.length) say("Some DXF objects are not supported and will be skipped: " + w.join(", ")); }
+    try { say(/\.(pdf|png|jpe?g|webp|bmp)$/i.test(f.name) ? "Converting the file to CAD — this can take a minute…" : "Reading the file…", true); const r = await K.readDrawingFile(f, (t) => say(t, true)); newDlg(r); const w = Object.keys(r.warn || {}); if (r.converted) say([r.note].concat(r.notes || []).join(" "), true); else if (w.length) say("Some DXF objects are not supported and will be skipped: " + w.join(", ")); }
     catch (e) { say(e.message); }
   }
   async function infoDlg(id) {
@@ -164,12 +165,34 @@
       getDrawing: (id) => call("kmr_cad_get", { p_id: id }),
       onInfo: (E2, inf) => { if (S.cur && inf.title && !S.cur.title) S.cur.title = inf.title; },
     });
-    S.E = E; return E;
+    S.E = E; chrome(E); return E;
+  }
+  /* full-screen workspace: header, tabs and footer hide while editing; side panel and ribbon can be folded away */
+  const pref = (k, v) => { try { if (v === undefined) return localStorage.getItem("kcad-" + k); localStorage.setItem("kcad-" + k, v); } catch (e) { /* private mode */ } return null; };
+  const cxRoot = () => { const e = $("#ed"); return e.classList.contains("cx") ? e : e.querySelector(".cx"); };
+  const isFs = () => document.body.classList.contains("fs");
+  function setFs(on, native) {
+    document.body.classList.toggle("fs", !!on); pref("fs", on ? "1" : "0");
+    try { if (native && on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* not allowed */ }
+    const b = document.querySelector(".cx-fsb[data-fs]"); if (b) b.querySelector("span").textContent = on ? "Exit full screen" : "Full screen";
+    setTimeout(() => { fit(); window.dispatchEvent(new Event("resize")); }, 60);
+  }
+  function chrome(E) {
+    const root = cxRoot(), qa = root.querySelector(".cx-qa"), help = qa.querySelector(".cx-help"); if (!qa || !help) return;
+    const mk = (cls, t, title, fn) => { const b = document.createElement("button"); b.className = "cx-fsb"; b.title = title; b.innerHTML = "<span>" + t + "</span>"; b.onclick = fn; if (cls) b.setAttribute(cls, ""); qa.insertBefore(b, help); return b; };
+    mk("", "Register", "Back to the drawings register", () => { if (E.dirty && !E.readOnly && !confirm("This drawing has changes that are not saved. Leave it? (A local draft is kept on this device.)")) return; go("go=list"); });
+    mk("data-fs", "Exit full screen", "Show or hide the page header (F11 for the whole browser)", () => setFs(!isFs(), !isFs()));
+    mk("", "Ribbon", "Fold the ribbon away to get more drawing space", () => { root.classList.toggle("cx-rcol"); pref("rcol", root.classList.contains("cx-rcol") ? "1" : "0"); setTimeout(() => window.dispatchEvent(new Event("resize")), 30); });
+    root.querySelector(".cx-rtabs").addEventListener("click", () => { if (root.classList.contains("cx-rcol")) { root.classList.remove("cx-rcol"); pref("rcol", "0"); setTimeout(() => window.dispatchEvent(new Event("resize")), 30); } }, true);
+    if (pref("rcol") === "1") root.classList.add("cx-rcol");
+    if (window.innerWidth > 820 && pref("side") !== "1") root.classList.add("cx-noside");
+    root.addEventListener("click", (ev) => { const a = ev.target.closest("[data-act=side]"); if (a) setTimeout(() => pref("side", root.classList.contains("cx-noside") ? "0" : "1"), 0); });
+    document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && S.fsNative) S.fsNative = false; });
   }
   const draftKey = (id) => "kcad-draft-" + (QP.slug || "demo") + "-" + id;
   function draftSave() { const E = S.E; if (!E || !S.cur || !E.dirty || E.readOnly) return; try { localStorage.setItem(draftKey(S.cur.id), JSON.stringify({ at: new Date().toISOString(), base: S.cur.updated_at, data: E.data() })); } catch (e) { /* storage full */ } }
   async function openEditor(id) {
-    const E = editor();
+    const E = editor(); setTimeout(() => { const r = cxRoot(); if (r && !S.sideSet) { S.sideSet = 1; if (window.innerWidth > 820 && pref("side") !== "1") { r.classList.add("cx-noside"); window.dispatchEvent(new Event("resize")); } } }, 300);
     if (!id) {
       if (S.cur) { setBar(); setTimeout(() => E.focus(), 50); return; }
       if (E._stage && E.doc.info && E.doc.info.stage && K.stageBar) { K.stageBar(E); E.readOnly = null; setTimeout(() => E.focus(), 50); return; }

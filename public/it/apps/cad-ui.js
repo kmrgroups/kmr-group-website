@@ -290,15 +290,15 @@
     if (E.dirty) { const ok = await E.dialog("New drawing", "<p>The current drawing has changes that are not saved. Start a new drawing anyway?</p>", () => true, { ok: "Discard and start new" }); if (!ok) return; }
     E.load(K.newDoc(), { title: "Untitled" });
   } });
-  cmd("OPEN", { a: [], d: "Open a DXF or KMR CAD (.json) file", norepeat: true, fn: async (E) => {
+  cmd("OPEN", { a: [], d: "Open a DXF, DWG, PDF, picture or KMR CAD (.json) file", norepeat: true, fn: async (E) => {
     if (E.opts.onOpen && (await E.opts.onOpen(E)) !== false) return;
     const file = await K.pickFile(".dxf,.json,.kcad"); if (!file) return;
-    try { const r = await K.readDrawingFile(file); if (E.opts.onOpenFile) return E.opts.onOpenFile(E, r); E.load(r.doc, Object.assign({ title: r.name }, r.info || {})); E.msg(`Opened ${file.name}: ${E.doc.ents.length} objects. ${warnText(r.warn)}`); }
+    try { const r = await K.readDrawingFile(file); if (E.opts.onOpenFile) return E.opts.onOpenFile(E, r); E.load(r.doc, Object.assign({ title: r.name }, r.info || {})); E.msg(`Opened ${file.name}: ${E.doc.ents.length} objects. ${r.converted ? [r.note].concat(r.notes || []).join(" ") : warnText(r.warn)}`); }
     catch (e) { E.err(e.message); }
   } });
   cmd("IMPORT", { a: ["IMP", "DXFIN"], d: "Import a DXF into the current drawing", fn: async (E) => {
     const file = await K.pickFile(".dxf,.json"); if (!file) return; let r; try { r = await K.readDrawingFile(file); } catch (e) { return E.err(e.message); }
-    E.tx("import", () => { for (const l of r.doc.layers) if (!E.doc.layers.find((x) => x.name === l.name)) E.doc.layers = E.doc.layers.concat([l]); E.doc.blocks = Object.assign({}, r.doc.blocks, E.doc.blocks); for (const e of r.doc.ents) E.add(Object.assign({}, e, { id: undefined }), true); });
+    E.tx("import", () => { for (const l of r.doc.layers) if (!E.doc.layers.find((x) => x.name === l.name)) E.doc.layers = E.doc.layers.concat([l]); E.doc.blocks = Object.assign({}, r.doc.blocks, E.doc.blocks); if (r.doc.images) E.doc.images = Object.assign({}, E.doc.images, r.doc.images); for (const e of r.doc.ents) E.add(Object.assign({}, e, { id: undefined }), true); });
     E.zoomExt(); E.msg(`Imported ${r.doc.ents.length} objects from ${file.name}. ${warnText(r.warn)}`);
   } });
   cmd("QSAVE", { a: ["SAVE"], d: "Save the drawing (Ctrl+S)", norepeat: true, fn: async (E) => { if (E.opts.onSave) return E.opts.onSave(E, false); K.download(fname(E, "json"), JSON.stringify({ kcad: 1, info: E.info, doc: E.data() })); E.markSaved(); } });
@@ -368,22 +368,31 @@
     rect(0, 0, W, H, 0.25); rect(20, 10, W - 10, H - 10, 0.7);
     // centring marks
     ln([W / 2, H - 10], [W / 2, H - 5], 0.7); ln([W / 2, 10], [W / 2, 5], 0.7); ln([20, H / 2], [15, H / 2], 0.7); ln([W - 10, H / 2], [W - 5, H / 2], 0.7);
-    const x0 = W - 10 - 180, y0 = 10, X = (v) => x0 + v;
-    rect(x0, y0, W - 10, y0 + 56, 0.7);
-    for (const y of [8, 16, 24, 32, 40]) ln([X(0), y0 + y], [X(180), y0 + y]);
-    ln([X(0), y0 + 48], [X(110), y0 + 48]); ln([X(110), y0 + 40], [X(110), y0 + 56]);
-    ln([X(60), y0], [X(60), y0 + 40]); ln([X(110), y0], [X(110), y0 + 24]); ln([X(140), y0], [X(140), y0 + 24]); ln([X(30), y0 + 24], [X(30), y0 + 40]);
-    lab(X(1.5), y0 + 53.5, "COMPANY"); lab(X(111.5), y0 + 53.5, "PROJECTION"); lab(X(1.5), y0 + 45.5, "TITLE"); lab(X(1.5), y0 + 37.5, "DRAWN"); lab(X(31.5), y0 + 37.5, "DATE"); lab(X(61.5), y0 + 37.5, "MATERIAL");
-    lab(X(1.5), y0 + 29.5, "CHECKED"); lab(X(31.5), y0 + 29.5, "APPROVED"); lab(X(61.5), y0 + 29.5, "GENERAL TOLERANCE"); lab(X(1.5), y0 + 21.5, "DRAWING NUMBER"); lab(X(61.5), y0 + 21.5, "CUSTOMER / PART NO.");
-    lab(X(111.5), y0 + 21.5, "REV"); lab(X(141.5), y0 + 21.5, "SCALE"); lab(X(1.5), y0 + 13.5, "SHEET SIZE"); lab(X(61.5), y0 + 13.5, "SHEET"); lab(X(111.5), y0 + 13.5, "UNITS"); lab(X(141.5), y0 + 13.5, "STATUS");
-    lab(X(1.5), y0 + 2.2, "Drawn with KMR CAD Draft · Powered By : KMR Group of Companies · www.kmr-groups.com");
-    // projection symbol
-    const px = X(145), py = y0 + 47.5, cone = (cx) => { B.push({ t: "pline", layer: "0", lw: 0.35, closed: true, pts: [[cx - 7, py - 2.5, 0], [cx + 7, py - 5, 0], [cx + 7, py + 5, 0], [cx - 7, py + 2.5, 0]] }); ln([cx - 9, py], [cx + 9, py], 0.18); }, circ = (cx) => { B.push({ t: "circle", layer: "0", lw: 0.35, c: [cx, py], r: 5 }, { t: "circle", layer: "0", lw: 0.35, c: [cx, py], r: 2.5 }); ln([cx - 7, py], [cx + 7, py], 0.18); ln([cx, py - 7], [cx, py + 7], 0.18); };
-    if (r.proj === "3") { circ(px - 6); cone(px + 18); } else { cone(px - 6); circ(px + 18); }
+    // layout: footer 6 mm, five rows of 9 mm, company row 12 mm. Every value is fitted to its own cell (never wider, never taller).
+    const x0 = W - 10 - 180, y0 = 10, X = (v) => x0 + v, RH = 9, FT = 6, rb = (i) => y0 + FT + RH * i, TOP = rb(5) + 12;
+    const cut = (t, h, w) => { t = String(t == null ? "" : t).replace(/\s+/g, " ").trim(); if (!t) return ""; let hh = h; while (hh > 1.7 && G.textW(t, hh) > w) hh -= 0.1; if (G.textW(t, hh) <= w) return { s: t, h: Math.round(hh * 10) / 10 }; while (t.length > 1 && G.textW(t + "…", hh) > w) t = t.slice(0, -1); return { s: t.trimEnd() + "…", h: Math.round(hh * 10) / 10 }; };
+    rect(x0, y0, W - 10, TOP, 0.7);
+    for (let i = 0; i < 5; i++) ln([X(0), rb(i + 1)], [X(180), rb(i + 1)]);
+    ln([X(0), y0 + FT], [X(180), y0 + FT]);
+    ln([X(110), rb(5)], [X(110), TOP]);            // company | projection
+    ln([X(60), rb(2)], [X(60), rb(4)]); ln([X(30), rb(2)], [X(30), rb(4)]);   // drawn/date/material, checked/approved/tolerance
+    ln([X(60), rb(0)], [X(60), rb(2)]); ln([X(110), rb(0)], [X(110), rb(2)]); ln([X(140), rb(0)], [X(140), rb(2)]);   // number | customer | rev | scale ; sheet size | sheet | units | status
+    ln([X(110), rb(0)], [X(110), rb(1)]);
+    const L = (cx, row, t) => lab(cx + 1.5, rb(row) + RH - 3.2, t);
+    lab(X(1.5), TOP - 3.4, "COMPANY"); lab(X(111.5), TOP - 3.4, "PROJECTION"); L(X(0), 4, "TITLE"); L(X(0), 3, "DRAWN"); L(X(30), 3, "DATE"); L(X(60), 3, "MATERIAL");
+    L(X(0), 2, "CHECKED"); L(X(30), 2, "APPROVED"); L(X(60), 2, "GENERAL TOLERANCE"); L(X(0), 1, "DRAWING NUMBER"); L(X(60), 1, "CUSTOMER / PART NO."); L(X(110), 1, "REV"); L(X(140), 1, "SCALE");
+    L(X(0), 0, "SHEET SIZE"); L(X(60), 0, "SHEET"); L(X(110), 0, "UNITS"); L(X(140), 0, "STATUS");
+    lab(X(1.5), y0 + 1.9, "Drawn with KMR CAD Draft · Powered By : KMR Group of Companies · www.kmr-groups.com");
+    // projection symbol (kept inside its 12 mm cell)
+    const px = X(145), py = TOP - 7.6, kk = 0.62, cone = (cx) => { B.push({ t: "pline", layer: "0", lw: 0.35, closed: true, pts: [[cx - 7 * kk, py - 2.5 * kk, 0], [cx + 7 * kk, py - 5 * kk, 0], [cx + 7 * kk, py + 5 * kk, 0], [cx - 7 * kk, py + 2.5 * kk, 0]] }); ln([cx - 9 * kk, py], [cx + 9 * kk, py], 0.18); }, circ = (cx) => { B.push({ t: "circle", layer: "0", lw: 0.35, c: [cx, py], r: 5 * kk }, { t: "circle", layer: "0", lw: 0.35, c: [cx, py], r: 2.5 * kk }); ln([cx - 7 * kk, py], [cx + 7 * kk, py], 0.18); ln([cx, py - 7 * kk], [cx, py + 7 * kk], 0.18); };
+    if (r.proj === "3") { circ(px - 8); cone(px + 14); } else { cone(px - 8); circ(px + 14); }
     const name = `SHEET-${r.sheet}-${r.orient === "landscape" ? "L" : "P"}`;
-    val(1.5 + x0, y0 + 49.5, r.co, 4.5); val(1.5 + x0, y0 + 41.5, r.title, 4); val(1.5 + x0, y0 + 33.5, r.dr, 2.8); val(31.5 + x0, y0 + 33.5, r.date, 2.8); val(61.5 + x0, y0 + 33.5, r.mat, 2.8); val(1.5 + x0, y0 + 25.5, r.ck, 2.8); val(31.5 + x0, y0 + 25.5, r.ap, 2.8); val(61.5 + x0, y0 + 25.5, r.tol, 2.8);
-    val(1.5 + x0, y0 + 17.5, r.num, 4); val(61.5 + x0, y0 + 17.5, r.cust, 2.8); val(111.5 + x0, y0 + 17.5, r.rev, 4); val(141.5 + x0, y0 + 17.5, r.k === 1 ? "1:1" : r.k < 1 ? K.fmt(1 / r.k, 3) + ":1" : "1:" + K.fmt(r.k, 3), 3.5);
-    val(1.5 + x0, y0 + 9.5, r.sheet + " " + (r.orient === "landscape" ? "landscape" : "portrait"), 2.8); val(61.5 + x0, y0 + 9.5, r.sh, 2.8); val(111.5 + x0, y0 + 9.5, E.doc.units, 2.8); val(141.5 + x0, y0 + 9.5, "DRAFT", 2.8);
+    const V = (cx, row, w, t, h) => { const c = cut(t, h, w - 3); if (c) val(cx + 1.5, rb(row) + 1.6, c.s, Math.min(c.h, 4.6), 0); };
+    { const c = cut(r.co, 5, 105); if (c) val(X(1.5), rb(5) + 2.6, c.s, c.h, 0); }
+    V(X(0), 4, 180, r.title, 4.2); V(X(0), 3, 30, r.dr, 3); V(X(30), 3, 30, r.date, 3); V(X(60), 3, 120, r.mat, 3);
+    V(X(0), 2, 30, r.ck, 3); V(X(30), 2, 30, r.ap, 3); V(X(60), 2, 120, r.tol, 3);
+    V(X(0), 1, 60, r.num, 4.2); V(X(60), 1, 50, r.cust, 3); V(X(110), 1, 30, r.rev, 4.2); V(X(140), 1, 40, r.k === 1 ? "1:1" : r.k < 1 ? K.fmt(1 / r.k, 3) + ":1" : "1:" + K.fmt(r.k, 3), 3.6);
+    V(X(0), 0, 60, r.sheet + " " + (r.orient === "landscape" ? "landscape" : "portrait"), 3); V(X(60), 0, 50, r.sh, 3); V(X(110), 0, 30, E.doc.units, 3); V(X(140), 0, 40, "DRAFT", 3);
     E.tx("title block", () => {
       if (!E.doc.layers.find((l) => l.name === lay)) E.doc.layers = E.doc.layers.concat([{ name: lay, color: "#ffffff", lt: "CONTINUOUS", lw: 0.35, on: true, frozen: false, lock: false }]);
       E.doc.blocks = Object.assign({}, E.doc.blocks, { [name]: { base: [0, 0], ents: B } });

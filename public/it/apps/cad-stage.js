@@ -188,7 +188,7 @@
       const f = how === "bi" ? await biFile(P) : file; if (!f) throw K.CANCEL; name = f.name; anchoredOk = hasPos && (how === "bi" || (P.source && P.source.fileName && f.name.replace(/\.[^.]+$/, "") === String(P.source.fileName).replace(/\.[^.]+$/, "")) || how === "file-same");
       const kd = kindOf(f.name);
       if (kd === "step") throw new Error("A STEP model has no drawing dimensions. Use the 2D drawing (DXF, DWG or PDF).");
-      if (kd === "pdf" || kd === "image") { say("Reading the drawing…"); return { kind: "raster", pages: await rasterPages(f, kd, desk, say), anchored: anchoredOk, items, info, name }; }
+      if (kd === "pdf" || kd === "image") { say("Reading the drawing…"); return { kind: "raster", pages: await rasterPages(f, kd, desk, say), anchored: anchoredOk, items, info, name, file: f }; }
       if (kd === "vector" || kd === "json") { say("Reading the drawing…"); const r = await K.readDrawingFile(f, say); doc = Object.assign(K.newDoc(false), r.doc); }
       else throw new Error("Use a DXF, DWG, PDF or picture of the drawing.");
     }
@@ -322,7 +322,7 @@
     const b = sh.box, w = b.x1 - b.x0, h = b.y1 - b.y0, Hp = Math.round((W * h) / w), c = canvas(W, Hp), x = c.getContext("2d");
     const view = { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, s: W / w, W, H: Hp };
     const P = (col, wd) => K.canvasPainter(x, view, { fg: INK, light: true, lwt: true, ltscale: doc.ltscale, override: col, width: wd });
-    const PP = { geom: P(INK), this: P(RED, 2), done: P(GREY), balloon: P(RED, 2), frame: P(INK) };
+    const PP = { geom: P(INK), this: P(RED, 2), done: P(GREY), balloon: P(RED, 2), frame: P(INK), model: P(INK), stock: P(INK), tool: P("#0369a1", 1.4), clamp: P("#b45309", 1.4) };
     const ents = doc.ents.filter((e) => { const bb = K.bbox(e, doc); return bb && !(bb.x1 < b.x0 || bb.x0 > b.x1 || bb.y1 < b.y0 || bb.y0 > b.y1); });
     await K.imgReady(doc, ents);
     for (const e of ents) { if (K.noPlot(doc, e)) continue; const role = e.stg || (/^STG-BALLOON$/.test(e.layer) ? "balloon" : /^STG-/.test(e.layer) ? "frame" : "geom"); K.paint(PP[role] || PP.geom, e, doc); }
@@ -359,7 +359,10 @@
     const opt = (v, label, note, dis) => `<label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="src" value="${esc(v)}"${v === dflt ? " checked" : ""}${dis ? " disabled" : ""}><span><b>${label}</b>${note ? `<br><span class="cx-mu">${note}</span>` : ""}</span></label>`;
     const regSel = (list) => list.map((d) => `<option value="reg:${esc(d.id)}">${esc(d.number)} rev ${esc(d.rev)} · ${esc(d.title || "")}${d.part_no ? " · " + esc(d.part_no) : ""}</option>`).join("");
     return E.dialog(`Stage drawings — ${P.part_no || ""} ${P.part_name || ""}`, `<p class="cx-note">Dimensions frozen as <b>rev ${esc(String(P.freeze.rev))}</b> on ${esc(dmy(P.freeze.at))} by ${esc(P.freeze.by || "")}: ${Object.keys(P.freeze.map || {}).length} operations make ${Object.values(P.freeze.map || {}).reduce((t, a) => t + a.length, 0)} characteristics.</p>
-      <h4>Draw on</h4>
+      <h4>What to draw</h4>
+      <label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="sty" value="flow" checked><span><b>The part at each process stage</b> (recommended)<br><span class="cx-mu">Raw material → sawing → CNC turning (one side held, clamping area, datum, tool path, dimensions) → next operations. The shape of the part is read from the drawing below and you can correct it.</span></span></label>
+      <label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="sty" value="fin"><span><b>The finished drawing for each operation</b><br><span class="cx-mu">This operation's dimensions and balloons in red, earlier ones grey, later ones left out.</span></span></label>
+      <h4>Take the drawing from</h4>
       ${opt("bi", "The ballooned drawing from Balloon Inspector", bi ? esc(P.bi.file_name || "") + " — balloons go exactly where they were placed. DXF / DWG are drawn as lines (later operations' dimensions are left out); PDF and pictures as a picture." : "This project has no ballooned drawing stored.", !bi)}
       ${opt(same.length ? "reg:" + same[0].id : "reg", "A drawing in this register", (same.length ? "Same part number: " : "") + `<select id="regs" style="max-width:100%">${same.length ? regSel(same) : ""}${others.length ? `<optgroup label="Other drawings">${regSel(others)}</optgroup>` : ""}</select><br>Characteristics are found by their value and text.`, !reg.length)}
       ${opt("open", "The drawing open now", "Characteristics are found by their value and text.", !openOk)}
@@ -368,8 +371,32 @@
       <label class="cx-chk"><input type="checkbox" id="sendNow" checked> Send them to the SOP straight away (you can edit and send again)</label>`,
       (b) => { const r = b.querySelector("input[name=src]:checked"); if (!r) throw new Error("Choose the drawing."); let how = r.value; if (/^reg/.test(how)) { const v = b.querySelector("#regs").value; if (!v) throw new Error("Choose a drawing from the register."); how = v; }
         if (how === "file" && b.querySelector("#same").checked) how = "file-same";
-        return { how, earlier: b.querySelector("#early").value, loose: b.querySelector("#loose").value, send: b.querySelector("#sendNow").checked }; },
+        return { how, style: b.querySelector("input[name=sty]:checked").value, earlier: b.querySelector("#early").value, loose: b.querySelector("#loose").value, send: b.querySelector("#sendNow").checked }; },
       { width: "min(760px,96vw)", ok: "Make stage drawings", init: (b) => { const s = b.querySelector("#regs"); if (s) s.onchange = () => { const r = b.querySelector('input[name=src][value^="reg"]'); if (r) { r.value = s.value; r.checked = true; } }; } });
+  }
+
+  /** process-stage drawings (cad-stage-flow.js): the part's shape from the drawing, checked by the user */
+  async function flowBuild(E, P, SRC, say) {
+    const F = K.stageFlow; if (!F) throw new Error("The stage-flow module did not load. Reload the page.");
+    let prof = null, how = "";
+    try {
+      let doc = SRC.kind === "vector" ? SRC.doc : null;
+      if (!doc && SRC.file && K.vec) { say("Converting the picture of the drawing to CAD to find the shape of the part…"); const r = await K.vec.convert(SRC.file, { ocr: false, keep: false, page: 1 }, say); doc = K.newDoc(false); K.vec.intoDoc(doc, r, 0, 0, 1); }
+      if (doc) { say("Finding the shape of the part…"); prof = F.silhouette(doc); }
+    } catch (e) { prof = null; how = " (" + e.message + ")"; }
+    const fromDrawing = !!prof; if (!prof) prof = F.fromPlan(P);
+    const model = Object.assign({}, prof, F.defaults(P, prof));
+    const note = fromDrawing ? `The shape was read from <b>${esc(SRC.name || "the drawing")}</b> (${prof.steps.length} step${prof.steps.length > 1 ? "s" : ""}, length ${prof.L} mm${prof.bore ? ", bore Ø" + prof.bore.d : ""}). Check it against the drawing — correct any number that is wrong.` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the steps of your part</b> (diameter and length from the left end).`;
+    const m = await F.dialog(E, P, model, note); if (!m) return null;
+    Object.assign(m, F.defaults(P, { steps: m.steps, bore: m.bore }), { steps: m.steps, bore: m.bore, D0: m.D0, fa: m.fa, clamp: m.clamp, first: m.first, bar: m.bar, L: m.steps.reduce((t, s) => t + s.l, 0), maxD: Math.max(...m.steps.map((x) => x.d)) });
+    // the first turned end is drawn at the left
+    if (m.first === "R") { m.steps = m.steps.slice().reverse(); if (m.bore) m.bore = Object.assign({}, m.bore, { end: m.bore.end === "L" ? "R" : "L" }); }
+    say("Drawing the stages…"); await new Promise((r) => setTimeout(r, 20));
+    const R = F.build(P, m, {});
+    const used = new Set(); for (const o of P.ops || []) for (const n of (P.freeze.map || {})[String(o.opNo)] || []) used.add(+n);
+    R.report.unsure = []; R.total = used.size;
+    R.doc.info = { stage: { pd: P.id, part: P.part_no || "", partName: P.part_name || "", freezeRev: P.freeze.rev, frozenAt: P.freeze.at, source: { kind: "stages", name: SRC.name || "", anchored: false }, raster: false, flow: true, shape: { steps: m.steps, bore: m.bore, D0: m.D0 }, sheets: R.sheets, made: new Date().toISOString() } };
+    return R;
   }
 
   /* ================= commands ================= */
@@ -389,7 +416,8 @@
     const SRC = await loadSource(E, P, o.how, file, say);
     if (o.how === "file-same" && !SRC.anchored && SRC.kind === "vector") E.msg("The balloons could not be lined up with this file, so characteristics are found by their value and text instead.", "mu");
     say("Drawing the stage sheets…"); await new Promise((r) => setTimeout(r, 20));
-    const R = buildSet(P, SRC, o);
+    const R = o.style === "flow" ? await flowBuild(E, P, SRC, say) : buildSet(P, SRC, o);
+    if (!R) return;
     if (!R.sheets.length) return E.err("No operation makes a ballooned characteristic, so there is nothing to draw.");
     // the set opens here as a new, unsaved drawing
     if (window.KCADShell) window.KCADShell.cur = null;
@@ -401,7 +429,7 @@
     const rep = R.report, miss = [...new Set(rep.missing)];
     if (rep.unsure && rep.unsure.length) E.msg(`Check balloons #${rep.unsure.join(", #")}: the same value is on the drawing more than once, so the first one was used. Move the balloon if it is on the wrong dimension, then Send to SOP.`, "er");
     if (SRC.kind === "raster" && SRC.pages.length > 1 && !SRC.anchored) E.msg(`Only sheet 1 of ${SRC.pages.length} is used, because the file has no balloon positions.`, "mu");
-    E.msg(`Made ${R.sheets.length} stage sheet${R.sheets.length > 1 ? "s" : ""} for ${new Set(R.sheets.map((s) => s.opNo)).size} operations from ${SRC.name}. ${rep.ballooned} balloons placed${SRC.kind === "vector" ? `, ${rep.linked} dimensions linked` : ""}${SRC.fitted ? " (balloons lined up from matching dimensions)" : ""}.`, "ok");
+    E.msg(`Made ${R.sheets.length} stage sheet${R.sheets.length > 1 ? "s" : ""} for ${new Set(R.sheets.map((s) => s.opNo)).size} operations from ${SRC.name}. ${rep.ballooned != null ? rep.ballooned : rep.balloons} balloons placed${SRC.kind === "vector" ? `, ${rep.linked} dimensions linked` : ""}${SRC.fitted ? " (balloons lined up from matching dimensions)" : ""}.`, "ok");
     if (SRC.kind === "raster" && !SRC.anchored) E.msg("A PDF or picture that was not ballooned has no balloon positions, so the sheets show the drawing and the table only. Choose the ballooned drawing to get the balloons.", "mu");
     else if (miss.length) E.msg(`Not found on the drawing — listed in the table only: #${miss.join(", #")}. Add the balloons by hand if needed, then Send to SOP.`, "er");
     if (o.send) await send(E);

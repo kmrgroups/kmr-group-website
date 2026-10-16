@@ -63,20 +63,22 @@
     const chars = [C(1, "Diameter", "Ø120", "Ø120 ±0.1", 120, 119.9, 120.1, "", "G-001"), C(2, "Diameter", "Ø40", "Ø40 +0.025/0", 40, 40, 40.025, "SC", "G-002"), C(3, "Diameter", "Ø60 h7", "Ø60 h7 (0/-0.030)", 60, 59.97, 60, "CC", "G-003"),
       C(4, "Linear", "20", "20 ±0.1", 20, 19.9, 20.1, "", "G-004"), C(5, "Linear", "35", "35 ±0.1", 35, 34.9, 35.1, "", "G-004"), C(6, "Diameter", "6x Ø11 THRU", "6x Ø11 THRU on PCD Ø90", 11, 11, 11.2, "", "G-005"),
       C(7, "Note", "REMOVE ALL BURRS AND SHARP EDGES 0.5 x 45°", "Remove all burrs and sharp edges 0.5 x 45°", null, null, null, "", "")];
-    const ops = [{ opNo: 10, key: "CUT", name: "Bar cutting", machine: "Bandsaw BS-01", chars: [] }, { opNo: 20, key: "TURN", name: "CNC turning – 1st setup", machine: "CNC lathe LT-01", chars: [1, 2, 4] }, { opNo: 30, key: "TURN2", name: "CNC turning – 2nd setup", machine: "CNC lathe LT-02", chars: [3, 5] },
-      { opNo: 40, key: "VMC", name: "VMC drilling", machine: "VMC-01", chars: [6] }, { opNo: 50, key: "DEBURR", name: "Deburring", machine: "Deburring bench", chars: [] }, { opNo: 60, key: "FINAL", name: "Final inspection", machine: "Inspection table", chars: [] }];
+    const ops = [{ opNo: 10, key: "RMI", name: "Raw material receiving & inspection", machine: "Inspection table & surface plate", chars: [7], tools: [] }, { opNo: 20, key: "CUT", name: "Bar cutting / sawing", machine: "Bandsaw BS-01", chars: [], tools: [] },
+      { opNo: 30, key: "TURN1", name: "CNC turning – OP 1 (first side)", machine: "CNC lathe LT-01", chars: [1, 2, 4], tools: [{ desc: "OD turning tool", spec: "CNMG 120408" }, { desc: "OD finish tool", spec: "VNMG 160404" }, { desc: "Boring bar", spec: "CCMT 09T304" }, { desc: "Parting / grooving", spec: "3 mm blade" }] },
+      { opNo: 40, key: "TURN2", name: "CNC turning – OP 2 (second side)", machine: "CNC lathe LT-02", chars: [3, 5], tools: [{ desc: "OD turning tool", spec: "CNMG 120408" }, { desc: "OD finish tool", spec: "VNMG 160404" }] },
+      { opNo: 50, key: "VMC", name: "VMC – drilling", machine: "VMC-01", chars: [6], tools: [{ desc: "Drill Ø11", spec: "Carbide drill" }] }, { opNo: 60, key: "DEBURR", name: "Deburring", machine: "Deburring bench", chars: [], tools: [] }, { opNo: 70, key: "FINAL", name: "Final inspection", machine: "Inspection table", chars: [], tools: [] }];
     const gauges = [{ id: "G-001", name: "Outside micrometer", range: "100–125 mm" }, { id: "G-002", name: "Bore gauge", range: "35–50 mm" }, { id: "G-003", name: "Outside micrometer", range: "50–75 mm" }, { id: "G-004", name: "Digital vernier caliper", range: "0–150 mm" }, { id: "G-005", name: "Pin gauge", range: "Ø11.0 / Ø11.2" }];
     const gn = (id) => { const g = gauges.find((x) => x.id === id); return g ? g.id + " " + g.name : ""; };
     const map = {}, spec = {}; ops.forEach((o) => { if (o.chars.length) map[String(o.opNo)] = o.chars.slice(); }); chars.forEach((c) => { spec[String(c.no)] = [c.type, c.spec, c.cls].join(" | "); });
     return { id: "pd-sample-dp1101", part_no: "DP-1101", part_name: "Drive flange", rev: "C", drawing_no: "DRG-2609-0001", customer: "Deccan Motors Ltd", status: "approved", sample: true,
       header: { partNo: "DP-1101", partName: "Drive flange", drawingNo: "DRG-2609-0001", drawingRev: "C", customer: "Deccan Motors Ltd", material: "EN8 (080M40)", supplier: "Sample Engineering Pvt Ltd" },
-      freeze: { rev: 1, at: ago(3), by: "Ravi Kumar", note: "Route agreed in the CFT review", map, spec }, chars, ops, gauges,
+      freeze: { rev: 1, at: ago(3), by: "Ravi Kumar", note: "Route agreed in the CFT review", map, spec }, chars, ops, gauges, family: "rotational", ctxInfo: { maxOD: 120, length: 35 }, notes: {},
       sop: { docNo: "SOP-DP1101", sections: ops.filter((o) => o.chars.length).map((o) => ({ opNo: o.opNo, docNo: "SOP-DP1101/" + o.opNo, checks: o.chars.map((n) => { const c = chars.find((x) => x.no === n); return { charNo: n, gauge: gn(c.gauge), freq: c.cls === "CC" ? "100%" : "5 pcs / 2 hrs" }; }) })) },
       source: { fileName: "", items: [] }, bi: null, stages: null };
   })();
   const pdShape = (r) => { const pl = (r.doc && r.doc.plan) || {}, sp = (r.doc && r.doc.docs && r.doc.docs.sop) || {};
     return { id: r.id, part_no: r.part_no, part_name: r.part_name, rev: r.rev, drawing_no: r.drawing_no, customer: r.customer, status: r.status, header: pl.header || {}, freeze: pl.freeze || null, chars: pl.chars || [],
-      ops: (pl.ops || []).map((o) => ({ opNo: o.opNo, key: o.key, name: o.name, machine: o.machine, chars: o.chars })), gauges: (pl.gauges || []).map((g) => ({ id: g.id, name: g.name, range: g.range })),
+      ops: (pl.ops || []).map((o) => ({ opNo: o.opNo, key: o.key, name: o.name, machine: o.machine, chars: o.chars, tools: o.tools })), family: pl.family, ctxInfo: pl.ctxInfo, notes: pl.notes, gauges: (pl.gauges || []).map((g) => ({ id: g.id, name: g.name, range: g.range })),
       sop: { docNo: sp.docNo, rev: sp.rev, sections: (sp.sections || []).map((s) => ({ opNo: s.opNo, docNo: s.docNo, checks: s.checks })) },
       source: { fileName: (r.source || {}).fileName, items: (r.source || {}).items || [], sheets: (r.source || {}).sheets, desk: (r.source || {}).desk, manual: (r.source || {}).manual }, bi: null,
       stages: r.stages ? { at: r.stages.at, by: r.stages.by, freezeRev: String(r.stages.freezeRev) } : null }; };
