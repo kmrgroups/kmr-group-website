@@ -85,6 +85,8 @@ mom:[
 ['VF','Step 6','Optimization (AIAG-VDA FMEA)','FMEA and Control Plan review meetings record optimisation actions with responsible person and target date.'],
 ['VDA','P2','Project management','Project review meetings are minuted with decisions, owners and dates.']],
 cad:[
+['ISO','7.1.5','Monitoring and measuring resources','Drawing aids work as in standard CAD: object snap, polar and object-snap tracking, adaptive grid and snap step for very small parts, one-time snap overrides in the right-click menu. Dimensions picked from the drawing are exact, so inspection values are not re-typed.'],
+['ISO','7.5.2','Layers, colour, linetype and lineweight','Colour palette, linetypes (hidden, centre, dashed ...) and lineweights display as they plot, so drawings follow the company drawing standard.'],
 ['ISO','7.5.2','Creating and updating documented information','Every drawing has a number, title, revision, part number, customer, units and a title block with drawn / checked / approved names and date.','reg'],
 ['ISO','7.5.3','Control of documented information','Status Draft → In review → Released; a released drawing is locked and can only change through a new revision. Earlier revisions are kept as superseded and cannot be edited.','rel'],
 ['IATF','7.5.3.2.1','Record retention','Every revision is stored with its history (who, when, change note); JSON export of all drawings and the platform daily backup.','rev'],
@@ -145,7 +147,9 @@ balloon:[
 ['PPAP','Element 1','Design records','The drawing is the reference for every ballooned characteristic.'],
 ['IATF','8.2.3.1.2','Customer-designated special characteristics','Key/critical characteristics are flagged on the drawing.'],
 ['IATF','8.6.2','Layout inspection and functional testing','Inspection report is prepared from the ballooned dimensions.'],
-['ISO','8.2.2 / 8.2.3','Determining and reviewing requirements','Drawing requirements are listed for review before manufacture.']],
+['ISO','8.2.2 / 8.2.3','Determining and reviewing requirements','Drawing requirements are listed for review before manufacture.'],
+['MSA','Gauge selection (10:1 rule)','Measurement system suitability','Each dimension is given the best master gauge automatically: right type and range, least count within 10 % of the tolerance, most economical first. If no master gauge suits, a suitable new gauge is allotted and marked to purchase; the choice can be changed by hand.'],
+['IATF','7.1.5.1.1','Measurement systems analysis','The gauge chosen here follows into the Control Plan, SOP and stage drawings, so the same gauge is named everywhere.']],
 ops:[
 ['ISO','7.1.3 / 7.1.5','Infrastructure; monitoring and measuring resources','Machines and gauges are listed in one master.'],
 ['ISO','7.5.2 / 7.5.3','Documented information','Parts, BOM, routing and tools are controlled in one place.'],
@@ -153,7 +157,8 @@ ops:[
 ['IATF','8.5.1.6','Management of production tooling','Tool details such as life, edges and resharpening are recorded.'],
 ['IATF','8.4.2.4','Supplier monitoring','Supplier master supports monitoring and selection.'],
 ['IATF','9.1.1.1','Monitoring of manufacturing processes','Loss and process codes are maintained.'],
-['APQP','Team and master data','Process definition','Part, process and machine masters support planning.']]
+['APQP','Team and master data','Process definition','Part, process and machine masters support planning.'],
+['ISO','7.2 / 7.3','Competence and awareness','Every screen of every app shows a short guide after each completed field (what to look at next); it can be switched off once the user knows the screens.']]
 };
 var CSS='.kstd table{width:100%;border-collapse:collapse}.kstd th,.kstd td{padding:8px 10px;border-bottom:1px solid var(--line,#e2e6ea);text-align:left;vertical-align:top;font-size:13px}.kstd th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut,#667)}.kstd .ch{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.kstd .ch button{border:1px solid var(--line,#cfd6dd);background:transparent;color:inherit;border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer}.kstd .ch button.on{background:#0b6b4b;color:#fff;border-color:#0b6b4b}.kstd .mut{color:var(--mut,#667);font-size:13px}@media print{.kstd .ch button:not(.on){display:none}.kstd .noprint{display:none}}';
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}

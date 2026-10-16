@@ -2,6 +2,7 @@
 (function () {
   /* number boxes ignore the mouse wheel; spell-check + synonyms in every text box */
   if (!window.__kmrText && !document.querySelector('script[src*="kmr-text.js"]')) { const t = document.createElement("script"); t.src = "/it/apps/kmr-text.js"; document.head.appendChild(t); }
+  if (!window.KMRGuide && !document.querySelector('script[src*="kmr-guide.js"]')) { const t = document.createElement("script"); t.src = "/it/apps/kmr-guide.js"; document.head.appendChild(t); }
   if (!window.__kmrSelect && !document.querySelector('script[src*="kmr-select.js"]')) { const t = document.createElement("script"); t.src = "/it/apps/kmr-select.js"; document.head.appendChild(t); }
   /* ---------- PDF viewer ---------- */
   function view(blob, name) {

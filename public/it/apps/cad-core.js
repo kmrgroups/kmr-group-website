@@ -522,10 +522,10 @@
       tol: 0.6 / s,
       style(st) {
         const c = ink(st.color); ctx.strokeStyle = c; ctx.fillStyle = c;
-        let w = o.lwt ? Math.max(1, Math.round((st.lw || 0) * 3.78)) : 1; if (st.w) w = Math.max(w, st.w * s); if (o.width) w = o.width;
+        let w = o.lwt ? Math.max(1, Math.round((st.lw || 0) * 4 * (o.dpr || 1) * 2) / 2) : 1; if (st.w) w = Math.max(w, st.w * s); if (o.width) w = o.width;
         ctx.lineWidth = w;
         lt = st.lt || "CONTINUOUS"; const def = K.LT[lt]; dashed = [];
-        if (def && def.p.length) { const k = (o.ltscale || 1) * s, arr = def.p.map((v) => Math.max(v === 0 ? 0.6 : 1, Math.abs(v) * k)); if (arr.reduce((a, b) => a + b, 0) > 4) dashed = arr; }
+        if (def && def.p.length) { let k = (o.ltscale || 1) * s; const tot = def.p.reduce((t, v) => t + Math.abs(v), 0) * k; if (tot < 9 && tot > 0) k *= 9 / tot;   /* zoomed far out: keep the pattern readable instead of turning solid */ const arr = def.p.map((v) => Math.max(v === 0 ? 0.8 : 1.2, Math.abs(v) * k)); dashed = arr; }
         ctx.setLineDash(o.dash || dashed); ctx.lineCap = st.w ? "round" : "butt"; ctx.lineJoin = "round";
       },
       line(a, b) { ctx.beginPath(); ctx.moveTo(X(a), Y(a)); ctx.lineTo(X(b), Y(b)); ctx.stroke(); },

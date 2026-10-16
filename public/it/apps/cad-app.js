@@ -35,7 +35,8 @@
     opts = opts || {};
     const E = { root, opts, doc: K.newDoc(), sel: [], CANCEL, lastPt: [0, 0], lastCmd: "", dirty: false };
     let prefs = {}; try { prefs = JSON.parse(localStorage.getItem("kcad-prefs") || "{}"); } catch (e) { prefs = {}; }
-    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: false, light: false, cross: 100, pick: 5 }, prefs);
+    if (!prefs.lwtMig) { prefs.lwt = true; prefs.lwtMig = 1; }   // thickness shows by default
+    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: true, light: false, cross: 100, pick: 5 }, prefs);
     const savePrefs = () => { try { localStorage.setItem("kcad-prefs", JSON.stringify(E.set)); } catch (e) { /* private mode */ } };
     E.cur = { layer: "0", color: null, lt: null, lw: null };
     E.view = { cx: 0, cy: 0, s: 3, W: 800, H: 600 };
@@ -277,8 +278,8 @@
     /* ---------------- snapping ---------------- */
     const cursorPoint = () => mouse.cp || mouse.wp;
     const snapAt = (wp, base) => {
-      if (!E.set.osnap) return null;
-      const S = E.set.snaps, ap = 12 / E.view.s, cands = [], nearPrims = [];
+      if (!E.set.osnap && !E.snapOv) return null;
+      const S = E.snapOv ? { [E.snapOv]: 1 } : E.set.snaps, t0 = performance.now(), ap = 12 / E.view.s, cands = [], nearPrims = [];
       const add = (p, type, pen = 0) => { if (!p) return; const d = G.dist(p, wp) * E.view.s; if (d <= 12) cands.push({ p, type, d: d + pen }); };
       let n = 0;
       const visit = (e, depth) => {
@@ -309,7 +310,7 @@
           if (S.nea) add(G.closest(wp, pr), "nea", 4);
         }
       };
-      for (let i = E.doc.ents.length - 1; i >= 0 && n < 400; i--) {
+      for (let i = E.doc.ents.length - 1; i >= 0 && (n < 3000 || performance.now() - t0 < 12); i--) {
         const e = E.doc.ents[i]; if (!E.visible(e)) continue;
         if (e.t !== "xline") { const b = K.bbox(e, E.doc); if (!b || wp[0] < b.x0 - ap || wp[0] > b.x1 + ap || wp[1] < b.y0 - ap || wp[1] > b.y1 + ap) continue; }
         n++; visit(e, 0);
@@ -321,14 +322,15 @@
       return cands[0];
     };
     /** ortho / polar / grid snap of a raw point */
+    const effSnap = () => { let u = E.set.snapUnit || 10; while (u * E.view.s < 6) u *= 10; while (u * E.view.s > 90 && u > 1e-9) u /= (u * E.view.s > 400 ? 10 : 2); return u; };
     const constrain = (wp, base) => {
       mouse.track = null;
       if (base && E.set.ortho) { const d = G.sub(wp, base); return Math.abs(d[0]) >= Math.abs(d[1]) ? [wp[0], base[1]] : [base[0], wp[1]]; }
       if (base && E.set.polar) {
         const inc = (E.set.polarInc || 15) * D2R, a = G.ang(base, wp), k = Math.round(a / inc) * inc, d = G.dist(base, wp);
-        if (d * E.view.s > 8 && Math.abs(Math.sin(a - k)) * d * E.view.s < 7) { const p = G.polar(base, k, d * Math.cos(a - k)); if (E.set.snap) { const u = E.set.snapUnit; const dd = Math.round(G.dist(base, p) / u) * u; mouse.track = { base, a: k }; return G.polar(base, k, dd); } mouse.track = { base, a: k }; return p; }
+        if (d * E.view.s > 8 && Math.abs(Math.sin(a - k)) * d * E.view.s < 7) { const p = G.polar(base, k, d * Math.cos(a - k)); if (E.set.snap) { const u = effSnap(); const dd = Math.round(G.dist(base, p) / u) * u; mouse.track = { base, a: k }; return G.polar(base, k, dd); } mouse.track = { base, a: k }; return p; }
       }
-      if (E.set.snap) { const u = E.set.snapUnit || 10; return [Math.round(wp[0] / u) * u, Math.round(wp[1] / u) * u]; }
+      if (E.set.snap) { const u = effSnap(); return [Math.round(wp[0] / u) * u, Math.round(wp[1] / u) * u]; }
       return wp;
     };
     const updateCursor = () => {
@@ -340,9 +342,9 @@
       mouse.ot = null;
       if (wantSnap && E.set.otrack && E.set.osnap) {
         const now = Date.now();
-        if (mouse.snap) { const key = mouse.snap.p.map((v) => v.toFixed(6)).join(","); if (hoverSnap.key !== key) hoverSnap = { key, t: now }; else if (now - hoverSnap.t > 420 && !acq.some((a) => a.key === key)) { acq.push({ key, p: mouse.snap.p.slice(), type: mouse.snap.type }); if (acq.length > 7) acq.shift(); clearTimeout(acqT); } else if (!acq.some((a) => a.key === key)) { clearTimeout(acqT); acqT = setTimeout(() => { updateCursor(); drawOverlay(); }, 450); } }
+        if (mouse.snap) { const key = mouse.snap.p.map((v) => v.toFixed(6)).join(","); if (hoverSnap.key !== key) hoverSnap = { key, t: now }; else if (now - hoverSnap.t > 250 && !acq.some((a) => a.key === key)) { acq.push({ key, p: mouse.snap.p.slice(), type: mouse.snap.type }); if (acq.length > 7) acq.shift(); clearTimeout(acqT); } else if (!acq.some((a) => a.key === key)) { clearTimeout(acqT); acqT = setTimeout(() => { updateCursor(); drawOverlay(); }, 270); } }
         else if (acq.length) {
-          const tol = 7 / E.view.s, angs = E.set.polar ? Array.from({ length: Math.round(180 / (E.set.polarInc || 15)) }, (_, i) => (i * (E.set.polarInc || 15)) * D2R) : [0, Math.PI / 2], cands = [];
+          const tol = 9 / E.view.s, angs = E.set.polar ? Array.from({ length: Math.round(180 / (E.set.polarInc || 15)) }, (_, i) => (i * (E.set.polarInc || 15)) * D2R) : [0, Math.PI / 2], cands = [];
           for (const a of acq) for (const g of angs) { const u = [Math.cos(g), Math.sin(g)], t = G.dot(G.sub(mouse.wp, a.p), u), q = G.add(a.p, G.mul(u, t)), d = G.dist(q, mouse.wp); if (d < tol && Math.abs(t) * E.view.s > 4) cands.push({ q, d, a, g }); }
           if (cands.length) {
             cands.sort((x, y) => x.d - y.d); let best = { q: cands[0].q, lines: [cands[0]] };
@@ -377,7 +379,7 @@
       drawUCS(ctx);
     };
     const drawGrid = (ctx) => {
-      const V = E.view; let u = E.set.gridUnit || 10; while (u * V.s < 12) u *= u * V.s < 2.4 ? 10 : 5; const major = u * 5;
+      const V = E.view; let u = E.set.gridUnit || 10; while (u * V.s < 12) u *= u * V.s < 2.4 ? 10 : 5; while (u * V.s > 150 && u > 1e-9) u /= 5; const major = u * 5;
       const w0 = s2w([0, V.H]), w1 = s2w([V.W, 0]);
       ctx.lineWidth = 1; const minor = E.set.light ? "#eef1f5" : "#263342", maj = E.set.light ? "#dde3ea" : "#2f3e50";
       for (const [step, col] of [[u, minor], [major, maj]]) {
@@ -512,6 +514,7 @@
     /* ---------------- pointer input ---------------- */
     const spOf = (ev) => { const r = c1.getBoundingClientRect(); return [ev.clientX - r.left, ev.clientY - r.top]; };
     c1.addEventListener("contextmenu", (ev) => ev.preventDefault());
+    root.addEventListener("contextmenu", (ev) => { if (ev.target.closest("input,textarea,.cx-in")) return; ev.preventDefault(); if (ev.target !== c1 && !ev.target.closest(".cx-menu")) { const r = c1.getBoundingClientRect(); if (ev.clientY > r.top && ev.clientY < r.bottom && ev.clientX > r.left && ev.clientX < r.right) showMenu([ev.clientX - r.left, ev.clientY - r.top]); } }, true);
     c1.addEventListener("pointerdown", (ev) => {
       c1.setPointerCapture(ev.pointerId); ptrs.set(ev.pointerId, spOf(ev)); hideMenu(); hideAC();
       if (ptrs.size === 2) { const [a, b] = Array.from(ptrs.values()); pinch = { d: G.dist(a, b), m: G.mid(a, b) }; win = null; downAt = null; return; }
@@ -559,7 +562,7 @@
     c1.addEventListener("wheel", (ev) => { ev.preventDefault(); const sp = spOf(ev); E.zoomAt(sp, Math.pow(1.0018, -ev.deltaY * (ev.deltaMode === 1 ? 30 : 1))); mouse.sp = sp; mouse.wp = s2w(sp); updateCursor(); }, { passive: false });
     const clickAt = (sp, d0, ev) => {
       const wp = cursorPoint();
-      if (R && (R.kind === "point" || R.kind === "dist" || R.kind === "angle")) { E.msg(K.fmt(wp[0], 4) + "," + K.fmt(wp[1], 4), "in mu"); return done(wp.slice()); }
+      if (R && (R.kind === "point" || R.kind === "dist" || R.kind === "angle")) { E.msg(K.fmt(wp[0], 4) + "," + K.fmt(wp[1], 4), "in mu"); E.snapOv = null; return done(wp.slice()); }
       if (R && R.kind === "ent") { const e = E.pick(mouse.wp, R.filter); if (e) { if (!E.editable(e) && !R.anyLayer) { E.err("That object is on a locked layer."); return; } E.lastShift = !!(d0.shift || ev.shiftKey); return done({ e, p: mouse.wp.slice() }); } E.msg("Nothing found there — click on an object.", "mu"); return; }
       if (R && R.kind === "kw") return;
       if (R && R.kind === "solid") { const s = E.pickSolid2D && E.pickSolid2D(mouse.wp); if (s) return done(s); E.msg("No solid there — click on the outline of a solid (or use the 3D view).", "mu"); return; }
@@ -573,17 +576,35 @@
     };
 
     /* ---------------- context menu ---------------- */
-    const showMenu = (sp) => {
-      const items = [];
-      if (R) { items.push(["Enter", () => submit("")], ["Cancel", () => E.cancel()]); for (const k of R.kws || []) items.push([k, () => submit(k)]); items.push(["—"], ["Zoom extents", () => E.zoomExt()]); }
-      else {
+    const showMenu = (sp, shift) => {
+      const items = [], ptReq = R && (R.kind === "point" || R.kind === "dist" || R.kind === "angle");
+      const OV = [["end", "Endpoint"], ["mid", "Midpoint"], ["int", "Intersection"], ["cen", "Center"], ["qua", "Quadrant"], ["per", "Perpendicular"], ["tan", "Tangent"], ["nea", "Nearest"], ["node", "Node"], ["ins", "Insertion"]];
+      const ov = ["sub", "Snap Overrides", OV.map(([k, n]) => [n, () => { E.snapOv = k; E.msg("One-time snap: " + n, "mu"); updateCursor(); drawOverlay(); }]).concat([["Clear override", () => { E.snapOv = null; updateCursor(); drawOverlay(); }]])];
+      const tog = (n, k, key) => [(E.set[k] ? "\u2713 " : "\u2003") + n + (key ? "  " + key : ""), () => toggle(k, n)];
+      if (R) {
+        items.push(["Enter", () => submit("")], ["Cancel  Esc", () => E.cancel()]);
+        if ((R.kws || []).length) { items.push(["—"]); for (const k of R.kws) items.push([k, () => submit(k)]); }
+        if (ptReq) items.push(["—"], ov);
+        items.push(["—"], ["Pan", () => E.msg("Hold the middle mouse button or Space and drag to pan.", "mu")], ["Zoom extents", () => E.zoomExt()]);
+      } else {
         if (E.lastCmd) items.push(["Repeat " + E.lastCmd, () => E.run(E.lastCmd)]);
-        if (E.sel.length) items.push(["—"], ["Move", () => E.run("MOVE")], ["Copy", () => E.run("COPY")], ["Rotate", () => E.run("ROTATE")], ["Scale", () => E.run("SCALE")], ["Mirror", () => E.run("MIRROR")], ["Erase", () => E.run("ERASE")], ["Explode", () => E.run("EXPLODE")], ["Select similar", () => E.run("SELECTSIMILAR")], ["Properties", () => showSide("props")], ["Copy to clipboard  Ctrl+C", () => E.run("COPYCLIP")], ["Deselect all", () => { E.sel = []; drawOverlay(); refreshSide(); }]);
-        items.push(["—"], ["Paste  Ctrl+V", () => E.run("PASTECLIP")], ["Select all  Ctrl+A", () => E.run("SELECTALL")], ["Zoom extents", () => E.zoomExt()], ["Zoom previous", () => E.zoomPrev()], ["Undo  Ctrl+Z", () => E.undo()]);
+        items.push(["Recent commands", ...[]].slice(0, 0));
+        if (E.sel.length) {
+          items.push(["—"], ["Move", () => E.run("MOVE")], ["Copy", () => E.run("COPY")], ["Rotate", () => E.run("ROTATE")], ["Scale", () => E.run("SCALE")], ["Mirror", () => E.run("MIRROR")], ["Offset", () => E.run("OFFSET")], ["Trim", () => E.run("TRIM")], ["Erase  Del", () => E.run("ERASE")], ["Explode", () => E.run("EXPLODE")],
+            ["—"], ["Select similar", () => E.run("SELECTSIMILAR")], ["Properties", () => showSide("props")], ["Cut  Ctrl+X", () => E.run("CUTCLIP")], ["Copy  Ctrl+C", () => E.run("COPYCLIP")], ["Deselect all", () => { E.sel = []; drawOverlay(); refreshSide(); }]);
+        }
+        items.push(["—"], ["Paste  Ctrl+V", () => E.run("PASTECLIP")], ["Select all  Ctrl+A", () => E.run("SELECTALL")], ["—"], ["Undo  Ctrl+Z", () => E.undo()], ["Redo  Ctrl+Y", () => E.redo && E.redo()],
+          ["—"], ["Zoom extents", () => E.zoomExt()], ["Zoom previous", () => E.zoomPrev()],
+          ["—"], ["sub", "Drafting aids", [tog("Grid", "grid", "F7"), tog("Snap", "snap", "F9"), tog("Ortho", "ortho", "F8"), tog("Polar", "polar", "F10"), tog("Object snap", "osnap", "F3"), tog("Object snap tracking", "otrack", "F11"), tog("Lineweight", "lwt"), ["Drafting settings\u2026", () => E.run("DSETTINGS")]]], ov);
       }
-      menu.innerHTML = items.map((it, k) => (it[0] === "—" ? "<hr>" : `<button data-k="${k}">${esc(it[0])}</button>`)).join("");
-      menu.style.display = "block"; menu.style.left = Math.min(sp[0], E.view.W - 200) + "px"; menu.style.top = Math.min(sp[1], E.view.H - menu.offsetHeight - 4) + "px";
-      menu.onclick = (ev) => { const b = ev.target.closest("button[data-k]"); if (!b) return; hideMenu(); items[+b.dataset.k][1](); };
+      let flat = [];
+      const html = (list) => list.map((it) => { if (it[0] === "—") return "<hr>"; if (it[0] === "sub") { const sub = it[2]; const h = '<div class="cx-sm"><button type="button" class="cx-smh">' + esc(it[1]) + ' <i>\u25b6</i></button><div class="cx-smp">' + html(sub) + "</div></div>"; return h; } flat.push(it[1]); return `<button data-k="${flat.length - 1}">${esc(it[0])}</button>`; }).join("");
+      menu.innerHTML = html(items);
+      menu.style.display = "block";
+      const mw = menu.offsetWidth, mh = menu.offsetHeight;
+      menu.style.left = Math.max(2, Math.min(sp[0], E.view.W - mw - 4)) + "px"; menu.style.top = Math.max(2, Math.min(sp[1], E.view.H - mh - 4)) + "px";
+      menu.classList.toggle("cx-flip", sp[0] + mw * 2 > E.view.W);
+      menu.onclick = (ev) => { const b = ev.target.closest("button[data-k]"); if (!b) return; hideMenu(); flat[+b.dataset.k](); };
     };
     const hideMenu = () => { menu.style.display = "none"; };
 
@@ -645,7 +666,7 @@
     const drawRibbon = () => {
       $(".cx-rtabs").innerHTML = RIB.map((t, i) => `<button data-i="${i}" class="${i === rtab ? "on" : ""}">${esc(t.t)}</button>`).join("");
       $(".cx-ribbon").innerHTML = RIB[rtab].g.map((g) => `<div class="cx-g"><div class="cx-gb">${g.b.map((b) => {
-        if (b === "|LAYERBOX") return `<div class="cx-lbox"><select class="cx-layer" title="Current layer (or the layer of the selected objects)"></select><div class="cx-row"><select class="cx-color" title="Colour"></select><select class="cx-lt" title="Linetype"></select><select class="cx-lw" title="Lineweight"></select></div></div>`;
+        if (b === "|LAYERBOX") return `<div class="cx-lbox"><select class="cx-layer" title="Current layer (or the layer of the selected objects)"></select><div class="cx-row cx-pdr"><button type="button" class="cx-pdb cx-color" data-pd="color" title="Colour — click for the colour palette"></button><button type="button" class="cx-pdb cx-lt" data-pd="lt" title="Linetype (hidden, centre, dashed …)"></button><button type="button" class="cx-pdb cx-lw" data-pd="lw" title="Lineweight (thickness)"></button></div></div>`;
         const c = K.CMDS[b[0]]; const title = c ? `${c.d}${c.a.length ? " (" + c.a[0] + ")" : ""}` : b[1];
         return `<button data-c="${b[0]}" title="${esc(title)}">${svgI(b[2])}<span>${esc(b[1])}</span></button>`;
       }).join("")}</div><div class="cx-gt">${esc(g.n)}</div></div>`).join("");
@@ -659,11 +680,13 @@
     const lwName = (v) => (v == null ? "ByLayer" : v === 0 ? "0.00 mm (thin)" : (+v).toFixed(2) + " mm");
     const refreshLayerBox = () => {
       const ls = $(".cx-layer"); if (!ls) return;
-      ls.innerHTML = E.doc.layers.map((l) => `<option value="${esc(l.name)}"${l.name === E.cur.layer ? " selected" : ""}>${l.on === false ? "◌ " : "● "}${esc(l.name)}${l.lock ? " 🔒" : ""}</option>`).join("");
-      const curL = K.layer(E.doc, E.cur.layer); ls.style.borderLeft = "6px solid " + (curL ? curL.color : "#fff");
-      $(".cx-color").innerHTML = COLORS.map(([n, v]) => `<option value="${v || ""}"${(v || "") === (E.cur.color || "") ? " selected" : ""}>${n}</option>`).join("") + (E.cur.color && !COLORS.some((c) => c[1] === E.cur.color) ? `<option value="${E.cur.color}" selected>${E.cur.color}</option>` : "") + `<option value="__more">More colours…</option>`;
-      $(".cx-lt").innerHTML = `<option value="">ByLayer</option>` + Object.keys(K.LT).map((n) => `<option${n === E.cur.lt ? " selected" : ""}>${n}</option>`).join("");
-      $(".cx-lw").innerHTML = `<option value="">ByLayer</option>` + K.LW.map((v) => `<option value="${v}"${v === E.cur.lw ? " selected" : ""}>${lwName(v)}</option>`).join("");
+      const shownL = (() => { const ls0 = new Set(E.sel.map((id) => (E.byId(id) || {}).layer).filter(Boolean)); return ls0.size === 1 ? [...ls0][0] : E.cur.layer; })(); ls.innerHTML = E.doc.layers.map((l) => `<option value="${esc(l.name)}"${l.name === shownL ? " selected" : ""}>${l.on === false ? "◌ " : "● "}${esc(l.name)}${l.lock ? " 🔒" : ""}</option>`).join("");
+      const curL = K.layer(E.doc, E.sel.length ? shownL : E.cur.layer); ls.style.borderLeft = "6px solid " + (curL ? curL.color : "#fff");
+      const sel = E.sel.map((id) => E.byId(id)).filter(Boolean), PD = K.pd;
+      const pv = (k) => { if (!sel.length) return { v: E.cur[k] == null ? null : E.cur[k] }; const set = new Set(sel.map((e) => (e[k] == null ? "" : String(e[k])))); return set.size === 1 ? { v: sel[0][k] == null ? null : sel[0][k] } : { varies: true }; };
+      const lay = sel.length === 1 ? K.layer(E.doc, sel[0].layer) || curL : curL, c = pv("color"), l = pv("lt"), w = pv("lw");
+      $(".cx-color").innerHTML = PD.colHtml(c.v, lay, c.varies); $(".cx-lt").innerHTML = PD.ltHtml(l.v, lay, l.varies); $(".cx-lw").innerHTML = PD.lwHtml(w.v, lay, w.varies);
+      $(".cx-color").dataset.v = c.varies ? "" : c.v == null ? "" : c.v; $(".cx-lt").dataset.v = l.varies ? "" : l.v || ""; $(".cx-lw").dataset.v = w.varies || w.v == null ? "" : w.v;
     };
     E.refreshLayerBox = refreshLayerBox;
     root.addEventListener("change", (ev) => {
@@ -673,7 +696,13 @@
       else if (t.classList.contains("cx-lt")) applyProp("lt", t.value || null);
       else if (t.classList.contains("cx-lw")) applyProp("lw", t.value === "" ? null : +t.value);
     });
+    root.addEventListener("click", (ev) => {
+      const b = ev.target.closest(".cx-pdb"); if (!b || !root.contains(b)) return; ev.stopPropagation();
+      const k = b.dataset.pd, cur = b.dataset.v || null, cb = (v) => applyProp(k === "color" ? "color" : k, v);
+      if (k === "color") K.pd.colorPop(b, cur, cb); else if (k === "lt") K.pd.ltPop(b, cur, cb); else K.pd.lwPop(b, cur === null ? null : +cur, cb);
+    }, true);
     const applyProp = (k, v) => {
+      if (k === "lw" && v != null && !E.set.lwt) { E.set.lwt = true; savePrefs(); drawStatus(); E.msg("Lineweight display switched on (Lwt) so the thickness shows.", "mu"); }
       if (E.sel.length && !cmdRunning) { E.tx("change " + k, () => { for (const id of E.sel) { const e = E.byId(id); if (e && !E.layerOf(e).lock) E.replace(id, Object.assign({}, e, { [k]: v })); } }); }
       else { E.cur[k] = v; }
       refreshLayerBox(); c1.focus();
@@ -697,7 +726,7 @@
     E.showSide = showSide;
     $(".cx-stabs").addEventListener("click", (ev) => { const b = ev.target.closest("button[data-p]"); if (b) showSide(b.dataset.p); });
     let sideT = 0;
-    const refreshSide = () => { drawStatus(); clearTimeout(sideT); sideT = setTimeout(() => { if (K.panels && K.panels[side]) K.panels[side](E, $(".cx-panel")); }, 30); };
+    const refreshSide = () => { drawStatus(); try { refreshLayerBox(); } catch (er) { /* ribbon not drawn yet */ } clearTimeout(sideT); sideT = setTimeout(() => { if (K.panels && K.panels[side]) K.panels[side](E, $(".cx-panel")); }, 30); };
     E.refreshSide = refreshSide;
 
     /* ---------------- dialogs ---------------- */

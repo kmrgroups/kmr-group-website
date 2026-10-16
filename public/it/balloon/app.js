@@ -154,21 +154,47 @@ function gaugeSuggest(it){
   return {id:"",name:base,range:sized,lc:lc?String(lc):"",purchase:true,why:lc?"needs a least count of "+lc+" or finer (10:1 on a "+(+band.toFixed(4))+" tolerance)":"not in the Operations Master gauge list"};
 }
 const gUsed=it=>it.gauges||[];
+/* fits of every master gauge for one characteristic — cached so the table redraws fast with big gauge lists */
+let _fitKey="", _fitMap=new Map();
+function fitsFor(it){
+  const G=window.KMR_GAUGES||[]; const k=G.length+"|"+(G[0]&&G[0].id)+"|"+(G[G.length-1]&&G[G.length-1].id); if(k!==_fitKey){ _fitKey=k; _fitMap=new Map(); }
+  const key=[it.type,it.nominal,it.upper,it.lower,it.gen,it.unit].join("~"); let r=_fitMap.get(key);
+  if(!r){ r=G.map(g=>({g,f:gaugeFit(it,g)})); if(_fitMap.size>3000) _fitMap.clear(); _fitMap.set(key,r); }
+  return r;
+}
+/* best master gauge = suits size + meets 10:1, and is the most economical one (coarsest least count that still passes, tightest range) */
+function bestGauge(it){
+  const good=fitsFor(it).filter(x=>x.f.s==="good"); if(!good.length) return null;
+  const lcv=g=>{ const v=parseFloat(String(g.lc||"").replace(",",".")); return v>0?v:0; };
+  const span=g=>{ const n=gNums(g.range); return n.length>=2?Math.abs(n[1]-n[0]):1e6; };
+  good.sort((a,b)=>(lcv(b.g)-lcv(a.g))||(span(a.g)-span(b.g))||String(a.g.id).localeCompare(String(b.g.id)));
+  return good[0].g;
+}
+/* every characteristic with no gauge yet gets one automatically: the best from the master, or a suggested new gauge to purchase */
+function autoAllot(){
+  if(!Array.isArray(window.KMR_GAUGES)||S.readonly) return;
+  for(const it of S.items){
+    if(gUsed(it).length||it.gaugeManual) continue;
+    const b=bestGauge(it);
+    it.gauges=[b?{id:b.id,name:b.name,range:b.range||"",lc:b.lc||"",type:b.type||"",purchase:false}:gaugeSuggest(it)];
+    it.gaugeAuto=true; setInstrFromGauges(it);
+  }
+}
 function gaugeCell(it){
   const G=window.KMR_GAUGES; if(!Array.isArray(G)) return `<td><input data-f="instr" value="${esc(it.instr)}" title="${esc(it.instr)}"></td>`;
   const chips=gUsed(it).map((g,i)=>{ const f=g.purchase?{s:"new"}:gaugeFit(it,g); const why=g.purchase?"Not in the Operations Master — new gauge to purchase: "+(g.why||""):f.why;
     return `<span class="gchip ${g.purchase?"new":f.s}" title="${esc((g.id?g.id+" · ":"")+g.name+(g.range?" · "+g.range:"")+(g.lc?" · LC "+g.lc:"")+" — "+why)}">${esc(g.id||"NEW")} ${esc(g.name.length>18?g.name.slice(0,17)+"…":g.name)}<b data-act="gdel" data-gi="${i}" title="Remove this gauge">×</b></span>`; }).join("");
   const have=new Set(gUsed(it).map(g=>g.id).filter(Boolean));
-  const fits=G.map(g=>({g,f:gaugeFit(it,g)})).filter(x=>!have.has(x.g.id));
+  const fits=fitsFor(it).filter(x=>!have.has(x.g.id));
   const good=fits.filter(x=>x.f.s==="good"), weak=fits.filter(x=>x.f.s==="weak"), bad=fits.filter(x=>x.f.s==="bad");
   const sug=gaugeSuggest(it), noGood=!good.length&&!gUsed(it).some(g=>!g.purchase&&gaugeFit(it,g).s==="good");
   const opt=(x,pre)=>`<option value="${esc(x.g.id)}">${pre} ${esc(x.g.id+" "+x.g.name+(x.g.range?" · "+x.g.range:"")+(x.g.lc?" · LC "+x.g.lc:""))}</option>`;
-  const sel=`<select data-f="gaugeAdd" title="Add a gauge from the Operations Master"><option value="">＋ gauge…</option>
-    ${good.length?`<optgroup label="Suitable — meets MSA 10:1">${good.map(x=>opt(x,"🟢")).join("")}</optgroup>`:""}
-    ${weak.length?`<optgroup label="In master, but too coarse (fails 10:1)">${weak.map(x=>opt(x,"🟠")).join("")}</optgroup>`:""}
-    ${noGood?`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(sug.name+(sug.range?" · "+sug.range:"")+(sug.lc?" · LC "+sug.lc:""))}</option></optgroup>`:""}
-    ${bad.length?`<optgroup label="Other master gauges (wrong type / range)">${bad.map(x=>opt(x,"⚪")).join("")}</optgroup>`:""}</select>`;
-  return `<td class="gcell">${chips}${sel}${noGood&&!gUsed(it).length?`<div class="gnote">No master gauge suits — ${esc(sug.why)}</div>`:""}</td>`;
+  /* only the useful options are drawn up-front (keeps the table quick); the full master list is filled in when the dropdown is opened */
+  const sel=`<select data-f="gaugeAdd" title="Add another gauge — the best one is already chosen for you"><option value="">＋ another gauge…</option>
+    ${good.length?`<optgroup label="Suitable — meets MSA 10:1">${good.slice(0,8).map(x=>opt(x,"🟢")).join("")}</optgroup>`:""}
+    ${noGood||!gUsed(it).length?`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(sug.name+(sug.range?" · "+sug.range:"")+(sug.lc?" · LC "+sug.lc:""))}</option></optgroup>`:""}
+    ${(good.length>8||weak.length||bad.length)?`<option value="__more">… show all ${fits.length} master gauges</option>`:""}</select>`;
+  return `<td class="gcell">${chips}${sel}${gUsed(it).length&&gUsed(it).every(g=>g.purchase)&&noGood?`<div class="gnote">No master gauge suits — new gauge allotted (${esc(sug.why)})</div>`:""}</td>`;
 }
 function setInstrFromGauges(it){ const g=gUsed(it); if(g.length){ it.instr=g.map(x=>x.name+(x.id?" ("+x.id+")":" (new)")).join(" / "); it.autoInstr=false; } else { it.instr=instrument(it); delete it.autoInstr; } }
 function zone(it){
@@ -285,8 +311,14 @@ function renderStats(){
   $("stats").innerHTML=`<span class="stat"><b>${n}</b>characteristics</span>${inspOn()?`<span class="stat p"><b>${p}</b>pass</span><span class="stat f"><b>${f}</b>fail</span><span class="stat"><b>${n-p-f}</b>not measured</span>`:`<span class="stat" title="Inspection reports are not in your plan">🔒 inspection results</span>`}${low?`<span class="stat" style="color:var(--warn)"><b>${low}</b>to check</span>`:""}${S.items.some(i=>i.cls)?`<span class="stat"><b>${S.items.filter(i=>i.cls).length}</b>SC/CC</span>`:""}${S.lang&&S.lang!=="English"?`<span class="lang" title="Translated with a built-in engineering glossary (offline). Check wording before sending.">${S.lang} → English</span>`:""}`;
 }
 function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
+function fillAllGauges(sel,it){
+  const fits=fitsFor(it).filter(x=>!new Set(gUsed(it).map(g=>g.id)).has(x.g.id)); const o=(x,p)=>`<option value="${esc(x.g.id)}">${p} ${esc(x.g.id+" "+x.g.name+(x.g.range?" · "+x.g.range:"")+(x.g.lc?" · LC "+x.g.lc:""))}</option>`;
+  const grp=(l,a,p)=>a.length?`<optgroup label="${l}">${a.map(x=>o(x,p)).join("")}</optgroup>`:"";
+  sel.innerHTML=`<option value="">＋ another gauge…</option>`+grp("Suitable — meets MSA 10:1",fits.filter(x=>x.f.s==="good"),"🟢")+grp("In master, but too coarse (fails 10:1)",fits.filter(x=>x.f.s==="weak"),"🟠")+`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(gaugeSuggest(it).name)}</option></optgroup>`+grp("Other master gauges (wrong type / range)",fits.filter(x=>x.f.s==="bad"),"⚪");
+  try{ sel.showPicker&&sel.showPicker(); }catch(e){}
+}
 function renderTable(){
-  renderStats();
+  autoAllot(); renderStats();
   const tw=$("tw");
   if(!S.items.length){ tw.innerHTML=`<div class="emptytable">${S.sheets.length?"No balloons yet. Tap “Find dimensions” (free) to read the drawing, or “Add balloon” to place them by hand.":"Open a drawing to start the inspection table."}</div>`; return; }
   const sc=tw.scrollLeft, st=tw.scrollTop;
@@ -323,18 +355,21 @@ $("tw").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-id]"); if(!tr) return; const id=+tr.dataset.id, act=e.target.closest("[data-act]")?.dataset.act;
   if(act==="del"){ S.items=S.items.filter(i=>i.id!==id); if(S.sel===id) S.sel=null; renderAll(); return; }
   if(act==="go"){ const it=S.items.find(i=>i.id===id); select(id); centerOn(it); return; }
-  if(act==="gdel"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; it.gauges=gUsed(it).filter((_,k)=>k!==+e.target.closest("[data-gi]").dataset.gi); setInstrFromGauges(it); renderTable(); return; }
+  if(act==="gdel"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; it.gauges=gUsed(it).filter((_,k)=>k!==+e.target.closest("[data-gi]").dataset.gi); it.gaugeManual=true; it.gaugeAuto=false; setInstrFromGauges(it); renderTable(); return; }
   if(S.sel!==id){ S.sel=id; draw(); document.querySelectorAll("tr.sel").forEach(r=>r.classList.remove("sel")); tr.classList.add("sel"); }
 });
 $("tw").addEventListener("change",e=>{
   const f=e.target.dataset.f; if(!f) return; const id=+e.target.closest("tr").dataset.id, it=S.items.find(i=>i.id===id); const v=e.target.value;
-  if(f==="gaugeAdd"){ if(!v) return; it.gauges=gUsed(it).slice();
+  if(f==="gaugeAdd"){ if(!v) return;
+    if(v==="__more"){ fillAllGauges(e.target,it); e.target.value=""; return; }
+    it.gauges=gUsed(it).slice(); it.gaugeAuto=false; it.gaugeManual=true;
     if(v==="__new") it.gauges.push(gaugeSuggest(it)); else { const g=(window.KMR_GAUGES||[]).find(x=>x.id===v); if(g) it.gauges.push({id:g.id,name:g.name,range:g.range||"",lc:g.lc||"",type:g.type||"",purchase:false}); }
     setInstrFromGauges(it); renderTable(); return; }
   if(["nominal","upper","lower"].includes(f)){ it[f]=num(v.replace(/−/g,"-").replace("±","")); if(f!=="nominal") it.gen=false; if(f==="nominal") applyGen(it); }
   else if(f==="text"){ it.text=v; it.en=translate(v,S.lang); if(it.type==="GD&T"){it.gdt="";it.datum="";} }
   else it[f]=v;
   if(f==="type"){ applyGen(it); it.instr=instrument(it); }
+  if(["type","nominal","upper","lower","unit"].includes(f)&&it.gaugeAuto&&!it.gaugeManual){ it.gauges=[]; it.gaugeAuto=false; }
   if(["nominal","upper","lower"].includes(f)&&it.autoInstr!==false) it.instr=instrument(it);
   if(f==="instr") it.autoInstr=false;
   renderTable(); draw();
@@ -1343,7 +1378,7 @@ document.addEventListener("pointerdown",e=>{ if(!e.target.closest(".phead detail
 
 /* ---------- API used by the hosted (cloud) version ---------- */
 function getSnapshot(){ return {v:1,clean:!!S.cleaned,desk:S.sheets.map(s=>s.deskew||0),sheets:S.sheets.map(s=>({w:s.w,h:s.h,cad:s.cadT||null})),fileName:S.fileName,header:{...S.header},set:{...S.set},
-  items:S.items.map((it,i)=>{ const {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges}=it; return {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges,no:i+1,zone:zone(it)}; })}; }
+  items:S.items.map((it,i)=>{ const {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges,gaugeManual,gaugeAuto}=it; return {id,sheet,ax,ay,bx,by,type,text,nominal,upper,lower,unit,gdt,datum,cls,actual,conf,gen,instr,source,en,ex,autoInstr,gauges,gaugeManual,gaugeAuto,no:i+1,zone:zone(it)}; })}; }
 function applySnapshot(p){
   S.header=Object.assign({},S.header,p.header||{}); Object.assign(S.set,p.set||{});
   $("sGen").value=S.set.gen; $("sGrid").value=S.set.grid; $("sCols").value=S.set.cols; $("sRows").value=S.set.rows; $("sSize").value=String(S.set.size); $("sTiles").value=String(S.set.tiles); $("sClean").value=String(S.set.clean??1);
