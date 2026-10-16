@@ -46,7 +46,7 @@
   const colorSel = (v, id) => `<select data-k="${id}">${COLS.map(([n, c]) => `<option value="${c}"${(v || "") === c ? " selected" : ""}>${n}</option>`).join("")}${v && !COLS.some((c) => c[1] === v) ? `<option value="${v}" selected>${v}</option>` : ""}<option value="__more">More…</option></select>`;
   const ltSel = (v, id, by = true) => `<select data-k="${id}">${by ? `<option value=""${!v ? " selected" : ""}>ByLayer</option>` : ""}${Object.keys(K.LT).map((n) => `<option${n === v ? " selected" : ""}>${n}</option>`).join("")}</select>`;
   const lwSel = (v, id, by = true) => `<select data-k="${id}">${by ? `<option value=""${v == null ? " selected" : ""}>ByLayer</option>` : ""}${K.LW.map((w) => `<option value="${w}"${w === v ? " selected" : ""}>${w.toFixed(2)} mm</option>`).join("")}</select>`;
-  const TN = { vport: "Viewport", fcf: "Geometric tolerance", table: "Table", attdef: "Attribute definition", line: "Line", pline: "Polyline", circle: "Circle", arc: "Arc", ellipse: "Ellipse", spline: "Spline", text: "Text", mtext: "Mtext", dim: "Dimension", leader: "Leader", hatch: "Hatch", insert: "Block reference", point: "Point", xline: "Construction line" };
+  const TN = { array: "Associative array", vport: "Viewport", fcf: "Geometric tolerance", table: "Table", attdef: "Attribute definition", line: "Line", pline: "Polyline", circle: "Circle", arc: "Arc", ellipse: "Ellipse", spline: "Spline", text: "Text", mtext: "Mtext", dim: "Dimension", leader: "Leader", hatch: "Hatch", insert: "Block reference", point: "Point", xline: "Construction line" };
   K.typeName = (e) => (e.t === "dim" ? { lin: "Linear dimension", ali: "Aligned dimension", rad: "Radius dimension", dia: "Diameter dimension", ang: "Angular dimension", ord: "Ordinate dimension" }[e.kind] : TN[e.t]) || e.t;
   K.measures = (e, doc) => {
     const out = [], d = doc.dim.dec, F = (v) => K.fmt(v, d);
@@ -99,7 +99,7 @@
         h += `<h4>Geometry</h4><div class="cx-pg">${g}</div>${ms.length ? `<div class="cx-kv">${ms.map(([k, v]) => `<span>${esc(k)}</span><b>${esc(v)}</b>`).join("")}</div>` : ""}`;
       }
       h += `<div class="cx-pa"><button class="cx-b o" data-run="SELECTSIMILAR">Select similar</button><button class="cx-b o" data-run="ERASE">Erase</button><button class="cx-b o" data-desel>Deselect</button></div>`;
-      el.innerHTML = h; bind(E, el, ids); if (K.propsHook) K.propsHook(E, el, ents);
+      el.innerHTML = h; bind(E, el, ids); if (K.propsHook) K.propsHook(E, el, ents); for (const ph of K.propsHooks || []) ph(E, el, ents);
     },
     layers(E, el) {
       const cnt = {}; E.doc.ents.forEach((e) => (cnt[e.layer] = (cnt[e.layer] || 0) + 1)); const q = (E._lq || "").toLowerCase();

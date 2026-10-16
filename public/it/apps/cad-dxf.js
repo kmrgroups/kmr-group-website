@@ -199,7 +199,14 @@
   };
 
   /* ---------- writer (R12) ---------- */
-  K.writeDXF = (doc) => {
+  K.writeDXF = (doc0) => {
+    /* dynamic block references → one plain block per state (AutoCAD reads them as ordinary blocks) */
+    const doc = Object.assign({}, doc0, { blocks: Object.assign({}, doc0.blocks) }), vmap = new Map();
+    const hash = (s) => { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); };
+    const vname = (e) => { const B = doc0.blocks[e.name]; if (!B || !B.dyn || !K.dynApply) return e.name; const k = JSON.stringify(e.dv || {}), nm = e.name + "_" + hash(k); if (!vmap.has(nm)) { vmap.set(nm, 1); const v = K.dynApply(B, e.dv || {}); doc.blocks[nm] = { base: v.base, ents: v.ents }; } return nm; };
+    const scan = (list) => list.map((e) => (e.t === "insert" && doc0.blocks[e.name] && doc0.blocks[e.name].dyn ? Object.assign({}, e, { name: vname(e) }) : e));
+    doc.ents = scan(doc0.ents || []);
+    for (const [n, b] of Object.entries(doc0.blocks || {})) doc.blocks[n] = Object.assign({}, b, { ents: scan(b.ents || []) });
     const isInt = (c) => (c >= 60 && c <= 99) || (c >= 160 && c <= 179) || (c >= 270 && c <= 299) || (c >= 370 && c <= 389) || (c >= 400 && c <= 409) || (c >= 1060 && c <= 1071);
     const o = [], put = (c, v) => { o.push(String(c), typeof v === "number" ? (isInt(c) ? String(Math.round(v)) : fmt(v)) : String(v)); };
     const fmt = (v) => (Number.isInteger(v) ? v.toFixed(1) : (+v.toFixed(8)).toString());
