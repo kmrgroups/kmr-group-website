@@ -58,7 +58,7 @@ table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:7px 8px;
 .cx-clist{display:flex;flex-direction:column;gap:2px;margin-top:8px}.cx-clist button{text-align:left;padding:5px 6px;border-radius:6px;display:grid;grid-template-columns:auto 1fr;gap:0 8px}.cx-clist button:hover{background:var(--ui3)}.cx-clist b{color:#fff}.cx-clist i{color:#93c5fd;font-style:normal;font-size:11px;align-self:center}.cx-clist span{grid-column:1/-1;color:var(--tm);font-size:11.5px}
 .cx-cmd{background:#111821;border-top:1px solid var(--bd);position:relative}
 .cx-hist{max-height:66px;overflow:auto;padding:3px 10px;font:12px/1.45 Consolas,"Cascadia Mono",Menlo,monospace;color:#9fb0c3;user-select:text}.cx-bighist .cx-hist{max-height:40vh}
-.cx-hist .er{color:#ff8a80}.cx-hist .ok{color:#7ee787}.cx-hist .cm{color:#e6edf3}.cx-hist .mu{color:#7d8ea3}.cx-hist .in{color:#ffd479}.cx-hist .pr{color:#c7d2df}
+.cx-hist .h-er{color:#ff8a80}.cx-hist .h-ok{color:#7ee787}.cx-hist .h-cm{color:#e6edf3}.cx-hist .h-mu{color:#7d8ea3}.cx-hist .h-in{color:#ffd479}.cx-hist .h-pr{color:#c7d2df}
 .cx-line{display:flex;align-items:center;gap:6px;padding:4px 8px;border-top:1px solid #1f2937;flex-wrap:wrap}.cx-pr{font:600 12.5px Consolas,Menlo,monospace;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
 .cx-kws{display:flex;gap:4px;flex-wrap:wrap}.cx-kws button{background:#1f3a5f;color:#bfdbfe;border-radius:5px;padding:1px 8px;font-size:12px}.cx-kws button:hover{background:#2563eb;color:#fff}.cx-kws i{color:var(--tm);font-style:normal}
 .cx-in{flex:1;min-width:140px;background:#0b1118!important;font:13px Consolas,Menlo,monospace!important;padding:5px 8px!important}
@@ -79,6 +79,10 @@ table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:7px 8px;
 .cx-syms{display:flex;gap:4px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--tm)}.cx-syms button{background:#0f151f!important;border:1px solid var(--bd)!important;border-radius:5px;padding:2px 8px;font-size:14px}
 .cx-plot .cx-pv{background:#e2e8f0;border-radius:8px;padding:12px;margin-top:8px;display:flex;justify-content:center}.cx-plot .cx-pv svg{max-height:38vh;max-width:100%}
 .cx-hint{display:none}
+.cx-syms2{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px}.cx-syms2 button{background:#fff!important;border:2px solid transparent!important;border-radius:6px;padding:3px;display:grid;place-items:center}.cx-syms2 button.on{border-color:var(--ac)!important;box-shadow:0 0 0 2px #3b9eff66}
+.cx-fcr{border:1px solid var(--bd);border-radius:8px;padding:8px;margin-bottom:8px}.cx-row input{flex:1}.cx-row select{width:56px}
+.cx-ds{display:grid;grid-template-columns:200px 1fr;gap:12px}.cx-dsl{display:flex;flex-direction:column;gap:3px}.cx-dsl>button{text-align:left;padding:5px 8px;border-radius:6px;border:1px solid var(--bd)!important}.cx-dsl>button.on{background:#1d4ed8!important;color:#fff}@media(max-width:640px){.cx-ds{grid-template-columns:1fr}}
+.cx-tgrid{overflow:auto;max-height:46vh;margin:8px 0}.cx-tgrid table{border-collapse:collapse;min-width:0}.cx-tgrid td,.cx-tgrid th{padding:1px;border:1px solid var(--bd)}.cx-tgrid input{min-width:90px;border-radius:0}.cx-tgrid th input{background:#24324a}
 @media(max-width:820px){.cx-side{position:absolute;right:0;top:0;bottom:0;z-index:4;width:min(92vw,340px);box-shadow:-10px 0 30px #0009}.cx:not(.cx-noside-m) .cx-side{display:none}.cx.cx-sideopen .cx-side{display:flex}.cx-title{max-width:30vw}.cx-qa .cx-help span{display:none}.cx-xy{min-width:120px}.cx-hist{max-height:42px}}
 @media print{body>*{display:none!important}}
 </style></head><body>
@@ -89,6 +93,6 @@ table{width:100%;border-collapse:collapse;min-width:720px}th,td{padding:7px 8px;
 <section id="edsec" class="hide"><div class="edwrap"><div class="edbar hide" id="edbar"></div><div id="ed"></div></div></section></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
 <script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{},names:{}};</script><script src="/it/apps/qp-core.js"></script>
-<script src="/it/apps/cad-geom.js"></script><script src="/it/apps/cad-dxf.js"></script><script src="/it/apps/cad-core.js"></script><script src="/it/apps/cad-app.js"></script><script src="/it/apps/cad-cmds.js"></script><script src="/it/apps/cad-ui.js"></script>
+<script src="/it/apps/cad-geom.js"></script><script src="/it/apps/cad-dxf.js"></script><script src="/it/apps/cad-core.js"></script><script src="/it/apps/cad-app.js"></script><script src="/it/apps/cad-cmds.js"></script><script src="/it/apps/cad-ui.js"></script><script src="/it/apps/cad-pro.js"></script>
 <script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/cad-demo.js"><\/script>')}</script>
 <script src="/it/apps/cad-shell.js"></script><script src="/it/apps/back.js"></script></body></html>

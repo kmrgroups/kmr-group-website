@@ -100,6 +100,10 @@ cad:[
 ['PPAP','Element 2','Authorized engineering change documents','The change notes of each revision document the engineering changes not yet on the design record.'],
 ['CP','Product characteristics','Control Plan characteristics','Dimensions on the released drawing are the product characteristics that the Control Plan and the Balloon Inspector use.'],
 ['VF','Step 2','Structure analysis (AIAG-VDA FMEA)','The drawing defines the product elements and characteristics that the FMEA structure and function analysis start from.'],
+['IATF','8.3.3.3','Special characteristics','Special characteristics are identified on the drawing with symbols, balloons, notes and GD&T feature control frames (ISO 1101 / ASME Y14.5).'],
+['PPAP','Element 9','Dimensional results','Balloons and the parts list number every characteristic so the dimensional report (Balloon Inspector) refers to the same items.'],
+['SPC','Specification limits','Capability against the specification','Dimension tolerances (±, deviation, limits) give the upper and lower specification limits used for Cp / Cpk.'],
+['MSA','Gage R&R - % tolerance','Measurement system acceptability','The drawing tolerance is the basis for the % tolerance of a Gage R&R study.'],
 ['VDA','P3','Planning of product and process development','Product drawings and their release status are available for the development plan and audit.']],
 capacity:[
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Machine capacity is planned against demand.'],
