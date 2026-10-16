@@ -194,7 +194,7 @@ function gaugeCell(it){
     ${good.length?`<optgroup label="Suitable — meets MSA 10:1">${good.slice(0,8).map(x=>opt(x,"🟢")).join("")}</optgroup>`:""}
     ${noGood||!gUsed(it).length?`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(sug.name+(sug.range?" · "+sug.range:"")+(sug.lc?" · LC "+sug.lc:""))}</option></optgroup>`:""}
     ${(good.length>8||weak.length||bad.length)?`<option value="__more">… show all ${fits.length} master gauges</option>`:""}</select>`;
-  return `<td class="gcell">${chips}${sel}${gUsed(it).length&&gUsed(it).every(g=>g.purchase)&&noGood?`<div class="gnote">No master gauge suits — new gauge allotted (${esc(sug.why)})</div>`:""}</td>`;
+  return `<td class="gcell"><div class="gw">${chips}${sel}${gUsed(it).length&&gUsed(it).every(g=>g.purchase)&&noGood?`<span class="gnote" title="${esc("No master gauge suits — new gauge allotted ("+sug.why+")")}">new</span>`:""}</div></td>`;
 }
 function setInstrFromGauges(it){ const g=gUsed(it); if(g.length){ it.instr=g.map(x=>x.name+(x.id?" ("+x.id+")":" (new)")).join(" / "); it.autoInstr=false; } else { it.instr=instrument(it); delete it.autoInstr; } }
 function zone(it){
@@ -311,22 +311,10 @@ function renderStats(){
   $("stats").innerHTML=`<span class="stat"><b>${n}</b>characteristics</span>${inspOn()?`<span class="stat p"><b>${p}</b>pass</span><span class="stat f"><b>${f}</b>fail</span><span class="stat"><b>${n-p-f}</b>not measured</span>`:`<span class="stat" title="Inspection reports are not in your plan">🔒 inspection results</span>`}${low?`<span class="stat" style="color:var(--warn)"><b>${low}</b>to check</span>`:""}${S.items.some(i=>i.cls)?`<span class="stat"><b>${S.items.filter(i=>i.cls).length}</b>SC/CC</span>`:""}${S.lang&&S.lang!=="English"?`<span class="lang" title="Translated with a built-in engineering glossary (offline). Check wording before sending.">${S.lang} → English</span>`:""}`;
 }
 function esc(s){ return String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
-function fillAllGauges(sel,it){
-  const fits=fitsFor(it).filter(x=>!new Set(gUsed(it).map(g=>g.id)).has(x.g.id)); const o=(x,p)=>`<option value="${esc(x.g.id)}">${p} ${esc(x.g.id+" "+x.g.name+(x.g.range?" · "+x.g.range:"")+(x.g.lc?" · LC "+x.g.lc:""))}</option>`;
-  const grp=(l,a,p)=>a.length?`<optgroup label="${l}">${a.map(x=>o(x,p)).join("")}</optgroup>`:"";
-  sel.innerHTML=`<option value="">＋ another gauge…</option>`+grp("Suitable — meets MSA 10:1",fits.filter(x=>x.f.s==="good"),"🟢")+grp("In master, but too coarse (fails 10:1)",fits.filter(x=>x.f.s==="weak"),"🟠")+`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(gaugeSuggest(it).name)}</option></optgroup>`+grp("Other master gauges (wrong type / range)",fits.filter(x=>x.f.s==="bad"),"⚪");
-  try{ sel.showPicker&&sel.showPicker(); }catch(e){}
-}
-function renderTable(){
-  autoAllot(); renderStats();
-  const tw=$("tw");
-  if(!S.items.length){ tw.innerHTML=`<div class="emptytable">${S.sheets.length?"No balloons yet. Tap “Find dimensions” (free) to read the drawing, or “Add balloon” to place them by hand.":"Open a drawing to start the inspection table."}</div>`; return; }
-  const sc=tw.scrollLeft, st=tw.scrollTop;
-  const gl=$("glegend"); if(gl){ const on=Array.isArray(window.KMR_GAUGES); gl.hidden=!on; if(on) gl.innerHTML=`<b>Gauge colours:</b> <span class="gchip good">green</span> master gauge, suits the size and meets MSA 10:1 <span class="gchip weak">amber</span> master gauge, but too coarse <span class="gchip new">purple</span> not in the master list — new gauge to purchase. Pick one or more per balloon; the choice follows into Process Documents.`; }
-  const multi=S.sheets.length>1, showEn=S.lang&&S.lang!=="English"&&S.items.some(i=>i.en);
-  const cols=[["No.","40px"],[multi?"Sh·Zone":"Zone","56px"],["Type","9%"],["Specification",showEn?"13%":"18%"]].concat(showEn?[["English","12%"]]:[]).concat([["Nominal","6.5%"],["+ Tol","6%"],["− Tol","6%"],["LSL","5.5%"],["USL","5.5%"],["Unit","4.5%"],["Class","4.5%"],["Instrument",Array.isArray(window.KMR_GAUGES)?"17%":"11%"],["Actual","7%"],["Result","5.5%"],["Conf.","4.5%"],["","26px"]]);
-  let h=`<table><colgroup>${cols.map(c=>`<col style="width:${c[1]}">`).join("")}</colgroup><thead><tr>${cols.map(c=>`<th title="${c[0]}">${c[0]}</th>`).join("")}</tr></thead><tbody>`;
-  S.items.forEach((it,i)=>{
+let _tctx={multi:false,showEn:false};
+function rowHtml(it,i){
+  const {multi,showEn}=_tctx;
+  let h="";
     const [l,u]=limits(it), res=result(it), g=it.gen?' class="gen" title="From general tolerance"':"";
     const spec = it.type==="GD&T" ? [it.gdt, it.text, it.datum?("| "+it.datum):""].filter(Boolean).join(" ") : it.text;
     h+=`<tr data-id="${it.id}" class="${it.id===S.sel?"sel ":""}${res}">
@@ -346,8 +334,39 @@ function renderTable(){
       <td><span class="res ${res}">${res==="pass"?"PASS":res==="fail"?"FAIL":"—"}</span></td>
       <td><span class="conf${it.conf!=null&&it.conf<0.7?" low":""}">${it.conf==null?(it.source==="cad"?"CAD":"manual"):Math.round(it.conf*100)+"%"}</span></td>
       <td><button class="del" data-act="del" aria-label="Delete balloon ${i+1}">×</button></td></tr>`;
-  });
-  tw.innerHTML=h+"</tbody></table>"; tw.scrollLeft=sc; tw.scrollTop=st;
+  return h;
+}
+/* keep the cursor where the user is working when the table redraws */
+function focusKey(){ const a=document.activeElement; if(!a||!a.dataset||!a.dataset.f||!$("tw").contains(a)) return null; const tr=a.closest("tr"); return {id:tr&&tr.dataset.id,f:a.dataset.f,s:a.selectionStart,e:a.selectionEnd}; }
+function focusBack(k){ if(!k||!k.id) return; const el=$("tw").querySelector(`tr[data-id="${k.id}"] [data-f="${k.f}"]`); if(!el) return; try{ el.focus({preventScroll:true}); if(k.s!=null&&el.setSelectionRange) el.setSelectionRange(k.s,k.e); }catch(e){} }
+/* redraw one row only (the rest of the table, scroll and focus stay exactly as they are) */
+function updateRow(it){
+  const tr=$("tw").querySelector(`tr[data-id="${it.id}"]`); if(!tr){ renderTable(); return; }
+  autoAllot(); const fk=focusKey(), i=S.items.indexOf(it), cls=tr.className.includes("sel")?"":"";
+  const t=document.createElement("tbody"); t.innerHTML=rowHtml(it,i); const nt=t.firstElementChild; tr.replaceWith(nt);
+  if(S.readonly) nt.querySelectorAll("input,select,.del").forEach(e=>e.disabled=true);
+  renderStats(); focusBack(fk); if(window.BI&&BI.onChange) BI.onChange();
+}
+function fillAllGauges(sel,it){
+  const fits=fitsFor(it).filter(x=>!new Set(gUsed(it).map(g=>g.id)).has(x.g.id)); const o=(x,p)=>`<option value="${esc(x.g.id)}">${p} ${esc(x.g.id+" "+x.g.name+(x.g.range?" · "+x.g.range:"")+(x.g.lc?" · LC "+x.g.lc:""))}</option>`;
+  const grp=(l,a,p)=>a.length?`<optgroup label="${l}">${a.map(x=>o(x,p)).join("")}</optgroup>`:"";
+  sel.innerHTML=`<option value="">＋ another gauge…</option>`+grp("Suitable — meets MSA 10:1",fits.filter(x=>x.f.s==="good"),"🟢")+grp("In master, but too coarse (fails 10:1)",fits.filter(x=>x.f.s==="weak"),"🟠")+`<optgroup label="Not in master — purchase new"><option value="__new">🟣 ${esc(gaugeSuggest(it).name)}</option></optgroup>`+grp("Other master gauges (wrong type / range)",fits.filter(x=>x.f.s==="bad"),"⚪");
+  try{ sel.showPicker&&sel.showPicker(); }catch(e){}
+}
+function renderTable(){
+  autoAllot(); renderStats();
+  const tw=$("tw");
+  if(!S.items.length){ tw.innerHTML=`<div class="emptytable">${S.sheets.length?"No balloons yet. Tap “Find dimensions” (free) to read the drawing, or “Add balloon” to place them by hand.":"Open a drawing to start the inspection table."}</div>`; return; }
+  const sc=tw.scrollLeft, st=tw.scrollTop, fk=focusKey();
+  const gl=$("glegend"); if(gl){ const on=Array.isArray(window.KMR_GAUGES); gl.hidden=!on; if(on) gl.innerHTML=`<b>Gauge colours:</b> <span class="gchip good">green</span> master gauge, suits the size and meets MSA 10:1 <span class="gchip weak">amber</span> master gauge, but too coarse <span class="gchip new">purple</span> not in the master list — new gauge to purchase. Pick one or more per balloon; the choice follows into Process Documents.`; }
+  const multi=S.sheets.length>1, showEn=S.lang&&S.lang!=="English"&&S.items.some(i=>i.en);
+  const gOn=Array.isArray(window.KMR_GAUGES);
+  const cols=[["No.","46px"],[multi?"Sh·Zone":"Zone","62px"],["Type","104px"],["Specification",showEn?"190px":"230px"]].concat(showEn?[["English","160px"]]:[]).concat([["Nominal","82px"],["+ Tol","74px"],["− Tol","74px"],["LSL","72px"],["USL","72px"],["Unit","58px"],["Class","58px"],["Instrument",gOn?"360px":"200px"],["Actual","92px"],["Result","74px"],["Conf.","62px"],["","34px"]]);
+  _tctx={multi,showEn};
+  const tw_=cols.reduce((n,c)=>n+parseInt(c[1],10),0);
+  let h=`<table data-nosno style="min-width:${tw_}px;width:${tw_}px"><colgroup>${cols.map(c=>`<col style="width:${c[1]}">`).join("")}</colgroup><thead><tr>${cols.map(c=>`<th title="${c[0]}">${c[0]}</th>`).join("")}</tr></thead><tbody>`;
+  S.items.forEach((it,i)=>{ h+=rowHtml(it,i); });
+  tw.innerHTML=h+"</tbody></table>"; tw.scrollLeft=sc; tw.scrollTop=st; focusBack(fk);
   if(S.readonly) tw.querySelectorAll("input,select,.del").forEach(e=>e.disabled=true);
   if(window.BI&&BI.onChange) BI.onChange();
 }
@@ -355,7 +374,7 @@ $("tw").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-id]"); if(!tr) return; const id=+tr.dataset.id, act=e.target.closest("[data-act]")?.dataset.act;
   if(act==="del"){ S.items=S.items.filter(i=>i.id!==id); if(S.sel===id) S.sel=null; renderAll(); return; }
   if(act==="go"){ const it=S.items.find(i=>i.id===id); select(id); centerOn(it); return; }
-  if(act==="gdel"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; it.gauges=gUsed(it).filter((_,k)=>k!==+e.target.closest("[data-gi]").dataset.gi); it.gaugeManual=true; it.gaugeAuto=false; setInstrFromGauges(it); renderTable(); return; }
+  if(act==="gdel"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; it.gauges=gUsed(it).filter((_,k)=>k!==+e.target.closest("[data-gi]").dataset.gi); it.gaugeManual=true; it.gaugeAuto=false; setInstrFromGauges(it); updateRow(it); return; }
   if(S.sel!==id){ S.sel=id; draw(); document.querySelectorAll("tr.sel").forEach(r=>r.classList.remove("sel")); tr.classList.add("sel"); }
 });
 $("tw").addEventListener("change",e=>{
@@ -364,7 +383,7 @@ $("tw").addEventListener("change",e=>{
     if(v==="__more"){ fillAllGauges(e.target,it); e.target.value=""; return; }
     it.gauges=gUsed(it).slice(); it.gaugeAuto=false; it.gaugeManual=true;
     if(v==="__new") it.gauges.push(gaugeSuggest(it)); else { const g=(window.KMR_GAUGES||[]).find(x=>x.id===v); if(g) it.gauges.push({id:g.id,name:g.name,range:g.range||"",lc:g.lc||"",type:g.type||"",purchase:false}); }
-    setInstrFromGauges(it); renderTable(); return; }
+    setInstrFromGauges(it); updateRow(it); return; }
   if(["nominal","upper","lower"].includes(f)){ it[f]=num(v.replace(/−/g,"-").replace("±","")); if(f!=="nominal") it.gen=false; if(f==="nominal") applyGen(it); }
   else if(f==="text"){ it.text=v; it.en=translate(v,S.lang); if(it.type==="GD&T"){it.gdt="";it.datum="";} }
   else it[f]=v;
@@ -372,7 +391,7 @@ $("tw").addEventListener("change",e=>{
   if(["type","nominal","upper","lower","unit"].includes(f)&&it.gaugeAuto&&!it.gaugeManual){ it.gauges=[]; it.gaugeAuto=false; }
   if(["nominal","upper","lower"].includes(f)&&it.autoInstr!==false) it.instr=instrument(it);
   if(f==="instr") it.autoInstr=false;
-  renderTable(); draw();
+  setTimeout(()=>{ updateRow(it); draw(); },0);   /* after the browser has moved the cursor to the next cell, so it stays there */
 });
 
 /* ---------- sheets ---------- */

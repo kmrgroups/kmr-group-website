@@ -35,8 +35,9 @@
     opts = opts || {};
     const E = { root, opts, doc: K.newDoc(), sel: [], CANCEL, lastPt: [0, 0], lastCmd: "", dirty: false };
     let prefs = {}; try { prefs = JSON.parse(localStorage.getItem("kcad-prefs") || "{}"); } catch (e) { prefs = {}; }
-    if (!prefs.lwtMig) { prefs.lwt = true; prefs.lwtMig = 1; }   // thickness shows by default
-    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: true, light: false, cross: 100, pick: 5 }, prefs);
+    if (!prefs.lwtMig) { prefs.lwt = true; prefs.lwtMig = 1; }
+    if (!prefs.crossMig) { prefs.cross = 12; prefs.crossMig = 1; }   // short crosshair so it never hides the drawing   // thickness shows by default
+    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: true, light: false, cross: 12, pick: 5 }, prefs);
     const savePrefs = () => { try { localStorage.setItem("kcad-prefs", JSON.stringify(E.set)); } catch (e) { /* private mode */ } };
     E.cur = { layer: "0", color: null, lt: null, lw: null };
     E.view = { cx: 0, cy: 0, s: 3, W: 800, H: 600 };
@@ -450,7 +451,7 @@
       // crosshair + pickbox
       if (mouse.inside && !panDrag) {
         const [x, y] = w2s(cp), sz = E.set.cross >= 100 ? V.W + V.H : (Math.max(V.W, V.H) * E.set.cross) / 200, pb = E.set.pick;
-        ctx.setLineDash([]); ctx.lineWidth = 1; ctx.strokeStyle = E.set.light ? "#222" : "#e6edf3"; ctx.beginPath();
+        ctx.setLineDash([]); ctx.lineWidth = 1; ctx.strokeStyle = E.set.light ? "rgba(34,34,34,.8)" : "rgba(230,237,243,.8)"; ctx.beginPath();
         const pointMode = R && (R.kind === "point" || R.kind === "dist" || R.kind === "angle");
         if (!(R && R.kind === "sel" || R && R.kind === "ent") || true) { ctx.moveTo(x - sz, y + 0.5); ctx.lineTo(x - (pointMode ? 0 : pb), y + 0.5); ctx.moveTo(x + (pointMode ? 0 : pb), y + 0.5); ctx.lineTo(x + sz, y + 0.5); ctx.moveTo(x + 0.5, y - sz); ctx.lineTo(x + 0.5, y - (pointMode ? 0 : pb)); ctx.moveTo(x + 0.5, y + (pointMode ? 0 : pb)); ctx.lineTo(x + 0.5, y + sz); }
         if (!pointMode) ctx.rect(x - pb + 0.5, y - pb + 0.5, pb * 2, pb * 2);

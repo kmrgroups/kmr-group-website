@@ -21,7 +21,17 @@
     return el.placeholder || el.title || el.name || "";
   };
   const isAction = (b) => b.matches('button,[type=submit],[type=button],a.btn,[role=button]') && vis(b);
+  const colName = (cell) => { const tb = cell.closest("table"); if (!tb) return ""; const i = [...cell.parentElement.children].indexOf(cell); const th = tb.querySelectorAll("thead th")[i]; return th ? th.textContent.trim() : ""; };
+  const tableNext = (cur) => {
+    const td = cur.closest("td"), tr = cur.closest("tr"); if (!td || !tr || !cur.closest("tbody")) return null;
+    const ctl = (r) => [...r.querySelectorAll("td input,td select")].filter((e) => vis(e) && e.dataset.f !== "unit" && e.dataset.f !== "cls" && e.dataset.f !== "gaugeAdd" && !e.disabled);
+    const row = ctl(tr), i = row.indexOf(cur);
+    for (let k = i + 1; k < row.length; k++) { const e = row[k]; if (e.tagName === "SELECT" || !String(e.value || "").trim()) return { el: e, kind: "field", col: colName(e.closest("td")) }; }
+    const nr = tr.nextElementSibling; if (nr) { const c = ctl(nr)[0]; if (c) return { el: c, kind: "field", col: colName(c.closest("td")), row: true }; }
+    return null;
+  };
   const nextTarget = (cur) => {
+    const tn = tableNext(cur); if (tn) return tn;
     const scope = cur.closest("form,dialog,.modal,.dlg,[role=dialog],.card,.panel,section,main") || document.body;
     const all = [...scope.querySelectorAll("input,select,textarea")].filter((e) => vis(e) && !e.closest("[data-noguide]") && !/^(hidden|file)$/.test(e.type));
     const i = all.indexOf(cur);
@@ -54,21 +64,24 @@
   const nextText = (n) => {
     if (n.el.getAttribute("data-guide")) return [n.el.getAttribute("data-guide")];
     if (n.kind === "action") { const t = (n.el.textContent || n.el.value || "").trim().replace(/\s+/g, " ").slice(0, 30); return ["All set here — now click “" + t + "”", "That is the next step."]; }
-    const nm = labelOf(n.el).replace(/[:*]\s*$/, "").trim();
+    const nm = (n.col || labelOf(n.el)).replace(/[:*]\s*$/, "").trim();
+    if (n.row) return ["Next row: " + nm, "This row is done — carry on with the next one."];
     const what = n.el.tagName === "SELECT" ? "choose an option" : n.el.type === "number" || /num|qty|amount/i.test(n.el.name || "") ? "enter the number" : n.el.type === "date" ? "pick the date" : "type it in";
     return [nm ? "Next: " + nm : "Next field", n.filled ? "Already filled — check it, or move on." : "Look here and " + what + "."];
   };
   const onDone = (ev) => {
-    if (!on()) return; const el = ev.target; if (!el || !el.matches || !el.matches("input,select,textarea") || skip(el)) return;
+    if (!on()) return; let el = ev.target; if (!el || !el.matches || !el.matches("input,select,textarea") || skip(el)) return;
     if (el.type === "search" || el.type === "file" || el.type === "range" || el.type === "color") return;
     if ((el.tagName !== "SELECT" && el.type !== "checkbox" && el.type !== "radio") && !String(el.value || "").trim()) return;
     if (el.closest("table") && el.closest("tbody") && el.closest("tr")) { /* table cells: point at the next cell in the same row only */ }
     const now = Date.now(); if (now - last < 500) return; last = now;
+    const trId = el.closest("tr") && el.closest("tr").dataset.id, fld = el.dataset && el.dataset.f, eid = el.id, enm = el.name;
     setTimeout(() => {
       if (!on()) return;
-      const n = nextTarget(el); if (!n) return; const ae = document.activeElement; if (ae && ae !== el && ae !== n.el && ae.matches && ae.matches("input,select,textarea")) return;
+      if (!el.isConnected) { const q = trId && fld ? 'tr[data-id="' + trId + '"] [data-f="' + fld + '"]' : eid ? "#" + CSS.escape(eid) : enm ? '[name="' + enm + '"]' : ""; const f = q && document.querySelector(q); if (!f) return; el = f; }
+      const n = nextTarget(el); if (!n) return;
       const [t, s] = nextText(n); say(n.el, t, s);
-    }, 220);
+    }, 420);
   };
   document.addEventListener("change", onDone, true);
   document.addEventListener("pointerdown", (e) => { if (bub && !e.target.closest(".kg-b")) hide(); }, true);
