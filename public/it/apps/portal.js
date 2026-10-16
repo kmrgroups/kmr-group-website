@@ -27,6 +27,7 @@
     sales: { color: "#E11D48", desc: "Monthly sales plan vs actual despatch, daily tracking, loss reasons and action plans.", demo: "/it/sales.html?demo=1" },
     apqp: { color: "#0891B2", desc: "Plan every new part through the five APQP phases — deliverables, owners, due dates and gates, linked to your other apps.", demo: "/it/apqp.html?demo=1" },
     ppap: { color: "#B45309", desc: "Assemble the PPAP package and the Part Submission Warrant from the drawings, FMEA and control plans you already have.", demo: "/it/ppap.html?demo=1" },
+    cad: { color: "#0369A1", desc: "Draw 2D engineering drawings the AutoCAD way — command line, snaps, layers, dimensions, hatches, blocks, title blocks, DXF in and out, print to PDF, with revision control.", demo: "/it/cad.html?demo=1" },
     mom: { color: "#7C3AED", desc: "Record every meeting in 5W1H by typing or by voice, in Indian and international languages, translate the points, and follow up the actions.", demo: "/it/mom.html?demo=1" },
     mnt: { color: "#EA580C", desc: "Log every breakdown with root cause and action, track MTBF, MTTR and downtime, plan preventive maintenance and print the machine history card.", demo: "/it/mnt.html?demo=1" },
     mmd: { color: "#2563EB", desc: "Issue raw material with QR tags, follow every part machine by machine to finished goods, run supplier DC and GRN, and see rejection, rework and loss hours.", demo: "/it/mmd.html?demo=1" },
@@ -37,7 +38,7 @@
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
-  const ART = { hrm: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1 };
+  const ART = { hrm: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
@@ -120,7 +121,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["balloon", "pd", "apqp", "ppap", "calib"]], ["Planning & production", "#10B981", ["capacity", "sales", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrm", "mom"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib"]], ["Planning & production", "#10B981", ["capacity", "sales", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrm", "mom"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};

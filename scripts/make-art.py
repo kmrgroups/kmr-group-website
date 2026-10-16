@@ -448,6 +448,27 @@ def app_mom():
     return window(a, "MOM", b)
 
 
+def app_cad():
+    a = "#0369A1"
+    b = heading("DRG-2609-0001 · Drive flange · rev C", "2D drawing · snaps, layers, dimensions, DXF")
+    b += "<rect x='0' y='34' width='420' height='160' rx='8' fill='#1E2833'/>"
+    cx, cy = 96, 114
+    b += f"<circle cx='{cx}' cy='{cy}' r='56' fill='none' stroke='#fff' stroke-width='1.6'/><circle cx='{cx}' cy='{cy}' r='19' fill='none' stroke='#fff' stroke-width='1.6'/><circle cx='{cx}' cy='{cy}' r='42' fill='none' stroke='#F87171' stroke-width='1' stroke-dasharray='9 3 2 3'/>"
+    import math
+    for i in range(6):
+        x = cx + 42 * math.cos(math.radians(90 + i * 60)); y = cy - 42 * math.sin(math.radians(90 + i * 60))
+        b += f"<circle cx='{x:.1f}' cy='{y:.1f}' r='5.5' fill='none' stroke='#fff' stroke-width='1.4'/>"
+    b += f"<path d='M{cx - 64} {cy}h128M{cx} {cy - 64}v128' stroke='#F87171' stroke-width='1' stroke-dasharray='9 3 2 3'/>"
+    x0 = 220
+    b += f"<path d='M{x0} 58h20v28h16v56h-16v28h-20z' fill='none' stroke='#fff' stroke-width='1.6'/>"
+    b += "".join(f"<path d='M{x0} {y}l20 -20' stroke='#94A3B8' stroke-width='.8'/>" for y in range(78, 92, 6)) + "".join(f"<path d='M{x0} {y}l20 -20' stroke='#94A3B8' stroke-width='.8'/>" for y in range(162, 176, 6))
+    b += f"<path d='M{x0 + 70} 58v112M{x0 + 66} 58l4 8 4-8M{x0 + 66} 170l4-8 4 8M{x0 + 40} 58h34M{x0 + 40} 170h34' stroke='#22D3EE' stroke-width='1' fill='none'/><text x='{x0 + 80}' y='118' {FONT} font-size='9' fill='#22D3EE'>Ø120</text>"
+    b += f"<path d='M150 84l38-30h22' stroke='#22D3EE' stroke-width='1' fill='none'/><text x='192' y='50' {FONT} font-size='8' fill='#22D3EE'>6x Ø11</text>"
+    b += f"<rect x='340' y='150' width='9' height='9' fill='none' stroke='#FACC15' stroke-width='1.5'/><text x='352' y='158' {FONT} font-size='8' fill='#FACC15'>Endpoint</text>"
+    b += f"<rect x='0' y='200' width='420' height='30' rx='8' fill='#111821'/><text x='12' y='219' font-family='Consolas,monospace' font-size='10' fill='#E6EDF3'>Command: TRIM  ·  Select object to trim [cuTting edges/Erase/Undo]:</text>"
+    return window(a, "CAD", b)
+
+
 ART = {
     "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
@@ -458,6 +479,7 @@ ART = {
     "app-rmp": lambda: svg(bg("#0D9488") + app_rmp(), "Raw Material Planning"),
     "app-mmd": lambda: svg(bg("#2563EB") + app_mmd(), "Material Movement"),
     "app-mom": lambda: svg(bg("#7C3AED") + app_mom(), "Minutes Of Meetings"),
+    "app-cad": lambda: svg(bg("#0369A1") + app_cad(), "KMR CAD Draft"),
     "app-mnt": lambda: svg(bg("#EA580C") + app_mnt(), "Maintenance"),
     "app-ppap": lambda: svg(bg("#B45309") + app_ppap(), "PPAP Submissions"),
     "app-calib": lambda: svg(bg("#6366F1") + app_calib(), "Calibration Hub"),
