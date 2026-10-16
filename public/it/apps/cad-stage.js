@@ -167,6 +167,21 @@
     }
     return out;
   }
+  /** a PDF / picture sheet cropped to the part views: the box around the balloons' anchor points, so the drawing is shown as large as the stage sheet allows */
+  async function cropPages(pages, items, info) {
+    for (let pi = 0; pi < pages.length; pi++) {
+      const pg = pages[pi], inf = info[pi], kx = inf && inf.w ? pg.w / inf.w : 1; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9, n = 0;
+      for (const it of items.values()) { if ((it.sheet || 0) !== pi || it.ax == null) continue; for (const [x, y] of [[it.ax, it.ay], [it.bx, it.by]]) { if (x == null || y == null) continue; const X = x * kx, Y = y * kx; x0 = Math.min(x0, X); y0 = Math.min(y0, Y); x1 = Math.max(x1, X); y1 = Math.max(y1, Y); n++; } }
+      if (n < 2) continue;
+      const mx = Math.max(60, (x1 - x0) * 0.1), my = Math.max(60, (y1 - y0) * 0.1);
+      const cx0 = Math.max(0, x0 - mx), cy0 = Math.max(0, y0 - my), cx1 = Math.min(pg.w, x1 + mx), cy1 = Math.min(pg.h, y1 + my);
+      if (cx1 - cx0 > pg.w * 0.92 && cy1 - cy0 > pg.h * 0.92) continue;
+      const im = new Image(); im.src = pg.src; await im.decode(); const sc = im.naturalWidth / pg.w, cw = cx1 - cx0, ch = cy1 - cy0, c = canvas(Math.round(cw * sc), Math.round(ch * sc));
+      c.getContext("2d").drawImage(im, cx0 * sc, cy0 * sc, cw * sc, ch * sc, 0, 0, c.width, c.height);
+      pages[pi] = { src: c.toDataURL("image/jpeg", 0.9), w: cw, h: ch, fw: pg.w, x0: cx0, y0: cy0 };
+    }
+    return pages;
+  }
   const kindOf = (name) => { const x = String(name || "").split(".").pop().toLowerCase(); return x === "dxf" || x === "dwg" ? "vector" : x === "pdf" ? "pdf" : /^(png|jpe?g|webp|bmp|gif)$/.test(x) ? "image" : x === "json" ? "json" : x === "step" || x === "stp" ? "step" : ""; };
   async function biFile(P) {
     const path = P.bi && P.bi.file_path, name = (P.bi && P.bi.file_name) || (path ? path.split("/").pop() : "drawing");
@@ -188,7 +203,7 @@
       const f = how === "bi" ? await biFile(P) : file; if (!f) throw K.CANCEL; name = f.name; anchoredOk = hasPos && (how === "bi" || (P.source && P.source.fileName && f.name.replace(/\.[^.]+$/, "") === String(P.source.fileName).replace(/\.[^.]+$/, "")) || how === "file-same");
       const kd = kindOf(f.name);
       if (kd === "step") throw new Error("A STEP model has no drawing dimensions. Use the 2D drawing (DXF, DWG or PDF).");
-      if (kd === "pdf" || kd === "image") { say("Reading the drawing…"); return { kind: "raster", pages: await rasterPages(f, kd, desk, say), anchored: anchoredOk, items, info, name, file: f }; }
+      if (kd === "pdf" || kd === "image") { say("Reading the drawing…"); const pages = await rasterPages(f, kd, desk, say); if (anchoredOk) await cropPages(pages, items, info); return { kind: "raster", pages, anchored: anchoredOk, items, info, name, file: f }; }
       if (kd === "vector" || kd === "json") { say("Reading the drawing…"); const r = await K.readDrawingFile(f, say); doc = Object.assign(K.newDoc(false), r.doc); }
       else throw new Error("Use a DXF, DWG, PDF or picture of the drawing.");
     }
@@ -228,8 +243,8 @@
         return k ? { a: k.pos, box, b: null } : null; };
     } else if (SRC.anchored) {
       // Balloon Inspector draws a PDF / picture at most 3200 px across, exactly as rasterPages does, so pixels match (kx = 1); a stored sheet width corrects any difference
-      anchor = (c) => { const it = SRC.items.get(+c.no); if (!it || it.ax == null || !SRC.pages[it.sheet || 0]) return null; const pg = SRC.pages[it.sheet || 0], inf = SRC.info[it.sheet || 0], kx = inf && inf.w ? pg.w / inf.w : 1;
-        return { a: [it.ax * kx, pg.h - it.ay * kx], b: it.bx != null ? [it.bx * kx, pg.h - it.by * kx] : null }; };
+      anchor = (c) => { const it = SRC.items.get(+c.no); if (!it || it.ax == null || !SRC.pages[it.sheet || 0]) return null; const pg = SRC.pages[it.sheet || 0], inf = SRC.info[it.sheet || 0], kx = inf && inf.w ? (pg.fw || pg.w) / inf.w : 1, ox0 = pg.x0 || 0, oy0 = pg.y0 || 0;
+        return { a: [it.ax * kx - ox0, pg.h - (it.ay * kx - oy0)], b: it.bx != null ? [it.bx * kx - ox0, pg.h - (it.by * kx - oy0)] : null }; };
       pageOf = (c) => { const it = SRC.items.get(+c.no); return it && SRC.pages[it.sheet || 0] ? it.sheet || 0 : 0; };
     }
     const roleOf = new Map(); for (const [no, k] of assigned) roleOf.set(k.e.id, no);
@@ -355,13 +370,14 @@
     const same = reg.filter((d) => P.part_no && d.part_no && String(d.part_no).toLowerCase() === String(P.part_no).toLowerCase());
     const others = reg.filter((d) => !same.includes(d)).slice(0, 200);
     const bi = P.bi && P.bi.file_path, openOk = E.doc.ents.length && !(E.doc.info && E.doc.info.stage);
+    const hasBal = !!bi || !!(P.source && (P.source.items || []).some((i) => i.ax != null));
     const dflt = bi ? "bi" : same.length ? "reg:" + same[0].id : openOk ? "open" : "file";
     const opt = (v, label, note, dis) => `<label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="src" value="${esc(v)}"${v === dflt ? " checked" : ""}${dis ? " disabled" : ""}><span><b>${label}</b>${note ? `<br><span class="cx-mu">${note}</span>` : ""}</span></label>`;
     const regSel = (list) => list.map((d) => `<option value="reg:${esc(d.id)}">${esc(d.number)} rev ${esc(d.rev)} · ${esc(d.title || "")}${d.part_no ? " · " + esc(d.part_no) : ""}</option>`).join("");
     return E.dialog(`Stage drawings — ${P.part_no || ""} ${P.part_name || ""}`, `<p class="cx-note">Dimensions frozen as <b>rev ${esc(String(P.freeze.rev))}</b> on ${esc(dmy(P.freeze.at))} by ${esc(P.freeze.by || "")}: ${Object.keys(P.freeze.map || {}).length} operations make ${Object.values(P.freeze.map || {}).reduce((t, a) => t + a.length, 0)} characteristics.</p>
       <h4>What to draw</h4>
-      <label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="sty" value="flow" checked><span><b>The part at each process stage</b> (recommended)<br><span class="cx-mu">Raw material → sawing → CNC turning (one side held, clamping area, datum, tool path, dimensions) → next operations. The shape of the part is read from the drawing below and you can correct it.</span></span></label>
-      <label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="sty" value="fin"><span><b>The finished drawing for each operation</b><br><span class="cx-mu">This operation's dimensions and balloons in red, earlier ones grey, later ones left out.</span></span></label>
+      <label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="sty" value="fin"${hasBal ? " checked" : ""}><span><b>The customer's ballooned drawing for each operation</b>${hasBal ? " (recommended)" : ""}<br><span class="cx-mu">The real shape of the part from the drawing, with every dimension made at the operation marked by its red balloon, and the table of those dimensions beside it. Earlier operations' dimensions are grey (when the drawing is DXF / DWG).</span></span></label>
+      <label class="cx-chk" style="align-items:flex-start;margin:6px 0"><input type="radio" name="sty" value="flow"${hasBal ? "" : " checked"}><span><b>A sketch of the part at each process stage</b><br><span class="cx-mu">Raw material → sawing → CNC turning with clamping area, datum and tool path. The shape is a simple sketch you check and correct, so it may not match the drawing exactly.</span></span></label>
       <h4>Take the drawing from</h4>
       ${opt("bi", "The ballooned drawing from Balloon Inspector", bi ? esc(P.bi.file_name || "") + " — balloons go exactly where they were placed. DXF / DWG are drawn as lines (later operations' dimensions are left out); PDF and pictures as a picture." : "This project has no ballooned drawing stored.", !bi)}
       ${opt(same.length ? "reg:" + same[0].id : "reg", "A drawing in this register", (same.length ? "Same part number: " : "") + `<select id="regs" style="max-width:100%">${same.length ? regSel(same) : ""}${others.length ? `<optgroup label="Other drawings">${regSel(others)}</optgroup>` : ""}</select><br>Characteristics are found by their value and text.`, !reg.length)}
@@ -473,5 +489,5 @@
     { n: "Stage drawings for the SOP", b: [["STAGEDWG", "Make stage drawings", "title"], ["STAGESEND", "Send to SOP", "exportI"], ["STAGESOP", "Open the SOP", "open"]] },
   ] });
 
-  K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate;
+  K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate; K.stageCrop = cropPages;
 })((window.KCAD = window.KCAD || {}));
