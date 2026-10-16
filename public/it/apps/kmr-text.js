@@ -32,6 +32,9 @@
     const h = eligible(t); if (!h) return;
     const n = Array.prototype.reduce.call(h.children, (a, c) => a + (c.hasAttribute("data-sno") ? 0 : span(c)), 0);
     if (!h.querySelector("[data-sno]")) { const th = document.createElement("th"); th.setAttribute("data-sno", ""); th.textContent = "S.No"; th.style.cssText = "width:52px;text-align:center;white-space:nowrap"; h.insertBefore(th, h.firstChild); }
+    /* a fixed-layout table sizes its columns from <colgroup>: give the new S.No column its own <col>, or every other column shifts one place */
+    const cg = t.querySelector(":scope > colgroup");
+    if (cg && !cg.querySelector("col[data-sno]")) { const c0 = document.createElement("col"); c0.setAttribute("data-sno", ""); c0.style.width = "52px"; cg.insertBefore(c0, cg.firstChild); }
     let i = 0;
     secs(t).forEach((sec) => rowsOf(sec).forEach((r) => {
       if (r === h) return;
