@@ -35,7 +35,7 @@
     opts = opts || {};
     const E = { root, opts, doc: K.newDoc(), sel: [], CANCEL, lastPt: [0, 0], lastCmd: "", dirty: false };
     let prefs = {}; try { prefs = JSON.parse(localStorage.getItem("kcad-prefs") || "{}"); } catch (e) { prefs = {}; }
-    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: false, light: false, cross: 100, pick: 5 }, prefs);
+    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: false, light: false, cross: 100, pick: 5 }, prefs);
     const savePrefs = () => { try { localStorage.setItem("kcad-prefs", JSON.stringify(E.set)); } catch (e) { /* private mode */ } };
     E.cur = { layer: "0", color: null, lt: null, lw: null };
     E.view = { cx: 0, cy: 0, s: 3, W: 800, H: 600 };
@@ -96,6 +96,7 @@
       const n = Object.assign({}, e);
       for (const k of ["layer", "color", "lt", "lw"]) if (n[k] === undefined || (k === "layer" && !n.layer)) n[k] = E.cur[k];
       n.id = e.id && !E.byId(e.id) ? e.id : K.uid();
+      for (const h of K.onAdd || []) h(E, n);
       E.doc.ents = E.doc.ents.concat([n]); idx = null; E.lastEnt = n.id; redraw(); return n;
     };
     E.replace = (id, n) => { if (!inTx) return E.tx("edit", () => E.replace(id, n)); n = Object.assign({}, n, { id }); E.doc.ents = E.doc.ents.map((e) => (e.id === id ? n : e)); idx = null; redraw(); return n; };
@@ -116,7 +117,7 @@
 
     /* ---------------- messages + command line ---------------- */
     const lines = [];
-    E.msg = (t, cls) => { lines.push([String(t), cls || ""]); if (lines.length > 400) lines.shift(); hist.innerHTML = lines.slice(-60).map((l) => `<div class="${l[1]}">${esc(l[0])}</div>`).join(""); hist.scrollTop = hist.scrollHeight; };
+    E.msg = (t, cls) => { lines.push([String(t), cls || ""]); if (lines.length > 400) lines.shift(); hist.innerHTML = lines.slice(-60).map((l) => `<div class="${l[1].split(" ").filter(Boolean).map((c) => "h-" + c).join(" ")}">${esc(l[0])}</div>`).join(""); hist.scrollTop = hist.scrollHeight; };
     E.err = (t) => E.msg(t, "er");
     const setPrompt = (text, kws, dflt) => {
       $(".cx-pr").textContent = text || "Command:";
@@ -133,7 +134,8 @@
       E.msg(msg, "pr");
       drawOverlay();
     });
-    const done = (v) => { const r = R; R = null; setPrompt(cmdRunning ? "" : "Command:"); r.resolve(v); drawOverlay(); };
+    let acq = [], hoverSnap = {}, acqT = 0;
+    const done = (v) => { if (Array.isArray(v)) acq = []; const r = R; R = null; setPrompt(cmdRunning ? "" : "Command:"); r.resolve(v); drawOverlay(); };
     E.getPoint = (msg, o) => ask("point", msg, o).then((v) => { if (Array.isArray(v)) E.lastPt = v; return v; });
     E.getDist = async (msg, o) => { o = o || {}; const v = await ask("dist", msg, o); if (Array.isArray(v)) { if (o.base) return G.dist(o.base, v); const q = await E.getPoint("Specify second point:", { base: v }); if (q == null || q.kw) return null; return G.dist(v, q); } return v; };
     E.getAngle = async (msg, o) => { o = o || {}; const v = await ask("angle", msg, o); if (Array.isArray(v)) { if (o.base) return G.ang(o.base, v); const q = await E.getPoint("Specify second point:", { base: v }); if (q == null || q.kw) return null; return G.ang(v, q); } return typeof v === "number" ? v * D2R : v; };
@@ -226,7 +228,7 @@
       catch (e) { if (e !== CANCEL) { E.err(e && e.message ? e.message : String(e)); console.error(e); } else E.msg("*Cancel*", "mu"); }
       finally {
         while (inTx) E.end();
-        cmdRunning = null; R = null; grip = null; setPrompt("Command:"); $(".cx-ribbon").querySelectorAll("button.on").forEach((b) => b.classList.remove("on")); drawOverlay(); refreshSide();
+        acq = []; cmdRunning = null; R = null; grip = null; setPrompt("Command:"); $(".cx-ribbon").querySelectorAll("button.on").forEach((b) => b.classList.remove("on")); drawOverlay(); refreshSide();
         if (cmdQueue) { const q = cmdQueue; cmdQueue = null; setTimeout(() => E.run(q[0], q[1]), 0); }
       }
     };
@@ -248,7 +250,9 @@
       return E.doc.ents.filter((e) => E.visible(e) && (!R || !R.filter || R.filter(e)) && (crossing ? K.crosses(e, r, E.doc) : K.inside(e, r, E.doc))).map((e) => e.id);
     };
     E.winSelect = winSelect;
+    E.groupExpand = (ids) => { if (E.set.pickgroup === false) return ids; const g = new Set(ids.map((id) => { const e = E.byId(id); return e && e.grp; }).filter(Boolean)); return g.size ? Array.from(new Set(ids.concat(E.doc.ents.filter((e) => g.has(e.grp)).map((e) => e.id)))) : ids; };
     const applySel = (ids, remove) => {
+      ids = E.groupExpand(ids);
       const lockedSkip = ids.filter((id) => { const e = E.byId(id); return e && E.layerOf(e).lock; }).length;
       ids = ids.filter((id) => { const e = E.byId(id); return e && !E.layerOf(e).lock; });
       if (remove || selMode === "remove") E.sel = E.sel.filter((id) => !ids.includes(id)); else E.sel = Array.from(new Set(E.sel.concat(ids)));
@@ -319,6 +323,20 @@
       mouse.snap = wantSnap ? snapAt(mouse.wp, base) : null;
       mouse.cp = mouse.snap ? mouse.snap.p : wantSnap ? constrain(mouse.wp, base) : mouse.wp;
       if (!wantSnap) mouse.track = null;
+      mouse.ot = null;
+      if (wantSnap && E.set.otrack && E.set.osnap) {
+        const now = Date.now();
+        if (mouse.snap) { const key = mouse.snap.p.map((v) => v.toFixed(6)).join(","); if (hoverSnap.key !== key) hoverSnap = { key, t: now }; else if (now - hoverSnap.t > 420 && !acq.some((a) => a.key === key)) { acq.push({ key, p: mouse.snap.p.slice(), type: mouse.snap.type }); if (acq.length > 7) acq.shift(); clearTimeout(acqT); } else if (!acq.some((a) => a.key === key)) { clearTimeout(acqT); acqT = setTimeout(() => { updateCursor(); drawOverlay(); }, 450); } }
+        else if (acq.length) {
+          const tol = 7 / E.view.s, angs = E.set.polar ? Array.from({ length: Math.round(180 / (E.set.polarInc || 15)) }, (_, i) => (i * (E.set.polarInc || 15)) * D2R) : [0, Math.PI / 2], cands = [];
+          for (const a of acq) for (const g of angs) { const u = [Math.cos(g), Math.sin(g)], t = G.dot(G.sub(mouse.wp, a.p), u), q = G.add(a.p, G.mul(u, t)), d = G.dist(q, mouse.wp); if (d < tol && Math.abs(t) * E.view.s > 4) cands.push({ q, d, a, g }); }
+          if (cands.length) {
+            cands.sort((x, y) => x.d - y.d); let best = { q: cands[0].q, lines: [cands[0]] };
+            for (const c2 of cands.slice(1)) { if (c2.a === cands[0].a) continue; const L1 = { k: "s", a: cands[0].a.p, b: G.add(cands[0].a.p, [Math.cos(cands[0].g), Math.sin(cands[0].g)]) }, L2 = { k: "s", a: c2.a.p, b: G.add(c2.a.p, [Math.cos(c2.g), Math.sin(c2.g)]) }; const x = G.ixSS(L1, L2, true, true)[0]; if (x && G.dist(x, mouse.wp) < tol * 1.6) { best = { q: x, lines: [cands[0], c2] }; break; } }
+            mouse.cp = best.q; mouse.ot = best.lines; mouse.track = null;
+          }
+        }
+      }
       const p = mouse.cp; $(".cx-xy").textContent = K.fmt(p[0], 4) + ", " + K.fmt(p[1], 4);
     };
 
@@ -401,6 +419,15 @@
       // selection window
       if (win) { const a = w2s(win.a), b = w2s(cp), cr = cp[0] < win.a[0]; ctx.setLineDash(cr ? [5, 4] : []); ctx.fillStyle = cr ? "rgba(48,209,88,.15)" : "rgba(10,132,255,.15)"; ctx.strokeStyle = cr ? "#30d158" : "#0a84ff"; ctx.lineWidth = 1; ctx.fillRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); ctx.strokeRect(a[0], a[1], b[0] - a[0], b[1] - a[1]); }
       if (mouse.snap && mouse.inside) drawSnap(ctx, mouse.snap);
+      if (E.set.otrack && (R || grip)) {
+        ctx.setLineDash([]); ctx.strokeStyle = "#30d158"; ctx.lineWidth = 1.5; for (const a of acq) { const [x, y] = w2s(a.p); ctx.beginPath(); ctx.moveTo(x - 5, y); ctx.lineTo(x + 5, y); ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5); ctx.stroke(); }
+        if (mouse.ot && mouse.inside) {
+          ctx.setLineDash([3, 4]); const Lw = V.W + V.H; for (const l of mouse.ot) { const [x, y] = w2s(l.a.p); ctx.beginPath(); ctx.moveTo(x - Math.cos(l.g) * Lw, y + Math.sin(l.g) * Lw); ctx.lineTo(x + Math.cos(l.g) * Lw, y - Math.sin(l.g) * Lw); ctx.stroke(); }
+          const [x, y] = w2s(mouse.cp), l0 = mouse.ot[0], lab = mouse.ot.length > 1 ? "Intersection of tracking lines" : `${({ end: "Endpoint", mid: "Midpoint", cen: "Centre", int: "Intersection", qua: "Quadrant" })[l0.a.type] || "Point"}: ${K.fmt(G.dist(l0.a.p, mouse.cp), E.doc.dim.dec)} < ${K.fmt(G.norm(G.ang(l0.a.p, mouse.cp)) / D2R, 0)}°`;
+          ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(x - 6, y - 6); ctx.lineTo(x + 6, y + 6); ctx.moveTo(x + 6, y - 6); ctx.lineTo(x - 6, y + 6); ctx.stroke();
+          ctx.font = "12px system-ui, Arial"; const tw = ctx.measureText(lab).width; ctx.fillStyle = "rgba(20,24,32,.92)"; ctx.fillRect(x + 12, y + 10, tw + 10, 18); ctx.fillStyle = "#30d158"; ctx.fillText(lab, x + 17, y + 23);
+        }
+      }
       // crosshair + pickbox
       if (mouse.inside && !panDrag) {
         const [x, y] = w2s(cp), sz = E.set.cross >= 100 ? V.W + V.H : (Math.max(V.W, V.H) * E.set.cross) / 200, pb = E.set.pick;
@@ -506,7 +533,9 @@
     c1.addEventListener("dblclick", (ev) => {
       if (ev.button === 1) { E.zoomExt(); return; }
       if (R || cmdRunning) return; const e = E.pick(s2w(spOf(ev))); if (!e) return;
-      if (["text", "mtext", "dim", "leader"].includes(e.t)) E.run("TEXTEDIT", { id: e.id }); else { E.sel = [e.id]; showSide("props"); drawOverlay(); refreshSide(); }
+      if (["text", "mtext", "dim", "leader"].includes(e.t)) E.run("TEXTEDIT", { id: e.id });
+      else if (e.t === "table") E.run("TABLEDIT", { id: e.id }); else if (e.t === "fcf") E.run("TOLEDIT", { id: e.id });
+      else if (e.t === "insert" && ((E.doc.blocks[e.name] || {}).ents || []).some((s) => s.t === "attdef")) E.run("ATTEDIT", { id: e.id }); else { E.sel = [e.id]; showSide("props"); drawOverlay(); refreshSide(); }
     });
     c1.addEventListener("auxclick", (ev) => { if (ev.button === 1 && ev.detail === 2) E.zoomExt(); });
     c1.addEventListener("wheel", (ev) => { ev.preventDefault(); const sp = spOf(ev); E.zoomAt(sp, Math.pow(1.0018, -ev.deltaY * (ev.deltaMode === 1 ? 30 : 1))); mouse.sp = sp; mouse.wp = s2w(sp); updateCursor(); }, { passive: false });
@@ -547,7 +576,7 @@
       if ($(".cx-modal").classList.contains("on")) { if (ev.key === "Escape") closeDlg(null); return; }
       if (inField) return;
       const k = ev.key, ctrl = ev.ctrlKey || ev.metaKey;
-      const F = { F1: () => E.run("HELP"), F2: () => root.classList.toggle("cx-bighist"), F3: () => toggle("osnap", "Osnap"), F7: () => toggle("grid", "Grid"), F8: () => toggle("ortho", "Ortho"), F9: () => toggle("snap", "Snap"), F10: () => toggle("polar", "Polar"), F12: () => toggle("dyn", "Dynamic input") };
+      const F = { F1: () => E.run("HELP"), F2: () => root.classList.toggle("cx-bighist"), F3: () => toggle("osnap", "Osnap"), F7: () => toggle("grid", "Grid"), F8: () => toggle("ortho", "Ortho"), F9: () => toggle("snap", "Snap"), F10: () => toggle("polar", "Polar"), F11: () => toggle("otrack", "Object snap tracking"), F12: () => toggle("dyn", "Dynamic input") };
       if (F[k]) { ev.preventDefault(); F[k](); return; }
       if (ctrl) {
         const map = { z: "U", y: "REDO", c: "COPYCLIP", v: "PASTECLIP", x: "CUTCLIP", a: "SELECTALL", s: "QSAVE", o: "OPEN", n: "NEW", p: "PLOT", 1: "PROPERTIES" };
@@ -632,7 +661,7 @@
     E.pickColor = pickColor;
 
     /* ---------------- status bar ---------------- */
-    const TG = [["grid", "Grid", "F7"], ["snap", "Snap", "F9"], ["ortho", "Ortho", "F8"], ["polar", "Polar", "F10"], ["osnap", "Osnap", "F3"], ["dyn", "Dyn", "F12"], ["lwt", "Lwt", ""], ["light", "Paper", ""]];
+    const TG = [["grid", "Grid", "F7"], ["snap", "Snap", "F9"], ["ortho", "Ortho", "F8"], ["polar", "Polar", "F10"], ["osnap", "Osnap", "F3"], ["otrack", "Otrack", "F11"], ["dyn", "Dyn", "F12"], ["lwt", "Lwt", ""], ["pickgroup", "Groups", ""], ["light", "Paper", ""]];
     const drawStatus = () => {
       $(".cx-tg").innerHTML = TG.map(([k, n, f]) => `<button data-t="${k}" class="${E.set[k] ? "on" : ""}" title="${n}${f ? " (" + f + ")" : ""}${k === "osnap" || k === "polar" || k === "snap" ? " — right-click for settings" : ""}">${n}</button>`).join("") + `<button data-t="__set" title="Drafting settings">⚙</button>`;
       $(".cx-info").textContent = `${E.doc.units} · ${E.sel.length ? E.sel.length + " selected · " : ""}${E.doc.ents.length} objects`;

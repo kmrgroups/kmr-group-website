@@ -805,7 +805,7 @@
     E.tx("block", () => {
       const ents = ids.map((id) => E.byId(id)).filter(Boolean).map((e) => Object.assign(JSON.parse(JSON.stringify(e)), { id: K.uid() }));
       E.doc.blocks = Object.assign({}, E.doc.blocks, { [r.n]: { base, ents } });
-      if (r.keep) { E.remove(ids); E.add({ t: "insert", name: r.n, p: base, sx: 1, sy: 1, rot: 0 }); }
+      if (r.keep) { E.remove(ids); const at = {}; ents.filter((s) => s.t === "attdef").forEach((s) => (at[s.tag] = s.def || "")); E.add(Object.assign({ t: "insert", name: r.n, p: base, sx: 1, sy: 1, rot: 0 }, Object.keys(at).length ? { attrs: at } : {})); }
     });
     E.msg(`Block "${r.n}" created with ${ids.length} object(s).`);
   } });
@@ -823,7 +823,7 @@
     let sc = 1, rot = 0, ins = p;
     if (p.kw) { if (p.kw === "Scale") sc = +(need(await E.getNum("Specify scale factor <1>:", { dflt: 1, positive: true }))); else rot = need(await E.getAngle("Specify rotation angle <0>:", { dflt: 0 })); ins = need(await E.getPoint("Specify insertion point:", { preview: (q) => [mk(q, sc, rot)] })); }
     else { const s = await E.getNum("Enter scale factor <1>:", { dflt: 1, positive: true }); if (typeof s === "number") sc = s; const a = await E.getAngle("Specify rotation angle <0>:", { base: ins, dflt: 0, preview: (q) => [mk(ins, sc, G.ang(ins, q))] }); if (typeof a === "number") rot = a; }
-    E.add(mk(ins, sc, rot));
+    const placed = E.add(mk(ins, sc, rot)); if (K.askAttrs) await K.askAttrs(E, placed);
   } });
   K.blockThumb = (doc, name) => { const d = K.newDoc(false); d.layers = doc.layers; d.blocks = doc.blocks; d.ents = [{ t: "insert", name, p: [0, 0], sx: 1, sy: 1, rot: 0, layer: "0" }]; const b = K.extents(d); if (!b) return ""; return K.toSVG(d, { box: b, widthMm: 60, heightMm: 44, mono: true }).replace(/width="60mm" height="44mm"/, 'width="90" height="66"'); };
   K.libThumb = (key) => { const d = K.newDoc(false); d.blocks = { X: K.LIB[key].make() }; d.ents = [{ t: "insert", name: "X", p: [0, 0], sx: 1, sy: 1, rot: 0, layer: "0" }]; const b = K.extents(d); return b ? K.toSVG(d, { box: b, widthMm: 60, heightMm: 44, mono: true }).replace(/width="60mm" height="44mm"/, 'width="90" height="66"') : ""; };

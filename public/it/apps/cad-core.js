@@ -67,6 +67,7 @@
   const clone = (e) => JSON.parse(JSON.stringify(e));
 
   /** a transformed copy of an entity (same id unless the caller changes it) */
+  K.EXT = K.EXT || {};
   K.xform = (e, m) => {
     const T = (p) => M.ap(m, p), d = decomp(m), n = clone(e), ad = (a) => (d.mir ? d.phi - a : a + d.phi);
     const textRot = (rot) => { const dir = [Math.cos(rot), Math.sin(rot)], v = [m[0] * dir[0] + m[2] * dir[1], m[1] * dir[0] + m[3] * dir[1]]; let r = Math.atan2(v[1], v[0]), flip = false; if (d.mir && Math.cos(r) < -1e-9) { r += Math.PI; flip = true; } return { r, flip }; };
@@ -87,13 +88,18 @@
       case "pline": n.pts = e.pts.map((p) => { const q = T(p); return [q[0], q[1], d.mir ? -(p[2] || 0) : p[2] || 0]; }); if (e.w) n.w = e.w * d.s; break;
       case "spline": n.pts = e.pts.map(T); if (e.ctrl) n.ctrl = e.ctrl.map(T); break;
       case "leader": n.pts = e.pts.map(T); if (e.h) n.h = e.h * d.s; break;
-      case "text": case "mtext": { n.p = T(e.p); n.h = e.h * d.s; if (e.w) n.w = e.w * d.s; const tr = textRot(e.rot || 0); n.rot = tr.r; if (tr.flip && e.t === "text" && e.ha !== 1) n.ha = e.ha === 2 ? 0 : 2; break; }
+      case "text": case "mtext": case "attdef": { n.p = T(e.p); n.h = e.h * d.s; if (e.w) n.w = e.w * d.s; const tr = textRot(e.rot || 0); n.rot = tr.r; if (tr.flip && e.t === "text" && e.ha !== 1) n.ha = e.ha === 2 ? 0 : 2; break; }
       case "dim": for (const k of ["p1", "p2", "loc", "c"]) if (e[k]) n[k] = T(e[k]); if (e.r) n.r = e.r * d.s; if (e.ext) n.ext = e.ext.map(T); if (e.kind === "lin" && e.dir && Math.abs(Math.sin(d.phi)) > 0.5) n.dir = e.dir === "h" ? "v" : "h"; if (e.ds) n.ds = e.ds * d.s; break;
       case "hatch": n.loops = e.loops.map((l) => l.map(T)); n.ang = ad(e.ang || 0); n.sc = (e.sc || 1) * d.s; break;
       case "insert":
         n.p = T(e.p);
         if (d.mir) { n.rot = d.phi - (e.rot || 0); n.sx = (e.sx || 1) * d.s; n.sy = -(e.sy || 1) * d.s; } else { n.rot = (e.rot || 0) + d.phi; n.sx = (e.sx || 1) * d.sx; n.sy = (e.sy || 1) * d.sy; }
         break;
+      default:
+        if (K.EXT[e.t] && K.EXT[e.t].xform) return K.EXT[e.t].xform(e, m, d, n);
+        for (const k of ["p", "a", "b", "c", "loc", "p1", "p2"]) if (Array.isArray(e[k])) n[k] = T(e[k]);
+        if (Array.isArray(e.pts)) n.pts = e.pts.map((q) => { const w = T(q); return q.length > 2 ? [w[0], w[1], q[2]] : w; });
+        if (e.h) n.h = e.h * d.s; if (e.rot != null) n.rot = ad(e.rot);
     }
     return n;
   };
@@ -184,8 +190,12 @@
   K.pathParam = (P, p) => { let best = 0, bd = Infinity; P.prims.forEach((pr, i) => { const q = G.closest(p, K.pAsPrim(pr)), d = G.dist(p, q); if (d < bd) { bd = d; best = i + Math.max(0, Math.min(1, K.pPar(pr, q))); } }); return best; };
 
   /* ---------- dimensions ---------- */
+  /** the dimension style of a dimension: Standard (doc.dim) ← named style ← its own overrides; annotative scale applied */
+  K.dimStyle = (e, doc) => { const D = Object.assign({}, doc.dim, (doc.dimstyles || {})[e.sty] || {}, e.st || {}); if (e.anno || D.anno) D.scale = (D.scale || 1) * K.annoF(); return D; };
+  /** annotative factor: model units per paper mm at the current annotation scale (1 when not used) */
+  K.annoF = () => (K.view && K.view.anno ? K.view.anno : 1);
   K.dimText = (e, doc) => {
-    const D = Object.assign({}, doc.dim, e.st || {}), fm = (v) => (D.pre || "") + K.fmt(v * (D.lfac || 1), D.dec) + (D.sfx || "");
+    const D = K.dimStyle(e, doc), fm = (v) => (D.pre || "") + K.fmt(v * (D.lfac || 1), D.dec) + (D.sfx || "");
     let v = "";
     if (e.kind === "lin" || e.kind === "ali") { const u = K.dimDir(e); v = fm(Math.abs(G.dot(G.sub(e.p2, e.p1), u))); }
     else if (e.kind === "rad") v = "R" + fm(e.r);
@@ -204,9 +214,9 @@
   const readable = (a) => { a = G.norm(a); return a > Math.PI / 2 + 1e-6 && a <= 1.5 * Math.PI + 1e-6 ? a - Math.PI : a; };
   /** the pieces a dimension is drawn with (world entities; colour/layer inherited from the dimension) */
   K.dimGeom = (e, doc) => {
-    const D = Object.assign({}, doc.dim, e.st || {}), k = D.scale || 1, as = D.as * k, th = D.th * k, exo = D.exo * k, exe = D.exe * k, gap = D.gap * k, out = [], txt = K.dimText(e, doc);
-    const L = (a, b) => out.push({ t: "line", a, b }), T = (p, rot, ha = 1, va = 0) => out.push({ t: "text", p, h: th, s: txt, rot, ha, va });
-    const tw = G.textW(txt, th);
+    const D = K.dimStyle(e, doc), k = D.scale || 1, as = D.as * k, th = D.th * k, exo = D.exo * k, exe = D.exe * k, gap = D.gap * k, out = [], txt = K.dimText(e, doc);
+    const L = (a, b) => out.push({ t: "line", a, b }), T = (p, rot, ha = 1) => out.push(...K.dimTextGeom(e, D, txt, p, rot, ha, th, gap));
+    const tw = K.dimTextW(e, D, txt, th, gap);
     if (e.kind === "lin" || e.kind === "ali") {
       const u = K.dimDir(e), d1 = G.add(e.loc, G.mul(u, G.dot(G.sub(e.p1, e.loc), u))), d2 = G.add(e.loc, G.mul(u, G.dot(G.sub(e.p2, e.loc), u)));
       for (const [p, d] of [[e.p1, d1], [e.p2, d2]]) { const v = G.sub(d, p), l = G.len(v); if (l > exo) { const w = G.unit(v); L(G.add(p, G.mul(w, exo)), G.add(d, G.mul(w, exe))); } }
@@ -222,7 +232,7 @@
       if (e.kind === "rad") { L(far ? e.c : e.c, far ? e.loc : pc); out.push(arrow(pc, far ? G.mul(dir, -1) : dir, as)); }
       else { const pa = G.sub(e.c, G.mul(dir, e.r)); L(pa, far ? e.loc : pc); out.push(arrow(pc, dir, as), arrow(pa, G.mul(dir, -1), as)); }
       const ha = dir[0] >= 0 ? 0 : 2, land = G.add(e.loc, [dir[0] >= 0 ? as : -as, 0]);
-      if (far) { L(e.loc, land); out.push({ t: "text", p: G.add(land, [dir[0] >= 0 ? gap : -gap, -th / 2]), h: th, s: txt, rot: 0, ha, va: 0 }); }
+      if (far) { L(e.loc, land); T(G.add(land, [dir[0] >= 0 ? gap : -gap, -th / 2]), 0, ha); }
       else { const rot = readable(Math.atan2(dir[1], dir[0])); T(G.add(G.mid(e.c, e.loc), G.mul([-Math.sin(rot), Math.cos(rot)], gap)), rot); }
     } else if (e.kind === "ang") {
       const A = K.dimAng(e), r = G.dist(e.c, e.loc), q0 = G.polar(e.c, A.a0, r), q1 = G.polar(e.c, A.a1, r);
@@ -232,8 +242,29 @@
       const am = A.a0 + A.sw / 2, rot = readable(am - Math.PI / 2), pm = G.polar(e.c, am, r + gap + (G.norm(am) > Math.PI ? th : 0));
       T(e.tp || pm, rot, 1, 0);
     } else if (e.kind === "ord") {
-      L(G.add(e.p1, G.mul(G.unit(G.sub(e.loc, e.p1)), exo)), e.loc); out.push({ t: "text", p: G.add(e.loc, e.dir === "x" ? [th / 2, gap] : [gap, -th / 2]), h: th, s: txt, rot: e.dir === "x" ? Math.PI / 2 : 0, ha: 0, va: 0 });
+      L(G.add(e.p1, G.mul(G.unit(G.sub(e.loc, e.p1)), exo)), e.loc); T(G.add(e.loc, e.dir === "x" ? [th / 2, gap] : [gap, -th / 2]), e.dir === "x" ? Math.PI / 2 : 0, 0);
     }
+    return out;
+  };
+
+  /* ---------- dimension text with tolerances: sym (±), dev (+/− stacked), lim (limits), basic (box) ---------- */
+  const tolParts = (e, D, txt) => {
+    const tt = e.tol || (D.tol && D.tol !== "none" ? { type: D.tol, up: D.tup, lo: D.tlo } : null); if (!tt || !tt.type || tt.type === "none") return null;
+    const dec = D.tdec != null ? D.tdec : D.dec, f = (v) => K.fmt(+v || 0, dec), up = +tt.up || 0, lo = tt.lo == null || tt.lo === "" ? up : +tt.lo;
+    if (tt.type === "sym") return { main: txt + " ±" + f(up) };
+    if (tt.type === "basic") return { main: txt, box: true };
+    if (tt.type === "dev") return { main: txt, a: (up >= 0 ? "+" : "") + f(up), b: (lo === 0 ? " " : "−") + f(Math.abs(lo)) };
+    if (tt.type === "lim") { const m = String(txt).match(/^(\D*?)(-?[\d.]+)(.*)$/); if (!m) return { main: txt }; const v = parseFloat(m[2]); return { main: "", pre: m[1], a: m[1] + f(v + up) + m[3], b: m[1] + f(v - lo) + m[3], lim: true }; }
+    return null;
+  };
+  K.dimTextW = (e, D, txt, th, gap) => { const t = tolParts(e, D, txt); if (!t) return G.textW(txt, th); const tf = D.tfac || 0.7; return G.textW(t.main, th) + (t.a ? G.textW(t.a.length > t.b.length ? t.a : t.b, th * (t.lim ? 1 : tf)) + (t.main ? gap : 0) : 0) + (t.box ? gap * 2 : 0); };
+  K.dimTextGeom = (e, D, txt, p, rot, ha, th, gap) => {
+    const t = tolParts(e, D, txt), out = [], W = K.dimTextW(e, D, txt, th, gap), x0 = ha === 1 ? -W / 2 : ha === 2 ? -W : 0, at = (x, y) => G.add(p, G.rotp([x, y], [0, 0], rot));
+    if (!t) { out.push({ t: "text", p, h: th, s: txt, rot, ha, va: 0 }); return out; }
+    const tf = t.lim ? 1 : D.tfac || 0.7, mw = G.textW(t.main, th);
+    if (t.main) out.push({ t: "text", p: at(x0 + (t.box ? gap : 0), 0), h: th, s: t.main, rot, ha: 0, va: 0 });
+    if (t.box) out.push({ t: "pline", closed: true, pts: [[x0, -gap], [x0 + W, -gap], [x0 + W, th + gap], [x0, th + gap]].map((q) => { const w = at(q[0], q[1]); return [w[0], w[1], 0]; }) });
+    if (t.a) { const xs = x0 + mw + (t.main ? gap : 0), h2 = th * tf; out.push({ t: "text", p: at(xs, t.lim ? th * 0.62 : th * 0.55), h: t.lim ? th * 0.7 : h2, s: t.a, rot, ha: 0, va: 0 }, { t: "text", p: at(xs, t.lim ? -th * 0.38 : -th * 0.2), h: t.lim ? th * 0.7 : h2, s: t.b, rot, ha: 0, va: 0 }); }
     return out;
   };
 
@@ -242,6 +273,11 @@
     const out = [], as = (doc.dim.as || 2.5) * (doc.dim.scale || 1), P = e.pts;
     for (let i = 0; i < P.length - 1; i++) out.push({ t: "line", a: P[i], b: P[i + 1] });
     if (P.length > 1) out.push(arrow(P[0], G.unit(G.sub(P[0], P[1])), as));
+    if (e.style === "balloon" && P.length > 1) {
+      const h = e.h || doc.dim.th * (doc.dim.scale || 1), r = e.br || h * 1.3, end = P[P.length - 1], prev = P[P.length - 2], c = G.add(end, G.mul(G.unit(G.sub(end, prev)), r));
+      out.push({ t: "circle", c, r }, { t: "text", p: c, h, s: String(e.s || ""), rot: 0, ha: 1, va: 2 });
+      return out;
+    }
     if (e.s) {
       const end = P[P.length - 1], prev = P[P.length - 2] || end, right = end[0] >= prev[0], h = e.h || doc.dim.th * (doc.dim.scale || 1);
       const land = G.add(end, [right ? as : -as, 0]); out.push({ t: "line", a: end, b: land });
@@ -279,7 +315,9 @@
     const cols = e.cols || 1, rows = e.rows || 1;
     for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
       const m = cols > 1 || rows > 1 ? M.mul(M.mul(M.move(e.p[0], e.p[1]), M.mul(M.rot([0, 0], e.rot || 0), M.move(c * (e.dc || 0), r * (e.dr || 0)))), M.mul(M.move(-e.p[0], -e.p[1]), m0)) : m0;
-      for (const s of B.ents) {
+      for (const s0 of B.ents) {
+        let s = s0;
+        if (s.t === "attdef") { if (s.inv) continue; const v = e.attrs && e.attrs[s.tag] != null ? e.attrs[s.tag] : s.def || ""; if (v === "") continue; s = Object.assign({}, s, { t: "text", s: v }); }
         let w = K.xform(s, m);
         w.layer = !s.layer || s.layer === "0" ? e.layer : s.layer;
         if (!s.color && (!s.layer || s.layer === "0")) w.color = e.color || null; else if (s.color === "byblock") w.color = e.color || null;
@@ -293,7 +331,7 @@
   K.explodeEnt = (e, doc) => {
     const P = (x) => Object.assign(K.props(e), x, { id: K.uid() });
     switch (e.t) {
-      case "insert": { const B = doc.blocks[e.name]; if (!B) return []; const m = M.mul(M.insert(e), M.move(-B.base[0], -B.base[1])); return B.ents.map((s) => { const w = K.xform(s, m); w.id = K.uid(); if (!s.layer || s.layer === "0") w.layer = e.layer; if (!s.color || s.color === "byblock") w.color = s.color === "byblock" || !s.layer || s.layer === "0" ? e.color || null : null; return w; }); }
+      case "insert": { const B = doc.blocks[e.name]; if (!B) return []; const m = M.mul(M.insert(e), M.move(-B.base[0], -B.base[1])); return B.ents.filter((s) => !(s.t === "attdef" && (s.inv || (e.attrs && e.attrs[s.tag] === "")))).map((s0) => { const s = s0.t === "attdef" ? Object.assign({}, s0, { t: "text", s: e.attrs && e.attrs[s0.tag] != null ? e.attrs[s0.tag] : s0.def || "" }) : s0; const w = K.xform(s, m); w.id = K.uid(); if (!s.layer || s.layer === "0") w.layer = e.layer; if (!s.color || s.color === "byblock") w.color = s.color === "byblock" || !s.layer || s.layer === "0" ? e.color || null : null; return w; }); }
       case "pline": return K.path(e).prims.map((p) => K.fromPrims(Object.assign({}, e, { t: "line" }), [p], false));
       case "dim": return K.dimGeom(e, doc).map((g) => P(g));
       case "leader": return K.leaderGeom(e, doc).map((g) => P(g));
@@ -301,7 +339,8 @@
       case "hatch": return K.hatchLines(e).map(([a, b]) => P({ t: "line", a, b }));
       case "ellipse": case "spline": return K.explodeEnt(K.toPline(e), doc);
       case "circle": return [];
-      default: return [];
+      case "attdef": return [P({ t: "text", p: e.p, h: e.h, s: e.def || e.tag, rot: e.rot || 0, ha: e.ha || 0, va: e.va || 0 })];
+      default: return K.EXT[e.t] ? K.EXT[e.t].geom(e, doc).map((g) => P(g)) : [];
     }
   };
   /* hatch pattern lines, cached per entity object */
@@ -325,7 +364,8 @@
       case "dim": return [].concat(...K.dimGeom(e, doc).map((g) => K.segs(g, doc)));
       case "hatch": return [].concat(...e.loops.map((l) => G.polySegs(l, true)));
       case "insert": return [].concat(...K.expand(e, doc).map((g) => K.segs(g, doc)));
-      default: return [];
+      case "attdef": return G.polySegs(K.textBox(Object.assign({}, e, { s: e.tag })), true);
+      default: return K.EXT[e.t] ? [].concat(...K.EXT[e.t].geom(e, doc).map((g) => K.segs(g, doc))) : [];
     }
   };
   const bbCache = new WeakMap();
@@ -337,6 +377,7 @@
   };
   K.extents = (doc, ents) => { let b = null; for (const e of ents || doc.ents) { const L = K.layer(doc, e.layer); if (L.on === false || L.frozen) continue; b = G.mergeBounds(b, K.bbox(e, doc)); } return b; };
   K.hitDist = (e, p, doc) => {
+    if (K.EXT[e.t]) { let d = Infinity; for (const w of K.EXT[e.t].geom(e, doc)) { const v = K.hitDist(w, p, doc); if (v < d) d = v; } return d; }
     if (e.t === "insert") { let d = Infinity; for (const w of K.expand(e, doc)) { const v = K.hitDist(w, p, doc); if (v < d) d = v; if (d === 0) break; } return d; }
     if (e.t === "hatch") { let inside = false; for (const l of e.loops) if (G.inPoly(p, l)) inside = !inside; if (inside) return 0; }
     if (e.t === "text") { if (G.inPoly(p, K.textBox(e))) return 0; }
@@ -369,11 +410,11 @@
       case "spline": return e.pts.slice();
       case "leader": return e.pts.slice();
       case "ellipse": { const r = e.rot || 0; return [e.c, G.add(e.c, G.rotp([e.rx, 0], [0, 0], r)), G.add(e.c, G.rotp([0, e.ry], [0, 0], r)), G.add(e.c, G.rotp([-e.rx, 0], [0, 0], r)), G.add(e.c, G.rotp([0, -e.ry], [0, 0], r))]; }
-      case "text": case "mtext": case "insert": case "point": return [e.p];
+      case "text": case "mtext": case "insert": case "point": case "attdef": return [e.p];
       case "xline": return [e.p];
       case "dim": return e.kind === "ang" ? [e.c, e.p1, e.p2, e.loc] : e.kind === "rad" || e.kind === "dia" ? [e.c, e.loc] : [e.p1, e.p2, e.loc];
       case "hatch": return [];
-      default: return [];
+      default: return K.EXT[e.t] && K.EXT[e.t].grips ? K.EXT[e.t].grips(e) : e.p ? [e.p] : [];
     }
   };
   /** an entity with grip i moved to point q */
@@ -392,7 +433,8 @@
       case "spline": n.pts[i] = q; delete n.ctrl; delete n.knots; break;
       case "leader": n.pts[i] = q; break;
       case "ellipse": if (i === 0) n.c = q; else if (i % 2) n.rx = Math.max(1e-6, G.dist(e.c, q)); else n.ry = Math.max(1e-6, G.dist(e.c, q)); break;
-      case "text": case "mtext": case "insert": case "point": case "xline": n.p = q; break;
+      case "text": case "mtext": case "insert": case "point": case "xline": case "attdef": n.p = q; break;
+      default: if (K.EXT[e.t] && K.EXT[e.t].gripMove) return K.EXT[e.t].gripMove(e, i, q); if (e.p) return K.xform(e, K.M.move(dd[0], dd[1]));
       case "dim": { const keys = e.kind === "ang" ? ["c", "p1", "p2", "loc"] : e.kind === "rad" || e.kind === "dia" ? ["c", "loc"] : ["p1", "p2", "loc"]; n[keys[i]] = q; if (keys[i] === "c" && e.loc && (e.kind === "rad" || e.kind === "dia")) n.loc = G.add(e.loc, dd); delete n.tp; break; }
     }
     return n;
@@ -427,6 +469,8 @@
         case "dim": sub(K.dimGeom(g, doc), { lt: "CONTINUOUS" }); P.style(st); break;
         case "leader": sub(K.leaderGeom(g, doc), { lt: "CONTINUOUS" }); P.style(st); break;
         case "insert": for (const w of K.expand(g, doc)) K.paint(P, w, doc, { color: col }); break;
+        case "attdef": P.text(K.textBase(g), g.h, g.tag || "TAG", g.rot || 0, g.ha === 2 ? 2 : g.ha === 1 ? 1 : 0); break;
+        default: if (K.EXT[g.t]) { sub(K.EXT[g.t].geom(g, doc), { lt: "CONTINUOUS" }); P.style(st); }
       }
     };
     P.style(st);

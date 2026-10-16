@@ -45,6 +45,7 @@
     const mtextClean = (s) => s.replace(/\\U\+([0-9A-Fa-f]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\S([^;^#/]*)[\^#/]([^;]*);/g, "$1/$2").replace(/\\P/g, "\n").replace(/\\[ACcFfHhQqTtWwpXx][^;]*;/g, "").replace(/\\[LlOoKk]/g, "").replace(/[{}]/g, "").replace(/\\~/g, " ").replace(/%%[cC]/g, "Ø").replace(/%%[dD]/g, "°").replace(/%%[pP]/g, "±");
     const txtClean = (s) => String(s).replace(/\\U\+([0-9A-Fa-f]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/%%[cC]/g, "Ø").replace(/%%[dD]/g, "°").replace(/%%[pP]/g, "±").replace(/%%[uUoO]/g, "");
     const ents = (dest) => {
+      let lastIns = null;
       while (i < P.length) {
         const [c, v] = P[i]; if (c !== 0) { i++; continue; }
         if (v === "ENDSEC" || v === "ENDBLK") return;
@@ -73,13 +74,16 @@
             if (v === "3DFACE") { e = { t: "pline", pts: q.map((p) => [p[0], p[1], 0]), closed: true }; break; }
             e = { t: "hatch", loops: [q], solid: true, pat: "SOLID", ang: 0, sc: 1 }; break;
           }
-          case "TEXT": case "ATTDEF": {
-            if (v === "ATTDEF") { W("attribute definitions"); break; }
+          case "ATTDEF": { const h = n(g, 40, 2.5), ha = parseInt(g[72] || 0, 10), al = ha && g[11] !== undefined; e = { t: "attdef", p: al ? [n(g, 11), n(g, 21)] : [n(g, 10), n(g, 20)], h, tag: String(g[2] || "TAG"), prompt: txtClean(g[3] || ""), def: txtClean(g[1] || ""), rot: n(g, 50) * D2R, ha: ha > 2 ? 1 : ha, va: 0 }; if (parseInt(g[70] || 0, 10) & 1) e.inv = true; break; }
+          case "TEXT": {
             const h = n(g, 40, 2.5), ha = parseInt(g[72] || 0, 10), va = parseInt(g[73] || 0, 10), al = (ha || va) && g[11] !== undefined;
             e = { t: "text", p: al ? [n(g, 11), n(g, 21)] : [n(g, 10), n(g, 20)], h, s: txtClean(g[1] || ""), rot: n(g, 50) * D2R, ha: ha > 2 ? 1 : ha, va };
             break;
           }
-          case "ATTRIB": { const h = n(g, 40, 2.5); e = { t: "text", p: [n(g, 10), n(g, 20)], h, s: txtClean(g[1] || ""), rot: n(g, 50) * D2R, ha: 0, va: 0 }; break; }
+          case "ATTRIB": {
+            const tag = String(g[2] || ""), blk = lastIns && doc.blocks[lastIns.name];
+            if (lastIns && tag && blk && blk.ents.some((s) => s.t === "attdef" && s.tag === tag)) { lastIns.attrs = Object.assign(lastIns.attrs || {}, { [tag]: txtClean(g[1] || "") }); break; }
+            const h = n(g, 40, 2.5); e = { t: "text", p: [n(g, 10), n(g, 20)], h, s: txtClean(g[1] || ""), rot: n(g, 50) * D2R, ha: 0, va: 0 }; break; }
           case "MTEXT": {
             let s = g.list.filter((x) => x[0] === 3).map((x) => x[1]).join("") + (g[1] || "");
             const ap = parseInt(g[71] || 1, 10), rot = g[50] !== undefined ? n(g, 50) * D2R : g[11] !== undefined ? Math.atan2(n(g, 21), n(g, 11)) : 0;
@@ -110,7 +114,7 @@
           case "VIEWPORT": case "ATTRIB_END": case "SEQEND": break;
           default: W(v);
         }
-        if (e) dest.push(common(g, e));
+        if (e) { dest.push(common(g, e)); if (e.t === "insert") lastIns = e; else if (v !== "ATTRIB") lastIns = null; }
       }
     };
     const readHatch = (g) => {
@@ -192,7 +196,7 @@
     const isInt = (c) => (c >= 60 && c <= 99) || (c >= 160 && c <= 179) || (c >= 270 && c <= 299) || (c >= 370 && c <= 389) || (c >= 400 && c <= 409) || (c >= 1060 && c <= 1071);
     const o = [], put = (c, v) => { o.push(String(c), typeof v === "number" ? (isInt(c) ? String(Math.round(v)) : fmt(v)) : String(v)); };
     const fmt = (v) => (Number.isInteger(v) ? v.toFixed(1) : (+v.toFixed(8)).toString());
-    const enc = (s) => String(s).replace(/Ø/g, "%%c").replace(/°/g, "%%d").replace(/±/g, "%%p").replace(/[^\x20-\x7e]/g, "?");
+    const enc = (s) => String(s).replace(/Ø/g, "%%c").replace(/°/g, "%%d").replace(/±/g, "%%p").replace(/−/g, "-").replace(/[^\x20-\x7e]/g, (c) => "\\U+" + c.charCodeAt(0).toString(16).toUpperCase().padStart(4, "0"));
     const insunits = { in: 1, ft: 2, mm: 4, cm: 5, m: 6 }[doc.units] || 4;
     put(0, "SECTION"); put(2, "HEADER"); put(9, "$ACADVER"); put(1, "AC1009"); put(9, "$INSUNITS"); put(70, insunits); put(9, "$LTSCALE"); put(40, doc.ltscale || 1);
     const ext = K.extents(doc) || { x0: 0, y0: 0, x1: 100, y1: 100 };
@@ -227,9 +231,21 @@
           }
           break;
         case "xline": base("LINE"); { const a = e.ray ? e.p : G.sub(e.p, G.mul(e.dir, 1e5)), b = G.add(e.p, G.mul(e.dir, 1e5)); put(10, a[0]); put(20, a[1]); put(30, 0); put(11, b[0]); put(21, b[1]); put(31, 0); } break;
+        case "attdef": base("ATTDEF"); put(10, e.p[0]); put(20, e.p[1]); put(30, 0); put(40, e.h); put(1, enc(e.def || "")); put(3, enc(e.prompt || e.tag)); put(2, safe(e.tag)); put(70, e.inv ? 1 : 0); if (e.rot) put(50, e.rot / D2R); if (e.ha) { put(72, e.ha); put(11, e.p[0]); put(21, e.p[1]); put(31, 0); } break;
         case "leader": case "dim": case "mtext": for (const s of K.explodeEnt(e, doc)) ent(Object.assign(s, { layer: e.layer, color: s.color || e.color }), lay); break;
         case "text": base("TEXT"); put(10, e.p[0]); put(20, e.p[1]); put(30, 0); put(40, e.h); put(1, enc(e.s)); if (e.rot) put(50, e.rot / D2R); if (e.ha || e.va) { put(72, e.ha || 0); put(11, e.p[0]); put(21, e.p[1]); put(31, 0); if (e.va) put(73, e.va); } break;
-        case "insert": base("INSERT"); put(2, safe(e.name)); put(10, e.p[0]); put(20, e.p[1]); put(30, 0); if (e.sx !== 1) put(41, e.sx); if (e.sy !== 1) put(42, e.sy); if (e.rot) put(50, e.rot / D2R); if (e.cols > 1 || e.rows > 1) { put(70, e.cols || 1); put(71, e.rows || 1); put(44, e.dc || 0); put(45, e.dr || 0); } break;
+        case "insert": {
+          const B = doc.blocks[e.name], arr = e.cols > 1 || e.rows > 1, defs = B && !arr ? B.ents.filter((s) => s.t === "attdef") : [];
+          base("INSERT"); if (defs.length) put(66, 1); put(2, safe(e.name)); put(10, e.p[0]); put(20, e.p[1]); put(30, 0); if (e.sx !== 1) put(41, e.sx); if (e.sy !== 1) put(42, e.sy); if (e.rot) put(50, e.rot / D2R);
+          if (arr) { put(70, e.cols || 1); put(71, e.rows || 1); put(44, e.dc || 0); put(45, e.dr || 0); }
+          if (defs.length) {
+            const m = K.M.mul(K.M.insert(e), K.M.move(-B.base[0], -B.base[1]));
+            for (const s of defs) { const w = K.xform(Object.assign({}, s, { t: "text" }), m); put(0, "ATTRIB"); put(8, L); put(10, w.p[0]); put(20, w.p[1]); put(30, 0); put(40, w.h); put(1, enc(e.attrs && e.attrs[s.tag] != null ? e.attrs[s.tag] : s.def || "")); put(2, safe(s.tag)); put(70, s.inv ? 1 : 0); if (w.rot) put(50, w.rot / D2R); if (s.ha) { put(72, s.ha); put(11, w.p[0]); put(21, w.p[1]); put(31, 0); } }
+            put(0, "SEQEND"); put(8, L);
+          }
+          break;
+        }
+        default: if (K.EXT[e.t]) for (const s of K.explodeEnt(e, doc)) ent(Object.assign(s, { layer: e.layer, color: s.color || e.color }), lay);
       }
     };
     const poly = (base, pts, closed, L) => { base("POLYLINE"); put(66, 1); put(10, 0); put(20, 0); put(30, 0); put(70, closed ? 1 : 0); for (const p of pts) { put(0, "VERTEX"); put(8, L); put(10, p[0]); put(20, p[1]); put(30, 0); if (p[2]) put(42, p[2]); } put(0, "SEQEND"); put(8, L); };
