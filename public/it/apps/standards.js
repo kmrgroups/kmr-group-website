@@ -107,7 +107,10 @@ cad:[
 ['PPAP','Element 9','Dimensional results','Balloons and the parts list number every characteristic so the dimensional report (Balloon Inspector) refers to the same items.'],
 ['SPC','Specification limits','Capability against the specification','Dimension tolerances (±, deviation, limits) give the upper and lower specification limits used for Cp / Cpk.'],
 ['MSA','Gage R&R - % tolerance','Measurement system acceptability','The drawing tolerance is the basis for the % tolerance of a Gage R&R study.'],
-['VDA','P3','Planning of product and process development','Product drawings and their release status are available for the development plan and audit.']],
+['VDA','P3','Planning of product and process development','Product drawings and their release status are available for the development plan and audit.'],
+['IATF','8.3.5.1','Design outputs - 3D math data','3D solids (made here or imported from STEP) are kept with the drawing revision; front, top, side and isometric views with hidden lines are generated from the model (first or third angle) and updated when the model changes, so 2D and 3D stay the same.'],
+['APQP','Phase 2','Product design - math data and prototypes','The 3D model exports as STL for prototypes and 3D printing and as 3D faces in DXF; volume and mass of each solid support the design review.'],
+['IATF','7.5.3.2.2','Engineering specifications - customer files','Customer DWG drawings open directly (converted to DXF on the computer, no upload) and STEP models import, so the customer revision can be checked against ours.']],
 capacity:[
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Machine capacity is planned against demand.'],
 ['IATF','8.2.3.1.3','Organizational manufacturing feasibility','Load against capacity shows whether the demand can be met.'],

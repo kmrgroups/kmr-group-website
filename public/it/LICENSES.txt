@@ -12,3 +12,8 @@ Third-party components shipped in balloon/engines/ or loaded from public CDNs:
 - pdf.js (Mozilla) – Apache 2.0.   jsPDF + jspdf-autotable – MIT.
 - supabase-js – MIT.   Barlow / Barlow Condensed fonts – SIL OFL.
 - qrcode-generator (Kazuhiko Arase) – MIT. QR codes on MMD tags / DC (apps/qr.js).
+- three.js (r169), three-mesh-bvh, three-bvh-csg – MIT (Copyright three.js authors,
+  Garrett Johnson). Bundled in apps/vendor/cad3d-vendor.js for the KMR CAD Draft
+  3D view, boolean operations, hidden-line drawing views and STL export.
+  The DWG and STEP readers above are also used by KMR CAD Draft (Open / Import DWG,
+  STEP in).

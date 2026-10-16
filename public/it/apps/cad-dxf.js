@@ -44,6 +44,7 @@
     };
     const mtextClean = (s) => s.replace(/\\U\+([0-9A-Fa-f]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\S([^;^#/]*)[\^#/]([^;]*);/g, "$1/$2").replace(/\\P/g, "\n").replace(/\\[ACcFfHhQqTtWwpXx][^;]*;/g, "").replace(/\\[LlOoKk]/g, "").replace(/[{}]/g, "").replace(/\\~/g, " ").replace(/%%[cC]/g, "Ø").replace(/%%[dD]/g, "°").replace(/%%[pP]/g, "±");
     const txtClean = (s) => String(s).replace(/\\U\+([0-9A-Fa-f]{4})/g, (m, h) => String.fromCharCode(parseInt(h, 16))).replace(/%%[cC]/g, "Ø").replace(/%%[dD]/g, "°").replace(/%%[pP]/g, "±").replace(/%%[uUoO]/g, "");
+    const faces = {};
     const ents = (dest) => {
       let lastIns = null;
       while (i < P.length) {
@@ -59,6 +60,7 @@
         }
         const g = grab(); let e = null;
         switch (v) {
+          case "3DFACE": { const L = g[8] || "0", F = (faces[L] = faces[L] || []), q = [0, 1, 2, 3].map((j) => [n(g, 10 + j), n(g, 20 + j), n(g, 30 + j)]); F.push(...q[0], ...q[1], ...q[2]); if (q[3].some((x, j) => Math.abs(x - q[2][j]) > 1e-9)) F.push(...q[0], ...q[2], ...q[3]); continue; }
           case "LINE": e = { t: "line", a: [n(g, 10), n(g, 20)], b: [n(g, 11), n(g, 21)] }; break;
           case "CIRCLE": e = { t: "circle", c: [n(g, 10), n(g, 20)], r: n(g, 40) }; break;
           case "ARC": e = { t: "arc", c: [n(g, 10), n(g, 20)], r: n(g, 40), a0: n(g, 50) * D2R, a1: n(g, 51) * D2R }; break;
@@ -195,6 +197,8 @@
       const paper = (K.PAPER ? Object.entries(K.PAPER).filter(([k]) => k[0] === "A").sort((a, c) => a[1][0] - c[1][0]).find(([, s]) => Math.max(...s) >= Math.max(w, h) - 1 && Math.min(...s) >= Math.min(w, h) - 1) : null) || ["A0"];
       doc.layouts = [{ id: K.uid(), name: "Layout1", paper: paper[0], orient: land ? "landscape" : "portrait", ps: "mono", ents: P }];
     }
+    /* 3D faces (one mesh per layer) come back as solids for the 3D view */
+    const fl = Object.entries(faces); if (fl.length) doc.solids = (doc.solids || []).concat(fl.map(([L, pos]) => ({ id: K.uid(), kind: "mesh", name: L === "3D-SOLIDS" ? "3D model" : L, p: { pos: pos.map((x) => Math.round(x * 1e5) / 1e5), idx: null } })));
     return { doc, warn };
   };
 
@@ -266,7 +270,7 @@
     put(0, "SECTION"); put(2, "BLOCKS");
     for (const [nm, b] of Object.entries(doc.blocks)) { put(0, "BLOCK"); put(8, "0"); put(2, safe(nm)); put(70, 0); put(10, b.base[0]); put(20, b.base[1]); put(30, 0); put(3, safe(nm)); for (const e of b.ents) ent(e, "0"); put(0, "ENDBLK"); put(8, "0"); }
     put(0, "ENDSEC");
-    put(0, "SECTION"); put(2, "ENTITIES"); for (const e of doc.ents) ent(e); put(0, "ENDSEC"); put(0, "EOF");
+    put(0, "SECTION"); put(2, "ENTITIES"); for (const e of doc.ents) ent(e); if (K.dxfExtra) K.dxfExtra(doc0, put); put(0, "ENDSEC"); put(0, "EOF");
     return o.join("\r\n") + "\r\n";
   };
   const safe = (s) => String(s).replace(/[<>/\\":;?*|=`]/g, "_").slice(0, 255) || "0";

@@ -63,6 +63,7 @@
   K.panels = {
     props(E, el) {
       const ids = E.sel.filter((id) => E.byId(id)), ents = ids.map((id) => E.byId(id));
+      if (!ents.length && E.sel3d && E.sel3d.length) { el.innerHTML = ""; for (const ph of K.propsHooks || []) ph(E, el, ents); if (el.innerHTML) return; }
       if (!ents.length) {
         el.innerHTML = `<h4>No selection — new objects use</h4><div class="cx-pg"><label>Layer<select data-cur="layer">${E.doc.layers.map((l) => `<option${l.name === E.cur.layer ? " selected" : ""}>${esc(l.name)}</option>`).join("")}</select></label><label>Colour${colorSel(E.cur.color, "cur:color")}</label><label>Linetype${ltSel(E.cur.lt, "cur:lt")}</label><label>Lineweight${lwSel(E.cur.lw, "cur:lw")}</label><label>Text height<input data-doc="text.h" type="number" step="any" value="${E.doc.text.h}"></label><label>Linetype scale<input data-doc="ltscale" type="number" step="any" value="${E.doc.ltscale}"></label></div>
           <h4>Drawing</h4><div class="cx-kv"><span>Units</span><b>${E.doc.units}</b><span>Objects</span><b>${E.doc.ents.length}</b><span>Layers</span><b>${E.doc.layers.length}</b><span>Blocks</span><b>${Object.keys(E.doc.blocks).length}</b>${(() => { const b = K.extents(E.doc); return b ? `<span>Extents</span><b>${f(b.x1 - b.x0, E)} × ${f(b.y1 - b.y0, E)}</b>` : ""; })()}</div>

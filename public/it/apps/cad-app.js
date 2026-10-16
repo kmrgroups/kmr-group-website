@@ -73,13 +73,13 @@
     E.zoomBox = (b, margin = 0.06) => { if (!b) return; E.pushView(); const w = Math.max(b.x1 - b.x0, 1e-6), h = Math.max(b.y1 - b.y0, 1e-6); E.view.s = Math.min(E.view.W / w, E.view.H / h) * (1 - 2 * margin); if (!isFinite(E.view.s) || E.view.s <= 0) E.view.s = 1; E.view.cx = (b.x0 + b.x1) / 2; E.view.cy = (b.y0 + b.y1) / 2; redraw(); };
     E.zoomExt = () => {
       if (E.space && E.space.lay && !E.space.ms && K.paperWH) { const [W, H] = K.paperWH(E.layoutOf(E.space.lay)); return E.zoomBox({ x0: 0, y0: 0, x1: W, y1: H }, 0.04); }
-      if (E.space && E.space.ms && E.fitVp) return E.fitVp(); const b = K.extents(E.doc); if (b) { if (b.x1 - b.x0 < 1e-9 && b.y1 - b.y0 < 1e-9) { b.x0 -= 50; b.x1 += 50; b.y0 -= 50; b.y1 += 50; } E.zoomBox(b); } else E.zoomBox({ x0: 0, y0: 0, x1: 297, y1: 210 }); };
+      if (E.space && E.space.ms && E.fitVp) return E.fitVp(); let b = K.extents(E.doc); if (E.solidBounds) b = G.mergeBounds(b, E.solidBounds()); if (b) { if (b.x1 - b.x0 < 1e-9 && b.y1 - b.y0 < 1e-9) { b.x0 -= 50; b.x1 += 50; b.y0 -= 50; b.y1 += 50; } E.zoomBox(b); } else E.zoomBox({ x0: 0, y0: 0, x1: 297, y1: 210 }); };
     E.zoomPrev = () => { const v = viewStack.pop(); if (v) { Object.assign(E.view, v); redraw(); } };
     E.zoomAt = (sp, f) => { const w = s2w(sp); E.view.s = Math.min(1e6, Math.max(1e-6, E.view.s * f)); const w2 = s2w(sp); E.view.cx += w[0] - w2[0]; E.view.cy += w[1] - w2[1]; redraw(); };
 
     /* ---------------- document + undo ---------------- */
-    const snapshot = () => ({ cons: E.doc.cons, params: E.doc.params, _active: E.doc._active, modelEnts: E.doc.modelEnts, layouts: (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: (l.ents || []).slice() })), dimstyles: E.doc.dimstyles, dimcur: E.doc.dimcur, annoScale: E.doc.annoScale, ents: E.doc.ents.slice(), layers: JSON.parse(JSON.stringify(E.doc.layers)), blocks: Object.assign({}, E.doc.blocks), dim: Object.assign({}, E.doc.dim), text: Object.assign({}, E.doc.text), units: E.doc.units, ltscale: E.doc.ltscale, pdmode: E.doc.pdmode, pdsize: E.doc.pdsize, cur: Object.assign({}, E.cur) });
-    const restore = (s) => { if (s._active !== E.doc._active && E.onSpaceRestore) E.onSpaceRestore(s._active); Object.assign(E.doc, { cons: s.cons, params: s.params, _active: s._active, modelEnts: s.modelEnts, layouts: s.layouts, dimstyles: s.dimstyles, dimcur: s.dimcur, annoScale: s.annoScale, ents: s.ents, layers: s.layers, blocks: s.blocks, dim: s.dim, text: s.text, units: s.units, ltscale: s.ltscale, pdmode: s.pdmode, pdsize: s.pdsize }); E.cur = s.cur; if (!E.doc.layers.find((l) => l.name === E.cur.layer)) E.cur.layer = E.doc.layers[0].name; };
+    const snapshot = () => ({ solids: E.doc.solids, cons: E.doc.cons, params: E.doc.params, _active: E.doc._active, modelEnts: E.doc.modelEnts, layouts: (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: (l.ents || []).slice() })), dimstyles: E.doc.dimstyles, dimcur: E.doc.dimcur, annoScale: E.doc.annoScale, ents: E.doc.ents.slice(), layers: JSON.parse(JSON.stringify(E.doc.layers)), blocks: Object.assign({}, E.doc.blocks), dim: Object.assign({}, E.doc.dim), text: Object.assign({}, E.doc.text), units: E.doc.units, ltscale: E.doc.ltscale, pdmode: E.doc.pdmode, pdsize: E.doc.pdsize, cur: Object.assign({}, E.cur) });
+    const restore = (s) => { if (s._active !== E.doc._active && E.onSpaceRestore) E.onSpaceRestore(s._active); Object.assign(E.doc, { solids: s.solids, cons: s.cons, params: s.params, _active: s._active, modelEnts: s.modelEnts, layouts: s.layouts, dimstyles: s.dimstyles, dimcur: s.dimcur, annoScale: s.annoScale, ents: s.ents, layers: s.layers, blocks: s.blocks, dim: s.dim, text: s.text, units: s.units, ltscale: s.ltscale, pdmode: s.pdmode, pdsize: s.pdsize }); E.cur = s.cur; if (!E.doc.layers.find((l) => l.name === E.cur.layer)) E.cur.layer = E.doc.layers[0].name; };
     let inTx = 0, txSnap = null, txLabel = "";
     E.begin = (label) => { if (E.readOnly && !inTx) throw new Error(E.readOnly); if (!inTx++) { txSnap = snapshot(); txLabel = label || E.lastCmd || "edit"; } };
     E.end = () => { if (inTx === 1 && E.txEndHook && !E._inHook) { E._inHook = true; try { E.txEndHook(txSnap); } catch (er) { console.error(er); } finally { E._inHook = false; } } if (--inTx === 0) { undoS.push(Object.assign(txSnap, { label: txLabel })); if (undoS.length > 200) undoS.shift(); redoS.length = 0; txSnap = null; changed(); } };
@@ -88,7 +88,7 @@
     E.unstashUndo = (st) => { undoS.length = 0; redoS.length = 0; undoS.push(...st.u); redoS.push(...st.r); };
     E.undo = () => { if (!undoS.length) return E.msg("Nothing to undo."); const s = undoS.pop(); redoS.push(Object.assign(snapshot(), { label: s.label })); restore(s); E.sel = E.sel.filter((id) => E.byId(id)); E.msg("Undo: " + s.label); changed(); };
     E.redo = () => { if (!redoS.length) return E.msg("Nothing to redo."); const s = redoS.pop(); undoS.push(Object.assign(snapshot(), { label: s.label })); restore(s); E.sel = E.sel.filter((id) => E.byId(id)); E.msg("Redo: " + s.label); changed(); };
-    const changed = () => { E.dirty = true; idx = null; redraw(); refreshSide(); refreshLayerBox(); setSaved(); if (opts.onChange) opts.onChange(E); };
+    const changed = () => { E.dirty = true; idx = null; redraw(); if (E.changeHook) try { E.changeHook(); } catch (er) { console.error(er); } refreshSide(); refreshLayerBox(); setSaved(); if (opts.onChange) opts.onChange(E); };
     E.changed = changed;
     let idx = null; // id → entity
     E.reindex = () => { idx = null; };
@@ -154,6 +154,9 @@
     E.getText = (msg, o) => ask("text", msg, o);
     E.getKw = (msg, kws, dflt) => ask("kw", msg, { kws, dflt });
     E.getEnt = (msg, o) => ask("ent", msg, o);
+    E.getSolid = (msg, o) => ask("solid", msg, o);
+    E.reqKind = () => (R ? R.kind : null);
+    E.resolveReq = (v) => { if (R) done(v); };
     E.getSel = async (msg, o) => {
       o = o || {};
       if (o.pre !== false && E.sel.length && !o.fresh) { const s = E.sel.filter((id) => { const e = E.byId(id); return e && E.editable(e) && (!o.filter || o.filter(e)); }); E.msg(s.length + " found"); E.sel = []; drawOverlay(); return s; }
@@ -369,6 +372,7 @@
         if (e.t !== "xline") { const b = K.bbox(e, E.doc); if (b && (b.x1 < w0[0] - m || b.x0 > w1[0] + m || b.y1 < w0[1] - m || b.y0 > w1[1] + m)) continue; }
         K.paint(P, e, E.doc);
       }
+      if (E.paintHook) try { E.paintHook(ctx, P); } catch (er) { console.error(er); }
       ctx.setLineDash([]);
       drawUCS(ctx);
     };
@@ -558,10 +562,13 @@
       if (R && (R.kind === "point" || R.kind === "dist" || R.kind === "angle")) { E.msg(K.fmt(wp[0], 4) + "," + K.fmt(wp[1], 4), "in mu"); return done(wp.slice()); }
       if (R && R.kind === "ent") { const e = E.pick(mouse.wp, R.filter); if (e) { if (!E.editable(e) && !R.anyLayer) { E.err("That object is on a locked layer."); return; } E.lastShift = !!(d0.shift || ev.shiftKey); return done({ e, p: mouse.wp.slice() }); } E.msg("Nothing found there — click on an object.", "mu"); return; }
       if (R && R.kind === "kw") return;
+      if (R && R.kind === "solid") { const s = E.pickSolid2D && E.pickSolid2D(mouse.wp); if (s) return done(s); E.msg("No solid there — click on the outline of a solid (or use the 3D view).", "mu"); return; }
       // selection (inside a command or idle)
       if (win) { if (win.drag || G.dist(w2s(win.a), sp) > 3) { const ids = winSelect(win.a, mouse.wp); win = null; applySel(ids, d0.shift || ev.shiftKey); } return; }
       const e = E.pick(mouse.wp, R && R.filter);
       if (e) { const rem = d0.shift || ev.shiftKey; if (!R && !rem && !ev.ctrlKey && E.sel.includes(e.id)) { refreshSide(); return; } applySel([e.id], rem || (!R && E.sel.includes(e.id) && ev.ctrlKey)); return; }
+      if (!R && E.pickSolid2D) { const s = E.pickSolid2D(mouse.wp); if (s) { E.sel = []; E.sel3d = (d0.shift || ev.shiftKey) && E.sel3d ? (E.sel3d.includes(s) ? E.sel3d.filter((x) => x !== s) : E.sel3d.concat(s)) : [s]; drawOverlay(); refreshSide(); return; } }
+      if (!R && E.sel3d && E.sel3d.length) { E.sel3d = []; refreshSide(); }
       win = { a: mouse.wp.slice(), drag: false }; drawOverlay();
     };
 
