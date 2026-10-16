@@ -158,6 +158,8 @@
       onNew: () => { if (ed()) newDlg(); },
       onOpen: () => { go("go=list"); return true; },
       onOpenFile: (E2, r) => newDlg(r),
+      listDrawings: async () => { await loadList(); return S.list; },
+      getDrawing: (id) => call("kmr_cad_get", { p_id: id }),
       onInfo: (E2, inf) => { if (S.cur && inf.title && !S.cur.title) S.cur.title = inf.title; },
     });
     S.E = E; return E;
@@ -180,6 +182,7 @@
     setBar();
     // a local draft newer than the saved copy?
     try { const dr = JSON.parse(localStorage.getItem(draftKey(id)) || "null"); if (dr && !E.readOnly && dr.base === d.updated_at && dr.data) { if (confirm(`There are unsaved changes to ${d.number} on this device from ${when(dr.at)}. Restore them?`)) { E.load(dr.data, E.info); E.readOnly = null; E.dirty = true; E.changed(); } else localStorage.removeItem(draftKey(id)); } } catch (e) { /* ignore */ }
+    if (K.reloadXrefs) K.reloadXrefs(E, true).catch((er) => E.err(er.message));
     if (S.newSheet) { const sz = S.newSheet; S.newSheet = ""; setTimeout(() => { E.mem = E.mem || {}; E.mem.tb = Object.assign({}, E.mem.tb || {}, { sheet: sz, co: QP.ctx && QP.ctx.company }); E.run("TITLEBLOCK"); }, 200); }
     setTimeout(() => E.focus(), 50);
   }

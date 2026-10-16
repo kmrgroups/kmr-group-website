@@ -101,6 +101,8 @@ cad:[
 ['CP','Product characteristics','Control Plan characteristics','Dimensions on the released drawing are the product characteristics that the Control Plan and the Balloon Inspector use.'],
 ['VF','Step 2','Structure analysis (AIAG-VDA FMEA)','The drawing defines the product elements and characteristics that the FMEA structure and function analysis start from.'],
 ['ISO','7.5.3.2','Distribution, access, retrieval and use','Sheets (layouts) print to PDF at true scale with the title block showing number and revision; several drawings print together for distribution; layers marked not-to-plot stay off the print.'],
+['ISO','7.5.3.2','Control of changes - references','A drawing that references another (XATTACH) always shows the latest released revision of that drawing and reports when it changed; references cannot be edited by mistake.'],
+['APQP','Phase 2','Design records for part families','Parametric constraints with formulas, dynamic blocks and associative arrays keep sizes of a part family and standard details consistent from one source.'],
 ['IATF','8.3.3.3','Special characteristics','Special characteristics are identified on the drawing with symbols, balloons, notes and GD&T feature control frames (ISO 1101 / ASME Y14.5).'],
 ['PPAP','Element 9','Dimensional results','Balloons and the parts list number every characteristic so the dimensional report (Balloon Inspector) refers to the same items.'],
 ['SPC','Specification limits','Capability against the specification','Dimension tolerances (±, deviation, limits) give the upper and lower specification limits used for Cp / Cpk.'],

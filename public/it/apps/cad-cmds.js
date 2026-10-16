@@ -468,7 +468,7 @@
   cmd("ERASE", { a: ["E", "DEL"], d: "Erase (delete) objects", fn: async (E) => { const ids = await selOrStop(E); if (!ids) return; E.tx("erase", () => E.remove(ids)); E.msg(ids.length + " object(s) erased."); } });
   cmd("EXPLODE", { a: ["X"], d: "Break blocks, polylines, dimensions, hatches into their parts", fn: async (E) => {
     const ids = await selOrStop(E); if (!ids) return; let n = 0, skip = 0;
-    E.tx("explode", () => { for (const id of ids) { const e = E.byId(id); const parts = e ? K.explodeEnt(e, E.doc) : []; if (!parts.length) { skip++; continue; } E.remove([id]); for (const p of parts) E.add(p, true); n++; } });
+    E.tx("explode", () => { for (const id of ids) { const e = E.byId(id); const parts = e && !e.xref ? K.explodeEnt(e, E.doc) : []; if (!parts.length) { skip++; continue; } E.remove([id]); for (const p of parts) E.add(p, true); n++; } });
     E.msg(`${n} object(s) exploded${skip ? `, ${skip} cannot be exploded` : ""}.`);
   } });
 
@@ -677,9 +677,16 @@
     const bb = ids.map((id) => K.bbox(E.byId(id), E.doc)).reduce((a, b) => G.mergeBounds(a, b), null) || { x0: 0, y0: 0, x1: 10, y1: 10 }, w = bb.x1 - bb.x0, h = bb.y1 - bb.y0, M = mem(E);
     const r = await E.dialog("Array", `<div class="cx-seg"><label><input type="radio" name="at" value="rect" ${M.arrT !== "polar" ? "checked" : ""}> Rectangular</label><label><input type="radio" name="at" value="polar" ${M.arrT === "polar" ? "checked" : ""}> Polar (around a centre)</label></div>
       <div class="cx-frm" data-t="rect"><label>Rows<input id="ar" type="number" min="1" value="${M.arR || 3}"></label><label>Columns<input id="ac" type="number" min="1" value="${M.arC || 4}"></label><label>Row spacing<input id="ars" type="number" step="any" value="${K.fmt(M.arRs || h * 1.5 || 10, 4)}"></label><label>Column spacing<input id="acs" type="number" step="any" value="${K.fmt(M.arCs || w * 1.5 || 10, 4)}"></label></div>
-      <div class="cx-frm" data-t="polar"><label>Number of items (incl. original)<input id="pn" type="number" min="2" value="${M.arN || 6}"></label><label>Angle to fill (°, − = clockwise)<input id="pa" type="number" step="any" value="${M.arA ?? 360}"></label><label class="cx-chk"><input id="pr" type="checkbox" ${M.arRot !== false ? "checked" : ""}> Rotate items as copied</label></div><p class="cx-note">For polar, you pick the centre point after OK.</p>`,
-      (b) => ({ t: b.querySelector("input[name=at]:checked").value, R: Math.max(1, +b.querySelector("#ar").value | 0), C: Math.max(1, +b.querySelector("#ac").value | 0), Rs: +b.querySelector("#ars").value, Cs: +b.querySelector("#acs").value, N: Math.max(2, +b.querySelector("#pn").value | 0), A: +b.querySelector("#pa").value, rot: b.querySelector("#pr").checked }));
-    if (!r) return; Object.assign(M, { arT: r.t, arR: r.R, arC: r.C, arRs: r.Rs, arCs: r.Cs, arN: r.N, arA: r.A, arRot: r.rot });
+      <div class="cx-frm" data-t="polar"><label>Number of items (incl. original)<input id="pn" type="number" min="2" value="${M.arN || 6}"></label><label>Angle to fill (°, − = clockwise)<input id="pa" type="number" step="any" value="${M.arA ?? 360}"></label><label class="cx-chk"><input id="pr" type="checkbox" ${M.arRot !== false ? "checked" : ""}> Rotate items as copied</label></div><label class="cx-chk"><input id="aas" type="checkbox" ${M.arAs !== false ? "checked" : ""}> Associative (one array object you can edit later: counts, spacing)</label><p class="cx-note">For polar, you pick the centre point after OK.</p>`,
+      (b) => ({ t: b.querySelector("input[name=at]:checked").value, R: Math.max(1, +b.querySelector("#ar").value | 0), C: Math.max(1, +b.querySelector("#ac").value | 0), Rs: +b.querySelector("#ars").value, Cs: +b.querySelector("#acs").value, N: Math.max(2, +b.querySelector("#pn").value | 0), A: +b.querySelector("#pa").value, rot: b.querySelector("#pr").checked, assoc: b.querySelector("#aas").checked }));
+    if (!r) return; Object.assign(M, { arT: r.t, arR: r.R, arC: r.C, arRs: r.Rs, arCs: r.Cs, arN: r.N, arA: r.A, arRot: r.rot, arAs: r.assoc });
+    if (r.assoc && K.makeArray) {
+      const src = ids.map((id) => E.byId(id));
+      if (r.t === "rect") { E.tx("array", () => { E.remove(ids); E.add({ t: "array", kind: "rect", src, base: [bb.x0, bb.y0], cols: r.C, rows: r.R, vc: [r.Cs, 0], vr: [0, r.Rs], layer: src[0].layer }, true); }); E.msg(`Associative array: ${r.R} × ${r.C}.`); return; }
+      const mk = (q) => ({ t: "array", kind: "polar", src, base: [(bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2], c: q, n: r.N, fill: r.A, rot: r.rot, layer: src[0].layer });
+      const c0 = need(await E.getPoint("Specify center point of array:", { preview: (q) => [mk(q)] })); if (!isP(c0)) return;
+      E.tx("array", () => { E.remove(ids); E.add(mk(c0), true); }); E.msg(`Associative polar array of ${r.N}.`); return;
+    }
     if (r.t === "rect") { if (r.R * r.C > 5000) return E.err("That is more than 5000 copies."); E.tx("array", () => { for (let i = 0; i < r.R; i++) for (let j = 0; j < r.C; j++) if (i || j) applyXf(E, ids, K.M.move(j * r.Cs, i * r.Rs), true); }); E.msg(`${r.R * r.C - 1} copies made.`); return; }
     const full = Math.abs(Math.abs(r.A) - 360) < 1e-9, step = (r.A * D2R) / (full ? r.N : r.N - 1);
     const mxf = (c, i) => (r.rot ? K.M.rot(c, step * i) : (() => { const ctr = [(bb.x0 + bb.x1) / 2, (bb.y0 + bb.y1) / 2], q = G.rotp(ctr, c, step * i); return K.M.move(q[0] - ctr[0], q[1] - ctr[1]); })());

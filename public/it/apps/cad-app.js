@@ -78,12 +78,14 @@
     E.zoomAt = (sp, f) => { const w = s2w(sp); E.view.s = Math.min(1e6, Math.max(1e-6, E.view.s * f)); const w2 = s2w(sp); E.view.cx += w[0] - w2[0]; E.view.cy += w[1] - w2[1]; redraw(); };
 
     /* ---------------- document + undo ---------------- */
-    const snapshot = () => ({ _active: E.doc._active, modelEnts: E.doc.modelEnts, layouts: (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: (l.ents || []).slice() })), dimstyles: E.doc.dimstyles, dimcur: E.doc.dimcur, annoScale: E.doc.annoScale, ents: E.doc.ents.slice(), layers: JSON.parse(JSON.stringify(E.doc.layers)), blocks: Object.assign({}, E.doc.blocks), dim: Object.assign({}, E.doc.dim), text: Object.assign({}, E.doc.text), units: E.doc.units, ltscale: E.doc.ltscale, pdmode: E.doc.pdmode, pdsize: E.doc.pdsize, cur: Object.assign({}, E.cur) });
-    const restore = (s) => { if (s._active !== E.doc._active && E.onSpaceRestore) E.onSpaceRestore(s._active); Object.assign(E.doc, { _active: s._active, modelEnts: s.modelEnts, layouts: s.layouts, dimstyles: s.dimstyles, dimcur: s.dimcur, annoScale: s.annoScale, ents: s.ents, layers: s.layers, blocks: s.blocks, dim: s.dim, text: s.text, units: s.units, ltscale: s.ltscale, pdmode: s.pdmode, pdsize: s.pdsize }); E.cur = s.cur; if (!E.doc.layers.find((l) => l.name === E.cur.layer)) E.cur.layer = E.doc.layers[0].name; };
+    const snapshot = () => ({ cons: E.doc.cons, params: E.doc.params, _active: E.doc._active, modelEnts: E.doc.modelEnts, layouts: (E.doc.layouts || []).map((l) => Object.assign({}, l, { ents: (l.ents || []).slice() })), dimstyles: E.doc.dimstyles, dimcur: E.doc.dimcur, annoScale: E.doc.annoScale, ents: E.doc.ents.slice(), layers: JSON.parse(JSON.stringify(E.doc.layers)), blocks: Object.assign({}, E.doc.blocks), dim: Object.assign({}, E.doc.dim), text: Object.assign({}, E.doc.text), units: E.doc.units, ltscale: E.doc.ltscale, pdmode: E.doc.pdmode, pdsize: E.doc.pdsize, cur: Object.assign({}, E.cur) });
+    const restore = (s) => { if (s._active !== E.doc._active && E.onSpaceRestore) E.onSpaceRestore(s._active); Object.assign(E.doc, { cons: s.cons, params: s.params, _active: s._active, modelEnts: s.modelEnts, layouts: s.layouts, dimstyles: s.dimstyles, dimcur: s.dimcur, annoScale: s.annoScale, ents: s.ents, layers: s.layers, blocks: s.blocks, dim: s.dim, text: s.text, units: s.units, ltscale: s.ltscale, pdmode: s.pdmode, pdsize: s.pdsize }); E.cur = s.cur; if (!E.doc.layers.find((l) => l.name === E.cur.layer)) E.cur.layer = E.doc.layers[0].name; };
     let inTx = 0, txSnap = null, txLabel = "";
     E.begin = (label) => { if (E.readOnly && !inTx) throw new Error(E.readOnly); if (!inTx++) { txSnap = snapshot(); txLabel = label || E.lastCmd || "edit"; } };
-    E.end = () => { if (--inTx === 0) { undoS.push(Object.assign(txSnap, { label: txLabel })); if (undoS.length > 200) undoS.shift(); redoS.length = 0; txSnap = null; changed(); } };
+    E.end = () => { if (inTx === 1 && E.txEndHook && !E._inHook) { E._inHook = true; try { E.txEndHook(txSnap); } catch (er) { console.error(er); } finally { E._inHook = false; } } if (--inTx === 0) { undoS.push(Object.assign(txSnap, { label: txLabel })); if (undoS.length > 200) undoS.shift(); redoS.length = 0; txSnap = null; changed(); } };
     E.tx = (label, fn) => { E.begin(label); try { return fn(); } finally { E.end(); } };
+    E.stashUndo = () => { const st = { u: undoS.splice(0), r: redoS.splice(0) }; return st; };
+    E.unstashUndo = (st) => { undoS.length = 0; redoS.length = 0; undoS.push(...st.u); redoS.push(...st.r); };
     E.undo = () => { if (!undoS.length) return E.msg("Nothing to undo."); const s = undoS.pop(); redoS.push(Object.assign(snapshot(), { label: s.label })); restore(s); E.sel = E.sel.filter((id) => E.byId(id)); E.msg("Undo: " + s.label); changed(); };
     E.redo = () => { if (!redoS.length) return E.msg("Nothing to redo."); const s = redoS.pop(); undoS.push(Object.assign(snapshot(), { label: s.label })); restore(s); E.sel = E.sel.filter((id) => E.byId(id)); E.msg("Redo: " + s.label); changed(); };
     const changed = () => { E.dirty = true; idx = null; redraw(); refreshSide(); refreshLayerBox(); setSaved(); if (opts.onChange) opts.onChange(E); };
@@ -448,6 +450,7 @@
         if (!pointMode) ctx.rect(x - pb + 0.5, y - pb + 0.5, pb * 2, pb * 2);
         ctx.stroke();
       }
+      if (E.overlayHook) try { E.overlayHook(ctx, P); } catch (er) { console.error(er); }
       updateDyn();
     };
     const updateDyn = () => {
