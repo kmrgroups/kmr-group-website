@@ -196,22 +196,29 @@
     const items = new Map(); ((P.source && P.source.items) || []).forEach((it, i) => items.set(it.no != null ? +it.no : i + 1, it));
     const info = (P.source && P.source.sheets) || (P.bi && P.bi.sheets) || [], desk = (P.source && P.source.desk) || (P.bi && P.bi.desk) || [];
     const hasPos = [...items.values()].some((it) => it.ax != null);
-    let doc = null, name = "", anchoredOk = false;
+    let doc = null, name = "", anchoredOk = false, fromPdf = false;
     if (how === "open") { doc = JSON.parse(JSON.stringify(E.data())); name = (E.info && (E.info.number || E.info.title)) || "drawing open in CAD"; }
     else if (/^reg:/.test(how)) { const d = await QP.call("kmr_cad_get", { p_id: how.slice(4) }); doc = Object.assign(K.newDoc(false), d.data || {}); name = d.number + " rev " + d.rev; }
     else {
       const f = how === "bi" ? await biFile(P) : file; if (!f) throw K.CANCEL; name = f.name; anchoredOk = hasPos && (how === "bi" || (P.source && P.source.fileName && f.name.replace(/\.[^.]+$/, "") === String(P.source.fileName).replace(/\.[^.]+$/, "")) || how === "file-same");
       const kd = kindOf(f.name);
       if (kd === "step") throw new Error("A STEP model has no drawing dimensions. Use the 2D drawing (DXF, DWG or PDF).");
-      if (kd === "pdf" || kd === "image") { say("Reading the drawing…"); const pages = await rasterPages(f, kd, desk, say); if (anchoredOk) await cropPages(pages, items, info); return { kind: "raster", pages, anchored: anchoredOk, items, info, name, file: f }; }
-      if (kd === "vector" || kd === "json") { say("Reading the drawing…"); const r = await K.readDrawingFile(f, say); doc = Object.assign(K.newDoc(false), r.doc); }
-      else throw new Error("Use a DXF, DWG, PDF or picture of the drawing.");
+      // a PDF made from CAD holds real lines and text: read them, so the part keeps its exact shape and dimension text
+      if (kd === "pdf" && K.vec && !(info.length > 1 || [...items.values()].some((it) => (it.sheet || 0) > 0))) {
+        try {
+          say("Reading the lines and text of the PDF…"); const r = await K.vec.convert(f, { ocr: false, keep: false, page: 1 }, say);
+          if (r.kind === "vector" && r.pages === 1 && r.cnt.text >= 8) { doc = Object.assign(K.newDoc(false), {}); K.vec.intoDoc(doc, r, 0, 0, 1); doc.units = "mm"; doc.ents = doc.ents.filter((e) => !((e.t === "text" || e.t === "mtext") && (e.h || 0) > 20)); fromPdf = true; }   // very large text is a watermark ("Draft copy")
+        } catch (er) { doc = null; fromPdf = false; }
+      }
+      if (!doc && (kd === "pdf" || kd === "image")) { say("Reading the drawing…"); const pages = await rasterPages(f, kd, desk, say); if (anchoredOk) await cropPages(pages, items, info); return { kind: "raster", pages, anchored: anchoredOk, items, info, name, file: f }; }
+      if (!doc) { if (kd === "vector" || kd === "json") { say("Reading the drawing…"); const r = await K.readDrawingFile(f, say); doc = Object.assign(K.newDoc(false), r.doc); }
+        else throw new Error("Use a DXF, DWG, PDF or picture of the drawing."); }
     }
     doc.ents = (doc.ents || []).filter((e) => e.t !== "xline"); for (const e of doc.ents) if (!e.id) e.id = K.uid();
     if (!doc.ents.length) throw new Error("The drawing is empty.");
     let T = null; const b = K.extents(doc), diag = Math.hypot(b.x1 - b.x0, b.y1 - b.y0);
     if (anchoredOk) { const ci = info[0] && info[0].cad; T = ci && ci.k ? fromCadT(ci) : fitT(items, P.chars || [], candidates(doc), diag); }
-    return { kind: "vector", doc, anchored: !!T, T, items, info, name, fitted: !!T && !(info[0] && info[0].cad) };
+    return { kind: "vector", doc, anchored: !!T, T, items, info, name, fromPdf, fitted: !!T && !(info[0] && info[0].cad) };
   }
 
   /* ================= the stage sheets ================= */
@@ -233,6 +240,7 @@
 
     // drawing objects ↔ characteristics, once for the whole set
     let assigned = new Map(), anchor = () => null, pageOf = () => 0, cands = [];
+    let crop = null;
     const frozenChars = [...opOf.keys()].map((n) => chars.get(n)).filter(Boolean);
     if (vec) {
       const b = K.extents(src), diag = Math.hypot(b.x1 - b.x0, b.y1 - b.y0); cands = candidates(src);
@@ -247,6 +255,10 @@
         return { a: [it.ax * kx - ox0, pg.h - (it.ay * kx - oy0)], b: it.bx != null ? [it.bx * kx - ox0, pg.h - (it.by * kx - oy0)] : null }; };
       pageOf = (c) => { const it = SRC.items.get(+c.no); return it && SRC.pages[it.sheet || 0] ? it.sheet || 0 : 0; };
     }
+    // a drawing read from a PDF still has its border and title block: keep the part views, the box around the dimensions and balloons
+    if (vec && SRC.fromPdf && SRC.anchored) { let bb = null; const mg = (p) => { if (p) bb = G.mergeBounds(bb, { x0: p[0], y0: p[1], x1: p[0], y1: p[1] }); };
+      for (const c of chars.values()) { const it0 = SRC.items.get(+c.no); if (!it0 || it0.ax == null) continue; const an = anchor(c); if (!an) continue; mg(an.a); mg(an.b); if (an.box) { mg([an.box.x0, an.box.y0]); mg([an.box.x1, an.box.y1]); } }
+      if (bb) { const m = Math.max(12, 0.12 * Math.max(bb.x1 - bb.x0, bb.y1 - bb.y0)); crop = { x0: bb.x0 - m, y0: bb.y0 - m, x1: bb.x1 + m, y1: bb.y1 + m }; } }
     const roleOf = new Map(); for (const [no, k] of assigned) roleOf.set(k.e.id, no);
 
     const sheets = []; let ox = 0;
@@ -254,7 +266,7 @@
       const mine = (map[String(o.opNo)] || []).map(Number), mineSet = new Set(mine);
       const pages = vec ? [0] : [...new Set(mine.map((n) => (chars.get(n) ? pageOf(chars.get(n)) : 0)))].sort((a, b) => a - b);
       pages.forEach((pi, k) => {
-        const cb = vec ? K.extents(src) : { x0: 0, y0: 0, x1: SRC.pages[pi].w, y1: SRC.pages[pi].h };
+        const cb = vec ? (crop || K.extents(src)) : { x0: 0, y0: 0, x1: SRC.pages[pi].w, y1: SRC.pages[pi].h };
         const bw = Math.max(cb.x1 - cb.x0, 1e-6), bh = Math.max(cb.y1 - cb.y0, 1e-6), aw = A.DA.x1 - A.DA.x0, ah = A.DA.y1 - A.DA.y0;
         const s = Math.min(aw / bw, ah / bh) * 0.96, f = 1 / s, P0 = (x, y) => [ox + x * f, y * f];
         const dx = P0((A.DA.x0 + A.DA.x1) / 2, 0)[0] - (cb.x0 + cb.x1) / 2, dy = ((A.DA.y0 + A.DA.y1) / 2) * f - (cb.y0 + cb.y1) / 2, mv = K.M.move(dx, dy);
@@ -262,9 +274,11 @@
         // 1. the drawing
         if (vec) {
           for (const e of src.ents) {
+            if (crop) { const bb = K.bbox(e, src); if (!bb || bb.x0 < crop.x0 || bb.x1 > crop.x1 || bb.y0 < crop.y0 || bb.y1 > crop.y1) continue; }
             const no = roleOf.get(e.id), oo = no != null ? opOf.get(no) : undefined;
             let role = no == null ? "geom" : mineSet.has(no) ? "this" : oo != null && oo < oi ? "done" : oo != null ? "later" : "loose";
             if (no == null && (["dim", "fcf"].includes(e.t) || (e.t === "insert" && e.dimblock) || (e.t === "text" && e.dimtext))) role = "loose";
+            if (role === "later" && SRC.fromPdf) role = "done";   // a PDF has no dimension objects to take out: other operations' dimensions are grey
             if (role === "later" || (role === "done" && opt.earlier === "hide") || (role === "loose" && opt.loose === "hide")) continue;
             const n = K.xform(e, mv); n.id = K.uid(); delete n.stg;
             if (role === "this") { n.color = RED; n.lw = 0.5; n.stg = "this"; } else if (role === "done") { n.color = GREY; n.stg = "done"; }
@@ -319,7 +333,7 @@
         const ly = 64; add({ t: "line", layer: "0", color: RED, lw: 0.5, a: P0(302, ly), b: P0(312, ly), stg: "this" }); T(314, ly - 0.9, 2.2, "Made at this operation (red balloon)", 0, "STG-TABLE");
         if (vec && opt.earlier !== "hide") { add({ t: "line", layer: "0", color: GREY, a: P0(302, ly - 6), b: P0(312, ly - 6), stg: "done" }); T(314, ly - 6.9, 2.2, "Made at earlier operations", 0, "STG-TABLE"); }
         const loose = vec && opt.loose !== "hide" ? E2.filter((e) => !e.stg && (e.t === "dim" || e.t === "fcf" || (e.t === "insert" && e.dimblock) || (e.t === "text" && e.dimtext))).length : 0;
-        T(302, ly - 13, 2.2, vec ? "Dimensions made at later operations are left out." : "Drawing shown as ballooned.", 0, "STG-TABLE");
+        T(302, ly - 13, 2.2, vec ? (SRC.fromPdf ? "Dimensions of other operations are grey." : "Dimensions made at later operations are left out.") : "Drawing shown as ballooned.", 0, "STG-TABLE");
         T(302, ly - 18, 2.2, loose ? `Black dimensions (${loose}) are not linked to a characteristic.` : "Geometry is shown finished.", 0, "STG-TABLE");
         if (loose) T(302, ly - 23, 2.2, "Geometry is shown finished.", 0, "STG-TABLE");
         doc.ents.push(...E2);
