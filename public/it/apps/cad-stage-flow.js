@@ -159,7 +159,7 @@
     T(14, 33, 5.2, "STAGE DRAWING"); T(14, 24.5, 3.4, fit(plain(`OP ${op.opNo} · ${String(op.name || "").toUpperCase()}`), 3.4, 83)); T(14, 15, 2.4, fit(plain(co), 2.4, 83));
     const sec = sopSec.get(String(op.opNo)), stgNo = `${(sec && sec.docNo) || "STG-" + (P.part_no || "")}${sec && sec.docNo ? "-STG" : "-" + op.opNo}`;
     const cells = [["Part no.", P.part_no || H.partNo], ["Part name", P.part_name || H.partName], ["Drawing no. / rev", [H.drawingNo || P.drawing_no, H.drawingRev || P.rev].filter(Boolean).join(" / rev ")], ["Customer", P.customer || H.customer],
-      ["Machine", op.machine || "—"], ["Stage drawing no.", stgNo], ["Dimensions frozen", `rev ${P.freeze.rev} · ${ctx.dmy(P.freeze.at)}`], ["Sheet", `${pageNo} of ${pages} · Op ${op.opNo}`]];
+      ["Machine", op.machine || "—"], ["Stage drawing no.", stgNo], ["Dimensions frozen", `rev ${P.freeze.rev} · ${ctx.dmy(P.freeze.at)}`], ["Sheet", `Op ${op.opNo} · sheet ${(ctx.sub || { k: 1 }).k} of ${(ctx.sub || { n: 1 }).n}`]];
     cells.forEach(([lab, val], i) => { const cx = 100 + (i % 4) * 77.5, cy = i < 4 ? 26 : 10; T(cx + 2, cy + 12, 1.9, lab); T(cx + 2, cy + 3.6, 3, fit(plain(val || "—"), 3, 73)); });
 
     /* ---- geometry of this stage ---- */
@@ -338,7 +338,79 @@
     if (list.length) add({ t: "table", layer: "STG-TABLE", p: P0(TB.x0, ty), h: 2.2, rh: 5.6, cw: [8, 34, 12.5, 12.5, 9, 30], rows, title: true, hdr: true, al: ["c", "l", "r", "r", "c", "l"], rot: 0 });
     else T(TB.x0 + 2, ty - 4, 2.4, "No characteristic of the drawing is made at this operation.", 0, "STG-TABLE");
     if (st.tools && st.tools.length) { const tr = [["TOOLS"], ...st.tools.slice(0, 7).map((t, i) => ["T" + String(i + 1).padStart(2, "0"), fit(plain(t), 2.2, 92)])]; add({ t: "table", layer: "STG-TABLE", p: P0(TB.x0, TB.y0 + 5.4 * tr.length + 2), h: 2.2, rh: 5.4, cw: [12, 94], rows: tr, title: true, hdr: false, al: ["l", "l"], rot: 0 }); }
+    if (rep.missing.length && ctx.sub && ctx.sub.n > 1) T(DA.x0, DA.y1 - 3, 2.6, `${rep.missing.length} more dimension${rep.missing.length > 1 ? "s" : ""} of this operation (balloons ${rep.missing.join(", ")}) are drawn on sheet 2.`, 0, "STG-FRAME", 0, { color: RED, stg: "this" });
     return { ents: E2, rep };
+  };
+
+  /* =============================================================== sheet 2: every other dimension of the operation =============================================================== */
+  /** the dimensions of an operation the part sketch cannot show (they are not a step of the part): each is drafted as a dimension
+      in its own small detail view with its balloon, so that every dimension of the table is drawn. Detail views are schematic. */
+  F.detail = (doc, P, st, ctx, nos) => {
+    const { ox, chars, sopSec, co, H } = ctx, op = st.op, sub = ctx.sub || { k: 2, n: 2 };
+    const E2 = [], add = (e) => { E2.push(U(e)); return e; }, A = (x, y) => [ox + x, y];
+    const T = (x, y, h, s, ha = 0, layer = "STG-FRAME", va = 0, extra = {}) => add(Object.assign({ t: "text", layer, p: A(x, y), h, s: String(s == null ? "" : s), rot: 0, ha, va }, extra));
+    const L = (x0, y0, x1, y1, layer = "STG-FRAME", extra = {}) => add(Object.assign({ t: "line", layer, a: A(x0, y0), b: A(x1, y1) }, extra));
+    add({ t: "pline", layer: "STG-FRAME", closed: true, lw: 0.7, pts: [A(10, 10), A(410, 10), A(410, 287), A(10, 287)].map((p) => [p[0], p[1], 0]) });
+    L(10, 42, 410, 42); L(298, 42, 298, 287); L(100, 10, 100, 42); L(100, 26, 410, 26); for (let i = 1; i < 4; i++) L(100 + i * 77.5, 10, 100 + i * 77.5, 42);
+    T(14, 33, 5.2, "STAGE DRAWING"); T(14, 24.5, 3.4, fit(plain(`OP ${op.opNo} · ${String(op.name || "").toUpperCase()}`), 3.4, 83)); T(14, 15, 2.4, fit(plain(co), 2.4, 83));
+    const sec = sopSec.get(String(op.opNo)), stgNo = `${(sec && sec.docNo) || "STG-" + (P.part_no || "")}${sec && sec.docNo ? "-STG" : "-" + op.opNo}-D`;
+    const cells = [["Part no.", P.part_no || H.partNo], ["Part name", P.part_name || H.partName], ["Drawing no. / rev", [H.drawingNo || P.drawing_no, H.drawingRev || P.rev].filter(Boolean).join(" / rev ")], ["Customer", P.customer || H.customer],
+      ["Machine", op.machine || "—"], ["Stage drawing no.", stgNo], ["Dimensions frozen", `rev ${P.freeze.rev} · ${ctx.dmy(P.freeze.at)}`], ["Sheet", `Op ${op.opNo} · sheet ${sub.k} of ${sub.n}`]];
+    cells.forEach(([lab, val], i) => { const cx = 100 + (i % 4) * 77.5, cy = i < 4 ? 26 : 10; T(cx + 2, cy + 12, 1.9, lab); T(cx + 2, cy + 3.6, 3, fit(plain(val || "—"), 3, 73)); });
+    T(DA.x0, DA.y1 - 3, 3, "DIMENSIONS MADE AT THIS OPERATION — DETAIL VIEWS", 0, "STG-FRAME", 0);
+    T(DA.x0, DA.y1 - 9, 2.2, "Each dimension of the table, drafted with its balloon. Detail views are schematic (not to scale); the value shown is the drawing value.", 0, "STG-FRAME", 0);
+    const red = { color: RED, lw: 0.5, stg: "this" }, thin = { color: null, lw: 0.2, stg: "model" };
+    const seg = (a, b, s2, layer = "STG-GEO") => add(Object.assign({ t: "line", layer, a: A(a[0], a[1]), b: A(b[0], b[1]) }, s2));
+    const poly = (pts, s2, closed = false) => add(Object.assign({ t: "pline", layer: "STG-GEO", closed, pts: pts.map((p) => { const q = A(p[0], p[1]); return [q[0], q[1], 0]; }) }, s2));
+    const dim = (d) => add(Object.assign({ t: "dim", layer: "STG-DIM", kind: "lin" }, d, { color: RED, stg: "this" }));
+    const bal = (no, c, a) => {
+      const cc = chars.get(no), C = A(c[0], c[1]), Q = A(a[0], a[1]), d = Math.hypot(Q[0] - C[0], Q[1] - C[1]) || 1;
+      add({ t: "circle", layer: "STG-BALLOON", c: C, r: 3.6, stg: "balloon", no }); add({ t: "text", layer: "STG-BALLOON", p: C, h: no >= 100 ? 2.5 : 3, s: String(no), rot: 0, ha: 1, va: 2, stg: "balloon", no });
+      add({ t: "line", layer: "STG-BALLOON", a: [C[0] + (Q[0] - C[0]) * 3.6 / d, C[1] + (Q[1] - C[1]) * 3.6 / d], b: Q, stg: "balloon", no });
+      if (cc && cc.cls) add({ t: "text", layer: "STG-BALLOON", p: [C[0], C[1] + 4.5], h: 2.2, s: String(cc.cls), rot: 0, ha: 1, va: 0, stg: "balloon", no });
+    };
+    const items = nos.map((n) => chars.get(n)).filter(Boolean), n = items.length, cols = n <= 2 ? Math.max(1, n) : n <= 6 ? 3 : n <= 16 ? 4 : n <= 25 ? 5 : 6, rows = Math.ceil(n / cols);
+    const AW = DA.x1 - DA.x0, TOP = DA.y1 - 14, AH = TOP - DA.y0, cw = AW / cols, ch = Math.min(64, AH / rows), D2R = Math.PI / 180;
+    items.forEach((c, i) => {
+      const col = i % cols, row = Math.floor(i / cols), x = DA.x0 + col * cw, y0 = TOP - (row + 1) * ch, no = +c.no;
+      poly([[x + 1, y0 + 1], [x + cw - 1, y0 + 1], [x + cw - 1, y0 + ch - 1], [x + 1, y0 + ch - 1]], { lw: 0.13, color: GREY, stg: "done" }, true);
+      const t = c.type, s = plain(c.spec || c.text || c.label || ""), cx = x + cw / 2 + 3, cy = y0 + ch / 2 - 1, hw = Math.max(5, Math.min(cw - 34, 40) / 2), hh = Math.max(4, Math.min(ch - 26, 24) / 2), V = (a, b) => [a, b];
+      T(x + cw - 3, y0 + ch - 5, 2, fit(plain(c.label || t || ""), 2, cw - 16), 2, "STG-FRAME", 0);
+      const lim = [c.lsl != null && c.lsl !== "" ? "LSL " + c.lsl : "", c.usl != null && c.usl !== "" ? "USL " + c.usl : ""].filter(Boolean).join("   "); if (lim) T(x + 3, y0 + 3, 2, lim, 0, "STG-FRAME", 0);
+      let anchor = V(cx - hw, cy + hh); const nm = parseFloat(String(c.nominal != null && c.nominal !== "" ? c.nominal : (s.match(/-?\d+(?:\.\d+)?/) || [])[0]));
+      if (t === "Diameter" || t === "Thread") {
+        const r = Math.max(3, Math.min(hh, 10)), Cx = x + cw * 0.34, Cy = cy;
+        add(Object.assign({ t: "circle", layer: "STG-GEO", c: A(Cx, Cy), r }, red)); seg([Cx - r - 3, Cy], [Cx + r + 3, Cy], { lt: "CENTER", lw: 0.15, color: null, stg: "stock" }); seg([Cx, Cy - r - 3], [Cx, Cy + r + 3], { lt: "CENTER", lw: 0.15, color: null, stg: "stock" });
+        if (t === "Thread") add(Object.assign({ t: "arc", layer: "STG-GEO", c: A(Cx, Cy), r: r * 0.82, a0: 0, a1: Math.PI * 1.5 }, thin));
+        add({ t: "dim", layer: "STG-DIM", kind: "dia", c: A(Cx, Cy), r, loc: A(Cx + Math.cos(0.6) * (r + 9), Cy + Math.sin(0.6) * (r + 9)), txt: s, color: RED, stg: "this" }); anchor = V(Cx - r * 0.7, Cy + r * 0.7);
+      } else if (t === "Angle" && nm > 0 && nm < 170) {
+        const Vx = cx - hw, Vy = cy - hh * 0.6, l1 = hw * 1.7, l2 = hw * 1.5, p1 = V(Vx + l1, Vy), p2 = V(Vx + Math.cos(nm * D2R) * l2, Vy + Math.sin(nm * D2R) * l2);
+        seg(V(Vx, Vy), p1, red); seg(V(Vx, Vy), p2, red);
+        const r = Math.min(l1, l2) * 0.7; add({ t: "dim", layer: "STG-DIM", kind: "ang", c: A(Vx, Vy), p1: A(p1[0], p1[1]), p2: A(p2[0], p2[1]), loc: A(Vx + Math.cos(nm / 2 * D2R) * r, Vy + Math.sin(nm / 2 * D2R) * r), txt: s, color: RED, stg: "this" }); anchor = p2;
+      } else if (t === "Radius") {
+        const Cx = cx - hw * 0.3, Cy = cy - hh * 0.3, r = Math.min(Math.max(hh * 1.3, 5), 10);
+        add(Object.assign({ t: "arc", layer: "STG-GEO", c: A(Cx, Cy), r, a0: 0, a1: Math.PI / 2 }, red)); seg([Cx + r, Cy], [Cx + r, Cy - 7], red); seg([Cx, Cy + r], [Cx - 9, Cy + r], red);
+        add({ t: "dim", layer: "STG-DIM", kind: "rad", c: A(Cx, Cy), r, loc: A(Cx + Math.cos(Math.PI / 4) * (r + 9), Cy + Math.sin(Math.PI / 4) * (r + 9)), txt: s, color: RED, stg: "this" }); anchor = V(Cx + Math.cos(Math.PI / 4) * r, Cy + Math.sin(Math.PI / 4) * r);
+      } else if (t === "Chamfer") {
+        const k = Math.min(hh, 8), a = V(cx - hw, cy - k), b = V(cx, cy - k), c2 = V(cx + k * 0.8, cy - k + k * 0.8), d = V(cx + k * 0.8, cy + k);
+        poly([a, b, c2, d], red); const m = V((b[0] + c2[0]) / 2, (b[1] + c2[1]) / 2);
+        add({ t: "dim", layer: "STG-DIM", kind: "ali", p1: A(b[0], b[1]), p2: A(c2[0], c2[1]), loc: A(m[0] + 6, m[1] - 6), txt: s, color: RED, stg: "this" }); anchor = m;
+      } else if (t === "Linear") {
+        seg([cx - hw, cy - 6], [cx - hw, cy + 6], red); seg([cx + hw, cy - 6], [cx + hw, cy + 6], red); seg([cx - hw - 3, cy - 6], [cx + hw + 3, cy - 6], thin);
+        dim({ dir: "h", p1: A(cx - hw, cy + 6), p2: A(cx + hw, cy + 6), loc: A(cx, cy + 11), txt: s }); anchor = V(cx - hw, cy + 6);
+      } else if (t === "Surface finish") {
+        poly([V(cx - 8, cy), V(cx - 4, cy - 6), V(cx + 3, cy + 7), V(cx + 16, cy + 7)], red); T(cx + 4, cy + 8.5, 2.6, fit(s, 2.6, cw * 0.5), 0, "STG-GEO", 0, { color: RED, stg: "this" }); anchor = V(cx - 4, cy - 6);
+      } else {
+        const tx = fit(s, 2.6, cw - 24), w2 = wOf(tx, 2.6) + 5; poly([V(cx - w2 / 2, cy - 4.5), V(cx + w2 / 2, cy - 4.5), V(cx + w2 / 2, cy + 4.5), V(cx - w2 / 2, cy + 4.5)], red, true); T(cx, cy, 2.6, tx, 1, "STG-GEO", 2, { color: RED, stg: "this" }); anchor = V(cx - w2 / 2, cy + 4.5);
+      }
+      bal(no, V(x + 8, y0 + ch - 8), anchor);
+    });
+    // the characteristics table (same as sheet 1)
+    const list = nos.slice().sort((a, b) => a - b).map((k) => chars.get(k)).filter(Boolean), rowsT = [["MADE AT THIS OPERATION — CHECK AS PER THE SOP"], ["No.", "Specification", "LSL", "USL", "Class", "Gauge"]], max = Math.floor((TB.y1 - TB.y0 - 14) / 5.6);
+    for (const c of list.slice(0, max)) { const ck = sec && (sec.checks || []).find((x) => String(x.charNo) === String(c.no)); rowsT.push([String(c.no), fit(plain(c.spec || c.text || c.label || ""), 2.2, 34 - 2.4), c.lsl == null || c.lsl === "" ? "" : String(c.lsl), c.usl == null || c.usl === "" ? "" : String(c.usl), c.cls || "", fit(plain((ck && ck.gauge) || ctx.gName.get(c.gauge) || c.balloonInstr || ""), 2.2, 30 - 2.4)]); }
+    if (list.length > max) rowsT.push(["", `… ${list.length - max} more — see the SOP`, "", "", "", ""]);
+    add({ t: "table", layer: "STG-TABLE", p: A(TB.x0, TB.y1), h: 2.2, rh: 5.6, cw: [8, 34, 12.5, 12.5, 9, 30], rows: rowsT, title: true, hdr: true, al: ["c", "l", "r", "r", "c", "l"], rot: 0 });
+    return { ents: E2, rep: { balloons: items.length } };
   };
 
   /* =============================================================== the set =============================================================== */
@@ -378,8 +450,14 @@
       if (kind !== "raw") add("Tolerance class", H.generalTol || "As per drawing");
       pageNo++; const stg = { op, kind, title, charsTitle, data, notes, tools: tools.length ? tools : null };
       const ctx = { ox, model, chars: new Map([...chars].filter(([n]) => true)), map: Object.assign({}, map, kind === "raw" ? { [String(op.opNo)]: mine.map((c) => +c.no) } : {}), sopSec, co, H, pageNo, pages: stages.length, mach: op.machine, match, gName, dmy: (t) => { if (!t) return ""; const d = new Date(t); return isNaN(d) ? String(t) : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); } };
-      const R = F.sheet(doc, P, stg, ctx); doc.ents.push(...R.ents); rep.balloons += R.rep.balloons; rep.missing.push(...R.rep.missing); rep.stages++;
-      sheets.push({ opNo: op.opNo, opName: op.name, sheet: 1, of: 1, kind, box: { x0: ox, y0: 0, x1: ox + PW, y1: PH } }); ox += PW * 1.08; void idx; void turnIdx; void first;
+      let R = F.sheet(doc, P, stg, ctx), extra = R.rep.missing.slice();
+      if (extra.length) { ctx.sub = { k: 1, n: 2 }; R = F.sheet(doc, P, stg, ctx); }
+      doc.ents.push(...R.ents); rep.balloons += R.rep.balloons; rep.stages++;
+      sheets.push({ opNo: op.opNo, opName: op.name, sheet: 1, of: extra.length ? 2 : 1, kind, box: { x0: ox, y0: 0, x1: ox + PW, y1: PH } }); ox += PW * 1.08; void idx; void turnIdx; void first;
+      if (extra.length) {
+        ctx.ox = ox; ctx.sub = { k: 2, n: 2 }; const D = F.detail(doc, P, stg, ctx, extra); doc.ents.push(...D.ents); rep.balloons += D.rep.balloons;
+        sheets.push({ opNo: op.opNo, opName: op.name, sheet: 2, of: 2, kind, box: { x0: ox, y0: 0, x1: ox + PW, y1: PH } }); ox += PW * 1.08;
+      }
     });
     rep.linked = match.size; return { doc, sheets, report: rep };
   };

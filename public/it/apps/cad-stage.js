@@ -375,18 +375,34 @@
       { width: "min(760px,96vw)", ok: "Make stage drawings", init: (b) => { const s = b.querySelector("#regs"); if (s) s.onchange = () => { const r = b.querySelector('input[name=src][value^="reg"]'); if (r) { r.value = s.value; r.checked = true; } }; } });
   }
 
+  /** a part read from a picture or PDF has no scale: scale it so the diameters of the table match the steps (and snap them to the table values) */
+  function calibrate(prof, P) {
+    const dia = [...new Set((P.chars || []).filter((c) => c.type === "Diameter" && !/PCD|THRU|^\d+\s*X/i.test(c.text || c.spec || "")).map((c) => firstNum(c.nominal != null && c.nominal !== "" ? c.nominal : c.spec)).filter((v) => v > 0))];
+    if (!dia.length) return { prof, note: "" };
+    const hit = (d, v) => Math.abs(d - v) <= Math.max(0.011, v * 0.02), score = (s) => dia.filter((v) => prof.steps.some((st) => hit(st.d * s, v))).length, r2 = (v) => Math.round(v * 100) / 100;
+    let best = { s: 1, n: score(1) };
+    for (const st of prof.steps) for (const v of dia) { const s = v / st.d, n = score(s); if (n > best.n || (n === best.n && best.s !== 1 && s > best.s)) best = { s, n }; }
+    if (best.s === 1 && best.n === 0) { const mx = Math.max(...prof.steps.map((x) => x.d)), md = Math.max(...dia); if (Math.abs(mx - md) > md * 0.05) best = { s: md / mx, n: 0 }; }
+    const snap = (d) => { const v = dia.find((x) => hit(d, x)); return v != null ? v : r2(d); };
+    const k = best.s;
+    if (Math.abs(k - 1) < 1e-6 && best.n === 0) return { prof, note: "" };
+    const steps = prof.steps.map((x) => ({ d: snap(x.d * k), l: r2(x.l * k) })), bore = prof.bore ? { d: snap(prof.bore.d * k), depth: r2(prof.bore.depth * k), end: prof.bore.end } : null;
+    return { prof: Object.assign({}, prof, { steps, bore, L: r2(steps.reduce((t, x) => t + x.l, 0)) }), note: Math.abs(k - 1) > 1e-6 ? ` The drawing has no scale, so it was scaled ×${r2(k)} to make its diameters match the diameters in the table.` : "" };
+  }
+
   /** process-stage drawings (cad-stage-flow.js): the part's shape from the drawing, checked by the user */
   async function flowBuild(E, P, SRC, say) {
     const F = K.stageFlow; if (!F) throw new Error("The stage-flow module did not load. Reload the page.");
-    let prof = null, how = "";
+    let prof = null, how = "", scaleNote = "";
     try {
       let doc = SRC.kind === "vector" ? SRC.doc : null;
       if (!doc && SRC.file && K.vec) { say("Converting the picture of the drawing to CAD to find the shape of the part…"); const r = await K.vec.convert(SRC.file, { ocr: false, keep: false, page: 1 }, say); doc = K.newDoc(false); K.vec.intoDoc(doc, r, 0, 0, 1); }
       if (doc) { say("Finding the shape of the part…"); prof = F.silhouette(doc); }
+      if (prof) { const cal = calibrate(prof, P); prof = cal.prof; scaleNote = cal.note; }
     } catch (e) { prof = null; how = " (" + e.message + ")"; }
     const fromDrawing = !!prof; if (!prof) prof = F.fromPlan(P);
     const model = Object.assign({}, prof, F.defaults(P, prof));
-    const note = fromDrawing ? `The shape was read from <b>${esc(SRC.name || "the drawing")}</b> (${prof.steps.length} step${prof.steps.length > 1 ? "s" : ""}, length ${prof.L} mm${prof.bore ? ", bore Ø" + prof.bore.d : ""}). Check it against the drawing — correct any number that is wrong.` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the steps of your part</b> (diameter and length from the left end).`;
+    const note = fromDrawing ? `The shape was read from <b>${esc(SRC.name || "the drawing")}</b> (${prof.steps.length} step${prof.steps.length > 1 ? "s" : ""}, length ${prof.L} mm${prof.bore ? ", bore Ø" + prof.bore.d : ""}). Check it against the drawing — correct any number that is wrong.${scaleNote}` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the steps of your part</b> (diameter and length from the left end).`;
     const m = await F.dialog(E, P, model, note); if (!m) return null;
     Object.assign(m, F.defaults(P, { steps: m.steps, bore: m.bore }), { steps: m.steps, bore: m.bore, D0: m.D0, fa: m.fa, clamp: m.clamp, first: m.first, bar: m.bar, L: m.steps.reduce((t, s) => t + s.l, 0), maxD: Math.max(...m.steps.map((x) => x.d)) });
     // the first turned end is drawn at the left
@@ -457,5 +473,5 @@
     { n: "Stage drawings for the SOP", b: [["STAGEDWG", "Make stage drawings", "title"], ["STAGESEND", "Send to SOP", "exportI"], ["STAGESOP", "Open the SOP", "open"]] },
   ] });
 
-  K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource;
+  K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate;
 })((window.KCAD = window.KCAD || {}));
