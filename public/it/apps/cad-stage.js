@@ -351,7 +351,7 @@
     const b = sh.box, w = b.x1 - b.x0, h = b.y1 - b.y0, Hp = Math.round((W * h) / w), c = canvas(W, Hp), x = c.getContext("2d");
     const view = { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, s: W / w, W, H: Hp };
     const P = (col, wd) => K.canvasPainter(x, view, { fg: INK, light: true, lwt: true, ltscale: doc.ltscale, override: col, width: wd });
-    const PP = { geom: P(INK), this: P(RED, 3.2), done: P(GREY), balloon: P(RED, 1.5), frame: P(INK), model: P("#374151", 2.6), stock: P(INK), tool: P("#0369a1", 1.4), clamp: P("#0369a1", 1.6), dimr: P(RED, 1.1), dimg: P("#374151", 1.1), ph: P("#6b7280", 1.0), hatch: P("#9ca3af", 0.8) };
+    const PP = { geom: P(INK), this: P(RED, 3.2), done: P(GREY), balloon: P("#047857", 1.5), frame: P(INK), model: P("#374151", 2.6), stock: P(INK), tool: P("#0369a1", 1.4), clamp: P("#0369a1", 1.6), dimr: P("#047857", 1.1), dimg: P("#374151", 1.1), ph: P("#6b7280", 1.0), hatch: P("#9ca3af", 0.8) };
     const ents = doc.ents.filter((e) => { const bb = K.bbox(e, doc); return bb && !(bb.x1 < b.x0 || bb.x0 > b.x1 || bb.y1 < b.y0 || bb.y0 > b.y1); });
     await K.imgReady(doc, ents);
     for (const e of ents) { if (K.noPlot(doc, e)) continue; const role = e.stg || (/^STG-BALLOON$/.test(e.layer) ? "balloon" : /^STG-/.test(e.layer) ? "frame" : "geom"); K.paint(PP[role] || PP.geom, e, doc); }

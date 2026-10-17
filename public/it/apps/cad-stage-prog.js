@@ -10,7 +10,7 @@
 (function (K) {
   "use strict";
   const G = K.geom, SP = (K.stageProg = {});
-  const RED = "#e11d48", DG = "#374151", BLUE = "#0369a1", INK = "#111111", PHG = "#6b7280";
+  const DIMC = "#22c55e", RED = "#e11d48", DG = "#374151", BLUE = "#0369a1", INK = "#111111", PHG = "#6b7280";
   const r2 = (v) => Math.round(v * 100) / 100, r3 = (v) => Math.round(v * 1000) / 1000;
   const numOf = (s) => { const m = String(s == null ? "" : s).replace(/,/g, ".").match(/-?\d+(?:\.\d+)?/); return m ? parseFloat(m[0]) : null; };
   const D2R = Math.PI / 180;
@@ -270,7 +270,7 @@
     this: { color: RED, lw: 0.6, stg: "this" }, model: { color: null, lw: 0.5, stg: "model" },
     hid: { color: null, lw: 0.3, lt: "HIDDEN", stg: "model" }, hidr: { color: RED, lw: 0.3, lt: "HIDDEN", stg: "this" },
     ph: { color: PHG, lw: 0.18, lt: "PHANTOM", stg: "ph" }, clamp: { color: "#38bdf8", lw: 0.4, stg: "clamp" }, hatch: { color: "#9ca3af", lw: 0.13, stg: "hatch" },
-    dimr: { color: RED, lw: 0.22, stg: "dimr" }, diml: { color: null, lw: 0.22, stg: "dimg" }, ctr: { color: null, lw: 0.18, lt: "CENTER", stg: "ph" },
+    dimr: { color: DIMC, lw: 0.22, stg: "dimr" }, diml: { color: null, lw: 0.22, stg: "dimg" }, ctr: { color: null, lw: 0.18, lt: "CENTER", stg: "ph" },
   };
   SP.ST = ST;
   /** the drawing kit: every size comes from h (dimension text height) so arrows, gaps and balloons scale with the sheet */
@@ -281,7 +281,7 @@
     K2.P = (pts, st, closed) => add(Object.assign({ t: "pline", layer: "STG-GEO", closed: !!closed, pts: pts.map((p) => [p[0], p[1], 0]) }, st));
     K2.T = (x, y, s, ha, st, rot, hh) => add(Object.assign({ t: "text", layer: "STG-GEO", p: [x, y], h: hh || fs, s: String(s), rot: rot || 0, ha: ha || 0, va: 0 }, { color: st.color, stg: st.stg }));
     K2.arrow = (x, y, dx, dy, st) => { const n = Math.hypot(dx, dy) || 1; dx /= n; dy /= n; const px = -dy, py = dx; add({ t: "hatch", layer: "STG-GEO", solid: true, loops: [[[x, y], [x - dx * AL + px * AW, y - dy * AL + py * AW], [x - dx * AL - px * AW, y - dy * AL - py * AW]]], color: st.color, stg: st.stg }); };
-    K2.bal = (no, x, y, st) => { add({ t: "circle", layer: "STG-BALLOON", c: [x, y], r: br, stg: "balloon", no, color: RED }); add({ t: "text", layer: "STG-BALLOON", p: [x, y], h: /^\d+$/.test(String(no)) ? (no >= 100 ? fs * 0.78 : fs * 0.9) : fs * 0.7, s: String(no), rot: 0, ha: 1, va: 2, stg: "balloon", no, color: RED }); };
+    K2.bal = (no, x, y, st) => { add({ t: "circle", layer: "STG-BALLOON", c: [x, y], r: br, stg: "balloon", no, color: DIMC }); add({ t: "text", layer: "STG-BALLOON", p: [x, y], h: /^\d+$/.test(String(no)) ? (no >= 100 ? fs * 0.78 : fs * 0.9) : fs * 0.7, s: String(no), rot: 0, ha: 1, va: 2, stg: "balloon", no, color: DIMC }); };
     K2.tw = (s) => wOf(s, fs);
     /** horizontal dimension between x1, x2 at height y; f1, f2 = y of the feature points (extension lines run from there) */
     K2.dimh = (x1, x2, y, f1, f2, txt, no, st, avoid) => {
@@ -547,6 +547,7 @@
     hid: [Object.assign({}, ST.hid), "Hidden edge (dashed)"],
     ph: [Object.assign({}, ST.ph), "Stock removed at this operation (phantom)"],
     clamp: [Object.assign({}, ST.clamp), "Chuck / vice / jaw / stop (blue)"],
+    dim: [{ color: DIMC, lw: 0.22, stg: "dimr" }, "Dimension, leader and balloon of this operation (green)"],
   };
 
   /* ================================================================ G. the profile sheet (turning: full section; other operations: finished part, external view) ================================================================ */
@@ -685,7 +686,7 @@
       }
     }
     K2.T(DA.x1 - 4, DA.y0 + 2, `Scale ${scTxt(k)}`, 2, ST.diml, 0, h * 0.75);
-    return { sh, S, jaws, datumTxt, holdTxt, mine, rows: mine.map((n) => chars.get(n)).filter(Boolean), legend: [LEG.this, LEG.model].concat(isTurn ? [LEG.ph, LEG.clamp] : [LEG.hid]) };
+    return { sh, S, jaws, datumTxt, holdTxt, mine, rows: mine.map((n) => chars.get(n)).filter(Boolean), legend: [LEG.this, LEG.dim, LEG.model].concat(isTurn ? [LEG.ph, LEG.clamp] : [LEG.hid]) };
   }
 
   /* ================================================================ H. raw bar, sawing, and the whole set ================================================================ */
@@ -722,7 +723,7 @@
     K2.dimh(xb, sx, bot - 12, bot, bot, `${r2(Lb0)} ±1  (sawn length)`, "R1", ST.dimr);
     K2.dimv(bot, top, xs - 14, xs, `(Ø${model.D0})  bar size — reference`, null, ST.diml);
     K2.T(DA.x1 - 4, DA.y0 + 2, `Scale ${scTxt(k)}`, 2, ST.diml, 0, h * 0.75);
-    return { sh, legend: [LEG.this, LEG.model, LEG.ph, LEG.clamp], rows: null };
+    return { sh, legend: [LEG.this, LEG.dim, LEG.model, LEG.ph, LEG.clamp], rows: null };
   }
 
   const dmyOf = (t) => { if (!t) return ""; const d = new Date(t); return isNaN(d) ? String(t) : d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }); };
@@ -768,7 +769,7 @@
   /** the whole set: one sheet per operation */
   SP.build = (P, model, opt) => {
     const doc = K.newDoc(false);
-    for (const [n, c, lw] of [["STG-FRAME", "#ffffff", 0.5], ["STG-TABLE", "#ffffff", 0.25], ["STG-BALLOON", RED, 0.35], ["STG-GEO", "#ffffff", 0.35], ["STG-DIM", "#00ffff", 0.18], ["STG-TOOL", BLUE, 0.3]]) doc.layers.push({ name: n, color: c, lt: "CONTINUOUS", lw, on: true, frozen: false, lock: false });
+    for (const [n, c, lw] of [["STG-FRAME", "#ffffff", 0.5], ["STG-TABLE", "#ffffff", 0.25], ["STG-BALLOON", DIMC, 0.35], ["STG-GEO", "#ffffff", 0.35], ["STG-DIM", "#00ffff", 0.18], ["STG-TOOL", BLUE, 0.3]]) doc.layers.push({ name: n, color: c, lt: "CONTINUOUS", lw, on: true, frozen: false, lock: false });
     doc.dim = Object.assign({}, doc.dim, { th: 2.5, as: 2.5, dec: 2, scale: 1, gap: 0.8 });
     const cx = SP.prepare(P, model, opt || {}), H = P.header || {}, co = (window.QP && QP.ctx && QP.ctx.company) || H.supplier || "";
     const sopSec = new Map(((P.sop && P.sop.sections) || []).map((s) => [String(s.opNo), s])), gName = new Map((P.gauges || []).map((g) => [g.id, [g.name, g.range].filter(Boolean).join(" ")]));
