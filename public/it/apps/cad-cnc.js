@@ -309,7 +309,7 @@
       });
     }
     N("M05"); N("M09"); N("M30"); lines.push("%");
-    const Sg = voidMap.size ? Object.assign({}, S, { voids: S.voids.map((v) => (voidMap.has(v) ? Object.assign({}, v, voidMap.get(v)) : v)) }) : S;
+    const Sg = voidMap.size && opt.skipPocket ? Object.assign({}, S, { voids: S.voids.map((v) => (voidMap.has(v) ? Object.assign({}, v, voidMap.get(v)) : v)) }) : S;
     return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S: Sg, jaws, cd, mine, rank, warn, keeps, checks };
   };
   void 0;
@@ -551,6 +551,35 @@
         const spec = (c.spec || c.text || "").toString(), nom = U.nomOf(c), err = Math.abs(2 * rr - nom), lsl = c.lsl != null && c.lsl !== "" ? +c.lsl : null, usl = c.usl != null && c.usl !== "" ? +c.usl : null;
         checks.push({ no: c.no, spec, dia: 2 * rr, ok: err <= 4 * cs + 1e-6 && (lsl == null || 2 * rr >= lsl - 2 * cs) && (usl == null || 2 * rr <= usl + 2 * cs) });
       }
+      // every dimension of the stage drawing, one by one: measured on the simulated part, reached by position, or to be inspected
+      const dims = [], T = this.g.tools, tl = Object.values(T), pad = (n) => "T" + String(n).padStart(2, "0"), tOD = tl.find((t) => t.kind === "od" && t.ins === "VNMG160404") || tl.find((t) => t.kind === "od"), tTh = tl.find((t) => t.kind === "thread"), tBr = tl.find((t) => t.kind === "bore");
+      const spanRes = (xa, xb) => { const i0 = Math.max(0, Math.floor((Math.min(xa, xb) - this.xlo) / cs)), i1 = Math.min(W - 1, Math.ceil((Math.max(xa, xb) - this.xlo) / cs)); let q = 0; for (let i = i0; i <= i1; i++) q = Math.max(q, colRes[i]); return q; };
+      const noseR = (t) => ((CN.INS || {})[t && t.ins] || {}).r || 0.4;
+      for (const c of this.g.mine) {
+        const f = this.cx.M.get(+c.no), spec = (c.spec || c.text || "").toString(), d = { no: c.no, type: c.type, spec, state: "note", res: "general note", made: "" };
+        dims.push(d); if (!f) continue;
+        const chk = (this.g.checks || []).find((q) => q.label === "dim " + c.no), lsl = c.lsl != null && c.lsl !== "" ? +c.lsl : null, usl = c.usl != null && c.usl !== "" ? +c.usl : null;
+        const outer = f.side === "o" || f.outer === true;
+        d.made = chk ? chk.steps.map((q) => q.tool + (q.std ? "" : " (CUSTOM)")).join(" + ") : c.type === "Thread" && tTh ? `${pad(tTh.n)} thread tool` : f.kind === "ra" || f.kind === "gdt" ? "" : outer ? (tOD ? `${pad(tOD.n)} OD finishing` : "OD turning") : tBr ? `${pad(tBr.n)} boring bar` : "drill";
+        if (f.kind === "dia" && !f.semi) {
+          const xs = f.e ? (f.e.a[0] + f.e.b[0]) / 2 : f.pt ? (f.pt[0] < 0.5 ? f.pt[0] + 2 * cs : f.pt[0] - 2 * cs) : (f.x0 + f.x1) / 2, ix = Math.max(0, Math.min(W - 1, Math.floor((xs - this.xlo) / cs)));
+          let rr = 0;
+          if (c.type === "Thread") { const i0 = Math.floor((f.x0 - this.xlo) / cs), i1 = Math.floor((f.x1 - this.xlo) / cs); for (let i = i0; i <= i1; i++) { let top = 0; for (let j = 0; j < Hc; j++) if (mat[j * W + i]) top = j + 1; rr = Math.max(rr, top * cs); } }
+          else {   // a dimension given at a point (a step or an end): take the widest value within 0.15 mm of it
+            const atEnd = f.pt && (f.pt[0] < 0.5 || f.pt[0] > this.cx.m.L - 0.5), w0 = f.pt && !atEnd ? Math.round(0.15 / cs) : 0, i0 = Math.max(0, ix - w0), i1 = Math.min(W - 1, ix + w0);
+            for (let i = i0; i <= i1; i++) { if (outer) { let top = 0; for (let j = 0; j < Hc; j++) if (mat[j * W + i]) top = j + 1; rr = Math.max(rr, top * cs); } else { let jb = 0; while (jb < Hc && !mat[jb * W + i]) jb++; rr = Math.max(rr, jb * cs); } }
+          }
+          const nom = c.type === "Thread" ? +c.nominal || U.nomOf(c) : U.nomOf(c), err = Math.abs(2 * rr - nom), tolOk = c.type === "Thread" ? err <= 0.15 : lsl != null || usl != null ? (lsl == null || 2 * rr >= lsl - 2 * cs) && (usl == null || 2 * rr <= usl + 2 * cs) : err <= 4 * cs + 1e-6;
+          Object.assign(d, { state: tolOk ? "ok" : "bad", res: `measured dia ${(2 * rr).toFixed(2)}` });
+        } else if (f.kind === "ra") {
+          const bore = !outer, t = bore ? tBr : tOD, fd = bore ? 0.06 : 0.08, Ra = t ? (fd * fd) / (32 * noseR(t)) * 1000 : 3.2, lim = usl != null ? usl : 99;
+          Object.assign(d, { state: Ra <= lim ? "ok" : "bad", res: t ? `Ra about ${Ra.toFixed(1)} um (f ${fd}, nose R${noseR(t)})` : `drilled surface, Ra about 3.2 um`, made: t ? `${pad(t.n)} finishing pass` : "drill" });
+        } else if (f.kind === "gdt") { Object.assign(d, { state: "insp", res: "inspect with gauge / CMM", made: "" }); }
+        else if (f.kind === "len" || f.kind === "edge") {
+          const xa = f.kind === "len" ? f.a : f.e ? Math.min(f.e.a[0], f.e.b[0]) : null, xb = f.kind === "len" ? f.b : f.e ? Math.max(f.e.a[0], f.e.b[0]) : null;
+          if (xa != null) { const r0 = spanRes(xa, xb); Object.assign(d, { state: r0 <= Math.max(3 * cs, 0.05) ? "ok" : "bad", res: f.kind === "len" ? `${(Math.abs(xb - xa)).toFixed(2)} reached (stock left ${r0.toFixed(2)})` : `shape reached (stock left ${r0.toFixed(2)})` }); if (f.kind === "edge" && c.type === "Radius" && f.arc) d.res = `R${(f.arc.R != null ? f.arc.R : +c.nominal || 0).toFixed(2)} cut by nose interpolation, stock left ${r0.toFixed(2)}`; }
+        }
+      }
       // where is stock left? group the leftover cells in 0.5 mm blocks and name the regions in Z and diameter
       const bw = Math.max(1, Math.round(0.5 / cs)), nx = Math.ceil(W / bw), ny = Math.ceil(Hc / bw), cnt = new Float32Array(nx * ny);
       for (let j = 0; j < Hc; j++) for (let i = 0; i < W; i++) if (mat[j * W + i] && !tgt[j * W + i]) cnt[Math.floor(j / bw) * nx + Math.floor(i / bw)] += cs * cs;
@@ -562,7 +591,7 @@
         regions.push({ a, txt: `Z ${Math.max(za, zb).toFixed(1)} to ${Math.min(za, zb).toFixed(1)}, dia ${(2 * j0 * bw * cs).toFixed(1)} to ${(2 * (j1 + 1) * bw * cs).toFixed(1)}` });
       }
       regions.sort((p, q) => q.a - p.a);
-      this.stats = { resid, maxRes: maxCol, checks, regions: regions.slice(0, 3), time: this.total, lines: this.g.lines.filter((l) => /^N\d+/.test(l)).length };
+      this.stats = { resid, maxRes: maxCol, checks, dims, regions: regions.slice(0, 3), time: this.total, lines: this.g.lines.filter((l) => /^N\d+/.test(l)).length };
       this.dirty = true;
     }
   }
@@ -670,7 +699,7 @@
   };
   Sim.prototype.lifeKey = function () { return this.g.name + ":" + this.g.lines.length; };
   Sim.prototype.getLife = function () {
-    const key = this.lifeKey(); if (!CN._life[key]) { const d = new Sim(this.g, this.cx); d.quiet = true; d.advance(d.total + 5); CN._life[key] = d.lifeData(); }
+    const key = this.lifeKey(); if (!CN._life[key]) { const d = new Sim(this.g, this.cx); d.quiet = true; d.advance(d.total + 5); CN._life[key] = d.lifeData(); CN._stats = CN._stats || {}; CN._stats[key] = d.stats; }
     return CN._life[key];
   };
   /*CHIPS*/
@@ -701,44 +730,40 @@
       const [X, Y] = pt(x - q.len / 2, y); i ? c.lineTo(X, Y) : c.moveTo(X, Y);
     }
   };
-  Sim.prototype.drawChips = function (c) {
+  Sim.prototype.drawChips = function (c, ks, still) {
+    ks = ks || 1.8;
     const mat = this.g.cd.name, dt = 0.016, xm = this.xr(0, 0)[0], xMouth = this.sx(xm), sf = this.sf, bot = CH - FOOT;
     for (const q of this.chips) {
-      q.life += dt; q.heat = Math.max(0, 1 - q.life * 0.9);
-      if (q.hole) { q.px += q.vx * dt; if ((q.px - xMouth) * sf > 0) { q.hole = false; q.vx *= 1.2; } }       // inside the bore the chip is carried out by the coolant along the axis
-      else { q.px += q.vx * dt; q.py += q.vy * dt; q.vy += 520 * dt; }
-      q.ang += q.w * dt;
-      if (q.vy > 0 && !q.hole && this.solidAt(q.px, q.py)) q.dead = true;   // falls behind the bar
-      if (q.py > bot || q.life > 3.5) q.dead = true;
+      if (!still) {
+        q.life += dt; q.heat = Math.max(0, 1 - q.life * 0.9);
+        if (q.hole) { q.px += q.vx * dt; if ((q.px - xMouth) * sf > 0) { q.hole = false; q.vx *= 1.2; } }       // inside the bore the chip is carried out by the coolant along the axis
+        else { q.px += q.vx * dt; q.py += q.vy * dt; q.vy += 520 * dt; }
+        q.ang += q.w * dt;
+        if (q.vy > 0 && !q.hole && this.solidAt(q.px, q.py)) q.dead = true;   // falls behind the bar
+        if (q.py > bot || q.life > 3.5) q.dead = true;
+      }
       const a = Math.max(0, Math.min(1, 1.4 - q.life * 0.4));
-      c.save(); c.translate(q.px, q.py); c.scale(1.8, 1.8); c.lineCap = "round"; c.lineJoin = "round";
+      c.save(); c.translate(q.px, q.py); c.scale(ks, ks); c.lineCap = "round"; c.lineJoin = "round";
       chipPath(c, q); c.strokeStyle = "rgba(2,6,23,.85)"; c.lineWidth = 3; c.stroke();
       chipPath(c, q); c.strokeStyle = chipColour(mat, q.heat, a); c.lineWidth = 1.6; c.stroke(); c.restore();
     }
+    if (!still)
     this.chips = this.chips.filter((q) => !q.dead);
   };
   Sim.prototype.draw = function (c, ui) {
     try { this._draw(c, ui); this.drawErr = ""; } catch (e) { this.drawErr = e.message; if (!this._errLogged) { this._errLogged = true; console.error("CNC simulation draw error", e); } c.save(); c.fillStyle = "#fca5a5"; c.font = "12px ui-monospace, Menlo, Consolas, monospace"; c.textBaseline = "alphabetic"; c.fillText("Display problem: " + e.message, 14, CH - FOOT + 54); c.restore(); }
   };
-  Sim.prototype._draw = function (c, ui) {
-    this.layout(); const k = this.k, W = CW, H = CH;
-    { const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#0d1626"); bg.addColorStop(1, "#070c16"); c.fillStyle = bg; c.fillRect(0, 0, W, H); }
-    if (ui && ui.look === "machine") this.drawMachineBg(c);
-    // header
-    c.fillStyle = "#111c33"; c.fillRect(0, 0, W, HEADH); c.fillStyle = "#e2e8f0"; c.font = "600 17px system-ui, Segoe UI, Arial"; c.textBaseline = "middle";
-    const op = this.g.op; c.fillText(`CNC SIMULATION · OP ${op.opNo} · ${String(op.name || "").toUpperCase()}`, 14, HEADH / 2);
-    c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#94a3b8"; c.textAlign = "right"; c.fillText(`${this.cx.P.part_no || ""} · program ${this.g.name}`, W - 14, HEADH / 2); c.textAlign = "left";
-    // view
-    this.paintGrid();
+  Sim.prototype.paintView = function (c, ui) {
+    const k = this.k, LW = ui && ui.inset ? 1 / ui.Z : 1;
     c.save(); c.beginPath(); c.rect(0, HEADH + STRIP, CW - PANEL, CH - HEADH - STRIP - FOOT); c.clip();
-    c.strokeStyle = "#475569"; c.setLineDash([14, 4, 3, 4]); c.lineWidth = 1; c.beginPath(); c.moveTo(8, this.cy); c.lineTo(CW - PANEL - 8, this.cy); c.stroke(); c.setLineDash([]);
+    c.strokeStyle = "#475569"; c.setLineDash([14 * LW, 4 * LW, 3 * LW, 4 * LW]); c.lineWidth = LW; c.beginPath(); c.moveTo(8, this.cy); c.lineTo(CW - PANEL - 8, this.cy); c.stroke(); c.setLineDash([]);
     c.imageSmoothingEnabled = true; const dx = this.sx(this.xlo), dw = (this.xhi - this.xlo) * k, dh = this.Hc * this.cs * k;
     if (ui && ui.look === "machine") this.drawMachineBody(c, dx, dw, dh);
     else { c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.save(); c.translate(0, this.cy * 2); c.scale(1, -1); c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.restore(); }
     // the finished outline (what the program has to make): dark casing + bright line so it shows on metal and on the background
     c.lineJoin = "round";
     for (const pass of [0, 1]) {
-      c.strokeStyle = pass ? "#22d3ee" : "rgba(2,6,23,.9)"; c.lineWidth = pass ? 2.2 : 5;
+      c.strokeStyle = pass ? "#22d3ee" : "rgba(2,6,23,.9)"; c.lineWidth = (pass ? 2.2 : 5) * LW;
       for (const sg of [1, -1]) {
         c.beginPath(); this.g.S.pts.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke();
         for (const v of this.g.S.voids) { c.beginPath(); const pp = v.tip ? v.pts.concat([v.tip]) : v.pts; pp.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke(); }
@@ -754,13 +779,26 @@
       c.save(); c.clip(); c.strokeStyle = "rgba(255,255,255,.10)"; c.lineWidth = 1; const xs = this.g.jaws.poly.map((p) => this.sx(p[0])), xa = Math.min(...xs), xb = Math.max(...xs); c.beginPath(); for (let X = xa; X < xb; X += 7) { c.moveTo(X, y0); c.lineTo(X, y1); } c.stroke(); c.restore();
     }
     // tool path trail
-    c.lineWidth = 1; c.strokeStyle = "rgba(34,197,94,.75)"; c.beginPath(); let pen = false;
+    c.lineWidth = LW; c.strokeStyle = "rgba(34,197,94,.75)"; c.beginPath(); let pen = false;
     for (const q of this.trail) { const [x, r] = this.xr(q[0], q[1]), X = this.sx(x), Y = this.cy - r * k; if (q[2] && pen) c.lineTo(X, Y); else c.moveTo(X, Y); pen = !!q[2]; } c.stroke();
     // tool and holder, real size (mm x scale), the cutting corner marked
     this.drawTool(c); if (ui && ui.look === "machine") this.drawCoolant(c);
     // chips (drawn larger than life so they can be seen; shape from chipSpec)
-    this.drawChips(c);
+    this.drawChips(c, ui && ui.inset ? 1.8 / (ui.Z * 0.55) : 1.8, !!(ui && ui.inset));
+    if (!(ui && ui.inset) && !(ui && ui.dimsOff)) this.drawDims(c);
     c.restore();
+  };
+  Sim.prototype._draw = function (c, ui) {
+    this.layout(); const k = this.k, W = CW, H = CH;
+    { const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#0d1626"); bg.addColorStop(1, "#070c16"); c.fillStyle = bg; c.fillRect(0, 0, W, H); }
+    if (ui && ui.look === "machine") this.drawMachineBg(c);
+    // header
+    c.fillStyle = "#111c33"; c.fillRect(0, 0, W, HEADH); c.fillStyle = "#e2e8f0"; c.font = "600 17px system-ui, Segoe UI, Arial"; c.textBaseline = "middle";
+    const op = this.g.op; c.fillText(`CNC SIMULATION · OP ${op.opNo} · ${String(op.name || "").toUpperCase()}`, 14, HEADH / 2);
+    c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#94a3b8"; c.textAlign = "right"; c.fillText(`${this.cx.P.part_no || ""} · program ${this.g.name}`, W - 14, HEADH / 2); c.textAlign = "left";
+    // view
+    this.paintGrid();
+    this.paintView(c, ui); if (!ui || ui.zoom !== false) this.drawCloseup(c, ui);
     // tool strip: which tool, holder, insert corner, edge in cut, wear
     const m = this.lastM, Z = this.pos[0], X = this.pos[1], t = this.tool && this.g.tools[this.tool], sy0 = HEADH;
     c.fillStyle = "#0e1a30"; c.fillRect(0, sy0, CW - PANEL, STRIP); c.fillStyle = "#1e293b"; c.fillRect(0, sy0 + STRIP - 1, CW - PANEL, 1); c.textBaseline = "alphabetic";
@@ -806,15 +844,18 @@
     c.textAlign = "right"; c.fillStyle = "#94a3b8"; c.fillText(`${this.removedMm3().toFixed(0)} mm³ removed ≈ ${(this.removedMm3() * ({ ALUMINIUM: 2.7, BRASS: 8.5, STAINLESS: 7.9 }[this.g.cd.name] || 7.85) / 1000).toFixed(1)} g of chips`, CW - PANEL - 14, fy + 44); c.textAlign = "left";
     if (ui && ui.msg) { c.fillStyle = "#fbbf24"; c.textAlign = "center"; c.fillText(ui.msg, (CW - PANEL) / 2, fy + 44); c.textAlign = "left"; }
     if (ui && ui.page === "life") { this.drawLife(c); return; }
+    if (ui && ui.page === "dims") { this.drawDimsPage(c); return; }
     // result card at the end
     if (this.done && this.stats) {
-      const st = this.stats, ok = st.maxRes < 3 * this.cs + 0.05, w = 470, h = 78 + Math.min(5, st.checks.length) * 18 + (st.regions || []).length * 18, x0 = 24, y0 = HEADH + STRIP + 110;
+      const st = this.stats, ok = st.maxRes < 3 * this.cs + 0.05, w = 470, h = 104 + Math.min(2, (st.dims || []).filter((q) => q.state === "bad").length) * 18 + (st.regions || []).length * 18, x0 = 24, y0 = HEADH + STRIP + 110;
       c.fillStyle = "rgba(2,6,23,.92)"; c.fillRect(x0, y0, w, h); c.strokeStyle = ok ? "#22c55e" : "#f59e0b"; c.lineWidth = 2; c.strokeRect(x0, y0, w, h);
       c.fillStyle = ok ? "#4ade80" : "#fbbf24"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ok ? "Machining complete — required shape reached" : "Machining complete — some stock is left", x0 + 14, y0 + 24);
       c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#e2e8f0"; c.fillText(`Stock left above the finished outline: max ${st.maxRes.toFixed(2)} mm`, x0 + 14, y0 + 46);
       c.fillText(`Cycle time ${mmss(st.time)} · ${st.lines} program blocks`, x0 + 14, y0 + 64);
       (st.regions || []).forEach((q, i) => { c.fillStyle = "#fbbf24"; c.fillText(`NOT MACHINED: ${q.txt}`, x0 + 14, y0 + 84 + i * 18); });
-      st.checks.slice(0, 5).forEach((q, i) => { c.fillStyle = q.ok ? "#4ade80" : "#fbbf24"; c.fillText(`${q.ok ? "✓" : "!"} #${q.no} ${q.spec.slice(0, 22)} → Ø${q.dia.toFixed(2)}`, x0 + 14, y0 + 84 + ((st.regions || []).length + i) * 18); });
+      { const D = st.dims || [], ok = D.filter((q) => q.state === "ok").length, bad = D.filter((q) => q.state === "bad"), insp = D.filter((q) => q.state === "insp").length, y = y0 + 84 + (st.regions || []).length * 18;
+        c.fillStyle = bad.length ? "#fbbf24" : "#4ade80"; c.fillText(`Dimensions: ${D.length} checked · ${ok} reached${insp ? " · " + insp + " to inspect" : ""}`, x0 + 14, y);
+        bad.slice(0, 2).forEach((q, i) => { c.fillStyle = "#f87171"; c.fillText(`✗ #${q.no} ${q.spec.slice(0, 20)} → ${q.res.slice(0, 26)}`, x0 + 14, y + 18 + i * 18); }); }
     }
   };
 
@@ -891,6 +932,84 @@
     for (let i = 0; i < 12; i++) { c.fillStyle = `rgba(224,242,254,${0.15 + 0.4 * Math.random()})`; c.beginPath(); c.arc(tx + (Math.random() - 0.5) * 34, ty + (Math.random() - 0.7) * 22, 1 + 2 * Math.random(), 0, 7); c.fill(); }
     c.restore();
   };
+  /* ================================================================ dimensions of the stage drawing, drawn on the part, a close-up window, and the dimension check page ================================================================ */
+  Sim.prototype.dimList = function () {
+    if (this._dl) return this._dl; const L = [], M = this.cx.M;
+    for (const c of this.g.mine) {
+      const f = M.get(+c.no); if (!f) continue; const spec = (c.spec || c.text || "").toString().replace(/\s*\*\s*$/, "").replace(/\s*\(.*$/, "");
+      let kind = null; if (c.type === "Thread") kind = "thr"; else if (f.kind === "dia") kind = "dia"; else if (f.kind === "len") kind = "len"; else if (f.kind === "edge" && c.type === "Radius") kind = "rad"; else if (f.kind === "edge" && (c.type === "Angle" || c.type === "Chamfer")) kind = "ang"; if (!kind) continue;
+      const d = { no: c.no, spec, kind, outer: f.side === "o" || f.outer === true };
+      if (kind === "dia" || kind === "thr") { d.x = f.e ? (f.e.a[0] + f.e.b[0]) / 2 : f.pt ? (f.pt[0] < 0.5 ? f.pt[0] + 0.35 : f.pt[0] - 0.35) : (f.x0 + f.x1) / 2; d.r = f.r != null ? f.r : f.pt ? f.pt[1] : f.e.a[1]; if (kind === "dia" && d.spec.length < 3) continue; }
+      else if (kind === "len") { d.x0 = Math.min(f.a, f.b); d.x1 = Math.max(f.a, f.b); d.outer = f.outer !== false; }
+      else { d.p = f.p || (f.e && [(f.e.a[0] + f.e.b[0]) / 2, (f.e.a[1] + f.e.b[1]) / 2]); if (!d.p) continue; }
+      L.push(d);
+    }
+    this._dl = L; return L;
+  };
+  Sim.prototype.drawDims = function (c) {
+    const L = this.dimList(), k = this.k, cy = this.cy, S = this.g.S, st = this.done && this.stats ? this.stats.dims : null;
+    const col = (d) => { const q = st && st.find((z) => z.no === d.no); return q ? (q.state === "ok" ? "#4ade80" : q.state === "bad" ? "#f87171" : "#f472b6") : "#f472b6"; };
+    const txt = (t, x, y, colr, al) => { c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = al || "center"; c.lineWidth = 3.5; c.strokeStyle = "rgba(2,6,23,.95)"; c.strokeText(t, x, y); c.fillStyle = colr; c.fillText(t, x, y); };
+    const arrow = (x, y, dx, dy, colr) => { const n = Math.hypot(dx, dy) || 1, ux = dx / n, uy = dy / n; c.beginPath(); c.moveTo(x, y); c.lineTo(x - ux * 8 - uy * 3, y - uy * 8 + ux * 3); c.lineTo(x - ux * 8 + uy * 3, y - uy * 8 - ux * 3); c.closePath(); c.fillStyle = colr; c.fill(); };
+    const line = (x1, y1, x2, y2, colr, w) => { c.beginPath(); c.moveTo(x1, y1); c.lineTo(x2, y2); c.strokeStyle = "rgba(2,6,23,.9)"; c.lineWidth = (w || 1.3) + 2; c.stroke(); c.strokeStyle = colr; c.lineWidth = w || 1.3; c.stroke(); };
+    c.save(); c.textBaseline = "alphabetic"; c.lineJoin = "round";
+    // diameters and threads: a vertical dimension line across the part at the feature, label above the top end (three rows so labels do not overlap)
+    const dl = L.filter((d) => d.kind === "dia" || d.kind === "thr").sort((a, b) => a.x - b.x), rowEnd = [-1e9, -1e9, -1e9];
+    dl.forEach((d) => {
+      const X = this.sx(d.x), y1 = cy - d.r * k, y2 = cy + d.r * k, cc = col(d), t = (d.kind === "dia" && !/^[ØøM]/.test(d.spec) ? "Ø" : "") + d.spec; c.font = "600 12px system-ui, Segoe UI, Arial"; const w = c.measureText(t).width;
+      line(X, y1, X, y2, cc); arrow(X, y1, 0, -1, cc); arrow(X, y2, 0, 1, cc);
+      let row = rowEnd.findIndex((e) => X - w / 2 > e + 6); if (row < 0) row = 0; rowEnd[row] = X + w / 2;
+      const ty = Math.min(y1, cy - 2) - 8 - row * 15; txt(t, X, ty, cc);
+    });
+    // lengths: horizontal dimension lines in lanes above the part (bore depths below it), with extension lines
+    const lens = L.filter((d) => d.kind === "len").sort((a, b) => a.x1 - a.x0 - (b.x1 - b.x0)), lanes = { up: [], dn: [] }, rmax = S.rmax;
+    lens.forEach((d) => {
+      const side = d.outer ? "up" : "dn", ln = lanes[side]; let lane = 0; while (ln.some((q) => q.lane === lane && !(d.x1 < q.x0 - 0.2 || d.x0 > q.x1 + 0.2))) lane++; ln.push({ lane, x0: d.x0, x1: d.x1 });
+      const sg = side === "up" ? -1 : 1, y = cy + sg * ((rmax + 1.1) * k + 22 + lane * 18), xa = this.sx(d.x0), xb = this.sx(d.x1), cc = col(d), t = d.spec;
+      const ra = S.rOut(d.x0 + 1e-6), rb = S.rOut(d.x1 - 1e-6);
+      line(xa, cy + sg * (ra * k + 3), xa, y + sg * 4, cc, 0.9); line(xb, cy + sg * (rb * k + 3), xb, y + sg * 4, cc, 0.9);
+      line(xa, y, xb, y, cc); arrow(xa, y, 1, 0, cc); arrow(xb, y, -1, 0, cc);
+      txt(t, (xa + xb) / 2, y + (sg < 0 ? -5 : 14), cc);
+    });
+    // radii and angles: text with a short leader to the edge
+    L.filter((d) => d.kind === "rad" || d.kind === "ang").forEach((d, i) => {
+      const X = this.sx(d.p[0]), Y = cy - d.p[1] * k, cc = col(d), dx = 16 + (i % 3) * 8, dy = -22 - (i % 4) * 9;
+      line(X, Y, X + dx, Y + dy, cc, 1); c.beginPath(); c.arc(X, Y, 2.2, 0, 7); c.fillStyle = cc; c.fill(); txt(d.spec.replace(/\s*\(.*$/, ""), X + dx, Y + dy - 3, cc, "left");
+    });
+    c.restore();
+  };
+  Sim.prototype.drawCloseup = function (c, ui) {
+    const bw = 340, bh = 170, bx = CW - PANEL - 12 - bw, by = CH - FOOT - bh - 8, Z = 4.5, m = this.lastM, far = (q) => !q || q.r > this.g.S.rmax + 2.5;
+    let tx, ty, q = null; if (m && m.type !== "tool" && m.type !== "home") { const [x, r] = this.xr(this.pos[0], this.pos[1]); q = { x, r }; }
+    if (far(q)) q = this.lastCut ? { x: this.lastCut.x, r: this.lastCut.r } : { x: (this.xlo + this.xhi) / 2, r: this.g.S.rmax * 0.8 };   // tool parked: show the last place it cut
+    tx = this.sx(q.x); ty = this.cy - q.r * this.k;
+    c.save(); c.beginPath(); c.rect(bx, by, bw, bh); c.clip(); c.fillStyle = "#0b1220"; c.fillRect(bx, by, bw, bh);
+    c.translate(bx + bw / 2, by + bh / 2); c.scale(Z, Z); c.translate(-tx, -ty);
+    this.paintView(c, Object.assign({}, ui || {}, { inset: true, Z }));
+    c.restore();
+    c.strokeStyle = "#22d3ee"; c.lineWidth = 2; c.strokeRect(bx, by, bw, bh); c.fillStyle = "rgba(2,6,23,.85)"; c.fillRect(bx, by, 150, 18); c.fillStyle = "#67e8f9"; c.font = "600 11px system-ui, Segoe UI, Arial"; c.textBaseline = "middle"; c.fillText("CLOSE-UP x4.5 at the tool tip", bx + 6, by + 9); c.textBaseline = "alphabetic";
+  };
+  Sim.prototype.getStats = function () {
+    const key = this.lifeKey(); CN._stats = CN._stats || {};
+    if (this.stats) return this.stats;
+    if (!CN._stats[key]) { const d = new Sim(this.g, this.cx); d.quiet = true; d.advance(d.total + 5); CN._stats[key] = d.stats; }
+    return CN._stats[key];
+  };
+  Sim.prototype.drawDimsPage = function (c) {
+    const st = this.getStats(), D = st.dims || [], x0 = 24, top = HEADH + STRIP + 4, ok = D.filter((q) => q.state === "ok").length, bad = D.filter((q) => q.state === "bad").length, insp = D.filter((q) => q.state === "insp").length;
+    c.fillStyle = "#0b1426"; c.fillRect(0, HEADH + 1, CW - PANEL, CH - HEADH - FOOT - 1);
+    c.textBaseline = "alphabetic"; c.fillStyle = "#e2e8f0"; c.font = "600 17px system-ui, Segoe UI, Arial"; c.fillText(`DIMENSION CHECK · ${this.g.name} · every dimension of this stage drawing`, x0, top + 6);
+    c.font = "13px system-ui, Segoe UI, Arial"; c.fillStyle = "#94a3b8"; c.fillText(`${D.length} dimensions: ${ok} reached${bad ? ` · ${bad} NOT reached` : ""}${insp ? ` · ${insp} to inspect on the part (form and position tolerances)` : ""}`, x0, top + 26);
+    const cols = [x0, x0 + 34, x0 + 214, x0 + 436, x0 + 700 - 24], hy = top + 50; c.font = "600 11px system-ui, Segoe UI, Arial"; c.fillStyle = "#64748b"; ["No", "Requirement", "Made by", "Result in the simulation", ""].forEach((h, i) => c.fillText(h, cols[i], hy));
+    c.fillStyle = "#1e293b"; c.fillRect(x0, hy + 5, CW - PANEL - 2 * x0, 1);
+    const RH = Math.min(17, Math.floor((CH - FOOT - hy - 20) / Math.max(1, D.length)));
+    c.font = "12px system-ui, Segoe UI, Arial";
+    D.forEach((q, i) => {
+      const y = hy + 20 + i * RH, colr = q.state === "ok" ? "#4ade80" : q.state === "bad" ? "#f87171" : q.state === "insp" ? "#fbbf24" : "#94a3b8";
+      c.fillStyle = "#cbd5e1"; c.fillText(String(q.no), cols[0], y); c.fillText(`${q.type}: ${q.spec}`.slice(0, 30), cols[1], y); c.fillStyle = /CUSTOM/.test(q.made) ? "#f59e0b" : "#94a3b8"; c.fillText((q.made || "").slice(0, 38), cols[2], y);
+      c.fillStyle = colr; c.fillText((q.res || "").slice(0, 40), cols[3], y); c.fillText(q.state === "ok" ? "✓" : q.state === "bad" ? "✗" : q.state === "insp" ? "◎" : "·", cols[4], y);
+    });
+  };
   Sim.prototype.removedMm3 = function () { return this.vol || 0; };
   void 0;
 
@@ -906,13 +1025,13 @@
       <select id="cnOp" style="${btn};max-width:300px"></select>
       <button id="cnPlay" style="${btn};background:#15803d;border-color:#16a34a">▶ Play</button><button id="cnRe" style="${btn}">⟲ Restart</button>
       <select id="cnSp" style="${btn};max-width:190px"><option value="120">Slow (about 2 min)</option><option value="60" selected>Normal (about 1 min)</option><option value="30">Fast (about 30 s)</option><option value="15">Very fast (about 15 s)</option></select>
-      <button id="cnLook" style="${btn}">🎥 Machine view</button><button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
+      <button id="cnDims" style="${btn}">📐 Dimension check</button><button id="cnZoom" style="${btn}">🔍 Close-up: on</button><button id="cnLook" style="${btn}">🎥 Machine view</button><button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
       <canvas id="cnCv" width="${CW}" height="${CH}" style="width:min(100%,calc((100vh - 70px) * 16 / 9));height:auto;border-radius:10px;border:1px solid #1e293b;background:#0b1220"></canvas>
       <div id="cnNote" style="color:#94a3b8;font-size:12px;max-width:1280px;text-align:center">Draft program made from the stage drawing. The program on the right is the one that is simulated. Check feeds, speeds, tools and tool-nose compensation on your machine before production.</div>`;
     document.body.appendChild(ov);
     const $ = (id) => ov.querySelector("#" + id), cv = $("cnCv"), c = cv.getContext("2d"); let sim = null, g = null, playing = false, last = 0, raf = 0, rec = null, doneAt = 0, ui = {};
     ranks.forEach((r) => { const o = document.createElement("option"); o.value = r.rank; o.textContent = `OP ${r.op.opNo} · ${r.op.name}`; $("cnOp").appendChild(o); });
-    const load = (rank) => { g = CN.gen(cx, rank); sim = new Sim(g, cx); sim.partsDone = +$("cnParts").value || 0; setTimeout(() => { try { if (sim) sim.getLife(); } catch (e) { /* ignore */ } }, 60); playing = false; $("cnPlay").textContent = "▶ Play"; doneAt = 0; ui = { look: ui.look }; $("cnLife").textContent = "⏱ Tool life"; };
+    const load = (rank) => { g = CN.gen(cx, rank); sim = new Sim(g, cx); sim.partsDone = +$("cnParts").value || 0; setTimeout(() => { try { if (sim) sim.getLife(); } catch (e) { /* ignore */ } }, 60); playing = false; $("cnPlay").textContent = "▶ Play"; doneAt = 0; ui = { look: ui.look, zoom: ui.zoom }; $("cnLife").textContent = "⏱ Tool life"; $("cnDims").textContent = "📐 Dimension check"; };
     const speed = () => Math.max(1, sim.total / (+$("cnSp").value || 60));
     const frame = (ts) => {
       raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (ts - last) / 1000 || 0); last = ts;
@@ -922,7 +1041,9 @@
       if (sim) sim.draw(c, ui);
     };
     $("cnLook").onclick = () => { ui.look = ui.look === "machine" ? "" : "machine"; $("cnLook").textContent = ui.look === "machine" ? "◀ Drawing view" : "🎥 Machine view"; };
-    $("cnLife").onclick = () => { ui.page = ui.page === "life" ? "" : "life"; $("cnLife").textContent = ui.page === "life" ? "◀ Back to simulation" : "⏱ Tool life"; };
+    $("cnDims").onclick = () => { ui.page = ui.page === "dims" ? "" : "dims"; $("cnDims").textContent = ui.page === "dims" ? "◀ Back to simulation" : "📐 Dimension check"; $("cnLife").textContent = "⏱ Tool life"; };
+    $("cnZoom").onclick = () => { ui.zoom = ui.zoom === false ? true : false; $("cnZoom").textContent = ui.zoom === false ? "🔍 Close-up: off" : "🔍 Close-up: on"; };
+    $("cnLife").onclick = () => { ui.page = ui.page === "life" ? "" : "life"; $("cnLife").textContent = ui.page === "life" ? "◀ Back to simulation" : "⏱ Tool life"; $("cnDims").textContent = "📐 Dimension check"; };
     $("cnParts").onchange = () => { if (sim) sim.partsDone = Math.max(0, +$("cnParts").value || 0); };
     $("cnOp").onchange = () => { if (rec) return; load(+$("cnOp").value); };
     $("cnPlay").onclick = () => { if (!sim) return; if (sim.done) { sim.reset(); } playing = !playing; $("cnPlay").textContent = playing ? "⏸ Pause" : "▶ Play"; };
