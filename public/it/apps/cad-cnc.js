@@ -331,12 +331,12 @@
       return f < 0.13 ? r({ t: "cone", d: 0.8, turns: 4.5, R: 5.5, len: 30, label: "conical spiral chips, broken every peck" }) : r({ t: "frag", d: 0.8, label: "fan chips (higher feed breaks them)" });
     }
     if (mat === "BRASS") return r({ t: "frag", d: 1.4, label: "short broken chips (brass)" });
-    if (mat === "ALUMINIUM") return f >= 0.15 && ap >= 0.6 ? r({ t: "helix", d: 12, turns: 7, R: 7, len: 80, label: "long loose spiral (aluminium keeps flowing)" }) : r({ t: "ribbon", d: 24, len: 110, amp: 6, label: "long ribbon (aluminium, light cut)" });
+    if (mat === "ALUMINIUM") return f >= 0.15 && ap >= 0.6 ? r({ t: "helix", d: 16, turns: 7, R: 7, len: 80, label: "long loose spiral (aluminium keeps flowing)" }) : r({ t: "ribbon", d: 24, len: 110, amp: 6, label: "long ribbon (aluminium, light cut)" });
     if (mat === "STAINLESS") return ap < 0.5 || f < 0.1 ? r({ t: "ribbon", d: 18, len: 85, amp: 4, label: "tough stringy ribbon (stainless, light cut)" }) : r({ t: "zig", d: 6, len: 26, amp: 5, label: "tough buckled chips (stainless)" });
     if (kind === "thread") return r({ t: "ribbon", d: 8, len: 34, amp: 2.5, label: "thin thread swarf" });
-    if (f < 0.1 || ap < 0.4) return r({ t: "ribbon", d: 20, len: 100, amp: 4, label: "long thin ribbon (feed or depth too small to break the chip)" });
+    if (f < 0.1 || ap < 0.4) return r({ t: "ribbon", d: 26, len: 100, amp: 4, label: "long thin ribbon (feed or depth too small to break the chip)" });
     if (f > 0.32) return r({ t: "frag", d: 3, label: "short C / square chips (feed very high)" });
-    return r({ t: "helix", d: 5, turns: 3.4, R: 3.5 + Math.min(ap, 3) * 1.1, len: 30, label: "short spiral chips (chip breaker working)" });
+    return r({ t: "helix", d: 7, turns: 3.4, R: 3.5 + Math.min(ap, 3) * 1.1, len: 30, label: "short spiral chips (chip breaker working)" });
   };
 
 
@@ -502,7 +502,7 @@
   void 0;
 
   /* ================================================================ drawing the simulation frame (one canvas, so the recorded video has everything) ================================================================ */
-  const CW = 1280, CH = 720, PANEL = 470, HEADH = 46, FOOT = 64, STRIP = 76, TOPM = 18;
+  const CW = 1280, CH = 720, PANEL = 470, HEADH = 46, FOOT = 64, STRIP = 76, TOPM = 12;
   Sim.prototype.layout = function () {
     const vw = CW - PANEL - 24, vh = CH - HEADH - STRIP - FOOT - 16, wx = this.xhi - this.xlo, k = Math.min(vw / wx, vh / (2 * this.Rm + 2 + TOPM));
     this.k = k; this.ox = 12 + (vw - wx * k) / 2 - this.xlo * k; this.cy = HEADH + STRIP + 8 + k * (this.Rm + 1 + TOPM);
@@ -510,14 +510,22 @@
   Sim.prototype.sx = function (x) { return this.ox + x * this.k; };
   Sim.prototype.sy = function (r) { return this.cy - r * this.k; };
   Sim.prototype.paintGrid = function () {
-    if (!this.off) { this.off = document.createElement("canvas"); this.off.width = this.W; this.off.height = this.Hc; this.octx = this.off.getContext("2d"); this.img = this.octx.createImageData(this.W, this.Hc); }
-    if (!this.dirty) return; const { W, Hc, mat, tgt, img } = this, d = img.data, res = this.done;
+    if (!this.off) { this.off = document.createElement("canvas"); this.off.width = this.W; this.off.height = this.Hc; this.octx = this.off.getContext("2d"); }
+    if (!this.img) this.img = this.octx.createImageData(this.W, this.Hc);
+    if (!this.dirty) return; const { W, Hc, mat, tgt, img } = this, d = img.data, res = this.done, rim = Math.max(2, Math.round(2.4 / Math.max(this.k * this.cs, 0.05)));
+    const empty = (k) => k < 0 || k >= mat.length || !mat[k];
     for (let j = 0; j < Hc; j++) {
-      const row = Hc - 1 - j, sh = 0.80 + 0.2 * (j / Hc);
+      const row = Hc - 1 - j, sh = 0.74 + 0.26 * (j / Hc);
       for (let i = 0; i < W; i++) {
         const k = j * W + i, o = (row * W + i) * 4;
         if (!mat[k]) { d[o + 3] = 0; continue; }
-        if (res && !tgt[k]) { d[o] = 245; d[o + 1] = 158; d[o + 2] = 11; d[o + 3] = 255; } else { d[o] = 150 * sh + 30; d[o + 1] = 165 * sh + 30; d[o + 2] = 185 * sh + 30; d[o + 3] = 255; }
+        if (res && !tgt[k]) { d[o] = 245; d[o + 1] = 158; d[o + 2] = 11; d[o + 3] = 255; continue; }
+        // machined steel: cool grey, brighter towards the outside, fine grain, lit rims (light from the upper left)
+        let v = sh * 150 + 38 + ((((i * 73856093) ^ (j * 19349663)) >>> 3) & 7) - 3, tint = 1;
+        const eU = j + rim < Hc ? empty(k + rim * W) : true, eD = j - rim >= 0 ? empty(k - rim * W) : false, eL = i - rim >= 0 ? empty(k - rim) : true, eR = i + rim < W ? empty(k + rim) : true;
+        if (eU) v += 46; if (eL) v += 26; if (eR) v -= 30; if (eD) v -= 24;
+        if (!tgt[k]) { v += 6; tint = 0.97; }   // metal still above the finished outline is a little duller
+        d[o] = Math.max(0, Math.min(255, v * 0.94 * tint)); d[o + 1] = Math.max(0, Math.min(255, v * 0.99)); d[o + 2] = Math.max(0, Math.min(255, v * 1.08)); d[o + 3] = 255;
       }
     }
     this.octx.putImageData(img, 0, 0); this.dirty = false;
@@ -541,28 +549,43 @@
     }
     return null;
   };
+  /** fill a polygon with a steel gradient across its height (light on top) */
+  const metalFill = (c, pts, stops, stroke) => {
+    const ys = pts.map((p) => p[1]), xs = pts.map((p) => p[0]), y0 = Math.min(...ys), y1 = Math.max(...ys), g = c.createLinearGradient(0, y0, 0, y1 + 0.01);
+    stops.forEach((q) => g.addColorStop(q[0], q[1])); c.beginPath(); pts.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.closePath();
+    c.save(); c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 9; c.shadowOffsetX = 2; c.shadowOffsetY = 4; c.fillStyle = g; c.fill(); c.restore(); c.strokeStyle = stroke || "#0b1220"; c.lineWidth = 1.1; c.stroke();
+    return { x0: Math.min(...xs), x1: Math.max(...xs), y0, y1 };
+  };
+  const STEEL = [[0, "#c3ccd8"], [0.18, "#9aa6b6"], [0.55, "#5f6b7c"], [1, "#333c4a"]], CYL = [[0, "#4b5563"], [0.28, "#e5e9ef"], [0.5, "#9ba6b5"], [1, "#2b3340"]], COAT = [[0, "#f4d98a"], [0.5, "#c99a2e"], [1, "#7a5a12"]];
+  const screw = (c, x, y, R) => { const g = c.createRadialGradient(x - R * 0.3, y - R * 0.3, R * 0.1, x, y, R); g.addColorStop(0, "#e5e7eb"); g.addColorStop(1, "#4b5563"); c.beginPath(); c.arc(x, y, R, 0, 7); c.fillStyle = g; c.fill(); c.strokeStyle = "#111827"; c.lineWidth = 1; c.stroke(); c.beginPath(); c.moveTo(x - R * 0.65, y - R * 0.2); c.lineTo(x + R * 0.65, y + R * 0.2); c.stroke(); };
   Sim.prototype.drawTool = function (c) {
     const tl = this.g.tools[this.tool], m = this.lastM; if (!tl || !m || m.type === "tool" || m.type === "home") return;
     const k = this.k, sf = this.sf, [x, r] = this.xr(this.pos[0], this.pos[1]), X = this.sx(x), Y = this.cy - r * k, P = (p) => [X + p[0] * sf * k, Y - p[1] * k];
-    const poly = (pts, fill, stroke, lw) => { c.beginPath(); pts.forEach((p, i) => { const q = P(p); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.closePath(); c.fillStyle = fill; c.fill(); c.strokeStyle = stroke; c.lineWidth = lw; c.stroke(); };
     if (tl.kind === "drill") {
-      const rd = tl.rd, cy = this.cy, fl = tl.fl, sh = tl.shank / 2, nut = tl.nut / 2, pl = 0.3 * 2 * rd;   // point length about 0.3 D for 118 deg
-      const Q = (u, v) => [X + u * sf * k, cy - v * k];
-      const path = (pts, fill, stroke) => { c.beginPath(); pts.forEach((p, i) => { const q = Q(p[0], p[1]); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.closePath(); c.fillStyle = fill; c.fill(); c.strokeStyle = stroke; c.lineWidth = 1; c.stroke(); };
-      path([[0, 0], [pl, rd], [fl, rd], [fl, -rd], [pl, -rd]], "#e5e7eb", "#0f172a");
-      c.strokeStyle = "#94a3b8"; c.lineWidth = 1; c.beginPath(); for (let q = 0; pl + 1 + q * 2.2 < fl; q++) { const u = pl + 1 + q * 2.2, a = Q(u, rd), b = Q(u + 1.6, -rd); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); } c.stroke();
-      path([[fl, sh], [fl + 4, sh], [fl + 4, -sh], [fl, -sh]], "#cbd5e1", "#0f172a");
-      path([[fl + 4, nut * 0.8], [fl + 12, nut], [fl + 62, nut], [fl + 62, -nut], [fl + 12, -nut], [fl + 4, -nut * 0.8]], "#64748b", "#0f172a");
-      const lb = Q(fl + 14, nut - 3); c.save(); c.fillStyle = "#e2e8f0"; c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = sf > 0 ? "left" : "right"; c.fillText(tl.holder, lb[0], lb[1]); c.restore();
-      const t0 = Q(0, 0); this.ring(c, t0[0], t0[1], 8, tl);
-      return;
+      const rd = tl.rd, cy = this.cy, fl = tl.fl, sh = tl.shank / 2, nut = tl.nut / 2, pl = 0.3 * 2 * rd, Q = (u, v) => [X + u * sf * k, cy - v * k];
+      const body = [[0, 0], [pl, rd], [fl, rd], [fl, -rd], [pl, -rd]].map((p) => Q(p[0], p[1])), b = metalFill(c, body, [[0, "#d9dee6"], [0.3, "#f3f4f6"], [0.55, "#aab3c0"], [1, "#5b6574"]]);
+      c.save(); c.beginPath(); body.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.closePath(); c.clip();   // two helical flutes
+      c.strokeStyle = "rgba(30,41,59,.85)"; c.lineWidth = Math.max(2, rd * k * 0.55); c.beginPath(); for (let q = 0; pl + q * 2.4 < fl + 2.4; q++) { const u = pl + q * 2.4, a = Q(u, rd * 0.9), e = Q(u + 1.8, -rd * 0.9); c.moveTo(a[0], a[1]); c.lineTo(e[0], e[1]); } c.stroke();
+      c.strokeStyle = "rgba(255,255,255,.55)"; c.lineWidth = 1; c.beginPath(); for (let q = 0; pl + q * 2.4 < fl + 2.4; q++) { const u = pl + q * 2.4 + 0.9, a = Q(u, rd * 0.9), e = Q(u + 1.8, -rd * 0.9); c.moveTo(a[0], a[1]); c.lineTo(e[0], e[1]); } c.stroke(); c.restore();
+      metalFill(c, [[fl, sh], [fl + 4, sh], [fl + 4, -sh], [fl, -sh]].map((p) => Q(p[0], p[1])), CYL);
+      const nutp = [[fl + 4, nut * 0.8], [fl + 12, nut], [fl + 62, nut], [fl + 62, -nut], [fl + 12, -nut], [fl + 4, -nut * 0.8]].map((p) => Q(p[0], p[1])); metalFill(c, nutp, CYL);
+      c.save(); c.strokeStyle = "rgba(0,0,0,.35)"; c.lineWidth = 1; c.beginPath(); for (let u = fl + 14; u < fl + 60; u += 2.2) { const a = Q(u, nut), e = Q(u, -nut); c.moveTo(a[0], a[1]); c.lineTo(e[0], e[1]); } c.stroke(); c.restore();
+      const lb = Q(fl + 16, nut + 1.6); c.save(); c.fillStyle = "#e2e8f0"; c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = sf > 0 ? "left" : "right"; c.fillText(tl.holder, lb[0], lb[1]); c.restore();
+      const t0 = Q(0, 0); this.ring(c, t0[0], t0[1], 8, tl, this.cornerOf(this.tool)); return;
     }
     const G = toolGeom(tl); if (!G) return;
-    poly(G.holder, "#64748b", "#0f172a", 1.2);
-    poly(G.insert, "#fbbf24", "#0f172a", 1.2);
-    const cs = this.cornerOf(this.tool), a = P(G.holder[0]), b = P(G.holder[1]);
-    c.save(); c.fillStyle = "#e2e8f0"; c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = sf > 0 ? "left" : "right"; const tx = P([22, G.holder[0][1] + (G.holder[2][1] - G.holder[0][1]) / 2 + 1.5]); c.fillText(G.label, tx[0], tx[1]); c.restore();
-    const cl = G.insert[0], ring = P(cl); this.ring(c, ring[0], ring[1], Math.max(8, (G.nose + 0.8) * k), tl, cs);
+    const hp = G.holder.map(P), ip = G.insert.map(P);
+    const hb = metalFill(c, hp, tl.kind === "bore" ? CYL : STEEL);
+    if (tl.kind !== "bore") { c.save(); c.strokeStyle = "rgba(255,255,255,.35)"; c.lineWidth = 1; c.beginPath(); c.moveTo(hp[0][0], hp[0][1] + 2); c.lineTo(hp[1][0], hp[0][1] + 2); c.stroke(); c.restore(); }
+    metalFill(c, ip, COAT, "#3b2a06");
+    // insert details: centre hole, clamp screw, bright cutting edges
+    const cxm = ip.reduce((a, p) => a + p[0], 0) / ip.length, cym = ip.reduce((a, p) => a + p[1], 0) / ip.length;
+    if (tl.kind !== "thread") screw(c, cxm, cym, Math.max(3, 0.9 * k)); else screw(c, cxm, cym + 0.2 * k, Math.max(3, 0.9 * k));
+    c.save(); c.strokeStyle = "rgba(255,255,255,.85)"; c.lineWidth = 1.2; c.beginPath(); c.moveTo(ip[1][0], ip[1][1]); c.lineTo(ip[0][0], ip[0][1]); c.lineTo(ip[ip.length - 1][0], ip[ip.length - 1][1]); c.stroke(); c.restore();
+    const hc = P([30, G.holder[0][1] + (G.holder[2][1] - G.holder[0][1]) / 2]); screw(c, hc[0], hc[1], Math.max(4, 1.6 * k));
+    const cs = this.cornerOf(this.tool);
+    c.save(); c.fillStyle = "#e2e8f0"; c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = sf > 0 ? "left" : "right"; const tx = P([44, G.holder[0][1] + (G.holder[2][1] - G.holder[0][1]) / 2 - 1.2]); c.fillText(G.label, tx[0], tx[1]); c.restore();
+    const ring = P(G.insert[0]); this.ring(c, ring[0], ring[1], Math.max(8, (G.nose + 0.8) * k), tl, cs);
   };
   /** red ring on the cutting corner + a short label */
   Sim.prototype.ring = function (c, X, Y, R, tl, cs) {
@@ -620,15 +643,18 @@
       if (q.vy > 0 && !q.hole && this.solidAt(q.px, q.py)) q.dead = true;   // falls behind the bar
       if (q.py > bot || q.life > 3.5) q.dead = true;
       const a = Math.max(0, Math.min(1, 1.4 - q.life * 0.4));
-      c.save(); c.translate(q.px, q.py); c.scale(2.3, 2.3); c.lineCap = "round"; c.lineJoin = "round";
+      c.save(); c.translate(q.px, q.py); c.scale(1.8, 1.8); c.lineCap = "round"; c.lineJoin = "round";
       chipPath(c, q); c.strokeStyle = "rgba(2,6,23,.85)"; c.lineWidth = 3; c.stroke();
       chipPath(c, q); c.strokeStyle = chipColour(mat, q.heat, a); c.lineWidth = 1.6; c.stroke(); c.restore();
     }
     this.chips = this.chips.filter((q) => !q.dead);
   };
   Sim.prototype.draw = function (c, ui) {
+    try { this._draw(c, ui); this.drawErr = ""; } catch (e) { this.drawErr = e.message; if (!this._errLogged) { this._errLogged = true; console.error("CNC simulation draw error", e); } c.save(); c.fillStyle = "#fca5a5"; c.font = "12px ui-monospace, Menlo, Consolas, monospace"; c.textBaseline = "alphabetic"; c.fillText("Display problem: " + e.message, 14, CH - FOOT + 54); c.restore(); }
+  };
+  Sim.prototype._draw = function (c, ui) {
     this.layout(); const k = this.k, W = CW, H = CH;
-    c.fillStyle = "#0b1220"; c.fillRect(0, 0, W, H);
+    { const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#0d1626"); bg.addColorStop(1, "#070c16"); c.fillStyle = bg; c.fillRect(0, 0, W, H); }
     // header
     c.fillStyle = "#111c33"; c.fillRect(0, 0, W, HEADH); c.fillStyle = "#e2e8f0"; c.font = "600 17px system-ui, Segoe UI, Arial"; c.textBaseline = "middle";
     const op = this.g.op; c.fillText(`CNC SIMULATION · OP ${op.opNo} · ${String(op.name || "").toUpperCase()}`, 14, HEADH / 2);
@@ -648,8 +674,15 @@
         for (const v of this.g.S.voids) { c.beginPath(); const pp = v.tip ? v.pts.concat([v.tip]) : v.pts; pp.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke(); }
       }
     }
-    // chuck / soft jaws
-    for (const sg of [1, -1]) { c.beginPath(); this.g.jaws.poly.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.closePath(); c.fillStyle = "rgba(14,116,180,.55)"; c.fill(); c.strokeStyle = "#38bdf8"; c.lineWidth = 1.5; c.stroke(); }
+    // chuck / soft jaws: steel with a serrated face
+    for (const sg of [1, -1]) {
+      const ys = this.g.jaws.poly.map((p) => this.cy - sg * p[1] * k), y0 = Math.min(...ys), y1 = Math.max(...ys), gr = c.createLinearGradient(0, y0, 0, y1);
+      gr.addColorStop(0, "#9aa7b8"); gr.addColorStop(0.45, "#5b6778"); gr.addColorStop(1, "#2b3442");
+      c.save(); c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 10; c.shadowOffsetY = 3;
+      c.beginPath(); this.g.jaws.poly.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.closePath(); c.fillStyle = gr; c.fill(); c.restore();
+      c.strokeStyle = "#0f172a"; c.lineWidth = 1.2; c.stroke();
+      c.save(); c.clip(); c.strokeStyle = "rgba(255,255,255,.10)"; c.lineWidth = 1; const xs = this.g.jaws.poly.map((p) => this.sx(p[0])), xa = Math.min(...xs), xb = Math.max(...xs); c.beginPath(); for (let X = xa; X < xb; X += 7) { c.moveTo(X, y0); c.lineTo(X, y1); } c.stroke(); c.restore();
+    }
     // tool path trail
     c.lineWidth = 1; c.strokeStyle = "rgba(34,197,94,.75)"; c.beginPath(); let pen = false;
     for (const q of this.trail) { const [x, r] = this.xr(q[0], q[1]), X = this.sx(x), Y = this.cy - r * k; if (q[2] && pen) c.lineTo(X, Y); else c.moveTo(X, Y); pen = !!q[2]; } c.stroke();
@@ -772,7 +805,7 @@
       raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (ts - last) / 1000 || 0); last = ts;
       if (playing && sim && !sim.done) sim.advance(dt * speed());
       if (sim && sim.done && playing) { playing = false; $("cnPlay").textContent = "▶ Play again"; doneAt = ts; }
-      if (rec && sim && sim.done && ts - doneAt > 2800) { rec.stop(); }
+      if (rec && sim && sim.done && ts - doneAt > 2800 && rec.state === "recording") { try { rec.stop(); } catch (e) { /* already stopped */ } }
       if (sim) sim.draw(c, ui);
     };
     $("cnLife").onclick = () => { ui.page = ui.page === "life" ? "" : "life"; $("cnLife").textContent = ui.page === "life" ? "◀ Back to simulation" : "⏱ Tool life"; };
