@@ -834,5 +834,7 @@
     } });
   };
 
+  SP.util = { nomOf, plainTxt, isDia, r2 };
+
   /*@@END@@*/
 })((window.KCAD = window.KCAD || {}));

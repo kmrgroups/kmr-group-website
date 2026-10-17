@@ -444,7 +444,7 @@
     const R = SP.build(P, m, { anchor });
     const used = new Set(); for (const o of P.ops || []) for (const n of (P.freeze.map || {})[String(o.opNo)] || []) used.add(+n);
     R.report.unsure = []; R.total = used.size;
-    R.doc.info = { stage: { pd: P.id, part: P.part_no || "", partName: P.part_name || "", freezeRev: P.freeze.rev, frozenAt: P.freeze.at, source: { kind: "stages", name: SRC.name || "", anchored: !!anchor }, raster: false, flow: true, shape: { outer: m.outer, inner: m.inner, L: m.L, D0: m.D0 }, sheets: R.sheets, made: new Date().toISOString() } };
+    R.doc.info = { stage: { pd: P.id, part: P.part_no || "", partName: P.part_name || "", freezeRev: P.freeze.rev, frozenAt: P.freeze.at, source: { kind: "stages", name: SRC.name || "", anchored: !!anchor }, raster: false, flow: true, shape: { outer: m.outer, inner: m.inner, L: m.L, D0: m.D0 }, model: { outer: m.outer, inner: m.inner, L: m.L, rmax: m.rmax, D0: m.D0, fa: m.fa, clamp: m.clamp, first: m.first, bar: m.bar }, own: Array.from(R.cx.own.entries()), sheets: R.sheets, made: new Date().toISOString() } };
     return R;
   }
 
@@ -495,8 +495,9 @@
   K.stageBar = (E, el) => {
     el = el || document.getElementById("edbar"); const st = E.doc.info && E.doc.info.stage; if (!el || !st) return;
     el.className = "edbar"; el.classList.remove("hide");
-    el.innerHTML = `<b>Stage drawings · ${esc(st.part)}</b> <span>freeze rev ${esc(String(st.freezeRev))} · ${st.sheets.length} sheet${st.sheets.length > 1 ? "s" : ""} · ${esc(st.source.name || "")}</span><span style="flex:1"></span>${st.sentAt ? `<span class="mut">Sent to the SOP ${esc(new Date(st.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>` : '<span class="mut">Not sent to the SOP yet</span>'}<button class="btn s" data-st="send">Send to SOP</button><button class="btn s o" data-st="save" title="Keep this set in the drawing register">Save as drawing</button>${/^pd-sample/.test(st.pd) ? '<span class="mut">(sample part — in your workspace the SOP opens in Process Documents)</span>' : `<a class="btn s o" href="${esc(sopHref(st.pd))}" target="_blank" rel="noopener">Open the SOP ↗</a>`}`;
+    el.innerHTML = `<b>Stage drawings · ${esc(st.part)}</b> <span>freeze rev ${esc(String(st.freezeRev))} · ${st.sheets.length} sheet${st.sheets.length > 1 ? "s" : ""} · ${esc(st.source.name || "")}</span><span style="flex:1"></span>${st.sentAt ? `<span class="mut">Sent to the SOP ${esc(new Date(st.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>` : '<span class="mut">Not sent to the SOP yet</span>'}<button class="btn s" data-st="send">Send to SOP</button><button class="btn s o" data-st="cnc" title="CNC program and machining simulation video">CNC simulation</button><button class="btn s o" data-st="save" title="Keep this set in the drawing register">Save as drawing</button>${/^pd-sample/.test(st.pd) ? '<span class="mut">(sample part — in your workspace the SOP opens in Process Documents)</span>' : `<a class="btn s o" href="${esc(sopHref(st.pd))}" target="_blank" rel="noopener">Open the SOP ↗</a>`}`;
     el.querySelector('[data-st="send"]').onclick = () => E.run("STAGESEND");
+    el.querySelector('[data-st="cnc"]').onclick = () => E.run("CNCSIM");
     el.querySelector('[data-st="save"]').onclick = () => E.run("SAVEAS");
   };
   K.editorHooks = K.editorHooks || [];
@@ -507,5 +508,5 @@
     { n: "Stage drawings for the SOP", b: [["STAGEDWG", "Make stage drawings", "title"], ["STAGESEND", "Send to SOP", "exportI"], ["STAGESOP", "Open the SOP", "open"]] },
   ] });
 
-  K.stageFlowBuild = flowBuild; K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate; K.stageCrop = cropPages;
+  K.stageGetProject = (id) => api.get(id); K.stageFlowBuild = flowBuild; K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate; K.stageCrop = cropPages;
 })((window.KCAD = window.KCAD || {}));
