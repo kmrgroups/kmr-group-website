@@ -469,8 +469,23 @@ def app_cad():
     return window(a, "CAD", b)
 
 
+def app_tsk():
+    a = "#4F46E5"
+    b = heading("My tasks · Friday", "Assigned from meetings, sales and by hand")
+    b += kpi(0, 38, 100, "Overdue", "2", RED) + kpi(106, 38, 100, "Due today", "3", AMBER) + kpi(212, 38, 100, "In progress", "5", a) + kpi(318, 38, 102, "Done this week", "12", OK)
+    items = [("Send revised quotation to Apex", "Sales Flow", "Tomorrow", AMBER), ("Close corrective action CA-114", "Minutes", "Overdue 2d", RED), ("Calibrate micrometer set MC-04", "Direct", "Mon 20", MUTED), ("Update control plan, station 3", "Minutes", "Today", AMBER)]
+    for i, (t, src, due, col) in enumerate(items):
+        y = 104 + i * 44
+        b += (f"<rect x='0' y='{y}' width='420' height='38' rx='9' fill='#fff' stroke='{LINE}'/><rect x='0' y='{y}' width='4' height='38' rx='2' fill='{col}'/>"
+              f"<circle cx='22' cy='{y + 19}' r='8' fill='none' stroke='{MUTED}' stroke-width='1.6'/>"
+              f"<text x='38' y='{y + 16}' {FONT} font-size='10.5' font-weight='700' fill='{INK}'>{t}</text><text x='38' y='{y + 29}' {FONT} font-size='9' fill='{MUTED}'>from {src}</text>"
+              f"<text x='410' y='{y + 22}' text-anchor='end' {FONT} font-size='9.5' font-weight='700' fill='{col}'>{due}</text>")
+    return window(a, "ActionTrack", b)
+
+
 ART = {
     "app-hrms": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM &amp; Payroll"),
+    "app-tsk": lambda: svg(bg("#4F46E5") + app_tsk(), "ActionTrack"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
     "app-pd": lambda: svg(bg("#F59E0B") + app_pd(), "Process Documents"),
     "app-capacity": lambda: svg(bg("#10B981") + app_capacity(), "Capacity Planner"),

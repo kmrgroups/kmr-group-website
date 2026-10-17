@@ -3,6 +3,7 @@
 (function () {
   "use strict";
   const APPS = {
+    tsk: { name: "ActionTrack", color: "#4F46E5", what: "Tasks with owner, due date, priority, checklist, comments, notifications and links to the meeting or sales entry they came from." },
     hrms: { name: "HRM & Payroll", color: "#0D9488", what: "Employees, shifts, holidays, leave, attendance, machine punches, payroll runs and payslips." },
     balloon: { name: "Balloon Inspector", color: "#A855F7", what: "Ballooned drawings and inspection reports (drawing files are kept so a restore brings them back)." },
     pd: { name: "Process Documents", color: "#F59E0B", what: "Projects (PFD, PFMEA, control plan, SOP …) and the workspace’s own lists." },
@@ -23,7 +24,7 @@
     id_cards: "ID cards", onboarding_invites: "onboarding", bi_reports: "reports", pd_projects: "projects", pd_masters: "own lists",
     cp_plans: "plan", cp_history: "saved versions", ops_records: "records",
     sf_lines: "plan lines", sf_despatch: "despatch days", sf_actions: "action plans",
-    cad_drawings: "drawings", cad_counters: "number counters", apqp_projects: "programmes", apqp_items: "deliverables", ppap_submissions: "submissions", rmp_bom: "BOM lines", rmp_stock: "stock records", rmp_demand: "parts to start", rmp_orders: "orders", mmd_route_sheets: "route sheets", mmd_tags: "QR tags", mmd_entries: "stage entries", mmd_dcs: "delivery challans", mmd_grns: "goods receipts", mmd_defects: "rejection & rework lines", mmd_loss: "loss entries", mmd_counters: "numbering counters", mom_meetings: "meetings", mom_points: "discussion points", mom_segments: "transcript lines", mom_counters: "numbering counters", mnt_breakdowns: "breakdowns", mnt_pm_plans: "PM plans", mnt_pm_log: "PM records", mnt_events: "history entries", mnt_counters: "numbering counters", cal_instruments: "instruments", cal_records: "calibrations", cal_events: "history events", cal_oot: "OOT cases", cal_msa: "MSA studies",
+    tsk_tasks: "tasks", tsk_comments: "comments", tsk_notifications: "notifications", tsk_push_subs: "alert devices", tsk_counters: "number counters", cad_drawings: "drawings", cad_counters: "number counters", apqp_projects: "programmes", apqp_items: "deliverables", ppap_submissions: "submissions", rmp_bom: "BOM lines", rmp_stock: "stock records", rmp_demand: "parts to start", rmp_orders: "orders", mmd_route_sheets: "route sheets", mmd_tags: "QR tags", mmd_entries: "stage entries", mmd_dcs: "delivery challans", mmd_grns: "goods receipts", mmd_defects: "rejection & rework lines", mmd_loss: "loss entries", mmd_counters: "numbering counters", mom_meetings: "meetings", mom_points: "discussion points", mom_segments: "transcript lines", mom_counters: "numbering counters", mnt_breakdowns: "breakdowns", mnt_pm_plans: "PM plans", mnt_pm_log: "PM records", mnt_events: "history entries", mnt_counters: "numbering counters", cal_instruments: "instruments", cal_records: "calibrations", cal_events: "history events", cal_oot: "OOT cases", cal_msa: "MSA studies",
   };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };

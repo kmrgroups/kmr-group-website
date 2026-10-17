@@ -1,0 +1,1 @@
+{"name":"ActionTrack","short_name":"ActionTrack","description":"Assign and track tasks","start_url":"/it/tasks.html","scope":"/it/","display":"standalone","background_color":"#f4f6fb","theme_color":"#4338ca","icons":[{"src":"/it/tasks-icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}

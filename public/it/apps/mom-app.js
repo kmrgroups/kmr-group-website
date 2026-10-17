@@ -122,7 +122,7 @@ ${bar}
       ${w ? `<div class="row" style="margin-top:8px"><button class="btn o s" id="atAdd">+ Add attendee</button><select id="atPick" data-multi style="max-width:320px"><option value="">Add from the CFT team…</option>${people.map((p) => `<option value="${esc(p.code)}">${esc(p.name)}${p.role ? " · " + esc(p.role) : ""}</option>`).join("")}</select><button class="btn o s" id="atPickGo">Add selected</button></div>` : ""}
       ${w ? '<div class="row" style="margin-top:12px"><button class="btn" id="hsave">Save and continue →</button></div>' : ""}</div><div class="row noprint" style="margin-top:10px">${!w ? '<button class="btn" data-step="2">Next: Discuss →</button>' : ""}</div>`)}
     ${sp(2, `${capturePanel(m, w)}<div class="row noprint"><button class="btn o" data-step="1">← Back</button><button class="btn" data-step="3">Next: Points →</button></div>`)}
-    ${sp(3, `    <div class="card"><div class="row"><h3 style="margin:0">Points · what was decided</h3><span class="grow"></span>${w ? '<button class="btn" id="pnew2">+ Add point</button>' : ""}${hasF("mom.translation") && D.points.length ? '<button class="btn o" id="trAll">🌐 Translate all</button>' : ""}</div>
+    ${sp(3, `    <div class="card"><div class="row"><h3 style="margin:0">Points · what was decided</h3><span class="grow"></span>${canTask() && D.points.some((p) => !["Done", "Dropped"].includes(p.status)) ? '<button class="btn o" id="ptAll" title="Give the open points to people as tasks in ActionTrack">→ Make tasks</button>' : ""}${w ? '<button class="btn" id="pnew2">+ Add point</button>' : ""}${hasF("mom.translation") && D.points.length ? '<button class="btn o" id="trAll">🌐 Translate all</button>' : ""}</div>
       <p class="note">Each point has an owner and a target date. Press Edit on a point to change it or to mark it Done. To make the points again from the discussion text, go back to Discuss.</p>${pointsTable()}</div><div class="row noprint" style="margin-top:10px"><button class="btn o" data-step="2">← Back to Discuss</button>${ed() && m.status === "open" ? '<button class="btn" id="fin2">✔ Finalise minutes</button>' : ""}</div>`)}`;
     bindEditor();
   }
@@ -152,7 +152,7 @@ ${bar}
       const tr = p.translations || {}, keys = Object.keys(tr);
       return `<tr data-pt="${p.id}"><td>${i + 1}</td><td class="t5">${p.topic ? `<div class="mut" style="font-size:12px">${esc(p.topic)}</div>` : ""}<b>${esc(p.what)}</b>${p.source === "voice" ? ' <span title="Made from the discussion text">🎙</span>' : ""}${sub("Why", p.why)}${sub("Where", p.where_at)}${sub("How", p.how)}${keys.length ? `<div>${keys.map((k) => `<span class="pill" data-showtr="${p.id}|${k}" style="cursor:pointer" title="Show translation">${esc(lname(k))}</span>`).join("")}</div><small class="tr" data-trbox="${p.id}"></small>` : ""}</td>
         <td class="t5">${esc(p.who || "")}</td><td>${dueChip(p.when_on, p.status)}${p.when_note ? `<div class="mut">${esc(p.when_note)}</div>` : ""}</td><td>${stChip(p.status)}<div class="mut" style="font-size:11px">${esc(p.ptype || "")}</div></td>
-        <td style="white-space:nowrap">${ed2 ? `<button class="btn o s" data-pe="${p.id}">${w ? "Edit" : "Update"}</button>` : ""}${hasF("mom.translation") ? ` <button class="btn o s" data-pt-tr="${p.id}" title="Translate this point">🌐</button>` : ""}${w ? ` <button class="btn o s" data-pd="${p.id}" title="Delete this point">✕</button>` : ""}</td></tr>`;
+        <td style="white-space:nowrap">${ed2 ? `<button class="btn o s" data-pe="${p.id}">${w ? "Edit" : "Update"}</button>` : ""}${hasF("mom.translation") ? ` <button class="btn o s" data-pt-tr="${p.id}" title="Translate this point">🌐</button>` : ""}${w ? ` <button class="btn o s" data-pd="${p.id}" title="Delete this point">✕</button>` : ""}${canTask() && !["Done", "Dropped"].includes(p.status) ? ` <button class="btn o s" data-pt-task="${p.id}" title="Make this a task in ActionTrack">→ Task</button>` : ""}</td></tr>`;
     }).join("")}</tbody></table>`;
   }
 
@@ -334,7 +334,7 @@ ${bar}
     const A = S.act || [], t = today(), f = V("af") || "open", ow = V("ao") || "", owners = [...new Set(A.map((a) => (a.who || "").split(",")[0].trim()).filter(Boolean))].sort();
     const rows = A.filter((a) => (f === "all" ? true : f === "open" ? !["Done", "Dropped"].includes(a.status) : f === "late" ? !["Done", "Dropped"].includes(a.status) && a.due_on && a.due_on < t : a.status === f)).filter((a) => !ow || (a.who || "").includes(ow));
     $("#act").innerHTML = `<div class="row"><select id="af" style="max-width:200px"><option value="open">Open</option><option value="late">Overdue</option><option value="In progress">In progress</option><option value="Done">Done</option><option value="all">All</option></select><select id="ao" style="max-width:220px"><option value="">All owners</option>${owners.map((o) => `<option${o === ow ? " selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="mut">${rows.length} of ${A.length}</span></div>
-      ${rows.length ? `<table><thead><tr><th>Meeting</th><th>Point</th><th>Owner</th><th>Target date</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr><td><a href="#go=meet&m=${a.meeting_id}" data-open="${a.meeting_id}">${esc(a.meeting_no)}</a><div class="mut">${dd(a.meeting_date)}</div></td><td class="t5"><b>${esc(a.what)}</b>${a.topic ? `<div class="mut">${esc(a.topic)}</div>` : ""}</td><td>${esc(a.who || "")}</td><td>${dueChip(a.due_on, a.status)}</td><td>${esc(a.ptype || "")}</td><td>${stChip(a.status)}</td><td style="white-space:nowrap">${ed() ? `<button class="btn o s" data-ad2="${a.id}|In progress">Start</button> <button class="btn s" data-ad2="${a.id}|Done">Done</button>` : ""}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">Nothing here.</p>'}`;
+      ${rows.length ? `<table><thead><tr><th>Meeting</th><th>Point</th><th>Owner</th><th>Target date</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr><td><a href="#go=meet&m=${a.meeting_id}" data-open="${a.meeting_id}">${esc(a.meeting_no)}</a><div class="mut">${dd(a.meeting_date)}</div></td><td class="t5"><b>${esc(a.what)}</b>${a.topic ? `<div class="mut">${esc(a.topic)}</div>` : ""}</td><td>${esc(a.who || "")}</td><td>${dueChip(a.due_on, a.status)}</td><td>${esc(a.ptype || "")}</td><td>${stChip(a.status)}</td><td style="white-space:nowrap">${ed() ? `<button class="btn o s" data-ad2="${a.id}|In progress">Start</button> <button class="btn s" data-ad2="${a.id}|Done">Done</button>` : ""}${canTask() && !["Done", "Dropped"].includes(a.status) ? ` <button class="btn o s" data-act-task="${a.id}" title="Make this a task in ActionTrack">→ Task</button>` : ""}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">Nothing here.</p>'}`;
     $("#af").value = f; $("#af").onchange = drawAct; $("#ao").onchange = drawAct; bindList();
     document.querySelectorAll("[data-ad2]").forEach((b) => (b.onclick = async () => { const [id, st] = b.dataset.ad2.split("|"); try { await call("kmr_mom_point_save", { p: { id, status: st } }); await loadAct(); drawAct(); } catch (e) { say(e.message); } }));
   }
@@ -356,5 +356,18 @@ ${bar}
     draw(); if ($("#pl")) $("#pl").onchange = draw; $("#pgo").onclick = () => window.print(); $("#pcl").onclick = closeM;
   }
 
-  (async () => { try { await QP.init("mom"); if (!QP.ctx) return; await route(); } catch (e) { say(e.message); } })();
+  /* ----- tasks in ActionTrack (only when the company has it and the user can use it) ----- */
+  const canTask = () => !!(window.KMRTask && KMRTask.on) && ed();
+  const taskOf = (p, no, title, mid) => ({ title: p.what, detail: [p.topic ? "Topic: " + p.topic : "", p.why ? "Why: " + p.why : "", "From " + no + (title ? " · " + title : "")].filter(Boolean).join("\n"), who: p.who, due: p.when_on || p.due_on || "",
+    priority: /risk|concern/i.test(p.ptype || "") ? "high" : "normal", source_app: "mom", source_ref: p.id, source_label: no, tags: "Meeting",
+    source_url: `/it/mom.html?${QP.DEMO ? "demo=1" : "kmr=1&co=" + encodeURIComponent(QP.slug)}#go=meet&m=${mid}` });
+  document.addEventListener("click", (e) => {
+    const one = e.target.closest("[data-pt-task]"), all = e.target.closest("#ptAll"), act = e.target.closest("[data-act-task]");
+    if (!one && !all && !act || !window.KMRTask) return;
+    if (act) { const a = (S.act || []).find((x) => x.id === act.dataset.actTask); if (a) KMRTask.assign([taskOf(a, a.meeting_no, "", a.meeting_id)]); return; }
+    const D = S.det, m = D.meeting, rows = D.points.filter((p) => (all ? !["Done", "Dropped"].includes(p.status) : p.id === one.dataset.ptTask));
+    KMRTask.assign(rows.map((p) => taskOf(p, m.meeting_no, m.title, m.id)));
+  });
+
+  (async () => { try { await QP.init("mom"); if (!QP.ctx) return; if (window.KMRTask) await KMRTask.init({ call: QP.call, slug: QP.slug, token: async () => { const r = QP.sb && (await QP.sb.auth.getSession()); return r && r.data.session ? r.data.session.access_token : null; } }); await route(); } catch (e) { say(e.message); } })();
 })();

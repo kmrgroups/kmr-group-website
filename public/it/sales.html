@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<script src="/it/apps/sso.js"></script>
+<script src="/it/apps/sso.js"></script><script src="/it/apps/tsk-assign.js"></script>
 <script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script>
 <script src="/it/company-config.js"></script>
 <script src="/it/kmr-lock.js"></script>
@@ -616,7 +616,7 @@ function paintAct() {
       <td>${esc(a.responsible)}</td>
       <td style="white-space:nowrap">${dmy(a.target_date)}<br>${a.status === 'Closed' ? '' : o ? `<span class="fl r">Overdue ${-d}d</span>` : d !== null && d <= 7 ? `<span class="fl a">Due in ${d}d</span>` : ''}</td>
       <td><select data-ast="${a.id}" ${canEdit ? '' : 'disabled'} style="border-color:var(--${a.status === 'Closed' ? 'green' : a.status === 'Under progress' ? 'amber' : 'blue'})">${CFG.STATUS.map(x => `<option ${a.status === x ? 'selected' : ''}>${x}</option>`).join('')}</select></td>
-      <td style="white-space:nowrap">${canEdit ? `<button class="btn ghost sm" data-aedit="${a.id}">Edit</button> <button class="btn ghost sm" data-adel="${a.id}" title="Delete">✕</button>` : ''}</td></tr>`; }).join('');
+      <td style="white-space:nowrap">${canEdit ? `<button class="btn ghost sm" data-aedit="${a.id}">Edit</button> <button class="btn ghost sm" data-adel="${a.id}" title="Delete">✕</button>` : ''}${canEdit && window.KMRTask && KMRTask.on && a.status !== 'Closed' ? ` <button class="btn ghost sm" data-atask="${a.id}" title="Make this a task in ActionTrack">→ Task</button>` : ''}</td></tr>`; }).join('');
   $('#actbody').innerHTML = `<div class="legend" style="margin-top:0"><span><span class="chip b">${cnt('Opened')}</span> Opened</span><span><span class="chip a">${cnt('Under progress')}</span> Under progress</span><span><span class="chip g">${cnt('Closed')}</span> Closed</span><span><span class="chip r">${actOverdue()}</span> Overdue</span></div>`
     + (L.length ? `<div class="scroll"><table><thead><tr><th>Issue</th><th>Issue brief</th><th>Immediate action</th><th>Permanent action</th><th>Responsibility</th><th>Target date</th><th>Status</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>`
       : `<p class="mut">${actions.length ? 'No action plans match the filters.' : 'No action plans yet. Press <b>New action plan</b>, or use <b>＋ Action</b> on a line in the Sales loss screen.'}</p>`);
@@ -721,6 +721,8 @@ document.addEventListener('click', async e => {
     else if (b.dataset.newact) { const l = lines.find(x => x.id === b.dataset.newact); if (l) { const c = calc(l); openAct(null, { issue: l.loss_reason || '', issue_other: l.loss_other || '', line_id: l.id, brief: `${l.part_code} ${l.part_name}: ${fmt(c.pending)} pcs pending against demand ${fmt(c.demand)}.` }); } }
     else if (b.id === 'newact') openAct(null);
     else if (b.dataset.aedit) openAct(actions.find(a => a.id === b.dataset.aedit));
+    else if (b.dataset.atask) { const a = actions.find(x => x.id === b.dataset.atask); if (a && window.KMRTask) KMRTask.assign([{ title: `${issueOf(a)}: ${a.brief}`.slice(0, 200), detail: [a.part_code ? `Part: ${a.buyer_name} · ${a.part_code} ${a.part_name}` : '', a.immediate_action ? 'Immediate action: ' + a.immediate_action : '', a.permanent_action ? 'Permanent action: ' + a.permanent_action : ''].filter(Boolean).join('\n'),
+      who: a.responsible, due: a.target_date, priority: 'normal', tags: 'Sales', source_app: 'sales', source_ref: a.id, source_label: 'Sales action plan', source_url: `/it/sales.html?${DEMO ? 'demo=1' : 'kmr=1&co=' + encodeURIComponent(slug)}#act` }]); }
     else if (b.dataset.adel) { if (!confirm('Delete this action plan?')) return; await api.rpc('kmr_sf_delete_action', { p_slug: slug, p_id: b.dataset.adel }); await loadActions(); keepScroll(() => { drawAct(); paintLoss(); renderDash(); }); say('Action plan deleted.', true); }
     else if (b.id === 'a_cancel') $('#amodal').classList.remove('on');
     else if (b.id === 'a_save') await saveActForm();
@@ -816,6 +818,7 @@ async function boot() {
     plantPicker();
     if (ALL) document.querySelectorAll('.tabs .tab:not([data-t=dash])').forEach(t => t.hidden = true);
     if (!DEMO && !ALL && window.KMRLock) await KMRLock.init(sb, slug, 'sales', { daily: 'sales.daily-despatch-abc-analysis', loss: 'sales.loss-reasons-action-plans', act: 'sales.loss-reasons-action-plans' }, { 'sales.daily-despatch-abc-analysis': 'Daily despatch & ABC analysis', 'sales.loss-reasons-action-plans': 'Loss reasons & action plans' });
+    if (window.KMRTask && !ALL) await KMRTask.init({ call: (fn, x) => api.rpc(fn, Object.assign({ p_slug: slug }, x || {})), slug, token: async () => { try { const r = sb && await sb.auth.getSession(); return r && r.data.session ? r.data.session.access_token : null; } catch (e) { return null; } } });
     showBrand();   // logo + company name top-left, tab icon, and the shared footer's ← KMR Apps target
     await load(); if (ALL) { document.querySelector('[data-t=dash]').click(); return; } try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
     const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (window.KMRStd) KMRStd.draw($('#std'), 'sales'); if (['std', 'dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();

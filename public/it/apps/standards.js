@@ -16,6 +16,7 @@ var CAT={
 };
 var A={
 sales:[
+['ISO','10.2','Nonconformity and corrective action - follow-up in ActionTrack','Where the company also has ActionTrack, an action plan can be turned into a task for its responsible person with the target date; the task links back to the action plan and the person is alerted on phone or computer. The action plan and its status stay in Sales Flow.'],
 ['ISO','8.2.1 / 8.2.3','Customer communication and review of requirements','Each customer and plant keeps its parts, price and monthly demand, so what was agreed is on record.'],
 ['ISO','8.1','Operational planning and control','The monthly sales plan is set part by part, with the daily plan and the despatch against it.'],
 ['IATF','8.2.3.1.3','Organizational manufacturing feasibility','Plan against demand is checked before it is accepted; over-plan and unplanned quantity are flagged.'],
@@ -70,6 +71,18 @@ mnt:[
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Maintenance plan against machine list and schedule.'],
 ['ISO','10.2','Nonconformity and corrective action','Breakdown cause and corrective action are recorded and analysed.'],
 ['VDA','P6','Process / service - resources','Machine availability and upkeep records support the audit.']],
+tsk:[
+['ISO','5.3','Organizational roles, responsibilities and authorities','Every task names who gave it and who is responsible; administrators and editors give tasks to others, everyone else works with the tasks they gave or received; only the giver or an editor can change or delete a task.'],
+['ISO','6.2','Quality objectives and planning to achieve them','Actions to reach objectives are broken into tasks with owner, due date, priority and checklist, and the dashboard shows what is late, due soon and blocked.'],
+['ISO','6.1','Actions to address risks and opportunities','Actions from risk reviews can be created as tasks (from Minutes of Meetings or by hand) and followed until Done.'],
+['ISO','7.4','Communication','The person is told when a task is given, commented on, due or overdue, in the app and by phone / desktop alert; comments keep the conversation next to the task.'],
+['ISO','7.5.2','Creating and updating documented information','Each task has a number and keeps a time-stamped trail of who created it, changed its status, handed it over or commented.'],
+['ISO','9.3.3','Management review outputs','Decisions and actions from management review (Minutes of Meetings) become tasks that link back to the meeting and are tracked to completion.'],
+['ISO','10.2','Nonconformity and corrective action','Corrective and preventive actions can be given an owner, due date and priority, escalated when overdue, and closed with a comment as evidence of completion.'],
+['IATF','9.3.1.1','Management review - general','Review actions are followed up in one list per person and for the whole team, with overdue items shown first.'],
+['IATF','10.2.3','Problem solving','Problem-solving steps and containment actions can be handed to named people with due dates and checked off.'],
+['IATF','7.5.3.2.1','Record retention','Tasks, comments and the status trail are kept in the database with JSON export and daily backup; the retention period is decided by the company.'],
+['APQP','Plan & Define','Planning and tracking','Open items from APQP / PPAP reviews can be assigned as tasks with due dates; the dashboard shows the open and late items per person. APQP gate decisions stay in the APQP Planner.']],
 hrms:[
 ['ISO','7.1.2','People','Employee master with department, designation, shift and status (active / left); today\'s headcount, who is in, late or on leave, and machine status are on the dashboard.'],
 ['IATF','7.1.2','People (supplemental)','Shifts, weekly offs, holidays and leave are set once and applied to every person, so the people available on each shift can be seen from attendance.'],
@@ -84,6 +97,7 @@ hrms:[
 ['ISO','8.1','Operational planning and control - pay rules','PF, ESI and professional tax have a company-wide on / off switch plus a per-employee setting; the overtime rate basis, attendance bonus rule and rounding are visible in Setup; the live salary of the running month is shown from the machine punches before it is finalised.'],
 ['VDA','P6','Process / service - resources (personnel)','Who was present on which shift and for how long is available per day, to support the staffing evidence asked for in a process audit.']],
 mom:[
+['ISO','10.2','Nonconformity and corrective action - follow-up in ActionTrack','Where the company also has ActionTrack, any point can be turned into a task with a named person, due date and priority; it keeps a link back to the meeting and the person is alerted on phone or computer. The point itself stays in these minutes.'],
 ['ISO','9.3','Management review','Management review meetings are minuted with inputs discussed, decisions and actions with owner and date.'],
 ['IATF','9.3.1.1','Management review - general','Review meeting records are kept per meeting number, with attendees and the matters discussed.'],
 ['IATF','9.3.3.1','Management review outputs - supplemental','Decisions and actions from the review are recorded as points with an owner and target date and tracked in the Action tracker.'],
