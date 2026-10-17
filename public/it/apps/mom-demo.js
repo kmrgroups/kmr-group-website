@@ -43,8 +43,8 @@
       const p = a.p || {}; let r = p.id && findP(p.id), m = r ? find(r.meeting_id) : find(p.meeting_id);
       if (r && m.status !== "open") { if (m.status === "void") err("This meeting is void."); const ok = ["status", "remarks", "when_on", "when_note"]; Object.keys(p).forEach((k) => { if (k !== "id" && !ok.includes(k)) delete p[k]; }); }
       else if (m.status !== "open") err("This meeting is finalised. Re-open it to add points.");
-      if (!r && !T(p.what)) err("Write what was discussed or decided (the “What” of 5W1H).");
-      if (r && "what" in p && !T(p.what)) err("The “What” of a point cannot be empty.");
+      if (!r && !T(p.what)) err("Write the point (what was discussed or decided).");
+      if (r && "what" in p && !T(p.what)) err("The point cannot be empty.");
       if (p.status && !PS.includes(p.status)) err("Status must be one of: " + PS.join(", ") + "."); if (p.ptype && !PT.includes(p.ptype)) err("Choose a valid point type.");
       if (!r) { r = { id: id(), meeting_id: m.id, translations: {}, sample: true, created_at: iso(now()), status: "Open", ptype: "Discussion", source: "typed" }; points.push(r); }
       ["topic", "what", "why", "who", "when_on", "when_note", "where_at", "how", "ptype", "status", "lang", "remarks", "source"].forEach((f) => { if (f in p) r[f] = nz(typeof p[f] === "string" ? p[f].trim() : p[f]); });

@@ -11,7 +11,7 @@
     apqp: { name: "APQP Planner", color: "#0891B2", what: "APQP programmes and their phase deliverables, owners, due dates and gate sign-offs." },
     ppap: { name: "PPAP Submissions", color: "#B45309", what: "PPAP submissions: level, the 18 elements and the Part Submission Warrant." },
     cad: { name: "KMR CAD Draft", color: "#0369A1", what: "Drawings with every revision, status, history, layers, blocks and the geometry (a restore brings the drawings back exactly)." },
-    mom: { name: "Minutes Of Meetings", color: "#7C3AED", what: "Meetings with attendees, 5W1H discussion points, voice transcript lines and translations." },
+    mom: { name: "Minutes Of Meetings", color: "#7C3AED", what: "Meetings with attendees, discussion points made from the voice or typed text, owners, target dates and translations." },
     mnt: { name: "Maintenance", color: "#EA580C", what: "Breakdowns, preventive maintenance plans and records, and machine history entries." },
     mmd: { name: "Material Movement", color: "#2563EB", what: "Route sheets, QR tags, stage entries, supplier DC / GRN, rejection & rework lines and loss hours." },
     rmp: { name: "Raw Material Planning", color: "#0D9488", what: "Stock, bill-of-material overrides, parts to start and supplier orders." },

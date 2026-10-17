@@ -130,5 +130,42 @@
     const t = String(text || "").toLowerCase(), hit = []; (names || []).forEach((n) => { const p = String(n || "").trim(); if (!p) return; const first = p.split(/\s+/)[0].toLowerCase(); if (t.includes(p.toLowerCase()) || (first.length > 2 && new RegExp("\\b" + first.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b").test(t))) hit.push(p); });
     return [...new Set(hit)].join(", ");
   }
-  window.MOMLang = { list: L, byTag, label, detect, translate, Recorder, supported, guessWhen, guessWho };
+  /* ---------- frame: turn spoken / typed discussion text into tidy points (rule based, no AI service) ---------- */
+  const NUMW = "one|two|three|four|five|six|seven|eight|nine|ten|first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth";
+  const MARK = new RegExp("\\b(?:(?:point|item|topic|agenda)\\s*(?:number|no\\.?|#)?\\s*(?:\\d{1,2}|" + NUMW + ")|(?:next|another|last|final)\\s+(?:point|item)|number\\s*\\d{1,2})\\b[\\s,:.\\-–]*", "gi");
+  const LEAD = /^([\s\S]*?)\b(?:(?:the\s+)?(?:list|points?|items?|agenda|topics?|following|issues?)\s+(?:is|are|as follows|for today|today)|as follows|the following|following)\b[\s:,\-–]*([\s\S]*)$/i;
+  const FILL = /\b(?:um+|uh+|er+|erm|hmm+|you know|i mean|basically|actually|okay|ok|so basically|kind of|sort of|like i said)\b[\s,]*/gi;
+  const cap = (s) => { s = s.trim(); return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; };
+  function tidy(s) {
+    s = String(s || "").replace(FILL, " ").replace(/\s+/g, " ").replace(/\s+([,.;:?!])/g, "$1").replace(/^[\s,.;:\-–]+/, "").replace(/\b(\w+)(\s+\1\b)+/gi, "$1");
+    s = s.replace(/^(?:and|then|so|also|that|is|are|of|to|the next|ok)\b[\s,]*/i, "").replace(/[\s,;:\-–]+$/, "").trim();
+    return cap(s);
+  }
+  function kind(t) {
+    const x = t.toLowerCase();
+    if (/\b(decided|decision|agreed|approved|finalised|finalized|freeze[d]?|confirmed)\b/.test(x)) return "Decision";
+    if (/\b(risk|concern|problem|issue|delay(?:ed)?|failure|rejection|complaint|breakdown|shortage|late)\b/.test(x)) return "Risk / concern";
+    if (/\?|\b(query|clarify|clarification|doubt)\b/.test(x)) return "Query";
+    if (/\b(should|must|need(?:s)? to|will|shall|please|to be (?:done|completed|prepared)|action|ensure|follow ?up|by (?:today|tomorrow|monday|tuesday|wednesday|thursday|friday|saturday|sunday)|before|deadline|prepare|complete|submit|arrange|plan(?:ning)?)\b/.test(x) && /\b(should|must|need(?:s)? to|will|shall|please|to be|ensure|follow ?up|by |before|deadline|prepare|complete|submit|arrange)\b/.test(x)) return "Action";
+    if (/\b(informed|information|update|status|reported|noted|fyi|for your information)\b/.test(x)) return "Information";
+    return "Discussion";
+  }
+  /** lines = array of text lines (or one string). opts: names (attendees), today (yyyy-mm-dd). Returns {topic, points:[{what,ptype,who,when_on}]} */
+  function frame(lines, opts) {
+    opts = opts || {}; const names = opts.names || [], base = opts.today;
+    const text = (Array.isArray(lines) ? lines : [lines]).map((l) => String(l || "").trim()).filter(Boolean).join("\n");
+    let chunks = text.split(MARK).map((c) => c.replace(/[ \t]+/g, " ").trim()).filter(Boolean), topic = "";
+    const marked = chunks.length > 1;
+    if (chunks.length) { const m = chunks[0].match(LEAD); if (m && m[2].trim() && (marked || chunks.length === 1)) { topic = tidy(m[1]); chunks[0] = m[2]; } else if (m && !m[2].trim() && m[1].trim()) { topic = tidy(m[1]); chunks.shift(); } }
+    if (!marked) {   // no "point number" words: use the lines and the sentences
+      const out = []; chunks.forEach((c) => c.split(/\n+/).forEach((ln) => ln.split(/(?<=[.?!।])\s+/).forEach((s) => {
+        const parts = s.split(/\s*(?:,\s*)?\b(?:also|additionally|next|another thing|further|moreover|in addition)\b\s*,?\s*/i).filter((q) => q.trim());
+        if (parts.length > 1 && parts.every((q) => q.trim().split(/\s+/).length >= 4)) out.push(...parts); else out.push(s);
+      })));
+      chunks = out;
+    }
+    const points = chunks.map((c) => tidy(c)).filter((c) => c.length > 2).map((w) => ({ what: w, ptype: kind(w), who: guessWho(w, names), when_on: guessWhen(w, base) || null }));
+    return { topic, points };
+  }
+  window.MOMLang = { list: L, byTag, label, detect, translate, Recorder, supported, guessWhen, guessWho, frame };
 })();

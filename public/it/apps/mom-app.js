@@ -21,6 +21,7 @@
   const uid = () => (crypto.randomUUID ? crypto.randomUUID() : "c" + Date.now().toString(36) + Math.random().toString(36).slice(2, 10));
   const isOpen = () => S.det && S.det.meeting.status === "open";
   const canWrite = () => ed() && isOpen();
+  const GUIDE = { 1: "Fill in the basics and tick who attended. Then press “Save and continue”.", 2: "Speak or type the discussion. It stays as plain text here. Then press “Understand and make points”.", 3: "Check the points (owner and target date). Mark actions Done as they finish. When everything is right, press “Finalise minutes”." };
 
   async function loadAll() { S.load = await call("kmr_mom_load"); }
   async function loadAct() { S.act = await call("kmr_mom_actions"); }
@@ -66,7 +67,7 @@
 
   /* ================= meeting list ================= */
   function meetTable(rows) {
-    if (!rows.length) return '<div class="empty"><b>No meetings yet.</b><br>Press <b>+ New meeting</b> to start. You will type or speak the discussion and the app arranges it as 5W1H points.</div>';
+    if (!rows.length) return '<div class="empty"><b>No meetings yet.</b><br>Press <b>+ New meeting</b> to start. You will speak or type the discussion, and the app turns it into points.</div>';
     return `<table><thead><tr><th>Meeting no.</th><th>Date</th><th>Subject</th><th>Type</th><th>Chair</th><th class="n">Points</th><th class="n">Open</th><th>Status</th></tr></thead><tbody>${rows.map((m) =>
       `<tr><td><a href="#go=meet&m=${m.id}" data-open="${m.id}"><b>${esc(m.meeting_no)}</b></a>${m.sample ? ' <span class="chip x">sample</span>' : ""}</td><td>${dd(m.meeting_date)}</td><td>${esc(m.title)}</td><td>${esc(m.mtype || "")}</td><td>${esc(m.chairperson || "")}</td><td class="n">${m.points || 0}</td><td class="n">${m.open_points || 0}</td><td><span class="chip ${m.status === "closed" ? "g" : m.status === "void" ? "x" : "a"}">${m.status === "open" ? "In progress" : m.status === "closed" ? "Finalised" : "Void"}</span></td></tr>`).join("")}</tbody></table>`;
   }
@@ -98,7 +99,7 @@
   function drawEditor() {
     const D = S.det, m = D.meeting, w = canWrite(), ro = w ? "" : " disabled", people = S.load.people || [];
     const att = m.attendees || [];
-const step = S.step || 3, N = [[1, "Meeting info", "who, when, where"], [2, "Discuss", "speak or type"], [3, "Points", D.points.length + " recorded"]], GUIDE = { 1: "Fill in the basics and tick who attended. Then press “Save and continue”.", 2: "Capture the discussion: press the microphone and speak, or type a point. You can use both.", 3: "Check the points. Mark actions Done as they finish. When everything is right, press “Finalise minutes”." };
+const step = S.step || 3, N = [[1, "Meeting info", "who, when, where"], [2, "Discuss", "speak or type"], [3, "Points", D.points.length + " recorded"]];
     const bar = `<div class="steps noprint">${N.map(([n, t, sm]) => `<button class="stp${step === n ? " on" : ""}" data-step="${n}"><b>${n}</b><span>${t}<small>${sm}</small></span></button>`).join("")}</div><p class="guide noprint" id="guide">${GUIDE[step]}</p>`;
     const sp = (n, h) => `<div data-sp="${n}"${step === n ? "" : ' class="hide"'}>${h}</div>`;
     $("#meet").innerHTML = `<div class="row noprint"><a class="btn o s" href="#go=meet" id="back">← All meetings</a><b style="font-size:17px">${esc(m.meeting_no)}</b><span class="chip ${m.status === "closed" ? "g" : m.status === "void" ? "x" : "a"}">${m.status === "open" ? "In progress" : m.status === "closed" ? "Finalised" : "Void"}</span><span class="grow"></span>
@@ -120,39 +121,36 @@ ${bar}
       <h3 style="margin-top:14px">Who attended</h3><table id="atn"><thead><tr><th>Name</th><th>Function / role</th><th>E-mail</th><th>Present</th><th></th></tr></thead><tbody>${att.map((a, i) => attRow(a, i, w)).join("")}</tbody></table>
       ${w ? `<div class="row" style="margin-top:8px"><button class="btn o s" id="atAdd">+ Add attendee</button><select id="atPick" data-multi style="max-width:320px"><option value="">Add from the CFT team…</option>${people.map((p) => `<option value="${esc(p.code)}">${esc(p.name)}${p.role ? " · " + esc(p.role) : ""}</option>`).join("")}</select><button class="btn o s" id="atPickGo">Add selected</button></div>` : ""}
       ${w ? '<div class="row" style="margin-top:12px"><button class="btn" id="hsave">Save and continue →</button></div>' : ""}</div><div class="row noprint" style="margin-top:10px">${!w ? '<button class="btn" data-step="2">Next: Discuss →</button>' : ""}</div>`)}
-    ${sp(2, `    <div class="card"><div class="row"><h3 style="margin:0">⌨ Or type a point</h3><span class="grow"></span>${w ? '<button class="btn" id="pnew">+ Add point (5W1H)</button>' : ""}</div>
-      <p class="note">Fill in What, Why, Who, When, Where and How. Only “What” is needed.</p></div>${capturePanel(m, w)}<div class="row noprint"><button class="btn o" data-step="1">← Back</button><button class="btn" data-step="3">Next: Points →</button></div>`)}
+    ${sp(2, `${capturePanel(m, w)}<div class="row noprint"><button class="btn o" data-step="1">← Back</button><button class="btn" data-step="3">Next: Points →</button></div>`)}
     ${sp(3, `    <div class="card"><div class="row"><h3 style="margin:0">Points · what was decided</h3><span class="grow"></span>${w ? '<button class="btn" id="pnew2">+ Add point</button>' : ""}${hasF("mom.translation") && D.points.length ? '<button class="btn o" id="trAll">🌐 Translate all</button>' : ""}</div>
-      <p class="note">Each point answers six questions: <b>What</b> · <b>Why</b> · <b>Who</b> · <b>When</b> · <b>Where</b> · <b>How</b>. Press Edit on a point to change it or to mark it Done.</p>${pointsTable()}</div><div class="row noprint" style="margin-top:10px"><button class="btn o" data-step="2">← Back to Discuss</button>${ed() && m.status === "open" ? '<button class="btn" id="fin2">✔ Finalise minutes</button>' : ""}</div>`)}`;
+      <p class="note">Each point has an owner and a target date. Press Edit on a point to change it or to mark it Done. To make the points again from the discussion text, go back to Discuss.</p>${pointsTable()}</div><div class="row noprint" style="margin-top:10px"><button class="btn o" data-step="2">← Back to Discuss</button>${ed() && m.status === "open" ? '<button class="btn" id="fin2">✔ Finalise minutes</button>' : ""}</div>`)}`;
     bindEditor();
   }
   const attRow = (a, i, w) => `<tr data-ai="${i}"><td><input data-af="name" value="${esc(a.name || "")}"${w ? "" : " disabled"}></td><td><input data-af="function" value="${esc(a.function || "")}"${w ? "" : " disabled"}></td><td><input data-af="email" value="${esc(a.email || "")}"${w ? "" : " disabled"}></td><td style="text-align:center"><input type="checkbox" class="tw" data-af="present" ${a.present === false ? "" : "checked"}${w ? "" : " disabled"}></td><td>${w ? `<button class="btn o s" data-ad="${i}">✕</button>` : ""}</td></tr>`;
   function attendees() { return [...document.querySelectorAll("#atn tbody tr")].map((tr) => ({ name: tr.querySelector('[data-af="name"]').value.trim(), function: tr.querySelector('[data-af="function"]').value.trim(), email: tr.querySelector('[data-af="email"]').value.trim(), present: tr.querySelector('[data-af="present"]').checked })).filter((a) => a.name); }
   function capturePanel(m, w) {
-    if (!w) return S.det.segments.length ? `<div class="card"><h3>Voice transcript (${S.det.segments.length} segments)</h3>${segList(false)}</div>` : "";
+    const segs = S.det.segments, txt = segs.map((g) => g.text).join("\n");
+    if (!w) return segs.length ? `<div class="card"><h3>Discussion text</h3><textarea rows="10" disabled>${esc(txt)}</textarea></div>` : '<div class="card"><h3>Discussion text</h3><p class="mut">No discussion was recorded.</p></div>';
     const voiceOK = hasF("mom.voice-capture");
-    return `<div class="vp${S.state === "listening" ? " rec" : ""}" id="vp"><div class="row"><h3 style="margin:0">🎙 Speak — the app writes it down</h3><span class="grow"></span>${S.state === "listening" ? '<span><span class="dot"></span>Recording</span>' : ""}</div>
-      ${!voiceOK ? '<div class="lock">Voice is not part of your plan. You can still type the points.</div>' : !LG.supported ? '<div class="lock">Voice needs Chrome, Edge or Safari. You can still type the points.</div>' : `
+    return `<div class="vp${S.state === "listening" ? " rec" : ""}" id="vp"><div class="row"><h3 style="margin:0">🎙 Speak or type the discussion</h3><span class="grow"></span>${S.state === "listening" ? '<span><span class="dot"></span>Recording</span>' : ""}</div>
+      ${!voiceOK ? '<div class="lock">Voice is not part of your plan. You can still type the discussion below.</div>' : !LG.supported ? '<div class="lock">Voice needs Chrome, Edge or Safari. You can still type the discussion below.</div>' : `
       <div class="frm"><div><label>Language spoken (choose up to 3 if people switch languages)</label><select id="vlang" data-multi>${langOpts(S.vl || m.language || "en-IN")}</select></div>
         <div><label>Who is speaking (optional)</label><select id="vspk"><option value="">Not specified</option>${(m.attendees || []).map((a) => `<option${a.name === S.lastSpeaker ? " selected" : ""}>${esc(a.name)}</option>`).join("")}</select></div></div>
       <div class="row" style="margin-top:10px"><button class="btn" id="vgo"${S.state === "listening" ? " disabled" : ""}>${S.state === "paused" ? "▶ Resume" : "● Start recording"}</button><button class="btn o" id="vpause"${S.state === "listening" ? "" : " disabled"}>⏸ Pause</button><button class="btn o" id="vstop"${S.state === "stopped" ? " disabled" : ""}>■ Stop</button><span class="mut" id="vstat">${vstat()}</span></div>
-      <div class="live" id="live">${S.interim ? esc(S.interim) : '<i>Press “Start recording” and speak. Your words appear here and are saved automatically.</i>'}</div>
-      <p class="note">Allow the microphone when the browser asks. Keep this page open while recording. Check names and numbers afterwards. (Chrome sends the audio to Google to convert it to text.)</p>`}
-      <h3 style="margin:12px 0 4px">What was said <span class="mut" id="segcount">(${S.det.segments.length})</span></h3>${S.det.segments.length ? '<p class="note">Press “→ 5W1H” on a line to turn it into a point. Or tick several lines and press the button at the bottom.</p>' : ""}${canWrite() && hasF("mom.voice-capture") ? '<div class="row noprint" style="margin-bottom:6px"><input id="sgNew" placeholder="Type a line of the discussion (no microphone needed)…" style="flex:1;min-width:200px"><button class="btn o s" id="sgAdd">+ Add line</button></div>' : ""}<div id="segs">${segList(true)}</div>${S.det.segments.length ? '<div class="row" style="margin-top:8px"><button class="btn o" id="segMake">Make one point from the ticked lines</button></div>' : ""}</div>`;
+      <div class="live" id="live">${S.interim ? esc(S.interim) : '<i>Press “Start recording” and speak. Your words appear in the text below, in the language you spoke, and are saved automatically.</i>'}</div>
+      <p class="note">Allow the microphone when the browser asks. Keep this page open while recording. (Chrome sends the audio to Google to convert it to text.)</p>`}
+      <h3 style="margin:12px 0 4px">Discussion text <span class="mut" id="segcount">${segs.length ? "(" + segs.length + " line" + (segs.length > 1 ? "s" : "") + ")" : ""}</span></h3>
+      <textarea id="tx" rows="12" placeholder="The spoken words appear here as plain text. You can also type or correct anything here. Say “point number 2”, “point number 3” … to separate the points.">${esc(txt)}</textarea>
+      <div class="row" style="margin-top:10px">${hasF("mom.translation") ? `<label class="lbl" style="margin:0">Write the points in</label><select id="pl_to" style="max-width:260px"><option value="">Same language as spoken</option>${langOpts("")}</select>` : ""}<button class="btn" id="mkpts">✨ Understand and make points</button><span class="mut" id="mkst"></span></div>
+      <p class="note">One click: the app reads the text above, separates the points, tidies the wording and picks the owner and target date if they are spoken. The points appear on the next screen (Points). This works by rules, not by a full AI, so please check the points.</p></div>`;
   }
   const vstat = () => `${S.state === "listening" ? "Listening in " + esc(lname(S.rec ? S.rec.lang : "")) : S.state === "paused" ? "Paused" : "Not recording"} · saved ${S.saved}${S.q.length ? " · waiting to save " + S.q.length : ""}`;
-  function segList(w) {
-    const segs = S.det.segments; if (!segs.length) return '<p class="mut">No transcript yet.</p>';
-    return segs.map((g) => `<div class="seg" data-sg="${g.id || g.client_id}"><input type="checkbox" class="tw" data-pick="${g.id || g.client_id}" title="Tick to use in a point">
-      <div><textarea rows="1" data-segtxt="${g.id || ""}"${w ? "" : " disabled"}>${esc(g.text)}</textarea><div class="mut" style="font-size:11px">${g.spoken_at ? new Date(g.spoken_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : ""}${g.speaker ? " · " + esc(g.speaker) : ""} · ${esc(lname(g.lang))}${g.point_id ? " · <b>in a point</b>" : ""}${g.id ? "" : " · saving…"}</div><div class="mut" data-segtr="${g.id || g.client_id}" style="color:var(--b2)"></div></div>
-      <div style="display:flex;gap:4px">${hasF("mom.translation") ? `<button class="btn o s" data-segtrb="${g.id || g.client_id}" title="Translate this line">🌐</button>` : ""}${w && g.id ? `<button class="btn o s" data-segpt="${g.id}" title="Make a 5W1H point">→ 5W1H</button><button class="btn o s" data-segdel="${g.id}" title="Delete">✕</button>` : ""}</div></div>`).join("");
-  }
   function pointsTable() {
-    const P = S.det.points, w = canWrite(), ed2 = ed(); if (!P.length) { const ns = S.det.segments.filter((g) => g.id).length; return `<div class="empty"><b>No points yet.</b><br>${ns ? `The discussion has <b>${ns}</b> voice/typed line${ns > 1 ? "s" : ""} that are not points yet. ${w ? '<br><button class="btn s" id="segAll" style="margin-top:8px">Make a point from each line</button>' : '<br>To turn them into points press <b>Edit minutes</b> (top right), then <b>Make a point from each line</b>.'}` : 'Go to <a href="#" data-step="2">step 2 · Discuss</a> to speak or type the discussion, or press <b>+ Add point</b>.'}</div>`; }
+    const P = S.det.points, w = canWrite(), ed2 = ed(); if (!P.length) { const ns = S.det.segments.filter((g) => g.id).length; return `<div class="empty"><b>No points yet.</b><br>${ns ? `The discussion text has <b>${ns}</b> line${ns > 1 ? "s" : ""} that are not points yet. ${w ? '<br><button class="btn s" id="segAll" style="margin-top:8px">Understand and make points</button>' : "<br>To turn them into points press <b>Edit minutes</b> (top right), then <b>Understand and make points</b>."}` : 'Go to <a href="#" data-step="2">step 2 · Discuss</a> to speak or type the discussion, or press <b>+ Add point</b>.'}</div>`; }
     const sub = (l, v) => (v ? `<div class="sub"><span>${l}</span> ${esc(v)}</div>` : "");
-    return `<table class="pts"><thead><tr><th>What was discussed / decided</th><th>Who</th><th>When</th><th>Status</th><th></th></tr></thead><tbody>${P.map((p) => {
+    return `<table class="pts"><thead><tr><th>S.No</th><th>Point</th><th>Owner</th><th>Target date</th><th>Status</th><th></th></tr></thead><tbody>${P.map((p, i) => {
       const tr = p.translations || {}, keys = Object.keys(tr);
-      return `<tr data-pt="${p.id}"><td class="t5">${p.topic ? `<div class="mut" style="font-size:12px">${esc(p.topic)}</div>` : ""}<b>${esc(p.what)}</b>${p.source === "voice" ? ' <span title="Taken from the voice record">🎙</span>' : ""}${sub("Why", p.why)}${sub("Where", p.where_at)}${sub("How", p.how)}${keys.length ? `<div>${keys.map((k) => `<span class="pill" data-showtr="${p.id}|${k}" style="cursor:pointer" title="Show translation">${esc(lname(k))}</span>`).join("")}</div><small class="tr" data-trbox="${p.id}"></small>` : ""}</td>
+      return `<tr data-pt="${p.id}"><td>${i + 1}</td><td class="t5">${p.topic ? `<div class="mut" style="font-size:12px">${esc(p.topic)}</div>` : ""}<b>${esc(p.what)}</b>${p.source === "voice" ? ' <span title="Made from the discussion text">🎙</span>' : ""}${sub("Why", p.why)}${sub("Where", p.where_at)}${sub("How", p.how)}${keys.length ? `<div>${keys.map((k) => `<span class="pill" data-showtr="${p.id}|${k}" style="cursor:pointer" title="Show translation">${esc(lname(k))}</span>`).join("")}</div><small class="tr" data-trbox="${p.id}"></small>` : ""}</td>
         <td class="t5">${esc(p.who || "")}</td><td>${dueChip(p.when_on, p.status)}${p.when_note ? `<div class="mut">${esc(p.when_note)}</div>` : ""}</td><td>${stChip(p.status)}<div class="mut" style="font-size:11px">${esc(p.ptype || "")}</div></td>
         <td style="white-space:nowrap">${ed2 ? `<button class="btn o s" data-pe="${p.id}">${w ? "Edit" : "Update"}</button>` : ""}${hasF("mom.translation") ? ` <button class="btn o s" data-pt-tr="${p.id}" title="Translate this point">🌐</button>` : ""}${w ? ` <button class="btn o s" data-pd="${p.id}" title="Delete this point">✕</button>` : ""}</td></tr>`;
     }).join("")}</tbody></table>`;
@@ -169,16 +167,15 @@ ${bar}
     if ($("#atAdd")) $("#atAdd").onclick = () => { $("#atn tbody").insertAdjacentHTML("beforeend", attRow({ present: true }, 99, true)); };
     if ($("#atPickGo")) $("#atPickGo").onclick = () => { const codes = V("atPick").split(", ").filter(Boolean); const have = attendees().map((a) => a.name); codes.forEach((c) => { const p = (S.load.people || []).find((x) => x.code === c); if (p && !have.includes(p.name)) $("#atn tbody").insertAdjacentHTML("beforeend", attRow({ name: p.name, function: p.function || p.role || "", email: p.email || "", present: true }, 99, true)); }); $("#atPick").value = ""; };
     $("#atn").addEventListener("click", (e) => { const b = e.target.closest("[data-ad]"); if (b) b.closest("tr").remove(); });
-    if ($("#pnew")) $("#pnew").onclick = () => pointDialog(null);
-    if ($("#pnew2")) $("#pnew2").onclick = () => pointDialog(null);
+        if ($("#pnew2")) $("#pnew2").onclick = () => pointDialog(null);
     if ($("#fin2")) $("#fin2").onclick = finalise;
-    if ($("#segAll")) $("#segAll").onclick = async () => { try { await makeAllPoints(); setStep(3); } catch (e) { say(e.message); } };
+    if ($("#segAll")) $("#segAll").onclick = understand;
     bindSteps();
     if ($("#trAll")) $("#trAll").onclick = () => translateDialog(D.points.map((p) => p.id));
-    bindPoints(); bindVoice(); bindSegs();
+    bindPoints(); bindVoice(); bindText();
   }
-  function setStep(n) { S.step = n; document.querySelectorAll("[data-sp]").forEach((d) => d.classList.toggle("hide", +d.dataset.sp !== n)); document.querySelectorAll(".stp").forEach((b) => b.classList.toggle("on", +b.dataset.step === n)); const g = $("#guide"); if (g) g.textContent = { 1: "Fill in the basics and tick who attended. Then press “Save and continue”.", 2: "Capture the discussion: press the microphone and speak, or type a point. You can use both.", 3: "Check the points. Mark actions Done as they finish. When everything is right, press “Finalise minutes”." }[n]; window.scrollTo(0, 0); }
-  function bindSteps() { document.querySelectorAll("[data-step]").forEach((b) => (b.onclick = (e) => { e.preventDefault(); setStep(+b.dataset.step); })); }
+  function setStep(n) { S.step = n; document.querySelectorAll("[data-sp]").forEach((d) => d.classList.toggle("hide", +d.dataset.sp !== n)); document.querySelectorAll(".stp").forEach((b) => b.classList.toggle("on", +b.dataset.step === n)); const g = $("#guide"); if (g) g.textContent = GUIDE[n]; window.scrollTo(0, 0); }
+  function bindSteps() { document.querySelectorAll("[data-step]").forEach((b) => (b.onclick = async (e) => { e.preventDefault(); if (S.step === 2 && +b.dataset.step !== 2) { try { await syncText(); } catch (x) { say(x.message); } } setStep(+b.dataset.step); })); }
   function bindPoints() {
     document.querySelectorAll("[data-pe]").forEach((b) => (b.onclick = () => pointDialog(S.det.points.find((p) => p.id === b.dataset.pe))));
     document.querySelectorAll("[data-pt-tr]").forEach((b) => (b.onclick = () => translateDialog([b.dataset.ptTr])));
@@ -193,15 +190,44 @@ ${bar}
       const keep = S.det.segments.filter((g) => !g.id); S.det = await call("kmr_mom_get", { p_id: m.id }); S.det.segments.push(...keep); say("Details saved.", true); const y = window.scrollY; if (next === true) S.step = 2; drawEditor(); window.scrollTo(0, next === true ? 0 : y);
     } catch (e) { say(e.message); }
   }
-  async function makeAllPoints() {
-    const m = S.det.meeting, names = (m.attendees || []).map((a) => a.name), gs = S.det.segments.filter((g) => g.id);
-    for (const g of gs) await call("kmr_mom_point_save", { p: { id: null, meeting_id: m.id, what: g.text, ptype: "Discussion", status: "Open", lang: g.lang || m.language || "en-IN", source: "voice", seg_ids: [g.id], who: LG.guessWho(g.text, names), when_on: LG.guessWhen(g.text, today()) || null } });
-    await refresh(); say(`${gs.length} point${gs.length > 1 ? "s" : ""} made from the discussion. Check them (Who, When) and then finalise.`, true);
+  /* Step 2 -> 3: read the discussion text and make the points (rule based, see MOMLang.frame) */
+  async function syncText() {   // save what is in the text box back to the transcript lines (one line = one saved line)
+    const ta = $("#tx"); if (!ta || !canWrite()) return true;
+    if (S.q.length) { await flush(); if (S.q.length) return false; }
+    const lines = ta.value.split("\n").map((x) => x.trim()).filter(Boolean), segs = S.det.segments.filter((g) => g.id), mid = S.det.meeting.id;
+    for (let i = 0; i < Math.min(lines.length, segs.length); i++) if (lines[i] !== segs[i].text) { await call("kmr_mom_seg_update", { p_id: segs[i].id, p_text: lines[i] }); segs[i].text = lines[i]; }
+    for (let i = lines.length; i < segs.length; i++) { await call("kmr_mom_seg_delete", { p_id: segs[i].id }); S.det.segments = S.det.segments.filter((g) => g.id !== segs[i].id); }
+    const add = lines.slice(segs.length).map((t) => ({ client_id: uid(), lang: S.det.meeting.language || "", text: t, spoken_at: new Date().toISOString(), speaker: "" }));
+    if (add.length) { const res = await call("kmr_mom_seg_save", { p: { meeting_id: mid, segs: add } }), ids = (res && res.ids) || {}; add.forEach((g) => S.det.segments.push(Object.assign({ id: ids[g.client_id] || null }, g))); }
+    segCount(); return true;
+  }
+  function segCount() { const c = $("#segcount"), n = S.det.segments.length; if (c) c.textContent = n ? `(${n} line${n > 1 ? "s" : ""})` : ""; }
+  async function understand() {
+    if (!canWrite()) return;
+    const m = S.det.meeting, st = $("#mkst"), btn = $("#mkpts"), note = (t) => { if (st) st.textContent = t; };
+    try {
+      if (btn) btn.disabled = true; note("Reading the text…");
+      if (!(await syncText())) { say("Some lines are not saved yet. Check the connection and try again."); return; }
+      const segs = S.det.segments.filter((g) => g.id); if (!segs.length) { say("There is no discussion text yet. Speak or type it first."); return; }
+      const old = S.det.points.filter((p) => p.source === "voice");
+      if (old.length && !confirm(`${old.length} point${old.length > 1 ? "s were" : " was"} made from the discussion before. Replace ${old.length > 1 ? "them" : "it"} with new points made from the text now?\n\n(Points you typed yourself are kept.)`)) return;
+      const fr = LG.frame(segs.map((g) => g.text), { names: (m.attendees || []).map((a) => a.name), today: today() });
+      if (!fr.points.length) { say("Could not find any point in the text. Type a little more, or use + Add point on the Points screen."); return; }
+      const from = segs[0].lang || m.language || "en-IN", to = V("pl_to"); let lang = from, warn = "";
+      if (to && to !== from) {
+        try { note("Translating…"); const w = []; for (const p of fr.points) w.push(await LG.translate(p.what, from, to)); const tp = fr.topic ? await LG.translate(fr.topic, from, to) : ""; fr.points.forEach((p, i) => (p.what = w[i])); fr.topic = tp; lang = to; }
+        catch (e) { warn = " The translation did not work (" + e.message + "), so the points are in the spoken language."; }
+      }
+      note("Making points…");
+      for (const p of old) await call("kmr_mom_point_delete", { p_id: p.id });
+      for (const p of fr.points) await call("kmr_mom_point_save", { p: { id: null, meeting_id: m.id, topic: fr.topic || "", what: p.what, ptype: p.ptype, status: "Open", lang, source: "voice", seg_ids: [], who: p.who, when_on: p.when_on } });
+      S.step = 3; await refresh(); window.scrollTo(0, 0); say(`${fr.points.length} point${fr.points.length > 1 ? "s" : ""} made. Please check the wording, owner and target date.` + warn, !warn);
+    } catch (e) { say(e.message); note(""); if (btn) btn.disabled = false; }
   }
   async function finalise() {
     if (S.q.length) { await flush(); if (S.q.length) return say("Some transcript lines are not saved yet. Check the connection and try again."); }
     if (!S.det.points.length && S.det.segments.some((g) => g.id)) {
-      if (confirm(`There are ${S.det.segments.length} discussion lines but no points yet, so the Points list would be empty.\n\nOK = make a point from each line now (you can edit them, then finalise)\nCancel = go back`)) { try { await makeAllPoints(); setStep(3); } catch (e) { say(e.message); } }
+      if (confirm(`There is discussion text but no points yet, so the Points list would be empty.\n\nOK = understand the text and make the points now (you can edit them, then finalise)\nCancel = go back`)) { await understand(); }
       return;
     }
     if (S.state !== "stopped") { if (!confirm("Recording is on. Stop it and finalise the minutes?")) return; stopRec(); }
@@ -209,33 +235,30 @@ ${bar}
     try { await saveHeader(); await call("kmr_mom_close", { p_id: S.det.meeting.id }); S.det = null; await openMeeting(hashM()); say("Minutes finalised.", true); } catch (e) { say(e.message); }
   }
 
-  /* ================= 5W1H point dialog ================= */
+  /* ================= point dialog ================= */
   function pointDialog(p, pre) {
     const w = canWrite(), fieldsRo = w ? "" : " disabled", m = S.det.meeting, names = (m.attendees || []).map((a) => a.name);
     p = p || Object.assign({ ptype: "Discussion", status: "Open", lang: m.language || "en-IN", source: "typed" }, pre || {});
-    open(`<h3>${p.id ? (w ? "Edit point" : "Update point") : "New point"} · 5W1H</h3>${!w && p.id ? '<p class="note">The minutes are finalised — only status, remarks and the target date can change.</p>' : ""}
+    open(`<h3>${p.id ? (w ? "Edit point" : "Update point") : "New point"}</h3>${!w && p.id ? '<p class="note">The minutes are finalised — only status, remarks and the target date can change.</p>' : ""}
       <div class="w5">
-      <div class="f1"><label><span>What</span> was discussed / decided / to be done *</label><textarea id="p_what" rows="3" placeholder="e.g. Replace the worn deburring tool"${fieldsRo}>${esc(p.what || "")}</textarea></div>
-      <div class="f1"><label><span>Why</span> (reason, problem, benefit)</label><textarea id="p_why" rows="2"${fieldsRo}>${esc(p.why || "")}</textarea></div>
-      <div><label><span>Who</span> is responsible</label><input id="p_who" list="p_dl" value="${esc(p.who || "")}"${fieldsRo}></div>
-      <div><label><span>When</span> (target date)</label><input id="p_when" type="date" value="${esc(String(p.when_on || "").slice(0, 10))}"></div>
-      <div><label><span>Where</span> (line / machine / department)</label><input id="p_where" value="${esc(p.where_at || "")}"${fieldsRo}></div>
-      <div class="f1"><label><span>How</span> (method, steps, resources)</label><textarea id="p_how" rows="2"${fieldsRo}>${esc(p.how || "")}</textarea></div>
+      <div class="f1"><label>Point — what was discussed / decided / to be done *</label><textarea id="p_what" rows="3" placeholder="e.g. Replace the worn deburring tool"${fieldsRo}>${esc(p.what || "")}</textarea></div>
+      <div><label>Owner (who is responsible)</label><input id="p_who" list="p_dl" value="${esc(p.who || "")}"${fieldsRo}></div>
+      <div><label>Target date</label><input id="p_when" type="date" value="${esc(String(p.when_on || "").slice(0, 10))}"></div>
+      <div><label>Type</label><select id="p_type"${fieldsRo}>${opts(PT, p.ptype)}</select></div>
       <div><label>Status</label><select id="p_status">${opts(ST, p.status)}</select></div>
-      <div class="f1"><details class="opt"><summary>More options: topic, type, language, remarks</summary><div class="w5" style="margin-top:8px">
+      <div class="f1"><label>Remarks / follow-up</label><input id="p_rem" value="${esc(p.remarks || "")}"></div>
+      <div class="f1"><details class="opt"><summary>More options: topic, language, date note</summary><div class="w5" style="margin-top:8px">
         <div><label>Topic / agenda item</label><input id="p_topic" value="${esc(p.topic || "")}"${fieldsRo}></div>
-        <div><label>Type</label><select id="p_type"${fieldsRo}>${opts(PT, p.ptype)}</select></div>
         <div><label>Language of the text</label><select id="p_lang"${fieldsRo}>${langOpts(p.lang || "en-IN")}</select></div>
-        <div><label>When — note</label><input id="p_wnote" value="${esc(p.when_note || "")}" placeholder="e.g. before next review"${fieldsRo}></div>
-        <div class="f1"><label>Remarks / follow-up</label><input id="p_rem" value="${esc(p.remarks || "")}"></div></div></details></div></div><datalist id="p_dl">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
-      <div class="row" style="margin-top:12px"><button class="btn" id="p_ok">Save</button>${w && !p.id ? '<button class="btn o" id="p_more">Save and add another</button>' : ""}${w ? '<button class="btn o" id="p_sug" title="Fill Who and When from the words in What">Fill Who / When for me</button>' : ""}<button class="btn o" id="p_x">Cancel</button></div><div id="p_err"></div>`);
+        <div class="f1"><label>Date note</label><input id="p_wnote" value="${esc(p.when_note || "")}" placeholder="e.g. before next review"${fieldsRo}></div></div></details></div></div><datalist id="p_dl">${names.map((n) => `<option value="${esc(n)}">`).join("")}</datalist>
+      <div class="row" style="margin-top:12px"><button class="btn" id="p_ok">Save</button>${w && !p.id ? '<button class="btn o" id="p_more">Save and add another</button>' : ""}${w ? '<button class="btn o" id="p_sug" title="Fill Owner and Target date from the words in the point">Fill Owner / Date for me</button>' : ""}<button class="btn o" id="p_x">Cancel</button></div><div id="p_err"></div>`);
     $("#p_x").onclick = closeM;
     if ($("#p_what") && w) $("#p_what").addEventListener("input", () => { const d = LG.detect($("#p_what").value); if (d.tag && d.certain) $("#p_lang").value = d.tag; });
-    if ($("#p_sug")) $("#p_sug").onclick = () => { const t = V("p_what") + " " + V("p_how"); if (!V("p_who")) $("#p_who").value = LG.guessWho(t, names); if (!V("p_when")) $("#p_when").value = LG.guessWhen(t, today()); };
+    if ($("#p_sug")) $("#p_sug").onclick = () => { const t = V("p_what"); if (!V("p_who")) $("#p_who").value = LG.guessWho(t, names); if (!V("p_when")) $("#p_when").value = LG.guessWhen(t, today()); };
     const save = async (again) => {
       try {
-        const body = { id: p.id || null, meeting_id: m.id, topic: V("p_topic"), what: V("p_what"), why: V("p_why"), who: V("p_who"), when_on: V("p_when") || null, when_note: V("p_wnote"), where_at: V("p_where"), how: V("p_how"), ptype: V("p_type"), status: V("p_status"), lang: V("p_lang"), remarks: V("p_rem"), source: p.source || "typed", seg_ids: p.seg_ids || [] };
-        if (!w && p.id) { body.what = p.what; body.topic = p.topic; body.why = p.why; body.who = p.who; body.where_at = p.where_at; body.how = p.how; body.ptype = p.ptype; body.lang = p.lang; body.when_note = p.when_note; }
+        const body = { id: p.id || null, meeting_id: m.id, topic: V("p_topic"), what: V("p_what"), why: p.why || "", who: V("p_who"), when_on: V("p_when") || null, when_note: V("p_wnote"), where_at: p.where_at || "", how: p.how || "", ptype: V("p_type"), status: V("p_status"), lang: V("p_lang"), remarks: V("p_rem"), source: p.source || "typed", seg_ids: p.seg_ids || [] };
+        if (!w && p.id) { body.what = p.what; body.topic = p.topic; body.who = p.who; body.ptype = p.ptype; body.lang = p.lang; body.when_note = p.when_note; }
         await call("kmr_mom_point_save", { p: body }); closeM(); await refresh(); if (again) pointDialog(null);
       } catch (e) { $("#p_err").innerHTML = `<div class="msg">${esc(e.message)}</div>`; }
     };
@@ -286,8 +309,8 @@ ${bar}
     if (!r.text) return;
     const seg = { client_id: uid(), lang: r.lang, text: r.text, spoken_at: new Date().toISOString(), speaker: S.lastSpeaker || "" };
     S.det.segments.push(Object.assign({ id: null }, seg)); S.q.push(seg); lsSet(S.det.meeting.id, S.q);
-    const box = $("#segs"); if (box) { box.innerHTML = segList(true); bindSegs(); box.lastElementChild && box.lastElementChild.scrollIntoView({ block: "nearest" }); }
-    const c = $("#segcount"); if (c) c.textContent = `(${S.det.segments.length})`;
+    const ta = $("#tx"); if (ta) { ta.value += (ta.value && !ta.value.endsWith("\n") ? "\n" : "") + r.text; ta.scrollTop = ta.scrollHeight; }
+    segCount();
     setStat(); clearTimeout(S.ft); S.ft = setTimeout(flush, 1200);
   }
   async function flush() {
@@ -296,28 +319,14 @@ ${bar}
       const res = await call("kmr_mom_seg_save", { p: { meeting_id: mid, segs: batch } });
       const ids = (res && res.ids) || {}; S.q = S.q.filter((s) => !batch.includes(s)); S.saved += batch.length; lsSet(mid, S.q);
       S.det.segments.forEach((g) => { if (!g.id && ids[g.client_id]) g.id = ids[g.client_id]; });
-      const box = $("#segs"); if (box) { const ae = document.activeElement; if (!(ae && ae.tagName === "TEXTAREA")) { box.innerHTML = segList(true); bindSegs(); } }
     } catch (e) { clearTimeout(S.rt); S.rt = setTimeout(flush, 8000); say("Saving the transcript failed (" + e.message + "). It is kept on this device and will be retried."); }
     S.busy = false; setStat(); if (S.q.length && !S.rt) S.ft = setTimeout(flush, 1500);
   }
   window.addEventListener("beforeunload", (e) => { if (S.q.length || S.state === "listening") { e.preventDefault(); e.returnValue = ""; } });
-  function bindSegs() {
-    const box = $("#segs") || $("#meet"); if (!box) return;
-    box.querySelectorAll("[data-segpt]").forEach((b) => (b.onclick = () => { const g = S.det.segments.find((x) => x.id === b.dataset.segpt); makePoint([g]); }));
-    box.querySelectorAll("[data-segdel]").forEach((b) => (b.onclick = async () => { if (!confirm("Delete this transcript line?")) return; try { await call("kmr_mom_seg_delete", { p_id: b.dataset.segdel }); S.det.segments = S.det.segments.filter((g) => g.id !== b.dataset.segdel); $("#segs").innerHTML = segList(true); bindSegs(); } catch (e) { say(e.message); } }));
-    box.querySelectorAll("[data-segtxt]").forEach((t) => (t.onchange = async () => { if (!t.dataset.segtxt) return; try { await call("kmr_mom_seg_update", { p_id: t.dataset.segtxt, p_text: t.value }); const g = S.det.segments.find((x) => x.id === t.dataset.segtxt); if (g) g.text = t.value; } catch (e) { say(e.message); } }));
-    box.querySelectorAll("[data-segtrb]").forEach((b) => (b.onclick = () => segTranslate(b.dataset.segtrb)));
-    if ($("#sgAdd")) { const add = async () => { const t = V("sgNew").trim(), mid = S.det.meeting.id; if (!t) return; try { const g = { client_id: uid(), lang: S.det.meeting.language || "", text: t, spoken_at: new Date().toISOString(), speaker: S.lastSpeaker || ($("#vspk") ? V("vspk") : "") }; await call("kmr_mom_seg_save", { p: { meeting_id: S.det.meeting.id, segs: [g] } }); S.det = null; await openMeeting(mid); } catch (e) { say(e.message); } }; $("#sgAdd").onclick = add; $("#sgNew").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }; }
-    if ($("#segMake")) $("#segMake").onclick = () => { const ids = [...document.querySelectorAll("[data-pick]:checked")].map((c) => c.dataset.pick); const gs = S.det.segments.filter((g) => ids.includes(g.id)); if (!gs.length) return say("Tick one or more saved transcript lines first."); makePoint(gs); };
-  }
-  function makePoint(gs) {
-    const text = gs.map((g) => g.text).join(" "), names = (S.det.meeting.attendees || []).map((a) => a.name), lang = gs[0].lang;
-    pointDialog(null, { what: text, lang, source: "voice", seg_ids: gs.map((g) => g.id), who: LG.guessWho(text, names), when_on: LG.guessWhen(text, today()) });
-  }
-  async function segTranslate(id) {
-    const g = S.det.segments.find((x) => (x.id || x.client_id) === id), box = document.querySelector(`[data-segtr="${id}"]`); if (!g || !box) return;
-    const to = S.tgt || (g.lang && g.lang.startsWith("en") ? "hi-IN" : "en-IN"); open(`<h3>Translate this line</h3><label class="lbl">Into</label><select id="st_to">${langOpts(to)}</select><div class="row" style="margin-top:10px"><button class="btn" id="st_ok">Translate</button><button class="btn o" id="st_x">Close</button></div><div id="st_o" class="note"></div>`);
-    $("#st_x").onclick = closeM; $("#st_ok").onclick = async () => { try { $("#st_o").textContent = "Translating…"; S.tgt = V("st_to"); const t = await LG.translate(g.text, g.lang, S.tgt); closeM(); box.textContent = lname(S.tgt) + ": " + t; } catch (e) { $("#st_o").innerHTML = `<div class="msg">${esc(e.message)}</div>`; } };
+  function bindText() {
+    const ta = $("#tx"); if (!ta) return;
+    ta.onchange = () => syncText().catch((e) => say(e.message));
+    if ($("#mkpts")) $("#mkpts").onclick = understand;
   }
 
   /* ================= action tracker ================= */
@@ -325,7 +334,7 @@ ${bar}
     const A = S.act || [], t = today(), f = V("af") || "open", ow = V("ao") || "", owners = [...new Set(A.map((a) => (a.who || "").split(",")[0].trim()).filter(Boolean))].sort();
     const rows = A.filter((a) => (f === "all" ? true : f === "open" ? !["Done", "Dropped"].includes(a.status) : f === "late" ? !["Done", "Dropped"].includes(a.status) && a.due_on && a.due_on < t : a.status === f)).filter((a) => !ow || (a.who || "").includes(ow));
     $("#act").innerHTML = `<div class="row"><select id="af" style="max-width:200px"><option value="open">Open</option><option value="late">Overdue</option><option value="In progress">In progress</option><option value="Done">Done</option><option value="all">All</option></select><select id="ao" style="max-width:220px"><option value="">All owners</option>${owners.map((o) => `<option${o === ow ? " selected" : ""}>${esc(o)}</option>`).join("")}</select><span class="mut">${rows.length} of ${A.length}</span></div>
-      ${rows.length ? `<table><thead><tr><th>Meeting</th><th>What</th><th>Who</th><th>When</th><th>Where</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr><td><a href="#go=meet&m=${a.meeting_id}" data-open="${a.meeting_id}">${esc(a.meeting_no)}</a><div class="mut">${dd(a.meeting_date)}</div></td><td class="t5"><b>${esc(a.what)}</b>${a.topic ? `<div class="mut">${esc(a.topic)}</div>` : ""}</td><td>${esc(a.who || "")}</td><td>${dueChip(a.due_on, a.status)}</td><td>${esc(a.where_at || "")}</td><td>${esc(a.ptype || "")}</td><td>${stChip(a.status)}</td><td style="white-space:nowrap">${ed() ? `<button class="btn o s" data-ad2="${a.id}|In progress">Start</button> <button class="btn s" data-ad2="${a.id}|Done">Done</button>` : ""}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">Nothing here.</p>'}`;
+      ${rows.length ? `<table><thead><tr><th>Meeting</th><th>Point</th><th>Owner</th><th>Target date</th><th>Type</th><th>Status</th><th></th></tr></thead><tbody>${rows.map((a) => `<tr><td><a href="#go=meet&m=${a.meeting_id}" data-open="${a.meeting_id}">${esc(a.meeting_no)}</a><div class="mut">${dd(a.meeting_date)}</div></td><td class="t5"><b>${esc(a.what)}</b>${a.topic ? `<div class="mut">${esc(a.topic)}</div>` : ""}</td><td>${esc(a.who || "")}</td><td>${dueChip(a.due_on, a.status)}</td><td>${esc(a.ptype || "")}</td><td>${stChip(a.status)}</td><td style="white-space:nowrap">${ed() ? `<button class="btn o s" data-ad2="${a.id}|In progress">Start</button> <button class="btn s" data-ad2="${a.id}|Done">Done</button>` : ""}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">Nothing here.</p>'}`;
     $("#af").value = f; $("#af").onchange = drawAct; $("#ao").onchange = drawAct; bindList();
     document.querySelectorAll("[data-ad2]").forEach((b) => (b.onclick = async () => { const [id, st] = b.dataset.ad2.split("|"); try { await call("kmr_mom_point_save", { p: { id, status: st } }); await loadAct(); drawAct(); } catch (e) { say(e.message); } }));
   }
@@ -341,7 +350,7 @@ ${bar}
         <tr><th>Previous minutes</th><td>${esc(m.prev_ref || "")}</td><th>Next meeting</th><td>${m.next_date ? dd(m.next_date) : ""}</td></tr></table>
         ${m.agenda ? `<p><b>Agenda:</b> ${esc(m.agenda).replace(/\n/g, "<br>")}</p>` : ""}
         <p><b>Attendees:</b></p><table class="hdr" style="width:100%"><tr><th style="width:5%">S.No</th><th style="width:32%;background:#eef2f7">Name</th><th style="background:#eef2f7">Function</th><th style="width:12%;background:#eef2f7">Present</th></tr>${(m.attendees || []).map((a, i) => `<tr><td>${i + 1}</td><td>${esc(a.name)}</td><td>${esc(a.function || "")}</td><td>${a.present === false ? "Absent" : "Present"}</td></tr>`).join("")}</table>
-        <p><b>Discussion points (5W1H):</b></p><table class="p5" style="width:100%;min-width:0"><thead><tr><th>S.No</th><th>Topic</th><th>What</th><th>Why</th><th>Who</th><th>When</th><th>Where</th><th>How</th><th>Status</th></tr></thead><tbody>${P.map((p, i) => `<tr><td>${i + 1}</td><td>${esc(g(p, "topic"))}</td><td>${esc(g(p, "what"))}${p.ptype && p.ptype !== "Discussion" ? `<br><i>[${esc(p.ptype)}]</i>` : ""}</td><td>${esc(g(p, "why"))}</td><td>${esc(p.who || "")}</td><td>${p.when_on ? dd(p.when_on) : ""}${p.when_note ? "<br>" + esc(p.when_note) : ""}</td><td>${esc(g(p, "where_at"))}</td><td>${esc(g(p, "how"))}</td><td>${esc(p.status)}</td></tr>`).join("")}</tbody></table>
+        <p><b>Discussion points:</b></p><table class="p5" style="width:100%;min-width:0"><thead><tr><th>S.No</th><th>Topic</th><th>Point</th><th>Owner</th><th>Target date</th><th>Status</th></tr></thead><tbody>${P.map((p, i) => { const lg = ["why", "where_at", "how"].map((f, k) => (g(p, f) ? `<br><i>${["Why", "Where", "How"][k]}:</i> ${esc(g(p, f))}` : "")).join(""); return `<tr><td>${i + 1}</td><td>${esc(g(p, "topic"))}</td><td>${esc(g(p, "what"))}${p.ptype && p.ptype !== "Discussion" ? `<br><i>[${esc(p.ptype)}]</i>` : ""}${lg}</td><td>${esc(p.who || "")}</td><td>${p.when_on ? dd(p.when_on) : ""}${p.when_note ? "<br>" + esc(p.when_note) : ""}</td><td>${esc(p.status)}</td></tr>`; }).join("")}</tbody></table>
         ${m.distribution ? `<p><b>Distribution:</b> ${esc(m.distribution)}</p>` : ""}<div class="sg"><span>Prepared by (minute-taker)</span><span>Reviewed by (chairperson)</span><span>Approved by</span></div></div>`;
     };
     draw(); if ($("#pl")) $("#pl").onchange = draw; $("#pgo").onclick = () => window.print(); $("#pcl").onclick = closeM;

@@ -28,7 +28,7 @@
     apqp: { color: "#0891B2", desc: "Plan every new part through the five APQP phases — deliverables, owners, due dates and gates, linked to your other apps.", demo: "/it/apqp.html?demo=1" },
     ppap: { color: "#B45309", desc: "Assemble the PPAP package and the Part Submission Warrant from the drawings, FMEA and control plans you already have.", demo: "/it/ppap.html?demo=1" },
     cad: { color: "#0369A1", desc: "Draw 2D engineering drawings the AutoCAD way — command line, snaps, layers, dimensions, hatches, blocks, title blocks, DXF in and out, print to PDF, with revision control.", demo: "/it/cad.html?demo=1" },
-    mom: { color: "#7C3AED", desc: "Record every meeting in 5W1H by typing or by voice, in Indian and international languages, translate the points, and follow up the actions.", demo: "/it/mom.html?demo=1" },
+    mom: { color: "#7C3AED", desc: "Record every meeting by voice or typing, in Indian and international languages; one click turns the text into points; translate them and follow up the actions.", demo: "/it/mom.html?demo=1" },
     mnt: { color: "#EA580C", desc: "Log every breakdown with root cause and action, track MTBF, MTTR and downtime, plan preventive maintenance and print the machine history card.", demo: "/it/mnt.html?demo=1" },
     mmd: { color: "#2563EB", desc: "Issue raw material with QR tags, follow every part machine by machine to finished goods, run supplier DC and GRN, and see rejection, rework and loss hours.", demo: "/it/mmd.html?demo=1" },
     rmp: { color: "#0D9488", desc: "Turn the capacity plan into kilograms of raw material, compare with stock, and plan MOQ-rounded supplier orders with lead times.", demo: "/it/rmp.html?demo=1" },
