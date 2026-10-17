@@ -28,12 +28,14 @@
     VNMG160404: { iso: "VNMG 16 04 04", ic: 9.525, L: 16.6, ang: 35, r: 0.4, edges: 4, grade: "coated carbide P15 (finishing)" },
     DCMT0702: { iso: "DCMT 07 02 04", ic: 6.35, L: 7.0, ang: 55, r: 0.4, edges: 2, grade: "coated carbide P15 (boring)" },
     CCMT060204: { iso: "CCMT 06 02 04", ic: 6.35, L: 6.4, ang: 80, r: 0.4, edges: 2, grade: "coated carbide P15 (boring)" },
+    CCGT040102: { iso: "CCGT 04 01 02", ic: 4.76, L: 4.8, ang: 80, r: 0.2, edges: 2, grade: "uncoated carbide, micro boring" },
     TR16ER: { iso: "16 ER ISO 60 deg", ic: 9.525, L: 16.5, ang: 60, r: 0.15, edges: 3, grade: "coated carbide (threading)" },
   };
   const HOLD = { PCLNR2525M12: { w: 25, L: 150, lead: 95 }, MVJNR2525M16: { w: 25, L: 150, lead: 93 }, SER2525M16: { w: 25, L: 150, lead: 90 } };
   const BARS = [
     { name: "S16R-SDQCR07", D: 16, minBore: 20, ins: "DCMT0702" }, { name: "S12M-SDQCR07", D: 12, minBore: 16, ins: "DCMT0702" },
     { name: "S10K-SDQCR07", D: 10, minBore: 13, ins: "DCMT0702" }, { name: "S08K-SCLCR06", D: 8, minBore: 10, ins: "CCMT060204" },
+    { name: "S06F-SCLCR04", D: 6, minBore: 8, ins: "CCGT040102" },
   ];
   const barFor = (dia) => BARS.find((b) => dia + 1e-6 >= b.minBore) || null;
   const drillFor = (D, tipDepth) => {
@@ -150,18 +152,30 @@
     }
 
     // --- bores made at this operation: drill, rough and finish bore
-    const bores = [];
+    const bores = [], keeps = [], voidMap = new Map();
     for (const v of S.voids) {
       if (!v.roles.some((r) => r === "this")) continue;
       let pts = v.pts.map((p) => [uOf(p[0]), p[1]]), roles = v.roles.slice(), edges = v.roles.map((_, i) => eOf(v.pts[i], v.pts[i + 1], "i"));
       if (Math.abs(pts[0][0]) > Math.abs(pts[pts.length - 1][0])) { pts.reverse(); roles.reverse(); edges.reverse(); }
-      const tip = v.tip ? [uOf(v.tip[0]), 0] : null;
+      let tip = v.tip ? [uOf(v.tip[0]), 0] : null;
+      // a part of the bore that is wider than the neck in front of it cannot be reached from this side (it is made from the other side): keep it, do not machine it
+      let cut = pts.length, mn = pts[0][1];
+      for (let i = 1; i < pts.length; i++) { if (pts[i][1] > mn + 0.05) { cut = i; break; } mn = Math.min(mn, pts[i][1]); }
+      if (cut < pts.length && cut >= 2) {
+        const pocket = pts.slice(cut - 1).concat(tip ? [tip] : []), last = pts[cut - 1], toX = (q) => [xOf(q[0]), q[1]];
+        keeps.push({ keep: [[last[0], 0]].concat(pocket).concat([[pocket[pocket.length - 1][0], 0]]).map(toX) });
+        warn.push(`The bore is wider than its neck beyond depth ${fmt(last[0])} mm. That part cannot be machined from this side; it belongs to the other operation.`);
+        pts = pts.slice(0, cut); roles = roles.slice(0, cut - 1); edges = edges.slice(0, cut - 1); tip = [last[0] + 0.6 * last[1], 0];
+        keeps[keeps.length - 1].open = [[pts[0][0], 0]].concat(pts).concat([tip]).map(toX);
+      }
+      voidMap.set(v, { pts: pts.map((p) => [xOf(p[0]), p[1]]), tip: tip ? [xOf(tip[0]), 0] : null, roles });
       const flats = []; for (let i = 0; i + 1 < pts.length; i++) if (Math.abs(pts[i][1] - pts[i + 1][1]) < 1e-6 && Math.abs(pts[i + 1][0] - pts[i][0]) > 0.25) flats.push({ u0: pts[i][0], u1: pts[i + 1][0], r: pts[i][1], role: roles[i] });
-      if (!flats.length) continue;
-      const deep = flats.reduce((a, b) => (b.u1 > a.u1 ? b : a)), rMin = Math.min(...flats.map((f) => f.r));
+      const tf = flats.filter((f) => f.role === "this"); if (!tf.length) continue;
+      const deep = tf.reduce((a, b) => (b.u1 > a.u1 ? b : a)), rMin = Math.min(...tf.map((f) => f.r)), rFin = rMin;
       let dD = null; for (const c of mine) { const f = cx.M.get(+c.no); if (f && f.semi && f.kind === "dia" && f.side === "i") { const n = U.nomOf(c); if (n >= 2 && n < 2 * rMin - 0.1) dD = n; } }
-      let only = false; if (dD == null) { if (flats.every((f) => Math.abs(f.r - flats[0].r) < 0.02)) { dD = r3(2 * flats[0].r); only = true; } else dD = Math.max(2, Math.floor((2 * rMin - 1.0) * 2) / 2); }
-      const thisR = flats.filter((f) => f.role === "this").map((f) => f.r), rFin = thisR.length ? Math.min(...thisR) : rMin; bores.push({ pts, edges, tip, flats, deep, rMin, rFin, dD, only, rd: dD / 2 });
+      let only = false; if (dD == null) { if (tf.every((f) => Math.abs(f.r - tf[0].r) < 0.02) && pts.every((p, i) => i === 0 || Math.abs(p[1] - tf[0].r) < 0.02 || p[0] > deep.u1 - 1e-6)) { dD = r3(2 * tf[0].r); only = true; } else dD = Math.max(2, Math.floor((2 * rMin - 1.0) * 2) / 2); }
+      let lastThis = -1; roles.forEach((r, i) => { if (r === "this") lastThis = i; });
+      bores.push({ pts, edges, tip, flats: tf, deep, rMin, rFin, dD, only, rd: dD / 2, lastThis, nRoles: roles.length });
     }
     bores.forEach((b, bi) => {
       const depth = b.deep.u1, needBore = !b.only || b.pts.some((p, i) => i + 1 < b.pts.length && Math.abs(p[1] - b.pts[i + 1][1]) > 1e-6);
@@ -170,7 +184,7 @@
         bar = barFor(2 * b.rFin);
         if (!bar) {   // too small for any boring bar: the drill makes the final size
           b.dD = r3(2 * b.rFin); b.rd = b.dD / 2; const big = b.flats.some((f) => f.r > b.rFin + 0.05);
-          warn.push(`Bore dia ${fmt(b.dD)} is too small for the smallest boring bar (it needs a bore of at least dia 10). It is drilled to size${big ? "; the larger section needs a different process (back-boring or another set-up)" : ""}.`);
+          warn.push(`Bore dia ${fmt(b.dD)} is too small for the smallest boring bar (it needs a bore of at least dia 8). It is drilled to size${big ? "; the larger section needs a different process (back-boring or another set-up)" : ""}.`);
           C(`BORE DIA ${fmt(b.dD)} - TOO SMALL FOR A BORING BAR, DRILLED TO SIZE`);
         } else if (b.dD < bar.D + 1) { b.dD = Math.min(r3(bar.D + 1), r3(2 * b.rFin - 1)); b.rd = b.dD / 2; }
       }
@@ -196,7 +210,7 @@
             N(`G00 X${fmt(2 * lk)} Z1.`); N(`G01 Z${fmt(-us)} F0.15`); N(`G00 X${fmt(2 * (lk - 0.4))}`); N("G00 Z1.");
           }
         }
-        C("BORE FINISH - CONTOUR"); const full = b.pts.slice(); const ed = b.edges.slice(); if (b.tip) { full.push(b.tip); ed.push(null); }
+        C("BORE FINISH - CONTOUR"); const nb = b.lastThis >= 0 ? b.lastThis + 2 : b.pts.length, full = b.pts.slice(0, nb), ed = b.edges.slice(0, nb - 1); if (b.tip && nb === b.pts.length) { full.push(b.tip); ed.push(null); }
         const it = items(full, ed, arcOf), p0 = full[0];
         N(`G00 X${fmt(2 * Math.max(p0[1] - 1, 0.3))} Z1.`); N(`G01 X${fmt(2 * p0[1])} Z0. F0.06`);
         it.forEach((q) => N(q.arc ? `G${q.arc.cw ? "02" : "03"} X${fmt(2 * q.to[1])} Z${fmt(-q.to[0])} R${fmt(q.arc.R)}` : `G01 X${fmt(2 * q.to[1])} Z${fmt(-q.to[0])}`));
@@ -227,7 +241,8 @@
       });
     }
     N("M05"); N("M09"); N("M30"); lines.push("%");
-    return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S, jaws, cd, mine, rank, warn };
+    const Sg = voidMap.size ? Object.assign({}, S, { voids: S.voids.map((v) => (voidMap.has(v) ? Object.assign({}, v, voidMap.get(v)) : v)) }) : S;
+    return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S: Sg, jaws, cd, mine, rank, warn, keeps };
   };
   void 0;
 
@@ -350,6 +365,10 @@
       this.W = Math.ceil((xhi - xlo) / this.cs); this.Hc = Math.ceil(this.Rm / this.cs);
       this.sf = -g.d;   // display direction of the free end (the side the tool comes from)
       this.tgt = new Uint8Array(this.W * this.Hc); fillLoops(S.loops, this.W, this.Hc, xlo, this.cs, this.tgt);
+      for (const kp of g.keeps || []) {   // parts left on purpose (made from the other side): protected from cutting and not counted as stock left
+        const t1 = new Uint8Array(this.W * this.Hc), t2 = new Uint8Array(this.W * this.Hc); fillLoops([kp.keep], this.W, this.Hc, xlo, this.cs, t1); fillLoops([kp.open], this.W, this.Hc, xlo, this.cs, t2);
+        for (let q = 0; q < t1.length; q++) { if (t1[q]) this.tgt[q] = 1; if (t2[q]) this.tgt[q] = 0; }
+      }
       this.ctx = null; this.reset();
       // time of every move
       let t = 0; for (const m of this.mv) {
@@ -464,7 +483,18 @@
         const spec = (c.spec || c.text || "").toString(), nom = U.nomOf(c), err = Math.abs(2 * rr - nom), lsl = c.lsl != null && c.lsl !== "" ? +c.lsl : null, usl = c.usl != null && c.usl !== "" ? +c.usl : null;
         checks.push({ no: c.no, spec, dia: 2 * rr, ok: err <= 4 * cs + 1e-6 && (lsl == null || 2 * rr >= lsl - 2 * cs) && (usl == null || 2 * rr <= usl + 2 * cs) });
       }
-      this.stats = { resid, maxRes: maxCol, checks, time: this.total, lines: this.g.lines.filter((l) => /^N\d+/.test(l)).length };
+      // where is stock left? group the leftover cells in 0.5 mm blocks and name the regions in Z and diameter
+      const bw = Math.max(1, Math.round(0.5 / cs)), nx = Math.ceil(W / bw), ny = Math.ceil(Hc / bw), cnt = new Float32Array(nx * ny);
+      for (let j = 0; j < Hc; j++) for (let i = 0; i < W; i++) if (mat[j * W + i] && !tgt[j * W + i]) cnt[Math.floor(j / bw) * nx + Math.floor(i / bw)] += cs * cs;
+      const seen = new Uint8Array(nx * ny), regions = [];
+      for (let q = 0; q < nx * ny; q++) {
+        if (seen[q] || cnt[q] < 0.04) continue; const st = [q]; seen[q] = 1; let a = 0, i0 = nx, i1 = 0, j0 = ny, j1 = 0;
+        while (st.length) { const p = st.pop(), pi = p % nx, pj = (p - pi) / nx; a += cnt[p]; i0 = Math.min(i0, pi); i1 = Math.max(i1, pi); j0 = Math.min(j0, pj); j1 = Math.max(j1, pj); for (let di = -1; di <= 1; di++) for (let dj = -1; dj <= 1; dj++) { const ni = pi + di, nj = pj + dj; if (ni < 0 || nj < 0 || ni >= nx || nj >= ny) continue; const np = nj * nx + ni; if (!seen[np] && cnt[np] >= 0.04) { seen[np] = 1; st.push(np); } } }
+        const xa = this.xlo + i0 * bw * cs, xb = this.xlo + (i1 + 1) * bw * cs, za = -this.g.d * (xa - this.g.xw), zb = -this.g.d * (xb - this.g.xw);
+        regions.push({ a, txt: `Z ${Math.max(za, zb).toFixed(1)} to ${Math.min(za, zb).toFixed(1)}, dia ${(2 * j0 * bw * cs).toFixed(1)} to ${(2 * (j1 + 1) * bw * cs).toFixed(1)}` });
+      }
+      regions.sort((p, q) => q.a - p.a);
+      this.stats = { resid, maxRes: maxCol, checks, regions: regions.slice(0, 3), time: this.total, lines: this.g.lines.filter((l) => /^N\d+/.test(l)).length };
       this.dirty = true;
     }
   }
@@ -675,12 +705,13 @@
     if (ui && ui.page === "life") { this.drawLife(c); return; }
     // result card at the end
     if (this.done && this.stats) {
-      const st = this.stats, ok = st.maxRes < 3 * this.cs + 0.05, w = 430, h = 78 + Math.min(5, st.checks.length) * 18, x0 = 24, y0 = HEADH + STRIP + 110;
+      const st = this.stats, ok = st.maxRes < 3 * this.cs + 0.05, w = 470, h = 78 + Math.min(5, st.checks.length) * 18 + (st.regions || []).length * 18, x0 = 24, y0 = HEADH + STRIP + 110;
       c.fillStyle = "rgba(2,6,23,.92)"; c.fillRect(x0, y0, w, h); c.strokeStyle = ok ? "#22c55e" : "#f59e0b"; c.lineWidth = 2; c.strokeRect(x0, y0, w, h);
       c.fillStyle = ok ? "#4ade80" : "#fbbf24"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ok ? "Machining complete — required shape reached" : "Machining complete — some stock is left", x0 + 14, y0 + 24);
       c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#e2e8f0"; c.fillText(`Stock left above the finished outline: max ${st.maxRes.toFixed(2)} mm`, x0 + 14, y0 + 46);
       c.fillText(`Cycle time ${mmss(st.time)} · ${st.lines} program blocks`, x0 + 14, y0 + 64);
-      st.checks.slice(0, 5).forEach((q, i) => { c.fillStyle = q.ok ? "#4ade80" : "#fbbf24"; c.fillText(`${q.ok ? "✓" : "!"} #${q.no} ${q.spec.slice(0, 22)} → Ø${q.dia.toFixed(2)}`, x0 + 14, y0 + 84 + i * 18); });
+      (st.regions || []).forEach((q, i) => { c.fillStyle = "#fbbf24"; c.fillText(`NOT MACHINED: ${q.txt}`, x0 + 14, y0 + 84 + i * 18); });
+      st.checks.slice(0, 5).forEach((q, i) => { c.fillStyle = q.ok ? "#4ade80" : "#fbbf24"; c.fillText(`${q.ok ? "✓" : "!"} #${q.no} ${q.spec.slice(0, 22)} → Ø${q.dia.toFixed(2)}`, x0 + 14, y0 + 84 + ((st.regions || []).length + i) * 18); });
     }
   };
 
@@ -723,14 +754,14 @@
 
   CN.player = (cx, ranks, onClose) => {
     const ov = document.createElement("div"); ov.id = "cncOv";
-    ov.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(2,6,23,.95);display:flex;flex-direction:column;align-items:center;padding:10px 12px;gap:8px;font:14px system-ui,Segoe UI,Arial;color:#e2e8f0";
-    const btn = "background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:8px;padding:7px 13px;cursor:pointer;font:600 13px system-ui,Segoe UI,Arial";
-    ov.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:center;max-width:1280px">
-      <select id="cnOp" style="${btn}"></select>
+    ov.style.cssText = "position:fixed;inset:0;z-index:99999;background:rgba(2,6,23,.95);display:flex;flex-direction:column;align-items:center;padding:6px 10px;gap:6px;font:14px system-ui,Segoe UI,Arial;color:#e2e8f0";
+    const btn = "background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:7px;padding:5px 10px;cursor:pointer;font:600 12px system-ui,Segoe UI,Arial;width:auto;flex:0 0 auto";
+    ov.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:center;max-width:1280px">
+      <select id="cnOp" style="${btn};max-width:300px"></select>
       <button id="cnPlay" style="${btn};background:#15803d;border-color:#16a34a">▶ Play</button><button id="cnRe" style="${btn}">⟲ Restart</button>
-      <select id="cnSp" style="${btn}"><option value="120">Slow (about 2 min)</option><option value="60" selected>Normal (about 1 min)</option><option value="30">Fast (about 30 s)</option><option value="15">Very fast (about 15 s)</option></select>
+      <select id="cnSp" style="${btn};max-width:190px"><option value="120">Slow (about 2 min)</option><option value="60" selected>Normal (about 1 min)</option><option value="30">Fast (about 30 s)</option><option value="15">Very fast (about 15 s)</option></select>
       <button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
-      <canvas id="cnCv" width="${CW}" height="${CH}" style="width:min(100%,calc((100vh - 96px) * 16 / 9));height:auto;border-radius:10px;border:1px solid #1e293b;background:#0b1220"></canvas>
+      <canvas id="cnCv" width="${CW}" height="${CH}" style="width:min(100%,calc((100vh - 70px) * 16 / 9));height:auto;border-radius:10px;border:1px solid #1e293b;background:#0b1220"></canvas>
       <div id="cnNote" style="color:#94a3b8;font-size:12px;max-width:1280px;text-align:center">Draft program made from the stage drawing. The program on the right is the one that is simulated. Check feeds, speeds, tools and tool-nose compensation on your machine before production.</div>`;
     document.body.appendChild(ov);
     const $ = (id) => ov.querySelector("#" + id), cv = $("cnCv"), c = cv.getContext("2d"); let sim = null, g = null, playing = false, last = 0, raf = 0, rec = null, doneAt = 0, ui = {};
