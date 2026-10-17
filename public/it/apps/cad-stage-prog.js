@@ -159,17 +159,19 @@
     const ordered = chars.slice().sort((a, b) => (opOf(a) - opOf(b)) || a.no - b.no);
     const nearestEdge = (pt) => { let best = null; for (const e of A.edges) { const d = G.distTo(pt, { k: "s", a: e.a, b: e.b }); if (!best || d < best.d) best = { d, e }; } return best && best.e; };
     const near = (c, x, pt) => { const t = opSide ? opSide(c) : null, an = anchorFn ? anchorFn(c) : null; let v = 0; if (t) { if (x < t[0] - 0.05 || x > t[1] + 0.05) v -= 3; } if (an) v -= (4 * Math.hypot(an[0] - (pt ? pt[0] : x), pt ? an[1] - pt[1] : 0)) / L; return v; };
+    const terrOf = (c) => (opSide ? opSide(c) : null), okX = (c, x) => { const t = terrOf(c); return !t || (x >= t[0] - 0.05 && x <= t[1] + 0.05); };
+    const inT = (c, list, xOf, strict) => { const f = list.filter((q) => okX(c, xOf(q))); return f.length || strict ? f : list; };
     const best = (list, sc) => { let b = null, bs = -1e9; for (const q of list) { const v = sc(q); if (v > bs) { bs = v; b = q; } } return b; };
     const atFace = (e) => [e.a, e.b].some((q) => Math.abs(q[0]) < 0.02 || Math.abs(q[0] - L) < 0.02);
     const angDelta = (e, a) => Math.min(Math.abs(e.ang - a), Math.abs(90 - e.ang - a));
     // 1. diameters (and threads)
     for (const c of ordered) {
       const n = nomOf(c); if (!isDia(c) || !(n > 0)) continue;
-      const flats = A.edges.filter((e) => e.kind === "flat" && Math.abs(2 * e.a[1] - n) <= tolD(n) && e.len >= 0.4 && !used.has(e.id));
+      const flats = inT(c, A.edges.filter((e) => e.kind === "flat" && Math.abs(2 * e.a[1] - n) <= tolD(n) && e.len >= 0.4 && !used.has(e.id)), (e) => (e.a[0] + e.b[0]) / 2, true);
       const e = best(flats, (q) => -Math.abs(q.len) * 0 + near(c, (q.a[0] + q.b[0]) / 2, mid(q)) - (q.side === "i" ? 0.15 : 0));
       if (e) { used.add(e.id); out.set(c.no, { kind: "dia", side: e.side, e, x0: e.a[0], x1: e.b[0], r: e.a[1] }); continue; }
       const bp = []; for (const s2 of ["o", "i"]) for (const q of A.pts[s2]) if (Math.abs(2 * q[1] - n) <= tolD(n) && !used.has(s2 + q)) bp.push({ side: s2, q });
-      const b2 = best(bp, (z) => near(c, z.q[0], z.q) + (Math.abs(z.q[0]) < 1e-3 || Math.abs(z.q[0] - L) < 1e-3 ? 0.6 : 0));
+      const b2 = best(inT(c, bp, (z) => z.q[0], true), (z) => near(c, z.q[0], z.q) + (Math.abs(z.q[0]) < 1e-3 || Math.abs(z.q[0] - L) < 1e-3 ? 0.6 : 0));
       if (b2) { used.add(b2.side + b2.q); out.set(c.no, { kind: "dia", side: b2.side, pt: b2.q, x0: b2.q[0], x1: b2.q[0], r: b2.q[1] }); continue; }
       const fl = A.edges.filter((e3) => e3.kind === "flat" && Math.abs(2 * e3.a[1] - n) <= tolD(n)); const e2 = fl.find((q) => !used.has(q.id)) || fl[0];
       if (e2) { used.add(e2.id); out.set(c.no, { kind: "dia", side: e2.side, e: e2, x0: e2.a[0], x1: e2.b[0], r: e2.a[1] }); }
@@ -184,7 +186,7 @@
         const ao = xs[i] === 0 || A.xo.some((v) => Math.abs(v - xs[i]) < 1e-3), bo = xs[j] === L || A.xo.some((v) => Math.abs(v - xs[j]) < 1e-3);
         cand.push({ a: xs[i], b: xs[j], outer: ao && bo, key, d, adj: j === i + 1, face: xs[i] === 0 || xs[j] === L });
       }
-      const w = best(cand, (q) => (q.face ? 1.2 : 0) + (q.adj ? 0.8 : 0) + (q.outer ? 1 : 0) - (Math.abs(q.d - n) / Math.max(n, 1)) * 40 + near(c, (q.a + q.b) / 2, null) + (/BORE|DEPTH|DEEP/i.test(plainTxt(c)) && !q.outer ? 2 : 0));
+      const w = best(inT(c, cand, (q) => (q.a + q.b) / 2, true).filter((q) => okX(c, q.a) || okX(c, q.b)), (q) => (q.face ? 1.2 : 0) + (q.adj ? 0.8 : 0) + (q.outer ? 1 : 0) - (Math.abs(q.d - n) / Math.max(n, 1)) * 40 + near(c, (q.a + q.b) / 2, null) + (/BORE|DEPTH|DEEP/i.test(plainTxt(c)) && !q.outer ? 2 : 0));
       if (w) { usedPair.add(w.key); out.set(c.no, { kind: "len", a: w.a, b: w.b, outer: w.outer }); }
     }
     // 3. chamfers, angles, radii, finish, GD&T
@@ -198,16 +200,42 @@
       const sl = A.edges.filter((e) => e.kind === "slope");
       if (t === "Chamfer" || (t === "Angle" && /CHAMFER/.test(T) && !/HEX/.test(T))) {
         const a = ang != null ? ang : 45, leg = (() => { const mm = T.replace(/°/g, "").match(/(\d+(?:\.\d+)?)\s*X/); return mm ? parseFloat(mm[1]) : null; })();
-        const e = best(sl.filter((q) => angDelta(q, a) <= 2.5 && (leg == null || Math.abs(q.dx - leg) <= 0.15 * Math.max(leg, 1))), (q) => -angDelta(q, a) * 2 + (atFace(q) ? 2 : 0) - (used.has(q.id) ? 6 : 0) + near(c, (q.a[0] + q.b[0]) / 2, mid(q)) * 2);
+        const e = best(inT(c, sl, (q) => (q.a[0] + q.b[0]) / 2, true).filter((q) => angDelta(q, a) <= 2.5 && (leg == null || Math.abs(q.dx - leg) <= 0.15 * Math.max(leg, 1))), (q) => -angDelta(q, a) * 2 + (atFace(q) ? 2 : 0) - (used.has(q.id) ? 6 : 0) + near(c, (q.a[0] + q.b[0]) / 2, mid(q)) * 2);
         if (e) { used.add(e.id); out.set(c.no, { kind: "edge", e, p: mid(e), side: e.side }); continue; }
       }
       if (t === "Angle" && ang != null && ang > 0 && ang < 90) {
-        const e = best(sl.filter((q) => !used.has(q.id) && angDelta(q, ang) <= 2.5), (q) => -angDelta(q, ang) * 2 + near(c, (q.a[0] + q.b[0]) / 2, mid(q)));
+        const e = best(inT(c, sl, (q) => (q.a[0] + q.b[0]) / 2, true).filter((q) => !used.has(q.id) && angDelta(q, ang) <= 2.5), (q) => -angDelta(q, ang) * 2 + near(c, (q.a[0] + q.b[0]) / 2, mid(q)));
         if (e) { used.add(e.id); out.set(c.no, { kind: "edge", e, p: mid(e), side: e.side }); continue; }
       }
       if (t === "Radius" && n > 0) {
-        const g = best(arcs.filter((q) => !q.used && g_ok(q, n)), (q) => -Math.abs(q.R - n) / n * 4 + near(c, (q.edges[0].a[0] + q.edges[q.edges.length - 1].b[0]) / 2, null));
+        const g = best(inT(c, arcs.filter((q) => !q.used && g_ok(q, n)), (q) => (q.edges[0].a[0] + q.edges[q.edges.length - 1].b[0]) / 2, true), (q) => -Math.abs(q.R - n) / n * 4 + near(c, (q.edges[0].a[0] + q.edges[q.edges.length - 1].b[0]) / 2, null));
         if (g) { g.used = true; const es = g.edges, e = es[Math.floor(es.length / 2)]; es.forEach((q) => used.add(q.id)); out.set(c.no, { kind: "edge", e, p: [e.a[0], e.a[1]], side: e.side, arc: g }); continue; }
+      }
+      // 4. no feature of exactly this size (semi-finished / in-process size): the nearest feature of the same kind in the working area of the operation
+      {
+        const midx = (e) => (e.a[0] + e.b[0]) / 2;
+        if (isDia(c) && n > 0) {
+          const pool = inT(c, A.edges.filter((e) => e.kind === "flat" && e.len >= 0.4), midx, true), e = best(pool, (q) => -Math.abs(2 * q.a[1] - n) / n * 10 - (used.has(q.id) ? 0.3 : 0));
+          if (e && Math.abs(2 * e.a[1] - n) / n <= 0.7) { out.set(c.no, { kind: "dia", side: e.side, e, x0: e.a[0], x1: e.b[0], r: n / 2, semi: true }); continue; }
+        }
+        if (t === "Linear" && n > 0 && !/\bHEX\b|E\s*MIN|ACROSS|A\/F/i.test(plainTxt(c))) {
+          const xs = [...new Set([0, L, ...A.xo, ...A.xi])].sort((a, b) => a - b), cand = [];
+          for (let i = 0; i < xs.length; i++) for (let j = i + 1; j < xs.length; j++) {
+            const d = xs[j] - xs[i], key = xs[i] + "|" + xs[j], ao = xs[i] === 0 || A.xo.some((v) => Math.abs(v - xs[i]) < 1e-3), bo = xs[j] === L || A.xo.some((v) => Math.abs(v - xs[j]) < 1e-3);
+            cand.push({ a: xs[i], b: xs[j], outer: ao && bo, key, d, adj: j === i + 1, face: xs[i] === 0 || xs[j] === L });
+          }
+          const bore = /BORE|DEPTH|DEEP/i.test(plainTxt(c)), ok2 = cand.filter((q) => okX(c, q.a) || okX(c, q.b)), pool = ok2;
+          const w = best(pool, (q) => -Math.abs(q.d - n) / Math.max(n, 0.5) * 10 + (q.adj ? 0.6 : 0) + (q.outer ? 0.4 : 0) + (q.face ? 0.4 : 0) - (usedPair.has(q.key) ? 1.5 : 0) + (bore && !q.outer ? 2 : 0));
+          if (w && Math.abs(w.d - n) / Math.max(n, 0.5) <= 0.9) { usedPair.add(w.key); out.set(c.no, { kind: "len", a: w.a, b: w.b, outer: w.outer, semi: true }); continue; }
+        }
+        if ((t === "Angle" || t === "Chamfer") && sl.length) {
+          const a = ang != null ? ang : 45, pool = inT(c, sl, midx, true), e = best(pool, (q) => -angDelta(q, a) - (used.has(q.id) ? 4 : 0));
+          if (e && angDelta(e, a) <= 25) { used.add(e.id); out.set(c.no, { kind: "edge", e, p: mid(e), side: e.side, semi: true }); continue; }
+        }
+        if (t === "Radius" && n > 0 && arcs.length) {
+          const g = best(inT(c, arcs.filter((q) => !q.used), (q) => (q.edges[0].a[0] + q.edges[q.edges.length - 1].b[0]) / 2, true), (q) => -Math.abs((q.R || 0) - n));
+          if (g) { g.used = true; const es = g.edges, e = es[Math.floor(es.length / 2)]; es.forEach((q) => used.add(q.id)); out.set(c.no, { kind: "edge", e, p: [e.a[0], e.a[1]], side: e.side, arc: g, semi: true }); continue; }
+        }
       }
       const an = anchorFn ? anchorFn(c) : null;
       if (t === "Surface finish" || t === "GD&T") {
@@ -340,7 +368,7 @@
     // which turning operation cuts which edge: the one whose characteristic sits on it; the rest follow their neighbours
     const own = new Map(), last = Math.max(0, nT - 1);
     if (nT) {
-      for (const [no, f] of M) { const rk = rankOfChar(no); if (rk == null) continue; const es = f.arc ? f.arc.edges : f.e && (f.kind === "dia" || f.kind === "edge") ? [f.e] : []; for (const e of es) if (!own.has(e.id)) own.set(e.id, rk); }
+      for (const [no, f] of M) { const rk = rankOfChar(no); if (rk == null) continue; if (nT >= 2 && (rk === 0 || rk === last)) { const t = rk === 0 ? terr.first : terr.second, x = f.e ? (f.e.a[0] + f.e.b[0]) / 2 : f.arc ? f.arc.edges[0].a[0] : null; if (x != null && (x < t[0] - 0.3 || x > t[1] + 0.3)) continue; } const es = f.arc ? f.arc.edges : f.e && (f.kind === "dia" || f.kind === "edge") ? [f.e] : []; for (const e of es) if (!own.has(e.id)) own.set(e.id, rk); }
       const groups = new Map();
       for (const e of A.edges) { const k = e.side + e.ci; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(e); }
       const rmid = (e) => (e.a[1] + e.b[1]) / 2;
@@ -537,7 +565,7 @@
       const c = chars.get(no); if (!c || c.type === "Material" || c.type === "Note") continue;
       const f = M.get(no), txt = plain(c.spec || c.text || c.label || "");
       if (!f) { loose.push({ no, txt }); continue; }
-      if (f.kind === "dia") { vd.push({ no, txt, r: f.r, x0: f.x0, x1: f.x1, bore: f.side === "i" && !!f.e && f.e.len >= 1, red: true }); if (f.e) mineEdges.add(f.e.id); }
+      if (f.kind === "dia") { vd.push({ no, txt, r: f.r, x0: f.x0, x1: f.x1, bore: f.side === "i" && !!f.e && f.e.len >= 1, red: true, semi: !!f.semi }); if (f.e) mineEdges.add(f.e.id); }
       else if (f.kind === "len") hd.push({ no, txt, a: f.a, b: f.b, outer: f.outer, red: true });
       else if (f.kind === "hex") hexC.push({ no, c, txt });
       else if (f.e && (f.kind === "edge" || f.kind === "ra" || f.kind === "gdt" || f.kind === "free")) { ld.push({ no, c, f, txt, kind: f.kind, p: f.p || midE(f.e) }); if (f.kind === "edge") (f.arc ? f.arc.edges : [f.e]).forEach((e) => mineEdges.add(e.id)); }
@@ -612,6 +640,8 @@
     const base = colRight ? X(S.xr) + 14 : X(S.xl) - 10;
     cols.forEach((d, i) => { const xc = base + (colRight ? 1 : -1) * i * 11; K2.dimv(Y(-d.r), Y(d.r), xc, X(colRight ? d.x1 : d.x0), d.txt, d.no, d.red ? ST.dimr : ST.diml); sh.rep.dims++; });
     for (const d of vd.filter((q) => q.bore)) { K2.dimv(Y(-d.r), Y(d.r), X(d.x0 + (d.x1 - d.x0) * 0.78), null, d.txt, d.no, ST.dimr, true); sh.rep.dims++; }
+    // semi-finished sizes (in-process, no finished feature of that size): the surface is shown as a phantom line
+    both((sg) => { for (const d of vd) if (d.semi && d.x1 > d.x0) K2.L([X(d.x0), Y(sg * d.r)], [X(d.x1), Y(sg * d.r)], ST.ph); });
     // --- lengths: rows above the part, shortest nearest
     rows.forEach((q, i) => { const y = Y(Rtop) + 9 + i * 7.5, av = []; for (let j = i + 1; j < rows.length; j++) av.push(X(rows[j].a), X(rows[j].b)); K2.dimh(X(q.a), X(q.b), y, Y(S.rOut(q.a)), Y(S.rOut(q.b)), q.txt, q.no, q.red ? ST.dimr : ST.diml, av); sh.rep.dims++; });
     for (const q of boreLens) { const ra = S.rVoid(q.a), rb = S.rVoid(q.b); if (ra == null && rb == null) { loose.push({ no: q.no, txt: q.txt }); continue; } const rm = Math.min(ra == null ? 1e9 : ra, rb == null ? 1e9 : rb); K2.dimh(X(q.a), X(q.b), Y(rm * 0.3), Y(ra == null ? rm : ra), Y(rb == null ? rm : rb), q.txt, q.no, ST.dimr); sh.rep.dims++; }
