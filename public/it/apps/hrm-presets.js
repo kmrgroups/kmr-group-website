@@ -24,7 +24,7 @@
   const MACHINES = [
     { brand: "ZKTeco", protocol: "adms", link: "zk", port: 4370, models: ["K40", "K50", "F18", "F22", "MB160", "MB360", "MB460", "iClock 360", "iClock 580", "iFace 702", "UA760", "MA300", "SpeedFace-V3L", "SpeedFace-V5L", "ProFace X", "uFace 202", "SenseFace 2A"] },
     { brand: "eSSL", protocol: "adms", link: "zk", port: 4370, models: ["X990", "MB20-VL", "MB160", "MB460", "K90 Pro", "F18", "iFace 302", "uFace 202", "ProFace X", "Ultra-FA", "AiFace Mars", "TFT100"] },
-    { brand: "Realtime", protocol: "adms", link: "zk", port: 4370, models: ["T502", "T304", "T6", "Other model"] },
+    { brand: "Realtime", protocol: "json", link: "", port: 5005, models: ["RS9w", "RS9", "T502", "T304", "T6", "Other model"] },
     { brand: "BioMax", protocol: "adms", link: "zk", port: 4370, models: ["Other model"] },
     { brand: "Matrix COSEC", protocol: "json", link: "", port: 80, models: ["ARGO FACE", "VEGA FAXQ", "DOOR FOT", "PATH DCFE", "Other model"] },
     { brand: "Mantra", protocol: "json", link: "", port: 80, models: ["Other model"] },
