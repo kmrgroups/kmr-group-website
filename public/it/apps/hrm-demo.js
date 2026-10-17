@@ -28,7 +28,7 @@
     ["Bhaskar S", "Production", "Machine Operator", 16800], ["Rekha T", "HR", "HR Executive", 27000], ["Tarun Joshi", "Security", "Security Guard", 12500], ["Usha K", "Production", "Machine Operator", 16200], ["Yusuf Ali", "Production", "CNC Operator", 19000]];
   people.forEach((p, i) => {
     const sal = p[3], basic = Math.round(sal * 0.5 / 100) * 100, hra = Math.round(basic * 0.4 / 100) * 100, spl = sal - basic - hra;
-    const e = { id: id(), emp_code: "E" + String(i + 1).padStart(3, "0"), name: p[0], gender: null, dob: null, doj: i < 20 ? (y - 1 - (i % 4)) + "-0" + (1 + (i % 9)) + "-10" : y + "-04-" + String(10 + i - 20).padStart(2, "0"), dol: null, department: p[1], designation: p[2], grade: null, mobile: "98" + String(40000000 + i * 91357).slice(0, 8), email: null, address: null,
+    const e = { id: id(), emp_code: "E" + String(i + 1).padStart(3, "0"), name: p[0], gender: null, dob: "1990-05-" + String(i + 1).padStart(2, "0"), hours_per_day: 8, bonus_eligible: false, doj: i < 20 ? (y - 1 - (i % 4)) + "-0" + (1 + (i % 9)) + "-10" : y + "-04-" + String(10 + i - 20).padStart(2, "0"), dol: null, department: p[1], designation: p[2], grade: null, mobile: "98" + String(40000000 + i * 91357).slice(0, 8), email: null, address: null,
       status: "active", shift_id: i >= 6 && i % 3 === 0 ? sec.id : gen.id, bio_id: String(101 + i), pay_type: "monthly", basic, hra, special: spl, other_allow: 0, pf: sal <= 40000, esi: sal <= 21000, pt: true, ot_eligible: sal <= 25000 && p[1] === "Production",
       uan: sal <= 40000 ? "1012" + String(30000000 + i * 7919).slice(0, 8) : null, esi_no: sal <= 21000 ? "31" + String(10000000 + i * 4231).slice(0, 8) : null, pan: null, bank_name: "Sample Bank", bank_account: "5010" + String(10000000 + i * 3571).slice(0, 8), ifsc: "SAMP0000123", notes: null, sample: true, created_at: new Date().toISOString() };
     S.emps.push(e);
@@ -54,6 +54,7 @@
   })();
   const lv = (ei, code, from, to, st, reason, half) => { const e = S.emps[ei], t = S.types.find((x) => x.code === code); S.leaves.push({ id: id(), employee_id: e.id, leave_type_id: t.id, leave_code: code, from_date: from, to_date: to, half: !!half, days: half ? 0.5 : C.dnum(to) - C.dnum(from) + 1, reason, status: st, decided_by: st === "Pending" ? null : "demo@example.com", decided_at: st === "Pending" ? null : new Date().toISOString(), sample: true, created_at: new Date().toISOString() }); };
   lv(6, "CL", C.addDays(t0, -12), C.addDays(t0, -12), "Approved", "Family function"); lv(9, "SL", C.addDays(t0, -20), C.addDays(t0, -19), "Approved", "Fever"); lv(11, "CL", C.addDays(t0, 3), C.addDays(t0, 4), "Pending", "Travel"); lv(14, "LOP", C.addDays(t0, -6), C.addDays(t0, -5), "Approved", "Personal");
+  S.leaves.push({ id: id(), employee_id: S.emps[7].id, leave_type_id: null, leave_code: "PERM", kind: "permission", from_date: C.addDays(t0, -2), to_date: C.addDays(t0, -2), from_time: "16:00", to_time: "17:30", minutes: 90, half: false, days: 0, reason: "Bank work", status: "Pending", decided_by: null, decided_at: null, sample: true, created_at: new Date().toISOString() });
 
   const locked = () => S.runs.filter((r) => r.status === "final").map((r) => r.period);
   const isLocked = (d) => locked().includes(String(d).slice(0, 7));
@@ -61,6 +62,7 @@
   const view = (e) => Object.assign({}, e);
   const nextCode = () => (S.settings.emp_prefix || "E") + String(++S.ctr).padStart(3, "0");
   function empUpsert(p, existingId) {
+    if (existingId) { const c0 = S.emps.find((e) => e.id === existingId); if (c0) p = Object.assign({}, c0, p); }
     if (!T(p.name)) err("Enter the employee's name.");
     const bio = nz(p.bio_id) == null ? null : T(p.bio_id);
     if (bio && S.emps.some((e) => e.bio_id === bio && e.id !== existingId)) err("Biometric ID " + bio + " is already used by another employee.");
@@ -69,7 +71,7 @@
     if (S.emps.some((e) => e.emp_code === code && e.id !== existingId)) err("Employee code " + code + " already exists.");
     const o = Object.assign(cur || { id: id(), sample: false, created_at: new Date().toISOString() }, {
       emp_code: code, name: T(p.name), gender: nz(p.gender), dob: nz(p.dob), doj: nz(p.doj), dol: nz(p.dol), department: nz(p.department), designation: nz(p.designation), grade: nz(p.grade), mobile: nz(p.mobile), email: nz(p.email), address: nz(p.address),
-      status: p.status === "left" ? "left" : "active", shift_id: nz(p.shift_id), bio_id: bio, pay_type: p.pay_type === "daily" ? "daily" : "monthly", basic: N(p.basic), hra: N(p.hra), special: N(p.special), other_allow: N(p.other_allow),
+      status: p.status === "left" ? "left" : "active", shift_id: nz(p.shift_id), bio_id: bio, pay_type: ["daily", "fixed"].includes(p.pay_type) ? p.pay_type : "monthly", hours_per_day: N(p.hours_per_day, 8) || 8, bonus_eligible: !!p.bonus_eligible, basic: N(p.basic), hra: N(p.hra), special: N(p.special), other_allow: N(p.other_allow),
       pf: !!p.pf, esi: !!p.esi, pt: !!p.pt, ot_eligible: !!p.ot_eligible, uan: nz(p.uan), esi_no: nz(p.esi_no), pan: nz(p.pan), bank_name: nz(p.bank_name), bank_account: nz(p.bank_account), ifsc: nz(p.ifsc), notes: nz(p.notes) });
     if (!cur) S.emps.push(o);
     // punches that arrived before this person was listed now belong to them
@@ -94,15 +96,23 @@
   }
   const money = () => true;
   const needDev = () => { };
+  function permMinutes(d, a, b) {
+    if (!d) err("Choose the date."); if (!/^\d{2}:\d{2}$/.test(a || "") || !/^\d{2}:\d{2}$/.test(b || "")) err("Enter the permission time (from and to).");
+    const m = (+b.slice(0, 2) * 60 + +b.slice(3)) - (+a.slice(0, 2) * 60 + +a.slice(3)); if (m <= 0 || m > 480) err("The permission time must be between 1 minute and 8 hours (to-time after from-time)."); return m;
+  }
+  /* ---- employee mobile page (hrm-me.html): same rules as kmr_hrms_me_* ---- */
+  const SESS = {}, FAIL = {};
+  const who = (tok) => { const s = SESS[tok]; if (!s || s.exp < Date.now()) err("Please sign in again."); return S.emps.find((e) => e.id === s.eid && e.status === "active") || err("Please sign in again."); };
 
   window.QP_DEMO = Object.assign(window.QP_DEMO || {}, {
     kmr_hrms_load() { return J({ role: "admin", money: money(), settings: S.settings, shifts: S.shifts.slice().sort((a, b) => a.name.localeCompare(b.name)), holidays: S.holidays.slice().sort((a, b) => a.hdate.localeCompare(b.hdate)), leave_types: S.types, devices: S.devices, employees: S.emps.slice().sort((a, b) => a.emp_code.localeCompare(b.emp_code)).map(view), today: todayStr() }); },
     kmr_hrms_att_get(a) {
+      const pm = S.leaves.filter((l) => l.kind === 'permission' && l.status === 'Approved' && l.from_date >= a.p_from && l.from_date <= a.p_to).map((l) => ({ employee_id: l.employee_id, date: l.from_date, from_time: l.from_time, to_time: l.to_time, minutes: l.minutes }));
       if (!a.p_from || !a.p_to || a.p_to < a.p_from) err("Choose the dates."); if (C.dnum(a.p_to) - C.dnum(a.p_from) > 92) err("Choose at most three months at a time.");
       const lo = Date.parse(C.addDays(a.p_from, -1) + "T00:00:00Z") - TZMIN * 6e4, hi = Date.parse(C.addDays(a.p_to, 2) + "T00:00:00Z") - TZMIN * 6e4;
       return J({ attendance: S.att.filter((r) => r.work_date >= a.p_from && r.work_date <= a.p_to).sort((x, y) => x.work_date.localeCompare(y.work_date)),
         punches: S.punches.filter((p) => { const t = Date.parse(p.at); return t >= lo && t < hi; }).sort((x, y) => x.at.localeCompare(y.at)).map((p) => ({ id: p.id, employee_id: p.employee_id, bio_id: p.bio_id, at: p.at, verify: p.verify, direction: p.direction, device_id: p.device_id, source: p.source })),
-        leaves: S.leaves.filter((l) => l.status === "Approved" && l.from_date <= a.p_to && l.to_date >= a.p_from).map((l) => ({ employee_id: l.employee_id, from_date: l.from_date, to_date: l.to_date, half: l.half, leave_code: l.leave_code, paid: (S.types.find((t) => t.id === l.leave_type_id) || { paid: true }).paid })), locked: locked() });
+        permissions: pm, leaves: S.leaves.filter((l) => l.kind !== 'permission' && l.status === "Approved" && l.from_date <= a.p_to && l.to_date >= a.p_from).map((l) => ({ employee_id: l.employee_id, from_date: l.from_date, to_date: l.to_date, half: l.half, leave_code: l.leave_code, paid: (S.types.find((t) => t.id === l.leave_type_id) || { paid: true }).paid })), locked: locked() });
     },
     kmr_hrms_leaves(a) { const yr = String(a.p_year || t0.slice(0, 4)); return J(S.leaves.filter((l) => l.from_date.slice(0, 4) === yr || l.to_date.slice(0, 4) === yr).map((l) => { const e = S.emps.find((x) => x.id === l.employee_id) || {}; return Object.assign({}, l, { emp_name: e.name, emp_code: e.emp_code }); }).sort((x, y) => y.from_date.localeCompare(x.from_date))); },
     kmr_hrms_settings_save(a) { if (!a.p || typeof a.p !== "object") err("Settings must be an object."); S.settings = J(a.p); return null; },
@@ -166,12 +176,48 @@
       const l = { id: id(), employee_id: e.id, leave_type_id: t.id, leave_code: t.code, from_date: p.from_date, to_date: p.to_date, half: !!p.half, days, reason: nz(p.reason), status: "Pending", decided_by: null, decided_at: null, sample: e.sample, created_at: new Date().toISOString() }; S.leaves.push(l); return { id: l.id };
     },
     kmr_hrms_leave_decide(a) {
+      { const l0 = S.leaves.find((x) => x.id === a.p_id); if (l0 && l0.kind === "permission") { if (!["Approved", "Rejected", "Cancelled", "Pending"].includes(a.p_status)) err("Unknown status."); l0.status = a.p_status; l0.decided_by = "demo@example.com"; l0.decided_at = new Date().toISOString(); return null; } }
       if (!["Approved", "Rejected", "Cancelled", "Pending"].includes(a.p_status)) err("Unknown status."); const l = S.leaves.find((x) => x.id === a.p_id) || err("Leave request not found.");
       if (a.p_status === "Approved" && (isLocked(l.from_date) || isLocked(l.to_date))) err("The payroll of that month is finalised. Re-open the payroll first.");
       l.status = a.p_status; l.decided_by = "demo@example.com"; l.decided_at = new Date().toISOString();
       S.att = S.att.filter((r) => !(r.employee_id === l.employee_id && r.work_date >= l.from_date && r.work_date <= l.to_date && ["leave", "rule"].includes(r.source) && !isLocked(r.work_date))); return null;
     },
+    kmr_hrms_perm_save(a) {
+      const p = a.p, e = S.emps.find((x) => x.id === p.employee_id) || err("Choose the employee."), m = permMinutes(p.pdate, p.from_time, p.to_time);
+      if (p.id) { const l = S.leaves.find((x) => x.id === p.id && x.kind === "permission" && x.status === "Pending") || err("Only a pending request can be changed."); Object.assign(l, { employee_id: e.id, from_date: p.pdate, to_date: p.pdate, from_time: p.from_time, to_time: p.to_time, minutes: m, reason: nz(p.reason) }); return { id: l.id }; }
+      const l = { id: id(), employee_id: e.id, leave_type_id: null, leave_code: "PERM", kind: "permission", from_date: p.pdate, to_date: p.pdate, from_time: p.from_time, to_time: p.to_time, minutes: m, half: false, days: 0, reason: nz(p.reason), status: "Pending", decided_by: null, decided_at: null, sample: e.sample, created_at: new Date().toISOString() }; S.leaves.push(l); return { id: l.id };
+    },
     kmr_hrms_leave_delete(a) { const l = S.leaves.find((x) => x.id === a.p_id && ["Pending", "Rejected", "Cancelled"].includes(x.status)) || err("Only a pending, rejected or cancelled request can be deleted. Cancel an approved one first."); S.leaves = S.leaves.filter((x) => x !== l); return null; },
+    kmr_hrms_me_login(a) {
+      const code = T(a.p_code).toUpperCase(); if (!code || !a.p_dob) return { ok: false, error: "Enter your employee ID and date of birth." };
+      const f = FAIL[code] || { n: 0, at: Date.now() }; if (Date.now() - f.at > 15 * 6e4) { f.n = 0; f.at = Date.now(); } if (f.n >= 5) return { ok: false, error: "Too many wrong attempts. Please try again after 15 minutes." };
+      const e = S.emps.find((x) => x.emp_code.toUpperCase() === code && x.status === "active" && x.dob && x.dob === a.p_dob);
+      if (!e) { f.n++; FAIL[code] = f; return { ok: false, error: "Employee ID or date of birth is not correct." }; }
+      delete FAIL[code]; const tok = id() + id() + id(); SESS[tok] = { eid: e.id, exp: Date.now() + 12 * 36e5 }; return { ok: true, token: tok, name: e.name, company: "Sample Company" };
+    },
+    kmr_hrms_me_logout(a) { delete SESS[a.p_token]; return null; },
+    kmr_hrms_me_data(a) {
+      const e = who(a.p_token), per = a.p_period || t0.slice(0, 7), f = per + "-01", to = C.monthRange(per).to, yr = per.slice(0, 4), lo = Date.parse(C.addDays(f, -1) + "T00:00:00Z") - TZMIN * 6e4, hi = Date.parse(C.addDays(to, 2) + "T00:00:00Z") - TZMIN * 6e4;
+      const em = J(e); ["sample", "notes", "bank_account", "address"].forEach((k) => delete em[k]); em.bank_last4 = String(e.bank_account || "").slice(-4);
+      return J({ period: per, today: t0, company: "Sample Company", employee: em, settings: S.settings, shift: S.shifts.find((x) => x.id === e.shift_id) || null, holidays: S.holidays.slice().sort((x, y) => x.hdate.localeCompare(y.hdate)),
+        leave_types: S.types.filter((x) => x.active), attendance: S.att.filter((r) => r.employee_id === e.id && r.work_date >= f && r.work_date <= to),
+        punches: S.punches.filter((p) => (p.employee_id === e.id || (e.bio_id && p.bio_id === e.bio_id)) && Date.parse(p.at) >= lo && Date.parse(p.at) < hi).map((p) => ({ at: p.at, verify: p.verify, direction: p.direction })),
+        leaves: S.leaves.filter((l) => l.employee_id === e.id && (l.from_date.slice(0, 4) === yr || l.to_date.slice(0, 4) === yr)).sort((x, y) => y.from_date.localeCompare(x.from_date)),
+        payslips: S.slips.filter((s) => s.employee_id === e.id).map((s) => ({ run: S.runs.find((r) => r.id === s.run_id), s })).filter((x) => x.run && x.run.period <= per).map((x) => ({ period: x.run.period, status: x.run.status, month_days: x.run.month_days, slip: x.s })), locked: locked() });
+    },
+    kmr_hrms_me_leave_apply(a) {
+      const e = who(a.p_token), p = a.p, t = S.types.find((x) => x.id === p.leave_type_id && x.active) || err("Choose the leave type.");
+      if (!p.from_date || !p.to_date || p.to_date < p.from_date) err("Choose the leave dates (to-date cannot be before from-date)."); if (C.dnum(p.to_date) - C.dnum(p.from_date) > 60) err("Apply for at most 60 days at a time.");
+      if (p.half && p.from_date !== p.to_date) err("A half day is for one date."); if (p.from_date < C.addDays(t0, -31)) err("You can apply for leave of the last 30 days and later. Please ask your HR for older dates.");
+      if (isLocked(p.from_date) || isLocked(p.to_date)) err("The salary of that month is already finalised. Please ask your HR.");
+      if (S.leaves.some((l) => l.employee_id === e.id && l.kind !== "permission" && ["Pending", "Approved"].includes(l.status) && l.from_date <= p.to_date && l.to_date >= p.from_date)) err("You already have a leave request for some of these dates.");
+      const l = { id: id(), employee_id: e.id, leave_type_id: t.id, leave_code: t.code, kind: "leave", from_date: p.from_date, to_date: p.to_date, half: !!p.half, days: p.half ? 0.5 : C.dnum(p.to_date) - C.dnum(p.from_date) + 1, reason: nz(p.reason), status: "Pending", decided_by: null, decided_at: null, sample: true, created_at: new Date().toISOString() }; S.leaves.push(l); return { id: l.id };
+    },
+    kmr_hrms_me_perm_apply(a) {
+      const e = who(a.p_token), p = a.p, m = permMinutes(p.pdate, p.from_time, p.to_time); if (p.pdate < C.addDays(t0, -31)) err("You can apply for permission of the last 30 days and later. Please ask your HR for older dates."); if (isLocked(p.pdate)) err("The salary of that month is already finalised. Please ask your HR.");
+      const l = { id: id(), employee_id: e.id, leave_type_id: null, leave_code: "PERM", kind: "permission", from_date: p.pdate, to_date: p.pdate, from_time: p.from_time, to_time: p.to_time, minutes: m, half: false, days: 0, reason: nz(p.reason), status: "Pending", decided_by: null, decided_at: null, sample: true, created_at: new Date().toISOString() }; S.leaves.push(l); return { id: l.id };
+    },
+    kmr_hrms_me_cancel(a) { const e = who(a.p_token), l = S.leaves.find((x) => x.id === a.p_id && x.employee_id === e.id && x.status === "Pending") || err("Only a request that is still waiting can be cancelled."); l.status = "Cancelled"; return null; },
     kmr_hrms_payroll_list() { return J(S.runs.slice().sort((a, b) => b.period.localeCompare(a.period))); },
     kmr_hrms_payroll_get(a) { const r = S.runs.find((x) => x.period === a.p_period); return r ? J({ run: r, slips: S.slips.filter((s) => s.run_id === r.id).sort((x, y) => x.emp_code.localeCompare(y.emp_code)) }) : null; },
     kmr_hrms_payroll_save(a) {

@@ -80,6 +80,8 @@ hrms:[
 ['IATF','7.5.3.2.1','Record retention','Every raw punch from the machines is kept with machine, time and method (finger / face / card) next to the worked-out attendance; JSON backup and daily database backup. The retention period required by law is decided by the company.'],
 ['ISO','8.1','Operational planning and control','Attendance is worked out by fixed, visible rules (shift timings, grace, half and full day hours, break, overtime threshold) set in Setup, the same for everyone.'],
 ['ISO','9.1.3','Analysis and evaluation','Late arrivals, absence, missed punches and overtime hours are shown per person and per month; punches that match no employee are flagged.'],
+['ISO','7.5.3','Control of documented information - employee access','Employees open their own attendance and payslips on their mobile with employee ID and date of birth; they can see no one else\'s data, a session ends after 12 hours, and five wrong tries lock the sign-in for 15 minutes. Leave and permission requests are approved by HR and keep who decided and when.'],
+['ISO','8.1','Operational planning and control - pay rules','PF, ESI and professional tax have a company-wide on / off switch plus a per-employee setting; the overtime rate basis, attendance bonus rule and rounding are visible in Setup; the live salary of the running month is shown from the machine punches before it is finalised.'],
 ['VDA','P6','Process / service - resources (personnel)','Who was present on which shift and for how long is available per day, to support the staffing evidence asked for in a process audit.']],
 mom:[
 ['ISO','9.3','Management review','Management review meetings are minuted with inputs discussed, decisions and actions with owner and date.'],

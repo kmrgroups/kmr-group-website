@@ -84,4 +84,16 @@ eq(f.rows.map((x) => x.time), ["2026-09-03 09:01:00", "2026-09-03 18:05:00"], "c
 f = C.parsePunchFile("PIN;DateTime\n7;2026-09-03 08:55:00"); eq(f.rows[0], { bio_id: "7", time: "2026-09-03 08:55:00", verify: "other", direction: null }, "semicolon");
 // today with one punch is a running day, not a missed punch
 eq(C.buildAttendance(Object.assign({}, base, { punches: [{ employee_id: "e1", bio_id: "11", at: IST("2026-09-30", "09:00") }] }), "2026-09-30", "2026-09-30", {}, "2026-09-30").rows[0].status, "P", "running day");
+// Elixir Tec sheet rules (August 2026, 31 days): no PF, hourly = daily / hours per day, OT at 1x, bonus 500 when at most 1 day short, whole rupees
+const ES = { month_days_mode: "calendar", pf_enabled: false, esi_enabled: false, pt_enabled: false, ot_multiplier: 1, ot_basis: "gross", ot_day_divisor: "calendar", bonus_amount: 500, bonus_max_short: 1, round_net: true };
+const emk = (o) => Object.assign({ id: "x", emp_code: "E1", name: "n", pay_type: "monthly", basic: 0, hra: 0, special: 0, other_allow: 0, pf: true, esi: true, pt: true, ot_eligible: true, hours_per_day: 8.5, bonus_eligible: true }, o);
+const esm = (paid, otMin) => ({ days: 31, outside: 0, paid_days: paid, present: paid, hd: 0, wo: 0, h: 0, paid_leave: 0, unpaid_leave: 0, absent: 0, missed: 0, unrecorded: 0, ot_min: otMin, late_count: 0, late_min: 0, lop_days: 31 - paid });
+let eep = C.payOf(emk({ basic: 18500 }), esm(30, 0), "2026-08", ES);
+eq([eep.gross, eep.net, eep.deductions.length], [18403.23, 18403, 0], "full month with bonus, no PF even though employee PF is on");
+eep = C.payOf(emk({ basic: 9000, bonus_eligible: false }), esm(29, 0), "2026-08", ES); eq(eep.earnings.some((x) => x.code === "BONUS"), false, "bonus only when eligible");
+eep = C.payOf(emk({ basic: 9000 }), esm(29, 0), "2026-08", ES); eq(eep.earnings.some((x) => x.code === "BONUS"), false, "2 days short: no bonus");
+eep = C.payOf(emk({ basic: 2500, pay_type: "fixed", ot_eligible: false, bonus_eligible: false }), esm(10, 0), "2026-08", ES); eq(eep.net, 2500, "fixed pay is not prorated");
+eep = C.payOf(emk({ basic: 15500, hours_per_day: 12, bonus_eligible: false }), esm(31, 120), "2026-08", ES); eq(eep.earnings.find((x) => x.code === "OT").amount, r2e(15500 / 31 / 12 * 2), "OT hours at daily/hours");
+function r2e(n) { return Math.round(n * 100) / 100; }
+eep = C.payOf(emk({ basic: 20000 }), esm(31, 0), "2026-08", Object.assign({}, ES, { pf_enabled: true })); eq(eep.deductions.map((x) => x.code), ["PF", "ESI", "PT"].filter((x) => x === "PF"), "PF switch on: PF taken");
 console.log(bad ? bad + " FAILED" : "all passed"); process.exit(bad ? 1 : 0);

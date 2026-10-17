@@ -11,6 +11,10 @@
     pf_rate: 12, pf_wage_cap: 15000, eps_rate: 8.33, pf_admin_rate: 0.5, edli_rate: 0.5,
     esi_emp_rate: 0.75, esi_er_rate: 3.25, esi_limit: 21000,
     pt_slabs: [{ from: 0, amount: 0 }],       // professional tax by monthly gross; set the state's slabs in Setup
+    pf_enabled: true, esi_enabled: true, pt_enabled: true,   // company switches: off = nobody pays it, whatever the employee setting
+    ot_basis: "basic",                        // basic | gross: what the overtime hour rate is worked out from
+    bonus_amount: 0, bonus_max_short: 1,      // attendance bonus for employees marked eligible: paid when at most this many days are short
+    round_net: false,                         // pay whole rupees
     min_gap_min: 5,                           // two punches closer than this are one punch (double touch)
   };
   const cfg = (s) => Object.assign({}, DEFAULTS, s || {});
@@ -107,6 +111,7 @@
     const byBio = {}; (data.employees || []).forEach((e) => { if (e.bio_id) byBio[String(e.bio_id)] = e; });
     const hol = {}; (data.holidays || []).forEach((h) => { hol[String(h.hdate).slice(0, 10)] = h.name; });
     const manual = {}; (data.existing || []).forEach((r) => { if (r.source === "manual") manual[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = 1; });
+    const perm = {}; (data.permissions || []).forEach((x) => { const k = x.employee_id + "|" + String(x.date).slice(0, 10); perm[k] = { minutes: (perm[k] ? perm[k].minutes : 0) + num(x.minutes), from_time: x.from_time, to_time: x.to_time }; });
     const ctx = { settings: s, holidays: hol, leaves: data.leaves || [], today: today || local(Date.now(), tz).date };
     // sort punches into employee -> work date
     const bucket = {}, unknown = {};
@@ -124,7 +129,14 @@
       for (let d = from; d <= to; d = addDays(d, 1)) {
         if (manual[e.id + "|" + d]) continue;                                                           // hand-entered days stay as they are
         const r = dayRow(e, sh, d, bucket[e.id + "|" + d] || [], ctx);
-        if (r) rows.push(r);
+        if (r) {
+          const pm = perm[e.id + "|" + d];                                                              // an approved permission excuses that many minutes of late / early going
+          if (pm && (num(r.late_min) > 0 || num(r.early_min) > 0)) {
+            let left = pm.minutes, l = Math.min(num(r.late_min), left); r.late_min = num(r.late_min) - l; left -= l; const er = Math.min(num(r.early_min), left); r.early_min = num(r.early_min) - er;
+            r.remarks = (r.remarks ? r.remarks + "; " : "") + "Permission " + pm.from_time + "-" + pm.to_time;
+          }
+          rows.push(r);
+        }
       }
     });
     return { rows, unknown };
@@ -161,40 +173,45 @@
   /* ---------- pay of one employee for one month ---------- */
   function payOf(emp, sum, period, settings) {
     const s = cfg(settings), md = s.month_days_mode === "calendar" ? monthDays(period) : Math.max(1, num(s.month_days_mode, 30));
-    const daily = emp.pay_type === "daily";
+    const daily = emp.pay_type === "daily", fixed = emp.pay_type === "fixed";
     const full = { basic: num(emp.basic), hra: num(emp.hra), special: num(emp.special), other: num(emp.other_allow) };
     const grossMonthly = full.basic + full.hra + full.special + full.other;
-    const f = daily ? sum.paid_days : sum.paid_days / md;
+    const f = fixed ? 1 : daily ? sum.paid_days : sum.paid_days / md;
     const earn = (name, code, v) => ({ code, name, amount: r2(v * f) });
     const earnings = [earn("Basic", "BASIC", full.basic), earn("House rent allowance", "HRA", full.hra), earn("Special allowance", "SPL", full.special), earn("Other allowance", "OTH", full.other)].filter((x) => x.amount !== 0 || x.code === "BASIC");
     let otHours = 0, otPay = 0;
     if (emp.ot_eligible && sum.ot_min > 0) {
       otHours = r2(sum.ot_min / 60);
-      const hourly = daily ? full.basic / s.ot_hours_per_day : full.basic / s.ot_day_divisor / s.ot_hours_per_day;
+      const hpd = num(emp.hours_per_day) > 0 ? num(emp.hours_per_day) : s.ot_hours_per_day, rate = s.ot_basis === "gross" ? grossMonthly : full.basic;
+      const div = s.ot_day_divisor === "calendar" ? md : num(s.ot_day_divisor, 26);
+      const hourly = daily ? rate / hpd : rate / div / hpd;
       otPay = r2(otHours * hourly * s.ot_multiplier);
       earnings.push({ code: "OT", name: "Overtime", amount: otPay });
     }
+    const bonusOn = emp.bonus_eligible && num(s.bonus_amount) > 0 && sum.paid_days >= sum.days - sum.outside - num(s.bonus_max_short);
+    if (bonusOn) earnings.push({ code: "BONUS", name: "Attendance bonus", amount: r2(s.bonus_amount) });
     const earnedBasic = earnings.find((x) => x.code === "BASIC").amount;
     const gross = r2(earnings.reduce((a, x) => a + x.amount, 0));
     const deductions = [], info = { month_days: md, gross_monthly: r2(grossMonthly) };
-    if (emp.pf) {
+    if (emp.pf && s.pf_enabled !== false) {
       const wage = Math.min(earnedBasic, s.pf_wage_cap), ee = Math.round(wage * s.pf_rate / 100), eps = Math.round(wage * s.eps_rate / 100);
       deductions.push({ code: "PF", name: "Provident fund", amount: ee });
       Object.assign(info, { pf_wage: wage, er_eps: eps, er_epf: Math.round(wage * s.pf_rate / 100) - eps, er_admin: Math.round(wage * s.pf_admin_rate / 100), er_edli: Math.round(wage * s.edli_rate / 100) });
     }
-    if (emp.esi && grossMonthly <= s.esi_limit && gross > 0) {
+    if (emp.esi && s.esi_enabled !== false && grossMonthly <= s.esi_limit && gross > 0) {
       const ee = Math.ceil(gross * s.esi_emp_rate / 100 - 1e-9), er = Math.ceil(gross * s.esi_er_rate / 100 - 1e-9);
       deductions.push({ code: "ESI", name: "Employee state insurance", amount: ee }); Object.assign(info, { esi_wage: gross, er_esi: er });
     }
-    if (emp.pt) {
+    if (emp.pt && s.pt_enabled !== false) {
       const slabs = (s.pt_slabs || []).slice().sort((a, b) => num(a.from) - num(b.from)); let pt = 0;
       slabs.forEach((x) => { if (grossMonthly >= num(x.from)) pt = num(x.amount); });
       if (pt > 0) deductions.push({ code: "PT", name: "Professional tax", amount: pt });
     }
     const deduct = r2(deductions.reduce((a, x) => a + x.amount, 0));
+    if (s.round_net) info.round_off = r2(Math.round(gross - deduct) - (gross - deduct));
     Object.assign(info, { present: sum.present, half_days: sum.hd, weekly_off: sum.wo, holidays: sum.h, paid_leave: sum.paid_leave, unpaid_leave: sum.unpaid_leave, absent: sum.absent, missed_punch: sum.missed, unrecorded: sum.unrecorded, late_count: sum.late_count });
     return { employee_id: emp.id, emp_code: emp.emp_code, emp_name: emp.name, department: emp.department || null, designation: emp.designation || null,
-      paid_days: sum.paid_days, lop_days: sum.lop_days, ot_hours: otHours, earnings, deductions, gross, deduct, net: r2(gross - deduct), info };
+      paid_days: sum.paid_days, lop_days: sum.lop_days, ot_hours: otHours, earnings, deductions, gross, deduct, net: s.round_net ? Math.round(gross - deduct) : r2(gross - deduct), info };
   }
 
   /* totals of a payslip list */
@@ -203,7 +220,7 @@
   }
   /* after a payslip line is changed by hand */
   function reslip(sl) {
-    sl.gross = r2((sl.earnings || []).reduce((a, x) => a + num(x.amount), 0)); sl.deduct = r2((sl.deductions || []).reduce((a, x) => a + num(x.amount), 0)); sl.net = r2(sl.gross - sl.deduct); return sl;
+    sl.gross = r2((sl.earnings || []).reduce((a, x) => a + num(x.amount), 0)); sl.deduct = r2((sl.deductions || []).reduce((a, x) => a + num(x.amount), 0)); sl.net = r2(sl.gross - sl.deduct); if (sl.info && sl.info.round_off != null) { sl.info.round_off = r2(Math.round(sl.net) - sl.net); sl.net = Math.round(sl.net); } return sl;
   }
 
   /* ---------- reading a file exported from a machine (CSV / TXT / DAT) ---------- */
