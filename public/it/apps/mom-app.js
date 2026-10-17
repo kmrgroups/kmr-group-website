@@ -148,7 +148,7 @@ ${bar}
       <div style="display:flex;gap:4px">${hasF("mom.translation") ? `<button class="btn o s" data-segtrb="${g.id || g.client_id}" title="Translate this line">🌐</button>` : ""}${w && g.id ? `<button class="btn o s" data-segpt="${g.id}" title="Make a 5W1H point">→ 5W1H</button><button class="btn o s" data-segdel="${g.id}" title="Delete">✕</button>` : ""}</div></div>`).join("");
   }
   function pointsTable() {
-    const P = S.det.points, w = canWrite(), ed2 = ed(); if (!P.length) return '<div class="empty"><b>No points yet.</b><br>Go to <a href="#" data-step="2">step 2 · Discuss</a> to speak or type the discussion, or press <b>+ Add point</b>.</div>';
+    const P = S.det.points, w = canWrite(), ed2 = ed(); if (!P.length) { const ns = S.det.segments.filter((g) => g.id).length; return `<div class="empty"><b>No points yet.</b><br>${ns ? `The discussion has <b>${ns}</b> voice/typed line${ns > 1 ? "s" : ""} that are not points yet. ${w ? '<br><button class="btn s" id="segAll" style="margin-top:8px">Make a point from each line</button>' : '<br>To turn them into points press <b>Edit minutes</b> (top right), then <b>Make a point from each line</b>.'}` : 'Go to <a href="#" data-step="2">step 2 · Discuss</a> to speak or type the discussion, or press <b>+ Add point</b>.'}</div>`; }
     const sub = (l, v) => (v ? `<div class="sub"><span>${l}</span> ${esc(v)}</div>` : "");
     return `<table class="pts"><thead><tr><th>What was discussed / decided</th><th>Who</th><th>When</th><th>Status</th><th></th></tr></thead><tbody>${P.map((p) => {
       const tr = p.translations || {}, keys = Object.keys(tr);
@@ -162,7 +162,7 @@ ${bar}
     const D = S.det, m = D.meeting;
     $("#back").onclick = (e) => { e.preventDefault(); if (S.state === "listening" && !confirm("Recording is still running. Stop it and leave?")) return; stopRec(); go("go=meet"); };
     $("#prn").onclick = printMinutes; if ($("#fin")) $("#fin").onclick = finalise;
-    if ($("#reo")) $("#reo").onclick = async () => { try { await call("kmr_mom_reopen", { p_id: m.id }); S.det = null; await openMeeting(m.id); say("Minutes opened for editing. Press Finalise when done.", true); } catch (e) { say(e.message); } };
+    if ($("#reo")) $("#reo").onclick = async () => { try { await call("kmr_mom_reopen", { p_id: m.id }); S.det = null; await openMeeting(m.id); say("Minutes opened for editing. Press Finalise when done.", true); } catch (e) { say(/permission denied for function/i.test(e.message) ? "The database has not been updated for editing finalised minutes yet. Ask the administrator to run the update \u201C0071_mom_grants\u201D in Supabase (one-time), then try again." : e.message); } };
     if ($("#del")) $("#del").onclick = () => { if (!confirm("Delete " + m.meeting_no + " permanently, with all its points and transcript? This cannot be undone.\n\n(To keep the record, use Void instead.)")) return; call("kmr_mom_delete", { p_id: m.id }).then(() => { S.det = null; return loadAll().then(() => { go("go=meet"); say("Meeting deleted.", true); }); }).catch((e) => say(e.message)); };
     if ($("#vd")) $("#vd").onclick = () => { const r = prompt("Reason for voiding this meeting record?"); if (r === null) return; call("kmr_mom_void", { p_id: m.id, p_reason: r }).then(() => go("go=meet")).catch((e) => say(e.message)); };
     if ($("#hsave")) $("#hsave").onclick = () => saveHeader(true);
@@ -172,6 +172,7 @@ ${bar}
     if ($("#pnew")) $("#pnew").onclick = () => pointDialog(null);
     if ($("#pnew2")) $("#pnew2").onclick = () => pointDialog(null);
     if ($("#fin2")) $("#fin2").onclick = finalise;
+    if ($("#segAll")) $("#segAll").onclick = async () => { try { await makeAllPoints(); setStep(3); } catch (e) { say(e.message); } };
     bindSteps();
     if ($("#trAll")) $("#trAll").onclick = () => translateDialog(D.points.map((p) => p.id));
     bindPoints(); bindVoice(); bindSegs();
@@ -192,8 +193,17 @@ ${bar}
       const keep = S.det.segments.filter((g) => !g.id); S.det = await call("kmr_mom_get", { p_id: m.id }); S.det.segments.push(...keep); say("Details saved.", true); const y = window.scrollY; if (next === true) S.step = 2; drawEditor(); window.scrollTo(0, next === true ? 0 : y);
     } catch (e) { say(e.message); }
   }
+  async function makeAllPoints() {
+    const m = S.det.meeting, names = (m.attendees || []).map((a) => a.name), gs = S.det.segments.filter((g) => g.id);
+    for (const g of gs) await call("kmr_mom_point_save", { p: { id: null, meeting_id: m.id, what: g.text, ptype: "Discussion", status: "Open", lang: g.lang || m.language || "en-IN", source: "voice", seg_ids: [g.id], who: LG.guessWho(g.text, names), when_on: LG.guessWhen(g.text, today()) || null } });
+    await refresh(); say(`${gs.length} point${gs.length > 1 ? "s" : ""} made from the discussion. Check them (Who, When) and then finalise.`, true);
+  }
   async function finalise() {
     if (S.q.length) { await flush(); if (S.q.length) return say("Some transcript lines are not saved yet. Check the connection and try again."); }
+    if (!S.det.points.length && S.det.segments.some((g) => g.id)) {
+      if (confirm(`There are ${S.det.segments.length} discussion lines but no points yet, so the Points list would be empty.\n\nOK = make a point from each line now (you can edit them, then finalise)\nCancel = go back`)) { try { await makeAllPoints(); setStep(3); } catch (e) { say(e.message); } }
+      return;
+    }
     if (S.state !== "stopped") { if (!confirm("Recording is on. Stop it and finalise the minutes?")) return; stopRec(); }
     if (!confirm("Finalise these minutes? Points will be locked (action status and remarks can still be updated).")) return;
     try { await saveHeader(); await call("kmr_mom_close", { p_id: S.det.meeting.id }); S.det = null; await openMeeting(hashM()); say("Minutes finalised.", true); } catch (e) { say(e.message); }
