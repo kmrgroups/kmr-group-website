@@ -351,7 +351,7 @@
     const b = sh.box, w = b.x1 - b.x0, h = b.y1 - b.y0, Hp = Math.round((W * h) / w), c = canvas(W, Hp), x = c.getContext("2d");
     const view = { cx: (b.x0 + b.x1) / 2, cy: (b.y0 + b.y1) / 2, s: W / w, W, H: Hp };
     const P = (col, wd) => K.canvasPainter(x, view, { fg: INK, light: true, lwt: true, ltscale: doc.ltscale, override: col, width: wd });
-    const PP = { geom: P(INK), this: P(RED, 2), done: P(GREY), balloon: P(RED, 2), frame: P(INK), model: P(INK), stock: P(INK), tool: P("#0369a1", 1.4), clamp: P("#b45309", 1.4) };
+    const PP = { geom: P(INK), this: P(RED, 3.2), done: P(GREY), balloon: P(RED, 1.5), frame: P(INK), model: P("#374151", 2.6), stock: P(INK), tool: P("#0369a1", 1.4), clamp: P("#0369a1", 1.6), dimr: P(RED, 1.1), dimg: P("#374151", 1.1), ph: P("#6b7280", 1.0), hatch: P("#9ca3af", 0.8) };
     const ents = doc.ents.filter((e) => { const bb = K.bbox(e, doc); return bb && !(bb.x1 < b.x0 || bb.x0 > b.x1 || bb.y1 < b.y0 || bb.y0 > b.y1); });
     await K.imgReady(doc, ents);
     for (const e of ents) { if (K.noPlot(doc, e)) continue; const role = e.stg || (/^STG-BALLOON$/.test(e.layer) ? "balloon" : /^STG-/.test(e.layer) ? "frame" : "geom"); K.paint(PP[role] || PP.geom, e, doc); }
@@ -422,26 +422,29 @@
 
   /** process-stage drawings (cad-stage-flow.js): the part's shape from the drawing, checked by the user */
   async function flowBuild(E, P, SRC, say) {
-    const F = K.stageFlow; if (!F) throw new Error("The stage-flow module did not load. Reload the page.");
-    let prof = null, how = "", scaleNote = "";
+    const F = K.stageFlow, SP = K.stageProg; if (!F || !SP) throw new Error("The stage-flow module did not load. Reload the page.");
+    let cont = null, how = "", doc = null;
     try {
-      let doc = SRC.kind === "vector" ? SRC.doc : null;
+      doc = SRC.kind === "vector" ? SRC.doc : null;
       if (!doc && SRC.file && K.vec) { say("Converting the picture of the drawing to CAD to find the shape of the part…"); const r = await K.vec.convert(SRC.file, { ocr: false, keep: false, page: 1 }, say); doc = K.newDoc(false); K.vec.intoDoc(doc, r, 0, 0, 1); }
-      if (doc) { say("Finding the shape of the part…"); prof = F.silhouette(doc); }
-      if (prof) { const cal = calibrate(prof, P); prof = cal.prof; scaleNote = cal.note; }
-    } catch (e) { prof = null; how = " (" + e.message + ")"; }
-    const fromDrawing = !!prof; if (!prof) prof = F.fromPlan(P);
-    const model = Object.assign({}, prof, F.defaults(P, prof));
-    const note = fromDrawing ? `The shape was read from <b>${esc(SRC.name || "the drawing")}</b> (${prof.steps.length} step${prof.steps.length > 1 ? "s" : ""}, length ${prof.L} mm${prof.bore ? ", bore Ø" + prof.bore.d : ""}). Check it against the drawing — correct any number that is wrong.${scaleNote}` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the steps of your part</b> (diameter and length from the left end).`;
-    const m = await F.dialog(E, P, model, note); if (!m) return null;
-    Object.assign(m, F.defaults(P, { steps: m.steps, bore: m.bore }), { steps: m.steps, bore: m.bore, D0: m.D0, fa: m.fa, clamp: m.clamp, first: m.first, bar: m.bar, L: m.steps.reduce((t, s) => t + s.l, 0), maxD: Math.max(...m.steps.map((x) => x.d)) });
-    // the first turned end is drawn at the left
-    if (m.first === "R") { m.steps = m.steps.slice().reverse(); if (m.bore) m.bore = Object.assign({}, m.bore, { end: m.bore.end === "L" ? "R" : "L" }); }
+      if (doc) { say("Finding the outline of the part…"); const c = SP.contour(doc); if (c) { const cal = SP.calibrate(c, P.chars || []); cont = SP.scaleContour(c, cal.k, cal.dias); cont.cal = cal; } }
+    } catch (e) { cont = null; how = " (" + e.message + ")"; }
+    const fromDrawing = !!cont; if (!cont) { const pl = F.fromPlan(P); cont = SP.fromSteps(pl.steps, pl.bore); }
+    const def = F.defaults(P, { steps: SP.stepsOf(cont), bore: null }), model = Object.assign({}, cont, def);
+    const nb = cont.inner.length, calNote = fromDrawing && cont.cal && cont.cal.of ? ` The drawing has no printed scale: it was scaled ×${Math.round(cont.k * 1000) / 1000} so that ${cont.cal.score >= cont.cal.of ? "all" : "most"} of the diameters and lengths of the table match.` : "";
+    const note = fromDrawing ? `The outline was read from <b>${esc(SRC.name || "the drawing")}</b> (length ${model.L} mm, largest Ø ${Math.round(model.rmax * 200) / 100}${nb ? ", " + nb + " bore" + (nb > 1 ? "s" : "") : ", no bore"}).${calNote} Check it against the drawing and correct any point that is wrong.` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the outline of your part</b> (length from the left end, radius).`;
+    const m = await SP.dialog(E, P, model, note); if (!m) return null;
+    let flipped = false; if (m.first === "R") { Object.assign(m, SP.flip(m)); flipped = true; }
+    // where the customer's balloons sit on the drawing → where they are on the outline (helps place every dimension on the right feature)
+    const anchor = SRC.anchored && SRC.T && SRC.items && cont.tf && cont.k ? (c) => {
+      const it = SRC.items.get(+c.no); if (!it || it.ax == null) return null; const a = apT(SRC.T, it.ax, it.ay), tf = cont.tf, q = tf.horiz ? [a[0] - tf.x0, a[1] - tf.ax] : [a[1] - tf.x0, a[0] - tf.ax];
+      let x = q[0] * cont.k; if (flipped) x = m.L - x; return Number.isFinite(x) ? [x, Math.abs(q[1]) * cont.k] : null;
+    } : null;
     say("Drawing the stages…"); await new Promise((r) => setTimeout(r, 20));
-    const R = F.build(P, m, {});
+    const R = SP.build(P, m, { anchor });
     const used = new Set(); for (const o of P.ops || []) for (const n of (P.freeze.map || {})[String(o.opNo)] || []) used.add(+n);
     R.report.unsure = []; R.total = used.size;
-    R.doc.info = { stage: { pd: P.id, part: P.part_no || "", partName: P.part_name || "", freezeRev: P.freeze.rev, frozenAt: P.freeze.at, source: { kind: "stages", name: SRC.name || "", anchored: false }, raster: false, flow: true, shape: { steps: m.steps, bore: m.bore, D0: m.D0 }, sheets: R.sheets, made: new Date().toISOString() } };
+    R.doc.info = { stage: { pd: P.id, part: P.part_no || "", partName: P.part_name || "", freezeRev: P.freeze.rev, frozenAt: P.freeze.at, source: { kind: "stages", name: SRC.name || "", anchored: !!anchor }, raster: false, flow: true, shape: { outer: m.outer, inner: m.inner, L: m.L, D0: m.D0 }, sheets: R.sheets, made: new Date().toISOString() } };
     return R;
   }
 
@@ -476,6 +479,7 @@
     if (rep.unsure && rep.unsure.length) E.msg(`Check balloons #${rep.unsure.join(", #")}: the same value is on the drawing more than once, so the first one was used. Move the balloon if it is on the wrong dimension, then Send to SOP.`, "er");
     if (SRC.kind === "raster" && SRC.pages.length > 1 && !SRC.anchored) E.msg(`Only sheet 1 of ${SRC.pages.length} is used, because the file has no balloon positions.`, "mu");
     E.msg(`Made ${R.sheets.length} stage sheet${R.sheets.length > 1 ? "s" : ""} for ${new Set(R.sheets.map((s) => s.opNo)).size} operations from ${SRC.name}. ${rep.ballooned != null ? rep.ballooned : rep.balloons} balloons placed${SRC.kind === "vector" ? `, ${rep.linked} dimensions linked` : ""}${SRC.fitted ? " (balloons lined up from matching dimensions)" : ""}.`, "ok");
+    if (rep.noted && rep.noted.length) E.msg(`#${[...new Set(rep.noted)].join(", #")} could not be tied to one feature of the outline, so each is written under its sketch with its balloon. Check them, then Send to SOP.`, "mu");
     if (SRC.kind === "raster" && !SRC.anchored) E.msg("A PDF or picture that was not ballooned has no balloon positions, so the sheets show the drawing and the table only. Choose the ballooned drawing to get the balloons.", "mu");
     else if (miss.length) E.msg(`Not found on the drawing — listed in the table only: #${miss.join(", #")}. Add the balloons by hand if needed, then Send to SOP.`, "er");
     if (o.send) await send(E);
@@ -503,5 +507,5 @@
     { n: "Stage drawings for the SOP", b: [["STAGEDWG", "Make stage drawings", "title"], ["STAGESEND", "Send to SOP", "exportI"], ["STAGESOP", "Open the SOP", "open"]] },
   ] });
 
-  K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate; K.stageCrop = cropPages;
+  K.stageFlowBuild = flowBuild; K.stageBuild = buildSet; K.stageRender = renderSheet; K.stageLoad = loadSource; K.stageCalibrate = calibrate; K.stageCrop = cropPages;
 })((window.KCAD = window.KCAD || {}));

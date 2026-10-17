@@ -17,7 +17,7 @@
   const DA = { x0: 14, y0: 46, x1: 296, y1: 283 }, TB = { x0: 300, y0: 46, x1: 406, y1: 283 };
   const r2 = (v) => Math.round(v * 100) / 100, num = (s) => { const m = String(s == null ? "" : s).replace(/,/g, ".").match(/-?\d+(?:\.\d+)?/); return m ? parseFloat(m[0]) : null; };
   const BARS = [6, 8, 10, 12, 14, 16, 18, 20, 22, 25, 28, 30, 32, 35, 38, 40, 42, 45, 48, 50, 55, 60, 63, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110, 115, 120, 130, 140, 150, 160, 170, 180, 190, 200, 220, 250, 280, 300, 350, 400];
-  const stockFor = (od) => BARS.find((b) => b >= od + 1.5) || Math.ceil(od + 3);
+  const stockFor = (od) => BARS.find((b) => b >= od + 0.3) || Math.ceil(od + 1);
   let mctx = null; const wOf = (s, h) => { if (!mctx) { mctx = document.createElement("canvas").getContext("2d"); mctx.font = "100px Arial, Helvetica, sans-serif"; } return (mctx.measureText(s).width / 100) * (h / 0.716); };
   const fit = (s, h, w) => { s = String(s == null ? "" : s); if (wOf(s, h) <= w) return s; while (s.length > 1 && wOf(s + "…", h) > w) s = s.slice(0, -1); return s.trimEnd() + "…"; };
   const SYMW = { "⌖": "POS", "⊥": "PERP", "↗": "RUNOUT", "⌰": "T.RUNOUT", "∥": "PARL", "⏥": "FLAT", "○": "ROUND", "⌭": "CYL", "◎": "CONC", "⌒": "PROF", "⌓": "PROF", "∠": "ANG", "⌯": "SYM", "⏤": "STRT", "◆": "CC", "▼": "SC", "◇": "KC" };
@@ -70,7 +70,7 @@
       if (near.length) { const p = near.sort((u, v) => v.r - u.r)[0]; const depth = end === "L" ? p.x1 - edge : edge - p.x0; if (depth > 1) { bore = { d: r2(p.r * 2), depth: r2(depth), end }; break; } }
     }
     if (!bore) for (const h of hid) { if (Math.abs(h.y - best.ax) > 1e-9) { const r = Math.abs(h.y - best.ax); if (r > 0.8 && r < steps[0].r && (Math.abs(h.x0 - x0) < 0.3 || Math.abs(h.x1 - xe) < 0.3)) { const left = Math.abs(h.x0 - x0) < 0.3; bore = { d: r2(r * 2), depth: r2(h.x1 - h.x0), end: left ? "L" : "R" }; break; } } }
-    return { steps: steps.map((s) => ({ d: r2(s.r * 2), l: r2(s.x1 - s.x0) })), bore, L: r2(xe - x0), source: "drawing", horiz };
+    return { steps: steps.map((s) => ({ d: r2(s.r * 2), l: r2(s.x1 - s.x0) })), bore, L: r2(xe - x0), source: "drawing", horiz, ax: best.ax, x0, rmax: Math.max(...steps.map((s) => s.r)) };
   };
 
   /** from the numbers in the plan when no drawing geometry can be used: one cylinder, the user corrects it in "Part shape" */
@@ -486,5 +486,5 @@
       wire(); b.querySelector("#sfAdd").onclick = () => { const t = b.querySelector("#sfSteps"), n = t.querySelectorAll("tr").length; t.insertAdjacentHTML("beforeend", stepRow({ d: 20, l: 10 }, n)); wire(); redo(); };
     } });
   };
-  F.PW = PW; F.PH = PH; F.RED = RED;
+  F.PW = PW; F.PH = PH; F.RED = RED; F.plain = plain; F.fit = fit;
 })((window.KCAD = window.KCAD || {}));
