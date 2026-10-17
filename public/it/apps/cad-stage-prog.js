@@ -239,10 +239,10 @@
   const U = (o) => Object.assign({ id: K.uid(), color: null, lt: null, lw: null }, o);
   /** role → entity style. this = cutting (red), model = not cut here (dark grey), ph = stock removed (phantom), clamp = fixture (blue) */
   const ST = {
-    this: { color: RED, lw: 0.6, stg: "this" }, model: { color: DG, lw: 0.5, stg: "model" },
-    hid: { color: DG, lw: 0.3, lt: "HIDDEN", stg: "model" }, hidr: { color: RED, lw: 0.3, lt: "HIDDEN", stg: "this" },
-    ph: { color: PHG, lw: 0.18, lt: "PHANTOM", stg: "ph" }, clamp: { color: BLUE, lw: 0.4, stg: "clamp" }, hatch: { color: "#9ca3af", lw: 0.13, stg: "hatch" },
-    dimr: { color: RED, lw: 0.22, stg: "dimr" }, diml: { color: DG, lw: 0.22, stg: "dimg" }, ctr: { color: DG, lw: 0.18, lt: "CENTER", stg: "ph" },
+    this: { color: RED, lw: 0.6, stg: "this" }, model: { color: null, lw: 0.5, stg: "model" },
+    hid: { color: null, lw: 0.3, lt: "HIDDEN", stg: "model" }, hidr: { color: RED, lw: 0.3, lt: "HIDDEN", stg: "this" },
+    ph: { color: PHG, lw: 0.18, lt: "PHANTOM", stg: "ph" }, clamp: { color: "#38bdf8", lw: 0.4, stg: "clamp" }, hatch: { color: "#9ca3af", lw: 0.13, stg: "hatch" },
+    dimr: { color: RED, lw: 0.22, stg: "dimr" }, diml: { color: null, lw: 0.22, stg: "dimg" }, ctr: { color: null, lw: 0.18, lt: "CENTER", stg: "ph" },
   };
   SP.ST = ST;
   /** the drawing kit: every size comes from h (dimension text height) so arrows, gaps and balloons scale with the sheet */
@@ -373,7 +373,7 @@
   const PW = 420, PH = 297, DA = { x0: 14, y0: 46, x1: 296, y1: 283 }, TB = { x0: 300, y0: 46, x1: 406, y1: 283 };
   const FL = () => K.stageFlow;
   const plain = (s) => FL().plain(s), fit = (s, h, w) => FL().fit(s, h, w);
-  const NICE = [20, 10, 8, 5, 4, 2.5, 2, 1.5, 1, 0.8, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05];
+  const NICE = [20, 10, 8, 6, 5, 4, 3, 2.5, 2, 1.5, 1, 0.8, 0.5, 0.4, 0.25, 0.2, 0.1, 0.05];
   const niceScale = (k) => NICE.find((v) => v <= k + 1e-9) || k;
   const scTxt = (k) => (k >= 1 ? `${r2(k)}:1` : `1:${r2(1 / k)}`);
   const wrapTxt = (s, h, w) => { const out = []; let cur = ""; for (const wd of String(s).split(/\s+/)) { const t = cur ? cur + " " + wd : wd; if (wOf(t, h) <= w || !cur) cur = t; else { out.push(cur); cur = wd; } } if (cur) out.push(cur); return out; };
@@ -454,7 +454,7 @@
   };
 
   /* ================================================================ F. one sheet: frame, panel, symbols ================================================================ */
-  const INKS = { color: INK, lw: 0.25, stg: "dimg" }, GS = { color: DG, lw: 0.25, stg: "dimg" };
+  const INKS = { color: null, lw: 0.25, stg: "dimg" }, GS = { color: null, lw: 0.25, stg: "dimg" };
   const ITB = [[3, 0.040, 0.060], [6, 0.048, 0.075], [10, 0.058, 0.090], [18, 0.070, 0.110], [30, 0.084, 0.130], [50, 0.100, 0.160], [80, 0.120, 0.190], [120, 0.140, 0.220], [180, 0.160, 0.250], [250, 0.185, 0.290], [315, 0.210, 0.320]];
   const hTol = (d, g) => { const row = ITB.find((q) => d <= q[0]) || ITB[ITB.length - 1]; return g === "h11" ? row[2] : row[1]; };
 
@@ -500,9 +500,9 @@
     if (rows.length) add({ t: "table", layer: "STG-TABLE", p: [TB.x0, ty], h: 2.2, rh: 5, cw: [8, 34, 12.5, 12.5, 9, 30], rows: R, title: true, hdr: true, al: ["c", "l", "r", "r", "c", "l"], rot: 0 });
     else T(TB.x0 + 2, ty - 4, 2.4, "No characteristic of the drawing is made at this operation.");
     let y = TB.y0 + 2 + noteH + lgH - 4;
-    T(TB.x0 + 1, y + 1.5, 2.3, "LEGEND", 0, { color: DG, stg: "dimg" }); y -= 2;
+    T(TB.x0 + 1, y + 1.5, 2.3, "LEGEND", 0, { color: null, stg: "dimg" }); y -= 2;
     for (const [st, label] of lg) { y -= 5; add(Object.assign({ t: "line", layer: "STG-TABLE", a: [TB.x0 + 1, y + 0.9], b: [TB.x0 + 15, y + 0.9] }, st, { lw: st.lw > 0.3 ? 0.5 : st.lw })); T(TB.x0 + 18, y, 2.2, label); }
-    let ny = TB.y0 + noteH - 4; T(TB.x0 + 1, ny + 0.5, 2.3, "NOTES", 0, { color: DG, stg: "dimg" });
+    let ny = TB.y0 + noteH - 4; T(TB.x0 + 1, ny + 0.5, 2.3, "NOTES", 0, { color: null, stg: "dimg" });
     notes.forEach((s, i) => T(TB.x0 + 1, TB.y0 + noteH - 9 - i * 4.4, 2.2, s));
   }
   const LEG = {
@@ -555,7 +555,7 @@
     const endView = !isTurn && (hexC.length > 0 || holeMine);
     const Dmax = 2 * S.rmax, Rend = hexEM ? nomOf(hexEM.c) / 2 : Dmax / 2, kk = Math.min(4.4, 42 / Math.max(Rend, 1));
     // --- layout
-    const Rtop = Math.max(S.rmax, jaws ? jaws.top : 0), Rj = Rtop, xmin = S.xl, xmax = S.xr + (jaws ? jaws.lip : 0), PITCH = 10.5, forceSide = endView ? -1 : 0, evH = endView ? 2 * Rend * kk + 36 : 0;
+    const Rtop = Math.max(S.rmax, jaws ? jaws.top : 0), Rj = Rtop, xmin = S.xl, xmax = S.xr + (jaws ? jaws.lip : 0), PITCH = 9, forceSide = endView ? -1 : 0, evH = endView ? 2 * Rend * kk + 36 : 0;
     let cols, rows, boreLens, nrow, topH, fanH, looseH, botH, colsW, Wav, Hav, k, pw, X0, yc;
     const lay = () => {
       cols = vd.filter((d) => !d.bore).sort((a, b) => a.r - b.r); rows = hd.filter((q) => q.outer).sort((a, b) => (a.b - a.a) - (b.b - b.a)); boreLens = hd.filter((q) => !q.outer); nrow = forceSide ? ld.length : Math.ceil(ld.length / 2);
@@ -590,7 +590,7 @@
     // work holding
     let datumTxt = "", holdTxt = "", zeroSide = 1;
     if (jaws) {
-      both((sg) => { const poly = jaws.poly.map((p) => [X(p[0]), Y(sg * p[1])]); K2.P(poly, ST.clamp, true); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", pat: "ANSI31", sc: 0.45, ang: 90, solid: false, loops: [poly] }, { color: BLUE, lw: 0.13, stg: "clamp" })); });
+      both((sg) => { const poly = jaws.poly.map((p) => [X(p[0]), Y(sg * p[1])]); K2.P(poly, ST.clamp, true); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", pat: "ANSI31", sc: 0.45, ang: 90, solid: false, loops: [poly] }, { color: "#38bdf8", lw: 0.13, stg: "clamp" })); });
       const cxJ = X(jaws.stockEnd ? jaws.x0 + jaws.grip / 2 : jaws.x0 + (jaws.stopX - jaws.x0) / 2); K2.T(cxJ, Y(jaws.top) + 3, jaws.name, 1, ST.clamp, 0, h * 0.78);
       if (jaws.stockEnd) { datumSym(sh, X(S.xr), Y(0.3 * S.R0), 1, 0, "B", INKS); datumTxt = "blank end face seated on the jaw step"; holdTxt = "3-jaw chuck, stepped hard jaws"; zeroSide = 1; g54(sh, X(S.xl), Y(0), 1); }
       else {
@@ -675,9 +675,9 @@
     K2.L([xs - 8, yc], [sx + 26, yc], ST.ctr);
     K2.P([[xb - kerf, top + 14], [xb, top + 14], [xb, bot - 14], [xb - kerf, bot - 14]], ST.ph, true); K2.L([xb - kerf, top], [xb - kerf, bot], ST.this); K2.L([xb, top], [xb, bot], ST.this);
     K2.T(xb - kerf / 2, top + 17, "SAW BLADE (kerf 2.2)", 1, ST.diml, 0, h * 0.75);
-    for (const [y0, sg] of [[top, 1], [bot, -1]]) { const poly = [[xs + 12, y0], [xs + 38, y0], [xs + 38, y0 + sg * 16], [xs + 12, y0 + sg * 16]]; K2.P(poly, ST.clamp, true); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", pat: "ANSI31", sc: 0.45, ang: 90, solid: false, loops: [poly] }, { color: BLUE, lw: 0.13, stg: "clamp" })); }
+    for (const [y0, sg] of [[top, 1], [bot, -1]]) { const poly = [[xs + 12, y0], [xs + 38, y0], [xs + 38, y0 + sg * 16], [xs + 12, y0 + sg * 16]]; K2.P(poly, ST.clamp, true); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", pat: "ANSI31", sc: 0.45, ang: 90, solid: false, loops: [poly] }, { color: "#38bdf8", lw: 0.13, stg: "clamp" })); }
     K2.T(xs + 25, top + 20, "VICE JAWS", 1, ST.clamp, 0, h * 0.78);
-    const stop = [[sx, bot - 16], [sx + 16, bot - 16], [sx + 16, top + 16], [sx, top + 16]]; K2.P(stop, ST.clamp, true); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", pat: "ANSI31", sc: 0.45, ang: 90, solid: false, loops: [stop] }, { color: BLUE, lw: 0.13, stg: "clamp" }));
+    const stop = [[sx, bot - 16], [sx + 16, bot - 16], [sx + 16, top + 16], [sx, top + 16]]; K2.P(stop, ST.clamp, true); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", pat: "ANSI31", sc: 0.45, ang: 90, solid: false, loops: [stop] }, { color: "#38bdf8", lw: 0.13, stg: "clamp" }));
     K2.T(sx + 8, top + 20, "LENGTH STOP", 1, ST.clamp, 0, h * 0.78);
     const y0 = bot - 16, y1 = bot - 34; K2.L([sx, y0 - 0.5], [sx, y1], INKS); sh.add(Object.assign({ t: "hatch", layer: "STG-GEO", solid: true, loops: [[[sx, y1], [sx - 1.9, y1 + 3.4], [sx + 1.9, y1 + 3.4]]] }, INKS)); K2.L([sx, y1], [sx, y1 - 3.2], INKS);
     K2.P([[sx - 2.7, y1 - 8.6], [sx + 2.7, y1 - 8.6], [sx + 2.7, y1 - 3.2], [sx - 2.7, y1 - 3.2]], INKS, true); K2.T(sx, y1 - 7.2, "B", 1, INKS);
@@ -770,15 +770,18 @@
         return `<svg viewBox="0 0 ${W} ${Hh}" width="100%" style="max-width:${W}px;background:#fff;border:1px solid #d1d5db;border-radius:6px"><line x1="4" y1="${yc}" x2="${W - 4}" y2="${yc}" stroke="#9ca3af" stroke-dasharray="8 2 2 2"/>${d}</svg>`;
       } catch (e) { return ""; }
     };
-    const html = `<p class="cx-note">${srcNote}</p><div id="spPrev">${prev(model.outer, model.inner)}</div>
-      <h4>Outline of the finished part — one point per line: <i>length from the left end, radius</i> (mm)</h4>
-      <textarea id="spOut" rows="9" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px">${esc(outTxt)}</textarea>
-      <h4>Bore (hole) — same way; leave a blank line between separate bores, empty = no bore</h4>
-      <textarea id="spBore" rows="5" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px">${esc(boreTxt)}</textarea>
-      <h4>Raw material and set-up</h4><div class="cx-frm"><label>Bar Ø (mm)<input id="sfD0" type="number" step="any" min="1" value="${model.D0}"></label><label>Facing allowance each end (mm)<input id="sfFa" type="number" step="any" min="0" value="${model.fa}"></label><label>Chuck clamp length (mm)<input id="sfCl" type="number" step="any" min="3" value="${model.clamp}"></label>
-      <label>First turning side (OP 1)<select id="sfFi"><option value="L"${model.first === "L" ? " selected" : ""}>Left end as shown</option><option value="R"${model.first === "R" ? " selected" : ""}>Right end as shown</option></select></label><label>Bar supply length<input id="sfBL" value="${esc(model.bar.len)}"></label><label>Bar tolerance<input id="sfBT" value="${esc(model.bar.tol)}"></label></div>
-      <label>Condition<input id="sfCo" value="${esc(model.bar.cond)}"></label><label>Certificate<input id="sfCe" value="${esc(model.bar.cert)}"></label>`;
-    return E.dialog("Part shape for the stage drawings", html, (b) => {
+    const html = `<p class="cx-note">${srcNote}</p>
+      <p style="font-size:14px;margin:6px 0"><b>Is this the shape of your finished part?</b> The line is the outside, the dashed line is the hole. If it looks right, just press <b>Make the stage drawings</b>.</p><div id="spPrev">${prev(model.outer, model.inner)}</div>
+      <div class="cx-frm" style="margin-top:10px"><label>Raw bar diameter (mm)<input id="sfD0" type="number" step="any" min="1" value="${model.D0}"></label><label>Chuck grip length (mm)<input id="sfCl" type="number" step="any" min="3" value="${model.clamp}"></label></div>
+      <details style="margin-top:10px"><summary style="cursor:pointer;color:#0369a1">The picture is wrong, or I want to change more (optional)</summary>
+      <h4>Outside shape — one point per line: <i>length from the left end, radius</i> (mm)</h4>
+      <textarea id="spOut" rows="8" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px">${esc(outTxt)}</textarea>
+      <h4>Hole — same way; blank line between separate holes; empty = no hole</h4>
+      <textarea id="spBore" rows="4" style="width:100%;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12px">${esc(boreTxt)}</textarea>
+      <div class="cx-frm"><label>Facing allowance each end (mm)<input id="sfFa" type="number" step="any" min="0" value="${model.fa}"></label>
+      <label>First turning side<select id="sfFi"><option value="L"${model.first === "L" ? " selected" : ""}>Left end as shown</option><option value="R"${model.first === "R" ? " selected" : ""}>Right end as shown</option></select></label><label>Bar supply length<input id="sfBL" value="${esc(model.bar.len)}"></label><label>Bar tolerance<input id="sfBT" value="${esc(model.bar.tol)}"></label></div>
+      <label>Condition<input id="sfCo" value="${esc(model.bar.cond)}"></label><label>Certificate<input id="sfCe" value="${esc(model.bar.cert)}"></label></details>`;
+    return E.dialog("Check the part shape", html, (b) => {
       const g = (id) => b.querySelector("#" + id), tO = g("spOut").value, tB = g("spBore").value;
       let outer = model.outer, inner = model.inner;
       if (tO.trim() !== outTxt.trim()) { outer = parse(tO); if (!okPts(outer)) throw new Error("The outline needs at least two lines, each with two numbers: length and radius."); outer = outer.slice().sort((a, c) => a[0] - c[0]); }

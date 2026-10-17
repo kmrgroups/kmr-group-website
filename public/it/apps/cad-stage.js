@@ -432,7 +432,7 @@
     const fromDrawing = !!cont; if (!cont) { const pl = F.fromPlan(P); cont = SP.fromSteps(pl.steps, pl.bore); }
     const def = F.defaults(P, { steps: SP.stepsOf(cont), bore: null }), model = Object.assign({}, cont, def);
     const nb = cont.inner.length, calNote = fromDrawing && cont.cal && cont.cal.of ? ` The drawing has no printed scale: it was scaled ×${Math.round(cont.k * 1000) / 1000} so that ${cont.cal.score >= cont.cal.of ? "all" : "most"} of the diameters and lengths of the table match.` : "";
-    const note = fromDrawing ? `The outline was read from <b>${esc(SRC.name || "the drawing")}</b> (length ${model.L} mm, largest Ø ${Math.round(model.rmax * 200) / 100}${nb ? ", " + nb + " bore" + (nb > 1 ? "s" : "") : ", no bore"}).${calNote} Check it against the drawing and correct any point that is wrong.` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the outline of your part</b> (length from the left end, radius).`;
+    const note = fromDrawing ? `The outline was read from <b>${esc(SRC.name || "the drawing")}</b> (length ${model.L} mm, largest Ø ${Math.round(model.rmax * 200) / 100}${nb ? ", " + nb + " bore" + (nb > 1 ? "s" : "") : ", no bore"}).${calNote}` : `The shape could not be read from the drawing${how}, so a plain bar of the largest diameter is shown. <b>Type the outline of your part</b> (length from the left end, radius).`;
     const m = await SP.dialog(E, P, model, note); if (!m) return null;
     let flipped = false; if (m.first === "R") { Object.assign(m, SP.flip(m)); flipped = true; }
     // where the customer's balloons sit on the drawing → where they are on the outline (helps place every dimension on the right feature)
