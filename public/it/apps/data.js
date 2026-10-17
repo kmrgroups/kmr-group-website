@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   const APPS = {
-    hrm: { name: "HRM Suite", color: "#0EA5E9", what: "Employees, attendance, leave, payroll, loans, ID cards, onboarding and documents." },
+    hrms: { name: "HRM & Payroll", color: "#0D9488", what: "Employees, shifts, holidays, leave, attendance, machine punches, payroll runs and payslips." },
     balloon: { name: "Balloon Inspector", color: "#A855F7", what: "Ballooned drawings and inspection reports (drawing files are kept so a restore brings them back)." },
     pd: { name: "Process Documents", color: "#F59E0B", what: "Projects (PFD, PFMEA, control plan, SOP …) and the workspace’s own lists." },
     capacity: { name: "Capacity Planner", color: "#10B981", what: "Monthly plans (quantities, due dates, machine days) and saved versions." },
@@ -77,7 +77,6 @@
       const M = APPS[app];
       ctx.dialog(`Flush all data — ${M.name}`, `
         <p><b>${info ? info.records : ""} records</b> will be removed: ${esc(M.what)}</p>
-        ${app === "hrm" ? `<label style="display:flex;gap:8px;align-items:flex-start;margin:10px 0"><input type="checkbox" id="dmSetup"> <span>Also reset the company setup — plants, departments, designations, shifts, leave types, holidays and payroll rules go back to the defaults.</span></label>` : ""}
         <p>First a JSON backup is <b>downloaded to this computer</b>; then the data is removed. Keep the file — uploading it here restores everything.</p>
         <label class="f">Type FLUSH to confirm<div class="in"><input id="dmConfirm" autocomplete="off" placeholder="FLUSH"></div></label><span class="msg" id="dmMsg"></span>`,
         `<button class="btn" id="dmGo" style="background:#B00E28">Download backup &amp; flush</button>`);
@@ -89,12 +88,12 @@
         let file;
         try { file = await this.backup(ctx, app); } catch (e) { go.disabled = false; go.textContent = "Download backup & flush"; m.textContent = `Backup failed, nothing was removed: ${e.message || e}`; return; }
         go.textContent = "Flushing…";
-        const setup = !!(document.getElementById("dmSetup") || {}).checked;
+        const setup = false;
         const { data, error } = await ctx.sb.rpc("kmr_data_flush", { p_slug: ctx.slug, p_app: app, p_hrm_setup: setup });
         if (error) { go.disabled = false; go.textContent = "Download backup & flush"; m.textContent = `Backup saved (${file}), but the flush failed: ${error.message}`; return; }
         document.querySelectorAll(".veil").forEach((v) => v.remove());
         const n = data && (data.removed ?? data.employees);
-        this.overview(ctx, `<b>${esc(M.name)} flushed.</b> ${n != null ? `${n} ${app === "hrm" ? "employees and everything linked to them" : "records"} removed${setup ? "; company setup reset to defaults" : ""}.` : ""} Backup downloaded: <b>${esc(file)}</b>. Upload it here to restore.`);
+        this.overview(ctx, `<b>${esc(M.name)} flushed.</b> ${n != null ? `${n} records removed.` : ""} Backup downloaded: <b>${esc(file)}</b>. Upload it here to restore.`);
       };
     },
     async upload(ctx, app, file, input) {

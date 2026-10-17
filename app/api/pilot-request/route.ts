@@ -5,7 +5,7 @@ import { mailEnquiry } from "@/lib/notify";
 
 // Pilot / demo requests from www.kmr-groups.com/it (KMR Apps page) → KMR Console "Pilot requests".
 // Server-side only: validates the fields, ignores bots (hidden field) and limits repeats per email.
-const PRODUCTS = ["hrm", "balloon", "pd", "capacity"];
+const PRODUCTS = ["hrms", "balloon", "pd", "capacity"];
 
 export async function POST(req: NextRequest) {
   if (!(await rateOk(`pilot:${ipOf(req)}`, 10, 3600))) return tooMany();
@@ -27,6 +27,6 @@ export async function POST(req: NextRequest) {
     console.error("[pilot-request]", error.message);
     return NextResponse.json({ error: "Could not send right now. Please email info@kmr-groups.com." }, { status: 500 });
   }
-  await mailEnquiry({ name, email, phone, company, country, business: "software", about: products.map((p) => ({ hrm: "HRM", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner" } as Record<string, string>)[p]).join(", "), message, pilot: true });
+  await mailEnquiry({ name, email, phone, company, country, business: "software", about: products.map((p) => ({ hrms: "HRM & Payroll", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner" } as Record<string, string>)[p]).join(", "), message, pilot: true });
   return NextResponse.json({ ok: true });
 }

@@ -20,7 +20,7 @@
   const setView = (v) => { try { history.replaceState(null, "", viewHref(v)); } catch (e) { /* ignore */ } };
   const onLink = (sel, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener("click", (e) => { if (!plain(e)) return; e.preventDefault(); fn(el, e); }));
   const META = {
-    hrm: { color: "#0EA5E9", desc: "Employees, onboarding, ID cards, biometric attendance, shifts and leave.", demo: "/it/hrm/api/auth/demo" },
+    hrms: { color: "#0D9488", desc: "Employees, attendance by hand or from fingerprint and face machines, shifts, leave and payroll that works itself out each month — PF, ESI, professional tax, overtime, payslips and bank file.", demo: "/it/hrm.html?demo=1" },
     balloon: { color: "#A855F7", desc: "Balloon any drawing and build the inspection report.", demo: "/it/balloon.html?demo=1" },
     pd: { color: "#F59E0B", desc: "PFD, PFMEA, Control Plan, SOP, SPC, MSA and reports from the ballooned drawing.", demo: "/it/pd.html?demo=1&sample=1" },
     capacity: { color: "#10B981", desc: "Capacity plan, takt time and machine loading for every plant, with version history.", demo: "/it/capacity.html?demo=1" },
@@ -38,7 +38,7 @@
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
-  const ART = { hrm: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1 };
+  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
@@ -107,12 +107,6 @@
       if (j.error) return dialog(`Could not open ${r.product_name}`, esc(j.error.message), "");
       r.has_access = true;
     }
-    if (code === "hrm") {
-      const { data: { session } } = await sb.auth.getSession(); if (!session) return loginView("Please sign in again.");
-      const fm = document.createElement("form"); fm.method = "POST"; fm.action = "/it/hrm/api/auth/handoff";
-      [["access_token", session.access_token], ["refresh_token", session.refresh_token], ["co", r.product_slug || ""]].forEach(([k, v]) => { const i = document.createElement("input"); i.type = "hidden"; i.name = k; i.value = v; fm.append(i); });
-      document.body.append(fm); fm.submit(); return;
-    }
     let path = r.app_path;
     try { const back = sessionStorage.getItem("kmr-return-" + code); sessionStorage.removeItem("kmr-return-" + code);
       if (back && back.split(/[?#]/)[0] === r.app_path.split("?")[0]) path = back; } catch (e) {}
@@ -121,7 +115,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib"]], ["Planning & production", "#10B981", ["capacity", "sales", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrm", "mom"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib"]], ["Planning & production", "#10B981", ["capacity", "sales", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrms", "mom"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};
@@ -208,7 +202,6 @@
 
   /* ---------------- Administration (company administrators) ---------------- */
   const ROLE_OPTS = {
-    hrm: [["", "No access"], ["company_admin", "Company admin"], ["hr_manager", "HR manager"], ["hr_executive", "HR executive"], ["manager", "Manager (own team)"], ["payroll", "Payroll"], ["interviewer", "Interviewer (interview panels)"]],
     other: [["", "No access"], ["admin", "Admin"], ["editor", "Editor"], ["viewer", "Viewer"]],
   };
   const mainEl = () => document.querySelector(".main");
@@ -314,7 +307,7 @@
     const [{ data: list, error }, { data: c }] = await Promise.all([sb.rpc("kmr_admin_users", { p_slug: SLUG }), sb.rpc("kmr_admin_company", { p_slug: SLUG })]);
     if (error) { m.querySelector(".msg").textContent = error.message; return; }
     const tools = [...((c && c.tools) || []), { code: "ops", name: "Operations Master" }];
-    const label = (code, v) => ((code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).find((o) => o[0] === v) || ["", "—"])[1];
+    const label = (code, v) => (ROLE_OPTS.other.find((o) => o[0] === v) || ["", "—"])[1];
     m.innerHTML = adminHead("Users & access", "One list for all your KMR apps. Choose what each person may do in each app.") + `
       ${note ? `<div class="card" style="border-color:#1E7B4A;background:#E7F8EF;margin-bottom:14px">${note}</div>` : ""}
       <p><button class="btn" id="addU">+ Add a person</button></p>
@@ -331,7 +324,7 @@
       dialog(isNew ? "Add a person" : `Edit ${u.name || u.email}`, `
         <div class="ug"><label class="f">Email<div class="in"><input id="uE" type="email" value="${esc(u.email)}"></div></label>
         <label class="f">Name<div class="in"><input id="uN" value="${esc(u.name || "")}"></div></label>
-        ${tools.map((t) => `<label class="f">${esc(t.name)}<div class="in"><select id="uR_${t.code}">${(t.code === "hrm" ? ROLE_OPTS.hrm : ROLE_OPTS.other).map((o) => `<option value="${o[0]}" ${((u.roles || {})[t.code] || "") === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></div></label>`).join("")}
+        ${tools.map((t) => `<label class="f">${esc(t.name)}<div class="in"><select id="uR_${t.code}">${ROLE_OPTS.other.map((o) => `<option value="${o[0]}" ${((u.roles || {})[t.code] || "") === o[0] ? "selected" : ""}>${o[1]}</option>`).join("")}</select></div></label>`).join("")}
         </div>
         <label style="display:flex;gap:8px;align-items:center;margin:4px 0 12px"><input type="checkbox" id="uA" ${u.is_admin ? "checked" : ""}> Company administrator (Administration pages, users, company details)</label>
         ${isNew || u.has_login === false ? `<label class="f">Password for a new login<div class="in"><input id="uP" type="text" placeholder="${isNew ? "At least 8 characters — only if this email has no KMR login yet" : "This person has no login yet — set a password (at least 8 characters)"}"></div></label>` : (u.login_owned ? `<label class="f">New password (optional)<div class="in"><input id="uP" type="text" placeholder="Leave empty to keep the current password. If you change the e-mail, this is the password for the new e-mail's login (only if it has none yet)"></div></label>` : `<label class="f">Password (only if you change the e-mail)<div class="in"><input id="uP" type="text" placeholder="Needed only when the new e-mail has no KMR login yet"></div></label>`)}

@@ -8,11 +8,11 @@ import { IconCheck, IconCode, IconGlobe, IconLock, IconUsers } from "@/component
 import type { Product } from "@/lib/types";
 
 export const revalidate = 60;
-export const metadata = { title: "Software solutions", description: "KMR Apps for manufacturers — HRM, Balloon Inspector, Process Documents, Capacity Planner, Sales Flow and Calibration Hub — and custom software solutions." };
+export const metadata = { title: "Software solutions", description: "KMR Apps for manufacturers — HRM & Payroll, Balloon Inspector, Process Documents, Capacity Planner, Sales Flow and Calibration Hub — and custom software solutions." };
 
 type App = { code: string; name: string; description: string | null; app_path?: string | null; seat_label: string; version?: string | null; tagline?: string | null; features?: string[] | null; image_url?: string | null; video_url?: string | null; video_poster?: string | null; listed?: boolean; prices: { period: string; amount: number; min: number }[] };
 const FEATURES: Record<string, string[]> = {
-  hrm: ["Self-onboarding, ID cards, biometric attendance", "Leave, shifts and payroll-ready registers", "IATF 16949 / ISO 9001 HR records"],
+  hrms: ["Attendance by hand or from fingerprint and face machines (eSSL, ZKTeco, Realtime and more)", "Shifts, holidays and leave with approvals", "Automated payroll: PF, ESI, professional tax, overtime and payslips"],
   balloon: ["Balloon drawings (PDF, DXF, STEP) in minutes", "Inspection reports and FAI", "Shares data with Process Documents"],
   pd: ["APQP / PPAP documents from the ballooned drawing", "Process flow, PFMEA, control plan", "Inspection formats and CNC set-up sheets"],
   capacity: ["Monthly plan and machine loading", "Takt time, levelling and alternate machines", "Uses your Operations Master and HRM holidays"],
@@ -66,7 +66,7 @@ export default async function SoftwarePage() {
                       ) : <p className="text-sm font-semibold text-gold-dark">Pricing on request</p>}
                       <div className="mt-5 flex flex-wrap gap-3">
                         <a href="#demo" className="btn-gold">Book a free demo</a>
-                        <a href={`${a.code === "hrm" ? "/it/hrm/api/auth/demo" : (a.app_path || "/it/")}${a.code === "hrm" ? "" : (a.app_path || "").includes("?") ? "&demo=1" : "?demo=1"}`} className="btn-outline">Try with sample data</a>
+                        <a href={`${a.app_path || "/it/"}${(a.app_path || "").includes("?") ? "&demo=1" : "?demo=1"}`} className="btn-outline">Try with sample data</a>
                       </div>
                     </div>
                     </div>

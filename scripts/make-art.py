@@ -470,7 +470,7 @@ def app_cad():
 
 
 ART = {
-    "app-hrm": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM Suite"),
+    "app-hrms": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM &amp; Payroll"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
     "app-pd": lambda: svg(bg("#F59E0B") + app_pd(), "Process Documents"),
     "app-capacity": lambda: svg(bg("#10B981") + app_capacity(), "Capacity Planner"),

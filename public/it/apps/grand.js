@@ -4,8 +4,8 @@
    3. Administration  — company details & logo, users & access, invoices & payments: download, upload, flush (backup first) */
 (function () {
   "use strict";
-  const APP = { hrm: "HRM Suite", hrm_candidates: "HRM recruitment", hrm_qms: "HRM QMS & training", hrm_engage: "HRM engagement", hrm_comp: "HRM policies & compliance", hrm_safety: "HRM safety", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", sales: "Sales Flow", calib: "Calibration Hub", apqp: "APQP Planner", ppap: "PPAP Submissions", rmp: "Raw Material Planning", mmd: "Material Movement", mnt: "Maintenance", ops: "Operations Master" };
-  const UNIT = { hrm: "employees", hrm_candidates: "candidates", hrm_qms: "skill records", hrm_engage: "records", hrm_comp: "records", hrm_safety: "records", balloon: "reports", pd: "records", capacity: "records", sales: "plan lines", calib: "instruments", apqp: "programmes", ppap: "submissions", rmp: "records", mmd: "records", mnt: "records", mom: "records", cad: "drawings", ops: "records" };
+  const APP = { hrms: "HRM & Payroll", balloon: "Balloon Inspector", pd: "Process Documents", capacity: "Capacity Planner", sales: "Sales Flow", calib: "Calibration Hub", apqp: "APQP Planner", ppap: "PPAP Submissions", rmp: "Raw Material Planning", mmd: "Material Movement", mnt: "Maintenance", ops: "Operations Master" };
+  const UNIT = { hrms: "employees", balloon: "reports", pd: "records", capacity: "records", sales: "plan lines", calib: "instruments", apqp: "programmes", ppap: "submissions", rmp: "records", mmd: "records", mnt: "records", mom: "records", cad: "drawings", ops: "records" };
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const stamp = () => { const d = new Date(), z = (n) => String(n).padStart(2, "0"); return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}-${z(d.getHours())}${z(d.getMinutes())}`; };
   function save(json, name) {
@@ -38,8 +38,8 @@
             <div class="gm-btns">${btn("gmRealDl", "Download JSON")}${upl("gmRealUp", "Upload JSON")}${btn("gmRealFl", "Flush real data", { red: 1, off: !nReal })}</div></div>
           <div class="card" style="--c:#4F46E5"><div style="font-size:26px;line-height:1">🧪</div><h3>Sample Data Master</h3>
             ${ctx.sampleOk ? `<p>Ready-made sample data for every app, to try things out. Your real data is never touched.</p>` : `<p>Sample data lives only in the KMR demo workspace, so your company’s records stay clean. To explore an app, open it from the KMR Apps page and choose <b>Try with sample data</b> — that runs in your browser and never touches your data.</p>`}
-            <table class="gm">${rows(o.sample, { hrm: "sample employees", hrm_candidates: "sample candidates", balloon: "sample drawing", sales: "sample plan lines", calib: "sample instruments", apqp: "sample programmes", rmp: "sample materials & orders", mmd: "sample route sheets & tags", mnt: "sample breakdowns & PM", mom: "sample meetings & points", cad: "sample drawings", ppap: "sample submissions", ops: "sample records" })}</table>
-            <p style="font-size:12px;color:var(--muted)">HRM gets the whole flow: employees in two plants with a month of attendance, leave, salaries and loans, hiring from opening to new joiner (scored candidates, interviews, scorecards, offers), and QMS &amp; training (skill matrix, competencies, training plan, effectiveness, R&amp;R, KPIs, auditors). Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too. Sales Flow gets last month’s and this month’s plan for every sample part (prices from the sample rate contracts) with daily despatch, loss reasons and action plans; Calibration Hub gets every sample gauge as an instrument with its calibration history, an out-of-tolerance case and an MSA study. APQP Planner gets three programmes (built from the sample parts and CFT team) at different phases, and PPAP Submissions two Level 3 submissions linked to them.</p>
+            <table class="gm">${rows(o.sample, { hrms: "sample employees, punches & leave", balloon: "sample drawing", sales: "sample plan lines", calib: "sample instruments", apqp: "sample programmes", rmp: "sample materials & orders", mmd: "sample route sheets & tags", mnt: "sample breakdowns & PM", mom: "sample meetings & points", cad: "sample drawings", ppap: "sample submissions", ops: "sample records" })}</table>
+            <p style="font-size:12px;color:var(--muted)">HRM &amp; Payroll gets 24 sample employees on two shifts, two sample fingerprint / face machines with punches for the last month and this month, leave requests and holidays; open Attendance and press <i>Work out attendance</i>, then make a payroll. Process Documents and Capacity Planner use the Operations Master lists, so they get the sample too. Sales Flow gets last month’s and this month’s plan for every sample part (prices from the sample rate contracts) with daily despatch, loss reasons and action plans; Calibration Hub gets every sample gauge as an instrument with its calibration history, an out-of-tolerance case and an MSA study. APQP Planner gets three programmes (built from the sample parts and CFT team) at different phases, and PPAP Submissions two Level 3 submissions linked to them.</p>
             <div class="gm-btns">${ctx.sampleOk ? btn("gmSmpLd", "Load sample data") : ""}${ctx.sampleOk || nSample ? btn("gmSmpFl", ctx.sampleOk ? "Flush sample data" : "Remove leftover sample data", { red: 1, off: !nSample }) : ""}</div></div>
           <div class="card" style="--c:#B45309"><div style="font-size:26px;line-height:1">🏢</div><h3>Administration Data</h3>
             <p>Company details &amp; logo, users &amp; access, invoices &amp; payments.</p>
@@ -138,7 +138,7 @@
         if (!j || j.format !== want) throw new Error(kind === "real" ? "This is not a Real Data backup (download one from this card first)." : "This is not an Administration Data backup (download one from this card first).");
         const when = String(j.exported_at || "").slice(0, 16).replace("T", " ");
         const msg = kind === "real"
-          ? `Put every app back as it was in the backup from ${when}?\n\nThe current real data is replaced. Operations Master sample records and the sample drawing are not touched; HRM goes back exactly as it was then.`
+          ? `Put every app back as it was in the backup from ${when}?\n\nThe current real data is replaced. Operations Master sample records and the sample drawing are not touched; HRM & Payroll goes back as it was then.`
           : `Restore company details & logo and users & access from the backup of ${when}?${this.o.staff ? "\nInvoices and payments that are missing are added back." : ""}`;
         if (!confirm(msg)) { input.value = ""; return; }
         const { data, error } = await ctx.sb.rpc(kind === "real" ? "kmr_grand_real_import" : "kmr_grand_admin_import", { p_slug: ctx.slug, p_data: j });
@@ -163,20 +163,6 @@
       const { data, error } = await ctx.sb.rpc("kmr_grand_sample", { p_slug: ctx.slug, p_action: act });
       if (error) { b.disabled = false; b.textContent = t; alert(error.message); return; }
       let extra = "";
-      if (act === "load" && data.hrm) {
-        // the HRM app turns the sample punches into attendance days
-        b.textContent = "Preparing HRM attendance…";
-        try {
-          const { data: s } = await ctx.sb.auth.getSession();
-          const r = await fetch("/it/hrm/api/sample-attendance", { method: "POST", headers: { "content-type": "application/json", authorization: `Bearer ${s.session.access_token}` }, body: JSON.stringify({ slug: ctx.slug }) });
-          if (!r.ok) throw new Error();
-        } catch { extra = " HRM attendance for the sample month is worked out tonight (or open HRM › Attendance › Recalculate)."; }
-      }
-      if (data.hrm_flow && data.hrm_flow.recruitment !== undefined) data.hrm_candidates = data.hrm_flow.recruitment;
-      if (data.hrm_flow && data.hrm_flow.qms !== undefined) data.hrm_qms = data.hrm_flow.qms;
-      if (data.hrm_flow && data.hrm_flow.engagement !== undefined) data.hrm_engage = data.hrm_flow.engagement;
-      if (data.hrm_flow && data.hrm_flow.compliance !== undefined) data.hrm_comp = data.hrm_flow.compliance;
-      if (data.hrm_flow && data.hrm_flow.safety !== undefined) data.hrm_safety = data.hrm_flow.safety;
       const parts = Object.keys(APP).filter((k) => data[k] !== undefined).map((k) => `${esc(APP[k])} ${data[k]}`).join(" · ");
       this.overview(ctx, act === "load"
         ? `<b>Sample data loaded</b> — ${parts}.${extra} Lists already holding sample data are left as they are.`

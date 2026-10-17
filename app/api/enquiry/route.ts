@@ -5,7 +5,7 @@ import { mailEnquiry } from "@/lib/notify";
 
 // Enquiries from every business section → KMR Console › Enquiries (console.leads). Server only; honeypot + daily limit.
 const BUSINESSES = ["software", "shop", "training", "import_export", "trading", "distribution", "general"];
-const SOFTWARE = ["hrm", "balloon", "pd", "capacity"];
+const SOFTWARE = ["hrms", "balloon", "pd", "capacity"];
 
 export async function POST(req: NextRequest) {
   if (!(await rateOk(`enquiry:${ipOf(req)}`, 10, 3600))) return tooMany();

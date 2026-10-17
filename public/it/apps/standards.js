@@ -70,6 +70,17 @@ mnt:[
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Maintenance plan against machine list and schedule.'],
 ['ISO','10.2','Nonconformity and corrective action','Breakdown cause and corrective action are recorded and analysed.'],
 ['VDA','P6','Process / service - resources','Machine availability and upkeep records support the audit.']],
+hrms:[
+['ISO','7.1.2','People','Employee master with department, designation, shift and status (active / left); today\'s headcount, who is in, late or on leave, and machine status are on the dashboard.'],
+['IATF','7.1.2','People (supplemental)','Shifts, weekly offs, holidays and leave are set once and applied to every person, so the people available on each shift can be seen from attendance.'],
+['ISO','7.2','Competence (partly)','Department and designation are held for every person so a competence matrix can refer to them. Training and skill records are not kept in this version; keep them in your training register.'],
+['ISO','5.3','Organizational roles, responsibilities and authorities','Roles decide who can see and change what: salary, bank and statutory data and payroll are for editors and administrators only; only the administrator can delete an employee or re-open a finalised payroll.'],
+['ISO','7.5.2','Creating and updating documented information','Attendance, leave requests and payslips carry who made or changed them and when; days corrected by hand are marked and keep the reason.'],
+['ISO','7.5.3','Control of documented information','Finalising a payroll locks that month\'s attendance, leave and payslips; changes need an authorised re-open. Payslips and registers print with the company name and month.'],
+['IATF','7.5.3.2.1','Record retention','Every raw punch from the machines is kept with machine, time and method (finger / face / card) next to the worked-out attendance; JSON backup and daily database backup. The retention period required by law is decided by the company.'],
+['ISO','8.1','Operational planning and control','Attendance is worked out by fixed, visible rules (shift timings, grace, half and full day hours, break, overtime threshold) set in Setup, the same for everyone.'],
+['ISO','9.1.3','Analysis and evaluation','Late arrivals, absence, missed punches and overtime hours are shown per person and per month; punches that match no employee are flagged.'],
+['VDA','P6','Process / service - resources (personnel)','Who was present on which shift and for how long is available per day, to support the staffing evidence asked for in a process audit.']],
 mom:[
 ['ISO','9.3','Management review','Management review meetings are minuted with inputs discussed, decisions and actions with owner and date.'],
 ['IATF','9.3.1.1','Management review - general','Review meeting records are kept per meeting number, with attendees and the matters discussed.'],

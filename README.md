@@ -81,5 +81,5 @@ components/          Header, NavBar, Footer, HeroSlider, Blocks, ProductCard, Bu
                      EnquiryForm, ApplyForm, SocialLinks, Icons
 lib/                 site (company, settings, businesses), razorpay (server), supabaseClient, supabaseAdmin, types
 supabase/            SQL files listed in step 1
-public/it/           KMR Apps (HRM, Balloon Inspector, Process Documents, Capacity Planner)
+public/it/           KMR Apps (HRM & Payroll, Balloon Inspector, Process Documents, Capacity Planner)
 ```
