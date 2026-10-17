@@ -256,14 +256,22 @@
     K2.bal = (no, x, y, st) => { add({ t: "circle", layer: "STG-BALLOON", c: [x, y], r: br, stg: "balloon", no, color: RED }); add({ t: "text", layer: "STG-BALLOON", p: [x, y], h: /^\d+$/.test(String(no)) ? (no >= 100 ? fs * 0.78 : fs * 0.9) : fs * 0.7, s: String(no), rot: 0, ha: 1, va: 2, stg: "balloon", no, color: RED }); };
     K2.tw = (s) => wOf(s, fs);
     /** horizontal dimension between x1, x2 at height y; f1, f2 = y of the feature points (extension lines run from there) */
-    K2.dimh = (x1, x2, y, f1, f2, txt, no, st) => {
+    K2.dimh = (x1, x2, y, f1, f2, txt, no, st, avoid) => {
       const d = y >= Math.max(f1, f2) ? 1 : -1; for (const [x, f] of [[x1, f1], [x2, f2]]) K2.L([x, f + d * gap], [x, y + d * os], st);
-      const a = Math.min(x1, x2), b = Math.max(x1, x2), w = K2.tw(txt) + (no ? 2 * br + 2 : 0) + 2, inside = b - a >= w + 2 * AL;
-      if (inside) { K2.L([a, y], [b, y], st); K2.arrow(a, y, 1, 0, st); K2.arrow(b, y, -1, 0, st); }
-      else { K2.L([a - AL * 2, y], [b + AL * 2, y], st); K2.arrow(a, y, -1, 0, st); K2.arrow(b, y, 1, 0, st); if (b - a > 2 * AL) K2.L([a, y], [b, y], st); }
-      if (inside) { const cx = (a + b) / 2; K2.T(cx + (no ? br + 1 : 0), y + h * 0.3, txt, 1, st); if (no) K2.bal(no, cx - K2.tw(txt) / 2 - 0.5, y + h * 0.3 + br * 0.6, st); }
-      else { const tx = b + AL * 2 + 2; K2.T(tx, y - h * 0.3, txt, 0, st); if (no) K2.bal(no, tx + K2.tw(txt) + br + 1.5, y, st); }
-      return { x0: a - (inside ? 0 : AL * 2), x1: inside ? b : b + AL * 2 + 2 + K2.tw(txt) + (no ? 2 * br + 3 : 0) };
+      const a = Math.min(x1, x2), b = Math.max(x1, x2), tw = K2.tw(txt), w = tw + (no ? 2 * br + 2 : 0) + 2, fitsIn = b - a >= w + 2 * AL, av = avoid || [];
+      const clash = (lo, hi) => av.some((v) => v > lo - 0.6 && v < hi + 0.6);
+      let place = "in", off = 0;
+      if (!(fitsIn && !clash(a + AL, b - AL))) {
+        let ro = 0, lo = 0; while (ro < 60 && clash(b + AL * 2 + 1 + ro, b + AL * 2 + 3 + w + ro)) ro += 1; while (lo < 60 && clash(a - AL * 2 - 3 - w - lo, a - AL * 2 - 1 - lo)) lo += 1;
+        if (ro <= lo) { place = "r"; off = ro; } else { place = "l"; off = lo; }
+      }
+      const rightBox = [b + AL * 2 + 1 + off, b + AL * 2 + 3 + w + off], leftBox = [a - AL * 2 - 3 - w - off, a - AL * 2 - 1 - off];
+      if (place === "in") { K2.L([a, y], [b, y], st); K2.arrow(a, y, 1, 0, st); K2.arrow(b, y, -1, 0, st); }
+      else { K2.L([a - AL * 2 - (place === "l" ? off : 0), y], [b + AL * 2 + (place === "r" ? off : 0), y], st); K2.arrow(a, y, -1, 0, st); K2.arrow(b, y, 1, 0, st); if (b - a > 2 * AL) K2.L([a, y], [b, y], st); }
+      if (place === "in") { const cx = (a + b) / 2; K2.T(cx + (no ? br + 1 : 0), y + h * 0.3, txt, 1, st); if (no) K2.bal(no, cx - tw / 2 - 0.5, y + h * 0.3 + br * 0.6, st); }
+      else if (place === "r") { const tx = b + AL * 2 + 2 + off; K2.T(tx, y - h * 0.3, txt, 0, st); if (no) K2.bal(no, tx + tw + br + 1.5, y, st); }
+      else { const tx = a - AL * 2 - 2 - off; K2.T(tx, y - h * 0.3, txt, 2, st); if (no) K2.bal(no, tx - tw - br - 1.5, y, st); }
+      return { x0: place === "l" ? leftBox[0] : a - (place === "in" ? 0 : AL * 2), x1: place === "in" ? b : place === "r" ? rightBox[1] : b + AL * 2 };
     };
     /** vertical dimension between y1, y2 at x; f1, f2 = x of the feature points (null = no extension lines: inside a void) */
     K2.dimv = (y1, y2, x, f, txt, no, st, bin) => {
@@ -460,7 +468,7 @@
 
   function newSheet() {
     const ents = [], add = (e) => { const u = U(e); ents.push(u); return u; };
-    return { ents, add, K2: kit(add, 3.0), rep: { dims: 0, balloons: 0, missing: [] } };
+    return { ents, add, K2: kit(add, 2.6), rep: { dims: 0, balloons: 0, missing: [] } };
   }
   function datumSym(sh, x, y, dx, dy, letter, st) {
     const K2 = sh.K2, h = K2.h, Lt = h * 1.3, px = -dy, py = dx;
@@ -493,11 +501,11 @@
     // legend + notes are packed at the bottom; the table takes what is between
     const lg = legend || [], notes = (info.notes || []).flatMap((s) => wrapTxt(plain(s), 2.2, 100).map((t, i) => (i ? "   " : "• ") + t)).slice(0, 7);
     const lgH = lg.length * 5 + 8, noteH = Math.min(notes.length, 7) * 4.4 + 8, bottom = TB.y0 + 2 + lgH + noteH;
-    const ty = TB.y1 - 5 * rowsKV.length - 6, max = Math.max(3, Math.floor((ty - bottom - 8) / 5) - 3);
+    const ty = TB.y1 - 5 * rowsKV.length - 6; let RH = 5, max = Math.max(3, Math.floor((ty - bottom - 8) / RH) - 3); for (const t of [4.5, 4.1, 3.8]) { if (rows.length <= max) break; RH = t; max = Math.max(3, Math.floor((ty - bottom - 8) / RH) - 3); }
     const head = [[info.charsTitle], ["No.", "Specification", "LSL", "USL", "Class", "Gauge"]], body = rows.slice(0, max);
     const R = head.concat(body);
     if (rows.length > max) R.push(["", `… ${rows.length - max} more — see the SOP`, "", "", "", ""]);
-    if (rows.length) add({ t: "table", layer: "STG-TABLE", p: [TB.x0, ty], h: 2.2, rh: 5, cw: [8, 34, 12.5, 12.5, 9, 30], rows: R, title: true, hdr: true, al: ["c", "l", "r", "r", "c", "l"], rot: 0 });
+    if (rows.length) add({ t: "table", layer: "STG-TABLE", p: [TB.x0, ty], h: RH < 4.2 ? 1.7 : RH < 4.8 ? 1.9 : 2.2, rh: RH, cw: [8, 34, 12.5, 12.5, 9, 30], rows: R, title: true, hdr: true, al: ["c", "l", "r", "r", "c", "l"], rot: 0 });
     else T(TB.x0 + 2, ty - 4, 2.4, "No characteristic of the drawing is made at this operation.");
     let y = TB.y0 + 2 + noteH + lgH - 4;
     T(TB.x0 + 1, y + 1.5, 2.3, "LEGEND", 0, { color: null, stg: "dimg" }); y -= 2;
@@ -555,11 +563,11 @@
     const endView = !isTurn && (hexC.length > 0 || holeMine);
     const Dmax = 2 * S.rmax, Rend = hexEM ? nomOf(hexEM.c) / 2 : Dmax / 2, kk = Math.min(4.4, 42 / Math.max(Rend, 1));
     // --- layout
-    const Rtop = Math.max(S.rmax, jaws ? jaws.top : 0), Rj = Rtop, xmin = S.xl, xmax = S.xr + (jaws ? jaws.lip : 0), PITCH = 9, forceSide = endView ? -1 : 0, evH = endView ? 2 * Rend * kk + 36 : 0;
+    const Rtop = Math.max(S.rmax, jaws ? jaws.top : 0), Rj = Rtop, xmin = S.xl, xmax = S.xr + (jaws ? jaws.lip : 0), PITCH = 7.6, forceSide = endView ? -1 : 0, evH = endView ? 2 * Rend * kk + 36 : 0;
     let cols, rows, boreLens, nrow, topH, fanH, looseH, botH, colsW, Wav, Hav, k, pw, X0, yc;
     const lay = () => {
       cols = vd.filter((d) => !d.bore).sort((a, b) => a.r - b.r); rows = hd.filter((q) => q.outer).sort((a, b) => (a.b - a.a) - (b.b - b.a)); boreLens = hd.filter((q) => !q.outer); nrow = forceSide ? ld.length : Math.ceil(ld.length / 2);
-      topH = rows.length ? rows.length * 8.5 + 14 : 10; fanH = ld.length ? nrow * PITCH + 16 : 6; looseH = loose.length * 6 + (loose.length ? 4 : 0); botH = Math.max(fanH, evH) + looseH; colsW = cols.length ? cols.length * 11 + 14 : 8;
+      topH = rows.length ? rows.length * 7.5 + 12 : 10; fanH = ld.length ? nrow * PITCH + 13 : 6; looseH = loose.length * 6 + (loose.length ? 4 : 0); botH = Math.max(fanH, evH) + looseH; colsW = cols.length ? cols.length * 9.5 + 12 : 8;
       Wav = DA.x1 - DA.x0 - colsW - 18; Hav = DA.y1 - DA.y0 - topH - botH - 8;
       k = niceScale(Math.min(Wav / Math.max(xmax - xmin, 1e-6), Hav / (2 * Rj + 1e-6), 10));
       pw = (xmax - xmin) * k; X0 = DA.x0 + (colRight ? 8 : colsW) + Math.max(0, (Wav - pw) / 2); yc = DA.y0 + botH + 4 + Rj * k + Math.max(0, (Hav - 2 * Rj * k) / 2);
@@ -605,7 +613,7 @@
     cols.forEach((d, i) => { const xc = base + (colRight ? 1 : -1) * i * 11; K2.dimv(Y(-d.r), Y(d.r), xc, X(colRight ? d.x1 : d.x0), d.txt, d.no, d.red ? ST.dimr : ST.diml); sh.rep.dims++; });
     for (const d of vd.filter((q) => q.bore)) { K2.dimv(Y(-d.r), Y(d.r), X(d.x0 + (d.x1 - d.x0) * 0.78), null, d.txt, d.no, ST.dimr, true); sh.rep.dims++; }
     // --- lengths: rows above the part, shortest nearest
-    rows.forEach((q, i) => { const y = Y(Rtop) + 10 + i * 8.5; K2.dimh(X(q.a), X(q.b), y, Y(S.rOut(q.a)), Y(S.rOut(q.b)), q.txt, q.no, q.red ? ST.dimr : ST.diml); sh.rep.dims++; });
+    rows.forEach((q, i) => { const y = Y(Rtop) + 9 + i * 7.5, av = []; for (let j = i + 1; j < rows.length; j++) av.push(X(rows[j].a), X(rows[j].b)); K2.dimh(X(q.a), X(q.b), y, Y(S.rOut(q.a)), Y(S.rOut(q.b)), q.txt, q.no, q.red ? ST.dimr : ST.diml, av); sh.rep.dims++; });
     for (const q of boreLens) { const ra = S.rVoid(q.a), rb = S.rVoid(q.b); if (ra == null && rb == null) { loose.push({ no: q.no, txt: q.txt }); continue; } const rm = Math.min(ra == null ? 1e9 : ra, rb == null ? 1e9 : rb); K2.dimh(X(q.a), X(q.b), Y(rm * 0.3), Y(ra == null ? rm : ra), Y(rb == null ? rm : rb), q.txt, q.no, ST.dimr); sh.rep.dims++; }
     // --- leaders in a fan below the part: chamfers, angles, radii, finish, GD&T
     const rowTop = Y(-Rj) - 10, tw = (q) => K2.tw(q.kind === "gdt" ? "00.00 AB" : q.txt) + 2 * K2.br + 14 + (q.kind === "gdt" ? 3 * h * 1.8 : 0);
