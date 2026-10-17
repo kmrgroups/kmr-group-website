@@ -92,7 +92,7 @@
     C(`FROM STAGE DRAWING - DIMENSIONS FROZEN REV ${(P.freeze && P.freeze.rev) || ""}`);
     C(`MATERIAL ${H.material || cd.name} - STOCK DIA ${r3(model.D0)} X ${stockLen}`);
     C("DRAFT PROGRAM - PROVE OUT ON THE MACHINE BEFORE PRODUCTION");
-    const need = { face: uStock > 0.02 };
+    const need = { face: uStock > 0.02 && rank === 0 || (rank > 0 && uStock > 0.02) };
 
     N("G21 G40 G80 G99");
     N("G28 U0. W0.");
@@ -272,6 +272,27 @@
   };
   const mmss = (s) => { s = Math.max(0, Math.round(s)); return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`; };
 
+
+  /** chip form from material, tool, feed, depth of cut (after Seco / Mitsubishi chip-control guides):
+      low feed or very small depth -> long ribbon; mid feed with a chip breaker -> short spiral / comma; high feed -> short C / fan pieces;
+      aluminium stays long and continuous; stainless is tough and stringy / buckled; brass and cast iron break into needles; peck drilling breaks the chip every peck */
+  const chipSpec = (mat, kind, f, ap) => {
+    const r = (o) => Object.assign({ turns: 3, R: 4, amp: 3 }, o);
+    if (kind === "drill") {
+      if (mat === "BRASS") return r({ t: "frag", d: 0.9, label: "needle chips (brass breaks short)" });
+      if (mat === "ALUMINIUM") return r({ t: "helix", d: 0.9, turns: 5, R: 5, len: 46, label: "long-pitch spiral (aluminium, ductile)" });
+      if (mat === "STAINLESS") return r({ t: "zig", d: 0.9, len: 30, amp: 5, label: "buckled zig-zag chips (stainless)" });
+      return f < 0.13 ? r({ t: "cone", d: 0.8, turns: 4.5, R: 5.5, len: 30, label: "conical spiral chips, broken every peck" }) : r({ t: "frag", d: 0.8, label: "fan chips (higher feed breaks them)" });
+    }
+    if (mat === "BRASS") return r({ t: "frag", d: 1.4, label: "short broken chips (brass)" });
+    if (mat === "ALUMINIUM") return f >= 0.15 && ap >= 0.6 ? r({ t: "helix", d: 12, turns: 7, R: 7, len: 80, label: "long loose spiral (aluminium keeps flowing)" }) : r({ t: "ribbon", d: 24, len: 110, amp: 6, label: "long ribbon (aluminium, light cut)" });
+    if (mat === "STAINLESS") return ap < 0.5 || f < 0.1 ? r({ t: "ribbon", d: 18, len: 85, amp: 4, label: "tough stringy ribbon (stainless, light cut)" }) : r({ t: "zig", d: 6, len: 26, amp: 5, label: "tough buckled chips (stainless)" });
+    if (kind === "thread") return r({ t: "ribbon", d: 8, len: 34, amp: 2.5, label: "thin thread swarf" });
+    if (f < 0.1 || ap < 0.4) return r({ t: "ribbon", d: 20, len: 100, amp: 4, label: "long thin ribbon (feed or depth too small to break the chip)" });
+    if (f > 0.32) return r({ t: "frag", d: 3, label: "short C / square chips (feed very high)" });
+    return r({ t: "helix", d: 5, turns: 3.4, R: 3.5 + Math.min(ap, 3) * 1.1, len: 30, label: "short spiral chips (chip breaker working)" });
+  };
+
   class Sim {
     constructor(g, cx) {
       this.g = g; this.cx = cx; this.mv = CN.interp(g.lines, g.tools); const S0 = g.S0, S = g.S, jw = g.jaws;
@@ -305,19 +326,19 @@
     }
     reset() {
       const { W, Hc, g } = this; this.mat = new Uint8Array(W * Hc); fillLoops(g.S0.loops, W, Hc, this.xlo, this.cs, this.mat);
-      this.i = 0; this.s = 0; this.t = 0; this.li = -1; this.done = false; this.trail = []; this.chips = []; this.pos = [3, 40]; this.tool = 0; this.rpm = 0; this.feed = 0; this.phase = ""; this.stats = null; this.removed = 0; this.vol = 0;
+      this.i = 0; this.s = 0; this.t = 0; this.li = -1; this.done = false; this.trail = []; this.chips = []; this.chipTxt = ""; this.acc = 0; this.ap = 1; this.pos = [3, 40]; this.tool = 0; this.rpm = 0; this.feed = 0; this.phase = ""; this.stats = null; this.removed = 0; this.vol = 0;
       this.img = null; this.dirty = true; this.lastM = null;
     }
     xr(Z, X) { return [this.g.xw - this.g.d * Z, X / 2]; }
     cut(ix, j, force) { if (ix < 0 || ix >= this.W || j < 0 || j >= this.Hc) return 0; const k = j * this.W + ix; if (!this.mat[k]) return 0; if (!force && this.tgt[k]) return 0; this.mat[k] = 0; this.dirty = true; this.vol += 2 * Math.PI * (j + 0.5) * this.cs * this.cs * this.cs; return 1; }
     carve(m, Z, X) {
       const [x, r] = this.xr(Z, X), cs = this.cs, tl = this.g.tools[m.tool], ix = Math.floor((x - this.xlo) / cs); let n = 0;
-      if (!tl) return;
+      if (!tl) return 0;
       if (tl.kind === "od") {
-        const H = tl.H || 2, j0 = Math.ceil(r / cs - 0.5), j1 = Math.min(this.Hc - 1, Math.floor((r + H) / cs)); for (let j = j0; j <= j1; j++) n += this.cut(ix, j);
+        const H = tl.H || 2, j0 = Math.ceil(r / cs - 0.5), j1 = Math.min(this.Hc - 1, Math.floor((r + H) / cs)); for (let j = j0; j <= j1; j++) n += this.cut(ix, j); this.ap = n * cs;
         const jr = Math.floor(r / cs), nb = Math.round(1.2 / cs); for (let k = 0; k <= nb; k++) n += this.cut(ix + this.sf * k, jr);
       } else if (tl.kind === "bore") {
-        const H = tl.H || 1.6, j1 = Math.floor(r / cs - 0.5), j0 = Math.max(0, j1 - Math.round(H / cs)); for (let j = j0; j <= j1; j++) n += this.cut(ix, j);
+        const H = tl.H || 1.6, j1 = Math.floor(r / cs - 0.5), j0 = Math.max(0, j1 - Math.round(H / cs)); for (let j = j0; j <= j1; j++) n += this.cut(ix, j); this.ap = n * cs;
         const jr = Math.max(0, Math.floor(r / cs - 0.5)), nb = Math.round(1.2 / cs); for (let k = 0; k <= nb; k++) n += this.cut(ix + this.sf * k, jr);
       } else if (tl.kind === "drill") {
         const rd = tl.rd, T = 0.6 * rd + 1.2, nt = Math.round(T / cs);
@@ -329,7 +350,21 @@
           for (let a = -nx; a <= nx; a++) for (let j = Math.ceil(rT / cs - 0.5); j <= Math.floor((rT + hmax) / cs); j++) { const rc = (j + 0.5) * cs; if (Math.abs(a) * cs <= (rc - rT) * tan) n += this.cut(ix + a, j, true); }
         }
       }
-      if (n) { this.removed += n; if (this.chips.length < 160 && Math.random() < 0.7) for (let q = 0; q < 2; q++) this.chips.push({ x, r, vx: (Math.random() - 0.3) * 6 * this.sf, vr: 2 + Math.random() * 6, life: 1 }); }
+      if (n) this.removed += n;
+      return n;
+    }
+    /** chips: made from the length of metal actually cut, shaped by chipSpec */
+    emit(m, tl, ds, x, r, flush) {
+      this.layout(); const spec = chipSpec(this.g.cd.name, tl.kind, m.f / Math.max(this.rpm, 1), this.ap || 1), k = this.k; this.chipTxt = spec.label;
+      this.acc = (this.acc || 0) + ds; let guard = 0;
+      while ((this.acc >= spec.d || (flush && guard === 0)) && guard++ < 4) {
+        this.acc = Math.max(0, this.acc - spec.d); if (this.chips.length > 110) this.chips.shift();
+        const sf = this.sf, rnd = Math.random(), q = { spec, rr: Math.max(2.5, spec.R * (0.8 + 0.4 * rnd)), len: spec.len ? spec.len * (0.7 + 0.5 * rnd) : 8, ang: Math.random() * 6.28, w: (Math.random() - 0.5) * 7, life: 0, heat: 1, hole: false };
+        if (tl.kind === "drill") { const xm = this.xr(0, 0)[0]; q.px = this.sx(xm); q.py = this.cy + (Math.random() - 0.5) * 2 * Math.min(tl.rd * k, 10); q.vx = sf * (70 + Math.random() * 80); q.vy = (Math.random() - 0.4) * 40; q.out = true; }
+        else if (tl.kind === "bore") { q.px = this.sx(x); q.py = this.cy - r * k + 4; q.vx = sf * (90 + Math.random() * 60); q.vy = 0; q.hole = true; }
+        else { q.px = this.sx(x); q.py = this.cy - r * k - 3; q.vx = sf * (60 + Math.random() * 90); q.vy = -(90 + Math.random() * 110); }
+        this.chips.push(q);
+      }
     }
     /** advance the simulated machine time by dt seconds */
     advance(dt) {
@@ -339,10 +374,10 @@
         this.li = m.li; this.tool = m.tool; this.rpm = m.rpm; this.feed = m.f || 0; this.lastM = m;
         const prev = this.lines && this.lines[m.li]; void prev;
         if (m.type === "tool" || m.type === "home") { this.pos = m.type === "home" ? m.to.slice() : this.pos; }
-        else if (m.type === "rapid") { this.pos = this.posAt(m, tgt); }
+        else if (m.type === "rapid") { this.pos = this.posAt(m, tgt); if (this.acc > 0.4 && this.lastCut) { const lc = this.lastCut; this.emit(lc.m, lc.tl, 0, lc.x, lc.r, true); this.acc = 0; } }
         else {
           const ds = cs * 0.8; let s = this.s; if (s > tgt) s = 0;
-          while (s < tgt) { s = Math.min(tgt, s + ds); const q = this.posAt(m, s); this.carve(m, q[0], q[1]); this.pos = q; if (!this.trail.length || Math.hypot(q[0] - this.trail[this.trail.length - 1][0], q[1] - this.trail[this.trail.length - 1][1]) > 0.35) this.trail.push([q[0], q[1], m.type === "feed" ? 1 : 0]); }
+          while (s < tgt) { s = Math.min(tgt, s + ds); const q = this.posAt(m, s); const nn = this.carve(m, q[0], q[1]); this.pos = q; if (nn) { const tl2 = this.g.tools[m.tool], xy = this.xr(q[0], q[1]); if (tl2) { this.lastCut = { m, tl: tl2, x: xy[0], r: xy[1] }; this.emit(m, tl2, ds, xy[0], xy[1]); } } if (!this.trail.length || Math.hypot(q[0] - this.trail[this.trail.length - 1][0], q[1] - this.trail[this.trail.length - 1][1]) > 0.35) this.trail.push([q[0], q[1], m.type === "feed" ? 1 : 0]); }
           this.s = s;
         }
         if (p >= 1) { this.i++; this.s = 0; if (m.type !== "rapid" && m.type !== "tool" && m.type !== "home") this.pos = m.to.slice(); } else break;
@@ -397,6 +432,49 @@
     if (kind === "bore") return [[[0, 0], [1.0 * sf, -0.2], [4.0 * sf, -2.8], [3.4 * sf, -3.8], [0.2 * sf, -1.0]], [[2.0 * sf, -2.4], [34 * sf, -2.4], [34 * sf, -7.4], [3.4 * sf, -7.4]]];
     return [];
   };
+  /*CHIPS*/
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const chipColour = (mat, heat, a) => {
+    if (mat === "ALUMINIUM") return `rgba(226,232,240,${a})`;
+    if (mat === "BRASS") return `rgba(250,204,21,${a})`;
+    // steel / stainless: hot orange → straw → blue tempering colour → grey
+    const h = Math.max(0, Math.min(1, heat)), A = [148, 163, 184], B = [147, 197, 253], C = [251, 191, 36], D = [249, 115, 22];
+    const mix = (x, y, t) => x.map((v, i) => Math.round(lerp(v, y[i], t))), col = h > 0.66 ? mix(C, D, (h - 0.66) / 0.34) : h > 0.33 ? mix(B, C, (h - 0.33) / 0.33) : mix(A, B, h / 0.33);
+    return `rgba(${col[0]},${col[1]},${col[2]},${a})`;
+  };
+  Sim.prototype.solidAt = function (px, py) {
+    const x = (px - this.ox) / this.k, r = Math.abs(this.cy - py) / this.k, ix = Math.floor((x - this.xlo) / this.cs), j = Math.floor(r / this.cs);
+    return ix >= 0 && ix < this.W && j >= 0 && j < this.Hc && this.mat[j * this.W + ix] === 1;
+  };
+  /** draw one chip: coil, cone, wavy ribbon, zig-zag or small broken pieces, rotated by q.ang */
+  const chipPath = (c, q) => {
+    const sp = q.spec, N = 40, cs = Math.cos(q.ang), sn = Math.sin(q.ang), pt = (x, y) => [x * cs - y * sn, x * sn + y * cs];
+    c.beginPath();
+    if (sp.t === "frag") { for (let i = 0; i < 4; i++) { const ox = (i - 1.5) * 4.5, a = q.ang + i * 1.7; c.moveTo(ox, 0); c.arc(ox, 0, 2.4, a, a + 3.6); } return; }
+    for (let i = 0; i <= N; i++) {
+      const s = i / N; let x, y;
+      if (sp.t === "helix" || sp.t === "cone") { const th = s * sp.turns * 2 * Math.PI, R = sp.t === "cone" ? q.rr * (0.3 + 0.7 * s) : q.rr; x = s * q.len + R * 0.55 * Math.cos(th); y = R * Math.sin(th); }
+      else if (sp.t === "ribbon") { x = s * q.len; y = sp.amp * Math.sin(s * 9 + q.ang); }
+      else { x = s * q.len; y = ((Math.round(s * 10) % 2) * 2 - 1) * sp.amp * (1 - Math.abs(((s * 10) % 1) - 0.5) * 0.4); }
+      const [X, Y] = pt(x - q.len / 2, y); i ? c.lineTo(X, Y) : c.moveTo(X, Y);
+    }
+  };
+  Sim.prototype.drawChips = function (c) {
+    const mat = this.g.cd.name, dt = 0.016, xm = this.xr(0, 0)[0], xMouth = this.sx(xm), sf = this.sf, bot = CH - FOOT;
+    for (const q of this.chips) {
+      q.life += dt; q.heat = Math.max(0, 1 - q.life * 0.9);
+      if (q.hole) { q.px += q.vx * dt; if ((q.px - xMouth) * sf > 0) { q.hole = false; q.vx *= 1.2; } }       // inside the bore the chip is carried out by the coolant along the axis
+      else { q.px += q.vx * dt; q.py += q.vy * dt; q.vy += 520 * dt; }
+      q.ang += q.w * dt;
+      if (q.vy > 0 && !q.hole && this.solidAt(q.px, q.py)) q.dead = true;   // falls behind the bar
+      if (q.py > bot || q.life > 3.5) q.dead = true;
+      const a = Math.max(0, Math.min(1, 1.4 - q.life * 0.4));
+      c.save(); c.translate(q.px, q.py); c.scale(2.3, 2.3); c.lineCap = "round"; c.lineJoin = "round";
+      chipPath(c, q); c.strokeStyle = "rgba(2,6,23,.85)"; c.lineWidth = 3; c.stroke();
+      chipPath(c, q); c.strokeStyle = chipColour(mat, q.heat, a); c.lineWidth = 1.6; c.stroke(); c.restore();
+    }
+    this.chips = this.chips.filter((q) => !q.dead);
+  };
   Sim.prototype.draw = function (c, ui) {
     this.layout(); const k = this.k, W = CW, H = CH;
     c.fillStyle = "#0b1220"; c.fillRect(0, 0, W, H);
@@ -410,13 +488,15 @@
     c.strokeStyle = "#475569"; c.setLineDash([14, 4, 3, 4]); c.lineWidth = 1; c.beginPath(); c.moveTo(8, this.cy); c.lineTo(CW - PANEL - 8, this.cy); c.stroke(); c.setLineDash([]);
     c.imageSmoothingEnabled = true; const dx = this.sx(this.xlo), dw = (this.xhi - this.xlo) * k, dh = this.Hc * this.cs * k;
     c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.save(); c.translate(0, this.cy * 2); c.scale(1, -1); c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.restore();
-    // the finished outline (what the program has to make)
-    c.strokeStyle = "rgba(125,211,252,.85)"; c.lineWidth = 1; c.setLineDash([5, 4]);
-    for (const sg of [1, -1]) {
-      c.beginPath(); this.g.S.pts.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke();
-      for (const v of this.g.S.voids) { c.beginPath(); const pp = v.tip ? v.pts.concat([v.tip]) : v.pts; pp.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke(); }
+    // the finished outline (what the program has to make): dark casing + bright line so it shows on metal and on the background
+    c.lineJoin = "round";
+    for (const pass of [0, 1]) {
+      c.strokeStyle = pass ? "#22d3ee" : "rgba(2,6,23,.9)"; c.lineWidth = pass ? 2.2 : 5;
+      for (const sg of [1, -1]) {
+        c.beginPath(); this.g.S.pts.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke();
+        for (const v of this.g.S.voids) { c.beginPath(); const pp = v.tip ? v.pts.concat([v.tip]) : v.pts; pp.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.stroke(); }
+      }
     }
-    c.setLineDash([]);
     // chuck / soft jaws
     for (const sg of [1, -1]) { c.beginPath(); this.g.jaws.poly.forEach((p, i) => { const X = this.sx(p[0]), Y = this.cy - sg * p[1] * k; i ? c.lineTo(X, Y) : c.moveTo(X, Y); }); c.closePath(); c.fillStyle = "rgba(14,116,180,.55)"; c.fill(); c.strokeStyle = "#38bdf8"; c.lineWidth = 1.5; c.stroke(); }
     // tool path trail
@@ -435,20 +515,19 @@
       }
       if (this.lastM.type === "feed" || this.lastM.type === "thread") { c.fillStyle = "rgba(251,191,36,.9)"; c.beginPath(); c.arc(X, Y, 3, 0, 7); c.fill(); }
     }
-    // chips
-    for (const q of this.chips) { q.x += q.vx * 0.016; q.r += q.vr * 0.016; q.vr -= 22 * 0.016; q.life -= 0.035; c.fillStyle = `rgba(251,${146 + Math.round(60 * q.life)},60,${Math.max(0, q.life)})`; c.fillRect(this.sx(q.x), this.cy - q.r * k, 2.2, 2.2); }
-    this.chips = this.chips.filter((q) => q.life > 0);
+    // chips (drawn larger than life so they can be seen; shape from chipSpec)
+    this.drawChips(c);
     c.restore();
     // read-outs (top-left of the view)
     const m = this.lastM, Z = this.pos[0], X = this.pos[1], t = this.tool && this.g.tools[this.tool];
     c.font = "14px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#cbd5e1"; c.textBaseline = "alphabetic";
-    const rd = [["X (dia)", X.toFixed(3)], ["Z", Z.toFixed(3)], ["Spindle", (this.rpm || 0) + " rpm"], ["Feed", m && m.f ? (m.type === "rapid" ? "rapid" : (m.f / Math.max(this.rpm, 1)).toFixed(2) + " mm/rev") : "—"], ["Tool", t ? `T${String(this.tool).padStart(2, "0")} ${t.name}` : "—"]];
-    rd.forEach((q, i) => { c.fillStyle = "#64748b"; c.fillText(q[0], 18, HEADH + 26 + i * 19); c.fillStyle = "#e2e8f0"; c.fillText(q[1], 96, HEADH + 26 + i * 19); });
+    const rd = [["X (dia)", X.toFixed(3)], ["Z", Z.toFixed(3)], ["Spindle", (this.rpm || 0) + " rpm"], ["Feed", m && m.f ? (m.type === "rapid" ? "rapid" : (m.f / Math.max(this.rpm, 1)).toFixed(2) + " mm/rev") : "—"], ["Tool", t ? `T${String(this.tool).padStart(2, "0")} ${t.name}` : "—"], ["Chip", this.chipTxt || "—"]];
+    rd.forEach((q, i) => { c.fillStyle = "#64748b"; c.fillText(q[0], 18, HEADH + 26 + i * 19); c.fillStyle = "#e2e8f0"; c.fillText(String(q[1]).slice(0, 52), 96, HEADH + 26 + i * 19); });
     // phase (last comment above the current line)
     let ph = ""; for (let q = Math.max(0, this.li); q >= 0; q--) { const ln = this.g.lines[q]; if (/^\(/.test(ln) && !/^\(T\d/.test(ln)) { ph = ln.slice(1, -1); break; } }
-    if (ph) { c.fillStyle = "#38bdf8"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ph, 18, HEADH + 26 + 5 * 19 + 10); }
+    if (ph) { c.fillStyle = "#38bdf8"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ph, 18, HEADH + 26 + 6 * 19 + 10); }
     c.font = "12px system-ui, Segoe UI, Arial"; c.fillStyle = "#94a3b8";
-    const lg = [["rgba(125,211,252,.9)", "required shape (finished outline)"], ["#38bdf8", "chuck / soft jaws"], ["#22c55e", "tool path"], ["#f59e0b", "stock left uncut"]];
+    const lg = [["#22d3ee", "required shape (finished outline)"], ["#38bdf8", "chuck / soft jaws"], ["#22c55e", "tool path"], ["#f59e0b", "stock left uncut"], ["#e5e7eb", "chips (enlarged)"]];
     lg.forEach((q, i) => { const yy = CH - FOOT - 18 - (lg.length - 1 - i) * 17; c.fillStyle = q[0]; c.fillRect(18, yy - 8, 18, 3); c.fillStyle = "#94a3b8"; c.fillText(q[1], 44, yy - 2); });
     // program panel
     const px = CW - PANEL; c.fillStyle = "#0f172a"; c.fillRect(px, HEADH, PANEL, CH - HEADH); c.fillStyle = "#1e293b"; c.fillRect(px, HEADH, 2, CH - HEADH);
@@ -465,7 +544,7 @@
     const fy = CH - FOOT; c.fillStyle = "#111c33"; c.fillRect(0, fy, CW - PANEL, FOOT);
     const pr = this.total ? Math.min(1, this.t / this.total) : 0; c.fillStyle = "#1e293b"; c.fillRect(14, fy + 14, CW - PANEL - 28, 8); c.fillStyle = "#22c55e"; c.fillRect(14, fy + 14, (CW - PANEL - 28) * pr, 8);
     c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#e2e8f0"; c.fillText(`Machine time ${mmss(this.t)} / ${mmss(this.total)}`, 14, fy + 44);
-    c.textAlign = "right"; c.fillStyle = "#94a3b8"; c.fillText(`${this.removedMm3().toFixed(0)} mm³ of chips`, CW - PANEL - 14, fy + 44); c.textAlign = "left";
+    c.textAlign = "right"; c.fillStyle = "#94a3b8"; c.fillText(`${this.removedMm3().toFixed(0)} mm³ removed ≈ ${(this.removedMm3() * ({ ALUMINIUM: 2.7, BRASS: 8.5, STAINLESS: 7.9 }[this.g.cd.name] || 7.85) / 1000).toFixed(1)} g of chips`, CW - PANEL - 14, fy + 44); c.textAlign = "left";
     if (ui && ui.msg) { c.fillStyle = "#fbbf24"; c.textAlign = "center"; c.fillText(ui.msg, (CW - PANEL) / 2, fy + 44); c.textAlign = "left"; }
     // result card at the end
     if (this.done && this.stats) {
