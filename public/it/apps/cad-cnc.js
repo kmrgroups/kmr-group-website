@@ -798,7 +798,7 @@
     c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#94a3b8"; c.textAlign = "right"; c.fillText(`${this.cx.P.part_no || ""} · program ${this.g.name}`, W - 14, HEADH / 2); c.textAlign = "left";
     // view
     this.paintGrid();
-    this.paintView(c, ui); if (!ui || ui.zoom !== false) this.drawCloseup(c, ui);
+    this.paintView(c, ui); if (ui && ui.zoom === true) this.drawCloseup(c, ui);
     // tool strip: which tool, holder, insert corner, edge in cut, wear
     const m = this.lastM, Z = this.pos[0], X = this.pos[1], t = this.tool && this.g.tools[this.tool], sy0 = HEADH;
     c.fillStyle = "#0e1a30"; c.fillRect(0, sy0, CW - PANEL, STRIP); c.fillStyle = "#1e293b"; c.fillRect(0, sy0 + STRIP - 1, CW - PANEL, 1); c.textBaseline = "alphabetic";
@@ -1025,7 +1025,7 @@
       <select id="cnOp" style="${btn};max-width:300px"></select>
       <button id="cnPlay" style="${btn};background:#15803d;border-color:#16a34a">▶ Play</button><button id="cnRe" style="${btn}">⟲ Restart</button>
       <select id="cnSp" style="${btn};max-width:190px"><option value="120">Slow (about 2 min)</option><option value="60" selected>Normal (about 1 min)</option><option value="30">Fast (about 30 s)</option><option value="15">Very fast (about 15 s)</option></select>
-      <button id="cnDims" style="${btn}">📐 Dimension check</button><button id="cnZoom" style="${btn}">🔍 Close-up: on</button><button id="cnLook" style="${btn}">🎥 Machine view</button><button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
+      <button id="cnDims" style="${btn}">📐 Dimension check</button><button id="cnLook" style="${btn}">🎥 Machine view</button><button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
       <canvas id="cnCv" width="${CW}" height="${CH}" style="width:min(100%,calc((100vh - 70px) * 16 / 9));height:auto;border-radius:10px;border:1px solid #1e293b;background:#0b1220"></canvas>
       <div id="cnNote" style="color:#94a3b8;font-size:12px;max-width:1280px;text-align:center">Draft program made from the stage drawing. The program on the right is the one that is simulated. Check feeds, speeds, tools and tool-nose compensation on your machine before production.</div>`;
     document.body.appendChild(ov);
@@ -1042,7 +1042,6 @@
     };
     $("cnLook").onclick = () => { ui.look = ui.look === "machine" ? "" : "machine"; $("cnLook").textContent = ui.look === "machine" ? "◀ Drawing view" : "🎥 Machine view"; };
     $("cnDims").onclick = () => { ui.page = ui.page === "dims" ? "" : "dims"; $("cnDims").textContent = ui.page === "dims" ? "◀ Back to simulation" : "📐 Dimension check"; $("cnLife").textContent = "⏱ Tool life"; };
-    $("cnZoom").onclick = () => { ui.zoom = ui.zoom === false ? true : false; $("cnZoom").textContent = ui.zoom === false ? "🔍 Close-up: off" : "🔍 Close-up: on"; };
     $("cnLife").onclick = () => { ui.page = ui.page === "life" ? "" : "life"; $("cnLife").textContent = ui.page === "life" ? "◀ Back to simulation" : "⏱ Tool life"; $("cnDims").textContent = "📐 Dimension check"; };
     $("cnParts").onchange = () => { if (sim) sim.partsDone = Math.max(0, +$("cnParts").value || 0); };
     $("cnOp").onchange = () => { if (rec) return; load(+$("cnOp").value); };
