@@ -21,6 +21,28 @@
     return { name: "STEEL", vcR: 180, vcF: 220, vcD: 60, vcT: 110 };
   };
 
+
+  /** tool catalogue: real inserts, holders, boring bars and drills (ISO sizes) */
+  const INS = {
+    CNMG120408: { iso: "CNMG 12 04 08", ic: 12.7, L: 12.9, ang: 80, r: 0.8, edges: 8, grade: "coated carbide P25 (steel roughing)" },
+    VNMG160404: { iso: "VNMG 16 04 04", ic: 9.525, L: 16.6, ang: 35, r: 0.4, edges: 4, grade: "coated carbide P15 (finishing)" },
+    DCMT0702: { iso: "DCMT 07 02 04", ic: 6.35, L: 7.0, ang: 55, r: 0.4, edges: 2, grade: "coated carbide P15 (boring)" },
+    CCMT060204: { iso: "CCMT 06 02 04", ic: 6.35, L: 6.4, ang: 80, r: 0.4, edges: 2, grade: "coated carbide P15 (boring)" },
+    TR16ER: { iso: "16 ER ISO 60 deg", ic: 9.525, L: 16.5, ang: 60, r: 0.15, edges: 3, grade: "coated carbide (threading)" },
+  };
+  const HOLD = { PCLNR2525M12: { w: 25, L: 150, lead: 95 }, MVJNR2525M16: { w: 25, L: 150, lead: 93 }, SER2525M16: { w: 25, L: 150, lead: 90 } };
+  const BARS = [
+    { name: "S16R-SDQCR07", D: 16, minBore: 20, ins: "DCMT0702" }, { name: "S12M-SDQCR07", D: 12, minBore: 16, ins: "DCMT0702" },
+    { name: "S10K-SDQCR07", D: 10, minBore: 13, ins: "DCMT0702" }, { name: "S08K-SCLCR06", D: 8, minBore: 10, ins: "CCMT060204" },
+  ];
+  const barFor = (dia) => BARS.find((b) => dia + 1e-6 >= b.minBore) || null;
+  const drillFor = (D, tipDepth) => {
+    const cls = [3, 5, 8, 12].find((c) => c * D >= tipDepth + 0.5) || 12, shank = D <= 6 ? 6 : D <= 8 ? 8 : D <= 10 ? 10 : D <= 12 ? 12 : D <= 16 ? 16 : 20;
+    const er = shank <= 10 ? { name: "ER16", nut: 28 } : shank <= 16 ? { name: "ER25", nut: 42 } : { name: "ER32", nut: 50 };
+    return { cls, fl: cls * D, shank, er };
+  };
+  CN.INS = INS; CN.HOLD = HOLD; CN.BARS = BARS;
+
   /** list of [u, r] points + the outline edge of each piece -> items: line / arc (G02 / G03) */
   const items = (pts, edges, arcOf) => {
     const out = []; let i = 0;
@@ -50,7 +72,7 @@
     const stIdx = cx.stages.findIndex((o, i) => cx.rankOfStage.get(i) === rank), op = cx.stages[stIdx] || { opNo: 0, name: "" };
     const mine = (cx.map[String(op.opNo)] || []).map(Number).map((n) => cx.chars.get(n)).filter(Boolean);
     const cd = cutData(H.material), R0 = S0.R0;
-    const lines = [], tools = {}; let nn = 10, curT = 0;
+    const lines = [], tools = {}, warn = []; let nn = 10, curT = 0;
     const N = (s) => { lines.push(`N${nn} ${s}`); nn += 10; }, C = (s) => lines.push(`(${ascii(s)})`);
     const rpmAt = (vc, dia) => Math.min(4000, Math.round((vc * 1000) / (Math.PI * Math.max(dia, 4))));
     const toolNo = (n, name, kind, extra) => { tools[n] = Object.assign({ n, name, kind }, extra || {}); return n; };
@@ -99,7 +121,7 @@
     N(`G50 S${Math.round(Math.min(4000, rpmAt(cd.vcR, 4 * 2)))}`);
 
     // --- T01 facing + OD roughing
-    let tool = toolNo(1, "OD ROUGHING CNMG120408", "od", { H: 1.8, vc: cd.vcR });
+    let tool = toolNo(1, "OD ROUGHING CNMG120408", "od", { H: 1.8, vc: cd.vcR, ins: "CNMG120408", holder: "PCLNR2525M12" });
     if (need.face || oc) {
       changeTool(tool, "OD ROUGHING CNMG120408");
       N(`G96 S${cd.vcR} M03`);
@@ -134,27 +156,36 @@
       let pts = v.pts.map((p) => [uOf(p[0]), p[1]]), roles = v.roles.slice(), edges = v.roles.map((_, i) => eOf(v.pts[i], v.pts[i + 1], "i"));
       if (Math.abs(pts[0][0]) > Math.abs(pts[pts.length - 1][0])) { pts.reverse(); roles.reverse(); edges.reverse(); }
       const tip = v.tip ? [uOf(v.tip[0]), 0] : null;
-      const flats = []; for (let i = 0; i + 1 < pts.length; i++) if (Math.abs(pts[i][1] - pts[i + 1][1]) < 1e-6 && Math.abs(pts[i + 1][0] - pts[i][0]) > 0.25) flats.push({ u0: pts[i][0], u1: pts[i + 1][0], r: pts[i][1] });
+      const flats = []; for (let i = 0; i + 1 < pts.length; i++) if (Math.abs(pts[i][1] - pts[i + 1][1]) < 1e-6 && Math.abs(pts[i + 1][0] - pts[i][0]) > 0.25) flats.push({ u0: pts[i][0], u1: pts[i + 1][0], r: pts[i][1], role: roles[i] });
       if (!flats.length) continue;
       const deep = flats.reduce((a, b) => (b.u1 > a.u1 ? b : a)), rMin = Math.min(...flats.map((f) => f.r));
       let dD = null; for (const c of mine) { const f = cx.M.get(+c.no); if (f && f.semi && f.kind === "dia" && f.side === "i") { const n = U.nomOf(c); if (n >= 2 && n < 2 * rMin - 0.1) dD = n; } }
       let only = false; if (dD == null) { if (flats.every((f) => Math.abs(f.r - flats[0].r) < 0.02)) { dD = r3(2 * flats[0].r); only = true; } else dD = Math.max(2, Math.floor((2 * rMin - 1.0) * 2) / 2); }
-      bores.push({ pts, edges, tip, flats, deep, rMin, dD, only, rd: dD / 2 });
+      const thisR = flats.filter((f) => f.role === "this").map((f) => f.r), rFin = thisR.length ? Math.min(...thisR) : rMin; bores.push({ pts, edges, tip, flats, deep, rMin, rFin, dD, only, rd: dD / 2 });
     }
     bores.forEach((b, bi) => {
-      const rd = b.rd, depth = b.deep.u1, tipDepth = r3(depth + 0.3 * b.dD);
+      const depth = b.deep.u1, needBore = !b.only || b.pts.some((p, i) => i + 1 < b.pts.length && Math.abs(p[1] - b.pts[i + 1][1]) > 1e-6);
+      let bar = null;
+      if (needBore) {
+        bar = barFor(2 * b.rFin);
+        if (!bar) {   // too small for any boring bar: the drill makes the final size
+          b.dD = r3(2 * b.rFin); b.rd = b.dD / 2; const big = b.flats.some((f) => f.r > b.rFin + 0.05);
+          warn.push(`Bore dia ${fmt(b.dD)} is too small for the smallest boring bar (it needs a bore of at least dia 10). It is drilled to size${big ? "; the larger section needs a different process (back-boring or another set-up)" : ""}.`);
+          C(`BORE DIA ${fmt(b.dD)} - TOO SMALL FOR A BORING BAR, DRILLED TO SIZE`);
+        } else if (b.dD < bar.D + 1) { b.dD = Math.min(r3(bar.D + 1), r3(2 * b.rFin - 1)); b.rd = b.dD / 2; }
+      }
+      const rd = b.rd, tipDepth = r3(depth + 0.3 * b.dD), dr = drillFor(b.dD, tipDepth);
       C(`BORE ${bi + 1} - DRILL DIA ${fmt(b.dD)} DEPTH ${fmt(depth)}`);
-      const dn = toolNo(3 + bi * 10, `DRILL DIA ${fmt(b.dD)}`, "drill", { rd, vc: cd.vcD });
-      changeTool(dn, `DRILL DIA ${fmt(b.dD)} 118 DEG`);
+      const dn = toolNo(3 + bi * 10, `DRILL DIA ${fmt(b.dD)} ${dr.cls}XD`, "drill", { rd, vc: cd.vcD, ins: "DRILL", fl: dr.fl, shank: dr.shank, collet: dr.er.name, nut: dr.er.nut, holder: `${dr.er.name} collet chuck holder` });
+      changeTool(dn, `DRILL DIA ${fmt(b.dD)} ${dr.cls}XD 118 DEG`);
       N(`G97 S${rpmAt(cd.vcD, b.dD)} M03`); N("G00 X0. Z2."); N("M08");
       N("G74 R0.5"); N(`G74 Z${fmt(-tipDepth)} Q${Math.round(Math.min(3, Math.max(1, b.dD * 0.4)) * 1000)} F${b.dD > 6 ? "0.15" : "0.10"}`);
       N("G00 Z2."); N("G28 U0. W0.");
       // boring bar: rough layers, then the finishing contour with the mouth chamfer and the bottom
-      const bn = toolNo(4 + bi * 10, "BORING BAR S16 DCMT0702", "bore", { H: 1.6, vc: cd.vcF });
+      const bn = bar ? toolNo(4 + bi * 10, `BORING BAR ${bar.name} ${bar.ins}`, "bore", { H: 1.6, vc: cd.vcF, ins: bar.ins, holder: bar.name, bar }) : 0;
       const b2 = (u) => { let best = -1; for (let i = 0; i + 1 < b.pts.length; i++) { const p = b.pts[i], q = b.pts[i + 1]; if (u < Math.min(p[0], q[0]) - 1e-9 || u > Math.max(p[0], q[0]) + 1e-9) continue; if (Math.abs(q[0] - p[0]) < 1e-9) best = Math.max(best, p[1], q[1]); else best = Math.max(best, p[1] + ((q[1] - p[1]) * (u - p[0])) / (q[0] - p[0])); } return best; };
-      const needBore = !b.only || b.pts.some((p, i) => i + 1 < b.pts.length && Math.abs(p[1] - b.pts[i + 1][1]) > 1e-6);
-      if (needBore) {
-        changeTool(bn, "BORING BAR S16 DCMT0702");
+      if (needBore && bar) {
+        changeTool(bn, `BORING BAR ${bar.name} ${bar.ins}`);
         N(`G96 S${cd.vcF} M03`); N(`G00 X${fmt(2 * Math.max(rd - 0.5, 0.3))} Z2.`);
         let gmax = 0; for (let u = 0; u <= depth + 1e-9; u += 0.05) gmax = Math.max(gmax, b2(u) - fin);
         if (gmax > rd + 0.05) {
@@ -175,7 +206,7 @@
 
     // --- T02 OD finishing (chamfers, radii, grooves, the whole outline) and the thread
     if (oc) {
-      tool = toolNo(2, "OD FINISHING VNMG160404", "od", { H: 2.6, vc: cd.vcF });
+      tool = toolNo(2, "OD FINISHING VNMG160404", "od", { H: 2.6, vc: cd.vcF, ins: "VNMG160404", holder: "MVJNR2525M16" });
       changeTool(tool, "OD FINISHING VNMG160404");
       N(`G96 S${cd.vcF} M03`);
       const first = oc[0]; N(`G00 X${fmt(2 * (first[1] + 1))} Z1.`); N(`G01 X${fmt(2 * first[1])} Z0. F0.08`);
@@ -187,7 +218,7 @@
         const f = cx.M.get(+c.no); if (!f || !f.e || f.side !== "o") return;
         const pm = String(c.spec || c.text || "").match(/[×xX]\s*(\d+(?:\.\d+)?)/), pitch = pm ? parseFloat(pm[1]) : 1.5, rM = f.e.a[1], hh = r3(0.6134 * pitch);
         const ua = uOf(f.e.a[0]), ub = uOf(f.e.b[0]), u0 = Math.min(ua, ub), u1 = Math.max(ua, ub);
-        const tn = toolNo(5, `THREAD TOOL 60 DEG P${fmt(pitch)}`, "thread", { pitch, vc: cd.vcT });
+        const tn = toolNo(5, `THREAD TOOL 60 DEG P${fmt(pitch)}`, "thread", { pitch, vc: cd.vcT, ins: "TR16ER", holder: "SER2525M16" });
         C(`THREAD ${ascii(c.spec || c.text)} PITCH ${fmt(pitch)}`);
         changeTool(tn, `THREAD TOOL 60 DEG P${fmt(pitch)}`);
         N(`G97 S${rpmAt(cd.vcT, 2 * rM)} M03`); N(`G00 X${fmt(2 * (rM + 2))} Z${fmt(-(u0 - 3 * pitch))}`);
@@ -196,7 +227,7 @@
       });
     }
     N("M05"); N("M09"); N("M30"); lines.push("%");
-    return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S, jaws, cd, mine, rank };
+    return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S, jaws, cd, mine, rank, warn };
   };
   void 0;
 
@@ -293,6 +324,24 @@
     return r({ t: "helix", d: 5, turns: 3.4, R: 3.5 + Math.min(ap, 3) * 1.1, len: 30, label: "short spiral chips (chip breaker working)" });
   };
 
+
+  /** tool-life model: extended Taylor  T = Tref * (v/vref)^(-1/n) * (f/fref)^(-a/n) * (ap/apref)^(-b/n)
+      reference life Tref is the catalogue-style life at the cutting data the program uses; the exponents are typical values for coated carbide.
+      Calibrate Tref / n with your own tool-life records (CN.TAYLOR). Wear is VB (flank wear) with the ISO 3685 limit 0.3 mm. */
+  const TAYLOR = {
+    STEEL: { n: 0.25, a: 0.30, b: 0.12, k: 1 }, STAINLESS: { n: 0.20, a: 0.30, b: 0.12, k: 0.6 }, ALUMINIUM: { n: 0.40, a: 0.25, b: 0.10, k: 3 }, BRASS: { n: 0.35, a: 0.25, b: 0.10, k: 4 },
+  };
+  const REF = { od: { T: 15, f: 0.25, ap: 1.8 }, od2: { T: 25, f: 0.08, ap: 0.3 }, bore: { T: 20, f: 0.08, ap: 0.3 }, drill: { T: 40, f: 0.10, ap: 2 }, thread: { T: 20, f: 1.5, ap: 0.5 } };
+  CN.TAYLOR = TAYLOR; CN.REFLIFE = REF; CN.VB_LIMIT = 0.3;
+  const vbOf = (w) => { w = Math.max(0, Math.min(1.15, w)); return CN.VB_LIMIT * (0.18 * (1 - Math.exp(-w * 18)) + 0.62 * w + 0.2 * Math.pow(w, 6)); };
+  CN.vbOf = vbOf;
+  const lifeMin = (mat, tl, v, f, ap) => {
+    const tc = TAYLOR[mat] || TAYLOR.STEEL, key = tl.kind === "od" ? (tl.ins === "VNMG160404" ? "od2" : "od") : tl.kind, r = REF[key] || REF.od, vref = tl.vc || v;
+    const T = r.T * tc.k * Math.pow(Math.max(v, 5) / vref, -1 / tc.n) * Math.pow(Math.max(f, 0.01) / r.f, -tc.a / tc.n) * Math.pow(Math.max(ap, 0.05) / r.ap, -tc.b / tc.n);
+    return Math.max(0.3, Math.min(600, T));
+  };
+  CN.lifeMin = lifeMin;
+
   class Sim {
     constructor(g, cx) {
       this.g = g; this.cx = cx; this.mv = CN.interp(g.lines, g.tools); const S0 = g.S0, S = g.S, jw = g.jaws;
@@ -326,7 +375,7 @@
     }
     reset() {
       const { W, Hc, g } = this; this.mat = new Uint8Array(W * Hc); fillLoops(g.S0.loops, W, Hc, this.xlo, this.cs, this.mat);
-      this.i = 0; this.s = 0; this.t = 0; this.li = -1; this.done = false; this.trail = []; this.chips = []; this.chipTxt = ""; this.acc = 0; this.ap = 1; this.pos = [3, 40]; this.tool = 0; this.rpm = 0; this.feed = 0; this.phase = ""; this.stats = null; this.removed = 0; this.vol = 0;
+      this.i = 0; this.s = 0; this.t = 0; this.li = -1; this.done = false; this.trail = []; this.use = {}; this.chips = []; this.chipTxt = ""; this.acc = 0; this.ap = 1; this.pos = [3, 40]; this.tool = 0; this.rpm = 0; this.feed = 0; this.phase = ""; this.stats = null; this.removed = 0; this.vol = 0;
       this.img = null; this.dirty = true; this.lastM = null;
     }
     xr(Z, X) { return [this.g.xw - this.g.d * Z, X / 2]; }
@@ -353,8 +402,26 @@
       if (n) this.removed += n;
       return n;
     }
+    /** tool wear: time in cut, cutting speed, feed and depth give the share of one edge life used */
+    track(m, tl, ds, r) {
+      const rpm = Math.max(this.rpm, 1), dia = tl.kind === "drill" ? 2 * tl.rd : tl.kind === "thread" ? 2 * r : Math.max(2 * r, 4), v = (Math.PI * dia * rpm) / 1000, fRev = m.type === "thread" ? m.pitch : m.f / rpm;
+      const ap = tl.kind === "drill" ? tl.rd : tl.kind === "thread" ? m.depth || 0.5 : Math.max(this.ap || 0.3, 0.05), T = lifeMin(this.g.cd.name, tl, v, fRev, ap), dts = ds / Math.max(m.f / 60, 0.01);
+      const u = this.use[this.tool] || (this.use[this.tool] = { w: 0, cut: 0, vs: 0, fs: 0, as: 0 });
+      u.w += dts / (T * 60); u.cut += dts; u.vs += v * dts; u.fs += fRev * dts; u.as += ap * dts;
+    }
+    /** result per tool after a run (one part) */
+    lifeData() {
+      const out = [];
+      for (const k of Object.keys(this.use)) {
+        const u = this.use[k], tl = this.g.tools[k], ins = CN.INS[tl.ins] || { edges: 1, iso: tl.name, ic: 0, r: 0 }, w = Math.max(u.w, 1e-9);
+        const edges = tl.kind === "drill" ? 4 : ins.edges;   // a drill is re-ground (about 3 times), so 4 lives
+        out.push({ tool: +k, name: tl.name, holder: tl.holder || "", ins: tl.ins || "", iso: ins.iso, edges, edgeWord: tl.kind === "drill" ? "grinds" : "corners", cutS: u.cut, vc: u.vs / u.cut, f: u.fs / u.cut, ap: u.as / u.cut, w, edgeMin: u.cut / 60 / w, partsEdge: 1 / w, partsTool: edges / w });
+      }
+      return out.sort((a, b) => a.tool - b.tool);
+    }
     /** chips: made from the length of metal actually cut, shaped by chipSpec */
     emit(m, tl, ds, x, r, flush) {
+      if (this.quiet) return;
       this.layout(); const spec = chipSpec(this.g.cd.name, tl.kind, m.f / Math.max(this.rpm, 1), this.ap || 1), k = this.k; this.chipTxt = spec.label;
       this.acc = (this.acc || 0) + ds; let guard = 0;
       while ((this.acc >= spec.d || (flush && guard === 0)) && guard++ < 4) {
@@ -377,7 +444,7 @@
         else if (m.type === "rapid") { this.pos = this.posAt(m, tgt); if (this.acc > 0.4 && this.lastCut) { const lc = this.lastCut; this.emit(lc.m, lc.tl, 0, lc.x, lc.r, true); this.acc = 0; } }
         else {
           const ds = cs * 0.8; let s = this.s; if (s > tgt) s = 0;
-          while (s < tgt) { s = Math.min(tgt, s + ds); const q = this.posAt(m, s); const nn = this.carve(m, q[0], q[1]); this.pos = q; if (nn) { const tl2 = this.g.tools[m.tool], xy = this.xr(q[0], q[1]); if (tl2) { this.lastCut = { m, tl: tl2, x: xy[0], r: xy[1] }; this.emit(m, tl2, ds, xy[0], xy[1]); } } if (!this.trail.length || Math.hypot(q[0] - this.trail[this.trail.length - 1][0], q[1] - this.trail[this.trail.length - 1][1]) > 0.35) this.trail.push([q[0], q[1], m.type === "feed" ? 1 : 0]); }
+          while (s < tgt) { s = Math.min(tgt, s + ds); const q = this.posAt(m, s); const nn = this.carve(m, q[0], q[1]); this.pos = q; if (nn || m.type === "thread") { const tl2 = this.g.tools[m.tool], xy = this.xr(q[0], q[1]); if (tl2) { this.track(m, tl2, ds, xy[1]); if (nn) { this.lastCut = { m, tl: tl2, x: xy[0], r: xy[1] }; this.emit(m, tl2, ds, xy[0], xy[1]); } } } if (!this.trail.length || Math.hypot(q[0] - this.trail[this.trail.length - 1][0], q[1] - this.trail[this.trail.length - 1][1]) > 0.35) this.trail.push([q[0], q[1], m.type === "feed" ? 1 : 0]); }
           this.s = s;
         }
         if (p >= 1) { this.i++; this.s = 0; if (m.type !== "rapid" && m.type !== "tool" && m.type !== "home") this.pos = m.to.slice(); } else break;
@@ -405,10 +472,10 @@
   void 0;
 
   /* ================================================================ drawing the simulation frame (one canvas, so the recorded video has everything) ================================================================ */
-  const CW = 1280, CH = 720, PANEL = 470, HEADH = 46, FOOT = 64;
+  const CW = 1280, CH = 720, PANEL = 470, HEADH = 46, FOOT = 64, STRIP = 76, TOPM = 18;
   Sim.prototype.layout = function () {
-    const vw = CW - PANEL - 24, vh = CH - HEADH - FOOT - 16, wx = this.xhi - this.xlo, k = Math.min(vw / wx, vh / (2 * this.Rm + 2));
-    this.k = k; this.ox = 12 + (vw - wx * k) / 2 - this.xlo * k; this.cy = HEADH + 8 + vh / 2;
+    const vw = CW - PANEL - 24, vh = CH - HEADH - STRIP - FOOT - 16, wx = this.xhi - this.xlo, k = Math.min(vw / wx, vh / (2 * this.Rm + 2 + TOPM));
+    this.k = k; this.ox = 12 + (vw - wx * k) / 2 - this.xlo * k; this.cy = HEADH + STRIP + 8 + k * (this.Rm + 1 + TOPM);
   };
   Sim.prototype.sx = function (x) { return this.ox + x * this.k; };
   Sim.prototype.sy = function (r) { return this.cy - r * this.k; };
@@ -425,14 +492,68 @@
     }
     this.octx.putImageData(img, 0, 0); this.dirty = false;
   };
-  const toolShape = (kind, sf) => {
-    // polygons relative to the tip, in mm; x towards the free end (sf), r up
-    if (kind === "od") return [[[0, 0], [1.1 * sf, 0.15], [4.2 * sf, 3.4], [3.4 * sf, 4.6], [0.3 * sf, 1.2]], [[1.6 * sf, 2.3], [14 * sf, 2.3], [14 * sf, 8.5], [3.0 * sf, 8.5]]];
-    if (kind === "thread") return [[[0, 0], [0.9 * sf, 1.3], [-0.2 * sf, 1.6], [-0.9 * sf, 1.3]], [[0, 1.4], [10 * sf, 1.4], [10 * sf, 7.5], [-0.9 * sf, 7.5]]];
-    if (kind === "bore") return [[[0, 0], [1.0 * sf, -0.2], [4.0 * sf, -2.8], [3.4 * sf, -3.8], [0.2 * sf, -1.0]], [[2.0 * sf, -2.4], [34 * sf, -2.4], [34 * sf, -7.4], [3.4 * sf, -7.4]]];
-    return [];
+  /** tool, insert and holder in real size, in mm, tip at (0,0), x towards the free end (times sf), r up */
+  const ang2 = (deg) => [Math.cos((deg * Math.PI) / 180), Math.sin((deg * Math.PI) / 180)];
+  const rhomb = (a1, a2, L) => { const u = ang2(a1), v = ang2(a2); return [[0, 0], [L * u[0], L * u[1]], [L * (u[0] + v[0]), L * (u[1] + v[1])], [L * v[0], L * v[1]]]; };
+  const toolGeom = (tl) => {
+    const ins = (CN.INS || {})[tl.ins] || {}, h = (CN.HOLD || {})[tl.holder] || {};
+    if (tl.kind === "od") {
+      const fin = tl.ins === "VNMG160404", poly = fin ? rhomb(52, 87, ins.L) : rhomb(5, 85, ins.L), x0 = fin ? 2.0 : 1.6, r0 = fin ? 9 : 6.5;
+      return { holder: [[x0, r0], [h.L || 150, r0], [h.L || 150, r0 + (h.w || 25)], [x0, r0 + (h.w || 25)]], insert: poly, label: tl.holder, nose: ins.r || 0.4 };
+    }
+    if (tl.kind === "bore") {
+      const bar = tl.bar || { D: 12, minBore: 16 }, off = (bar.minBore - bar.D) / 2;
+      return { holder: [[1.2, -off], [150, -off], [150, -off - bar.D], [1.2, -off - bar.D]], insert: rhomb(-10, -65, ins.L || 7), label: tl.holder, nose: ins.r || 0.4 };
+    }
+    if (tl.kind === "thread") {
+      const L = ins.L || 16.5, hh = (L * Math.sqrt(3)) / 2;
+      return { holder: [[-1, 9], [150, 9], [150, 34], [-1, 34]], insert: [[0, 0], [-L / 2, hh], [L / 2, hh]], label: tl.holder, nose: ins.r || 0.15 };
+    }
+    return null;
+  };
+  Sim.prototype.drawTool = function (c) {
+    const tl = this.g.tools[this.tool], m = this.lastM; if (!tl || !m || m.type === "tool" || m.type === "home") return;
+    const k = this.k, sf = this.sf, [x, r] = this.xr(this.pos[0], this.pos[1]), X = this.sx(x), Y = this.cy - r * k, P = (p) => [X + p[0] * sf * k, Y - p[1] * k];
+    const poly = (pts, fill, stroke, lw) => { c.beginPath(); pts.forEach((p, i) => { const q = P(p); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.closePath(); c.fillStyle = fill; c.fill(); c.strokeStyle = stroke; c.lineWidth = lw; c.stroke(); };
+    if (tl.kind === "drill") {
+      const rd = tl.rd, cy = this.cy, fl = tl.fl, sh = tl.shank / 2, nut = tl.nut / 2, pl = 0.3 * 2 * rd;   // point length about 0.3 D for 118 deg
+      const Q = (u, v) => [X + u * sf * k, cy - v * k];
+      const path = (pts, fill, stroke) => { c.beginPath(); pts.forEach((p, i) => { const q = Q(p[0], p[1]); i ? c.lineTo(q[0], q[1]) : c.moveTo(q[0], q[1]); }); c.closePath(); c.fillStyle = fill; c.fill(); c.strokeStyle = stroke; c.lineWidth = 1; c.stroke(); };
+      path([[0, 0], [pl, rd], [fl, rd], [fl, -rd], [pl, -rd]], "#e5e7eb", "#0f172a");
+      c.strokeStyle = "#94a3b8"; c.lineWidth = 1; c.beginPath(); for (let q = 0; pl + 1 + q * 2.2 < fl; q++) { const u = pl + 1 + q * 2.2, a = Q(u, rd), b = Q(u + 1.6, -rd); c.moveTo(a[0], a[1]); c.lineTo(b[0], b[1]); } c.stroke();
+      path([[fl, sh], [fl + 4, sh], [fl + 4, -sh], [fl, -sh]], "#cbd5e1", "#0f172a");
+      path([[fl + 4, nut * 0.8], [fl + 12, nut], [fl + 62, nut], [fl + 62, -nut], [fl + 12, -nut], [fl + 4, -nut * 0.8]], "#64748b", "#0f172a");
+      const lb = Q(fl + 14, nut - 3); c.save(); c.fillStyle = "#e2e8f0"; c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = sf > 0 ? "left" : "right"; c.fillText(tl.holder, lb[0], lb[1]); c.restore();
+      const t0 = Q(0, 0); this.ring(c, t0[0], t0[1], 8, tl);
+      return;
+    }
+    const G = toolGeom(tl); if (!G) return;
+    poly(G.holder, "#64748b", "#0f172a", 1.2);
+    poly(G.insert, "#fbbf24", "#0f172a", 1.2);
+    const cs = this.cornerOf(this.tool), a = P(G.holder[0]), b = P(G.holder[1]);
+    c.save(); c.fillStyle = "#e2e8f0"; c.font = "600 12px system-ui, Segoe UI, Arial"; c.textAlign = sf > 0 ? "left" : "right"; const tx = P([22, G.holder[0][1] + (G.holder[2][1] - G.holder[0][1]) / 2 + 1.5]); c.fillText(G.label, tx[0], tx[1]); c.restore();
+    const cl = G.insert[0], ring = P(cl); this.ring(c, ring[0], ring[1], Math.max(8, (G.nose + 0.8) * k), tl, cs);
+  };
+  /** red ring on the cutting corner + a short label */
+  Sim.prototype.ring = function (c, X, Y, R, tl, cs) {
+    c.save(); c.strokeStyle = "#ef4444"; c.lineWidth = 2.4; c.beginPath(); c.arc(X, Y, R, 0, Math.PI * 2); c.stroke();
+    const txt = tl.kind === "drill" ? `T${String(tl.n).padStart(2, "0")} drill point` : `T${String(tl.n).padStart(2, "0")} corner ${cs.corner}/${cs.edges}`;
+    c.font = "700 12px system-ui, Segoe UI, Arial"; const w = c.measureText(txt).width + 12, bx = Math.max(6, Math.min(CW - PANEL - w - 6, X - w / 2)), by = Math.max(HEADH + STRIP + 4, Y - R - 24);
+    c.fillStyle = "rgba(127,29,29,.92)"; c.fillRect(bx, by, w, 18); c.fillStyle = "#fee2e2"; c.textBaseline = "middle"; c.fillText(txt, bx + 6, by + 9); c.restore();
+  };
+  /** which corner of the insert is in use and how worn it is, from the number of parts already made */
+  Sim.prototype.cornerOf = function (tool) {
+    const tl = this.g.tools[tool], ins = (CN.INS || {})[tl.ins] || {}, edges = tl.kind === "drill" ? 4 : ins.edges || 1, L = (CN._life[this.lifeKey()] || []).find((q) => q.tool === tool), done = Math.max(0, +this.partsDone || 0);
+    const used = L ? done * L.w : 0, ci = Math.min(edges - 1, Math.floor(used)), frac = used >= edges ? 1 : used - ci, part = this.use[tool] ? this.use[tool].w : 0, wf = Math.min(1.15, frac + part);
+    return { corner: ci + 1, edges, frac: wf, vb: vbOf(wf), exhausted: used >= edges, nm: tl.kind === "drill" ? "grind" : "corner" };
+  };
+  Sim.prototype.lifeKey = function () { return this.g.name + ":" + this.g.lines.length; };
+  Sim.prototype.getLife = function () {
+    const key = this.lifeKey(); if (!CN._life[key]) { const d = new Sim(this.g, this.cx); d.quiet = true; d.advance(d.total + 5); CN._life[key] = d.lifeData(); }
+    return CN._life[key];
   };
   /*CHIPS*/
+  CN._life = CN._life || {};
   const lerp = (a, b, t) => a + (b - a) * t;
   const chipColour = (mat, heat, a) => {
     if (mat === "ALUMINIUM") return `rgba(226,232,240,${a})`;
@@ -484,7 +605,7 @@
     c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#94a3b8"; c.textAlign = "right"; c.fillText(`${this.cx.P.part_no || ""} · program ${this.g.name}`, W - 14, HEADH / 2); c.textAlign = "left";
     // view
     this.paintGrid();
-    c.save(); c.beginPath(); c.rect(0, HEADH, CW - PANEL, CH - HEADH - FOOT); c.clip();
+    c.save(); c.beginPath(); c.rect(0, HEADH + STRIP, CW - PANEL, CH - HEADH - STRIP - FOOT); c.clip();
     c.strokeStyle = "#475569"; c.setLineDash([14, 4, 3, 4]); c.lineWidth = 1; c.beginPath(); c.moveTo(8, this.cy); c.lineTo(CW - PANEL - 8, this.cy); c.stroke(); c.setLineDash([]);
     c.imageSmoothingEnabled = true; const dx = this.sx(this.xlo), dw = (this.xhi - this.xlo) * k, dh = this.Hc * this.cs * k;
     c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.save(); c.translate(0, this.cy * 2); c.scale(1, -1); c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.restore();
@@ -502,30 +623,35 @@
     // tool path trail
     c.lineWidth = 1; c.strokeStyle = "rgba(34,197,94,.75)"; c.beginPath(); let pen = false;
     for (const q of this.trail) { const [x, r] = this.xr(q[0], q[1]), X = this.sx(x), Y = this.cy - r * k; if (q[2] && pen) c.lineTo(X, Y); else c.moveTo(X, Y); pen = !!q[2]; } c.stroke();
-    // tool
-    const tl = this.g.tools[this.tool];
-    if (tl && this.i < this.mv.length + 1 && this.lastM && this.lastM.type !== "tool" && this.lastM.type !== "home") {
-      const [x, r] = this.xr(this.pos[0], this.pos[1]), X = this.sx(x), Y = this.cy - r * k;
-      if (tl.kind === "drill") {
-        const rd = tl.rd, L = 60, sf = this.sf, cy = this.cy; c.fillStyle = "#e5e7eb"; c.strokeStyle = "#111827"; c.lineWidth = 1;
-        c.beginPath(); c.moveTo(X, cy); c.lineTo(X + sf * 0.6 * rd * k, cy - rd * k); c.lineTo(X + sf * L * k, cy - rd * k); c.lineTo(X + sf * L * k, cy + rd * k); c.lineTo(X + sf * 0.6 * rd * k, cy + rd * k); c.closePath(); c.fill(); c.stroke();
-        c.strokeStyle = "#94a3b8"; c.beginPath(); for (let q = 0; q < 8; q++) { const xx = X + sf * (0.6 * rd + 1.5 + q * 3) * k; c.moveTo(xx, cy - rd * k); c.lineTo(xx + sf * 2 * k, cy + rd * k); } c.stroke();
-      } else for (const poly of toolShape(tl.kind, this.sf)) {
-        c.beginPath(); poly.forEach((p, i) => { const px = X + p[0] * k, py = Y - p[1] * k; i ? c.lineTo(px, py) : c.moveTo(px, py); }); c.closePath(); c.fillStyle = poly.length === 5 || poly.length === 4 ? "#fbbf24" : "#cbd5e1"; c.fill(); c.strokeStyle = "#0f172a"; c.lineWidth = 1; c.stroke();
-      }
-      if (this.lastM.type === "feed" || this.lastM.type === "thread") { c.fillStyle = "rgba(251,191,36,.9)"; c.beginPath(); c.arc(X, Y, 3, 0, 7); c.fill(); }
-    }
+    // tool and holder, real size (mm x scale), the cutting corner marked
+    this.drawTool(c);
     // chips (drawn larger than life so they can be seen; shape from chipSpec)
     this.drawChips(c);
     c.restore();
-    // read-outs (top-left of the view)
-    const m = this.lastM, Z = this.pos[0], X = this.pos[1], t = this.tool && this.g.tools[this.tool];
-    c.font = "14px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#cbd5e1"; c.textBaseline = "alphabetic";
-    const rd = [["X (dia)", X.toFixed(3)], ["Z", Z.toFixed(3)], ["Spindle", (this.rpm || 0) + " rpm"], ["Feed", m && m.f ? (m.type === "rapid" ? "rapid" : (m.f / Math.max(this.rpm, 1)).toFixed(2) + " mm/rev") : "—"], ["Tool", t ? `T${String(this.tool).padStart(2, "0")} ${t.name}` : "—"], ["Chip", this.chipTxt || "—"]];
-    rd.forEach((q, i) => { c.fillStyle = "#64748b"; c.fillText(q[0], 18, HEADH + 26 + i * 19); c.fillStyle = "#e2e8f0"; c.fillText(String(q[1]).slice(0, 52), 96, HEADH + 26 + i * 19); });
+    // tool strip: which tool, holder, insert corner, edge in cut, wear
+    const m = this.lastM, Z = this.pos[0], X = this.pos[1], t = this.tool && this.g.tools[this.tool], sy0 = HEADH;
+    c.fillStyle = "#0e1a30"; c.fillRect(0, sy0, CW - PANEL, STRIP); c.fillStyle = "#1e293b"; c.fillRect(0, sy0 + STRIP - 1, CW - PANEL, 1); c.textBaseline = "alphabetic";
+    const ins = t ? (CN.INS[t.ins] || null) : null, hd = t ? (CN.HOLD[t.holder] || null) : null, cs = t ? this.cornerOf(this.tool) : null;
+    const moving = m && m.type !== "rapid" && m.type !== "tool" && m.type !== "home";
+    let edge = "—"; if (t && moving) { if (t.kind === "drill") edge = "both lips and the chisel edge"; else if (t.kind === "thread") edge = "both flanks of the V"; else if (m.arc) edge = "nose radius (contour)"; else { const dz = Math.abs(m.to[0] - m.from[0]), dr = Math.abs(m.to[1] - m.from[1]) / 2, an = Math.atan2(dr, dz) * 57.3; edge = an < 20 ? "nose + side cutting edge (turning)" : an > 70 ? "nose + end cutting edge (facing)" : "nose radius (taper / chamfer)"; } }
+    c.font = "700 14px system-ui, Segoe UI, Arial"; c.fillStyle = "#e2e8f0"; c.fillText(t ? `T${String(this.tool).padStart(2, "0")} · ${t.name}` : "No tool in cut", 14, sy0 + 19);
+    c.font = "12.5px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#94a3b8";
+    c.fillText(t ? `Holder ${t.holder || ""}${hd ? ` (${hd.w}x${hd.w} mm, ${hd.lead}° lead, length ${hd.L})` : ""}` : "", 14, sy0 + 36);
+    c.fillText(t ? (t.kind === "drill" ? `Drill dia ${(2 * t.rd).toFixed(1)} · flute ${t.fl.toFixed(0)} mm · shank ${t.shank} · ${t.collet} collet chuck` : `Insert ${ins ? ins.iso + " · " + cs.nm + " " + cs.corner + " of " + cs.edges + " · nose R" + ins.r : ""}${cs && cs.exhausted ? " · USED UP, replace" : ""}`) : "", 14, sy0 + 53);
+    c.fillStyle = "#4ade80"; c.fillText(t ? `In cut: ${edge}` : "", 14, sy0 + 70);
+    const gx = CW - PANEL - 262; c.fillStyle = "#64748b"; c.font = "12px system-ui, Segoe UI, Arial"; c.fillText("X dia / Z / rpm", gx, sy0 + 17); c.fillStyle = "#e2e8f0"; c.font = "12.5px ui-monospace, Menlo, Consolas, monospace"; c.fillText(`${X.toFixed(2)} / ${Z.toFixed(2)} / ${this.rpm || 0}`, gx + 96, sy0 + 17);
+    if (t && cs) {
+      const vb = cs.vb, fr = Math.min(1, cs.frac); c.fillStyle = "#64748b"; c.font = "12px system-ui, Segoe UI, Arial"; c.fillText(`Flank wear VB ${vb.toFixed(3)} / ${CN.VB_LIMIT.toFixed(2)} mm`, gx, sy0 + 34);
+      c.fillStyle = "#1e293b"; c.fillRect(gx, sy0 + 40, 240, 8); c.fillStyle = fr < 0.6 ? "#22c55e" : fr < 0.85 ? "#f59e0b" : "#ef4444"; c.fillRect(gx, sy0 + 40, 240 * fr, 8);
+      c.fillStyle = "#94a3b8"; c.fillText(`Edge life used ${(fr * 100).toFixed(0)}%${m && m.f && moving ? " · vc " + Math.round((Math.PI * (t.kind === "drill" ? 2 * t.rd : Math.max(X, 4)) * (this.rpm || 0)) / 1000) + " m/min" : ""}`, gx, sy0 + 62);
+    }
     // phase (last comment above the current line)
     let ph = ""; for (let q = Math.max(0, this.li); q >= 0; q--) { const ln = this.g.lines[q]; if (/^\(/.test(ln) && !/^\(T\d/.test(ln)) { ph = ln.slice(1, -1); break; } }
-    if (ph) { c.fillStyle = "#38bdf8"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ph, 18, HEADH + 26 + 6 * 19 + 10); }
+    c.save(); c.beginPath(); c.rect(0, HEADH + STRIP, CW - PANEL, 120); c.clip();
+    if (ph) { c.fillStyle = "#38bdf8"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ph, 18, HEADH + STRIP + 24); }
+    c.fillStyle = "#94a3b8"; c.font = "12.5px system-ui, Segoe UI, Arial"; if (this.chipTxt) c.fillText("Chip: " + this.chipTxt, 18, HEADH + STRIP + 44);
+    if (this.g.warn && this.g.warn.length) { c.fillStyle = "#fbbf24"; c.fillText("⚠ " + this.g.warn[0].slice(0, 118), 18, HEADH + STRIP + 64); }
+    c.restore();
     c.font = "12px system-ui, Segoe UI, Arial"; c.fillStyle = "#94a3b8";
     const lg = [["#22d3ee", "required shape (finished outline)"], ["#38bdf8", "chuck / soft jaws"], ["#22c55e", "tool path"], ["#f59e0b", "stock left uncut"], ["#e5e7eb", "chips (enlarged)"]];
     lg.forEach((q, i) => { const yy = CH - FOOT - 18 - (lg.length - 1 - i) * 17; c.fillStyle = q[0]; c.fillRect(18, yy - 8, 18, 3); c.fillStyle = "#94a3b8"; c.fillText(q[1], 44, yy - 2); });
@@ -546,15 +672,47 @@
     c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#e2e8f0"; c.fillText(`Machine time ${mmss(this.t)} / ${mmss(this.total)}`, 14, fy + 44);
     c.textAlign = "right"; c.fillStyle = "#94a3b8"; c.fillText(`${this.removedMm3().toFixed(0)} mm³ removed ≈ ${(this.removedMm3() * ({ ALUMINIUM: 2.7, BRASS: 8.5, STAINLESS: 7.9 }[this.g.cd.name] || 7.85) / 1000).toFixed(1)} g of chips`, CW - PANEL - 14, fy + 44); c.textAlign = "left";
     if (ui && ui.msg) { c.fillStyle = "#fbbf24"; c.textAlign = "center"; c.fillText(ui.msg, (CW - PANEL) / 2, fy + 44); c.textAlign = "left"; }
+    if (ui && ui.page === "life") { this.drawLife(c); return; }
     // result card at the end
     if (this.done && this.stats) {
-      const st = this.stats, ok = st.maxRes < 3 * this.cs + 0.05, w = 430, h = 78 + Math.min(5, st.checks.length) * 18, x0 = 24, y0 = HEADH + 150;
+      const st = this.stats, ok = st.maxRes < 3 * this.cs + 0.05, w = 430, h = 78 + Math.min(5, st.checks.length) * 18, x0 = 24, y0 = HEADH + STRIP + 110;
       c.fillStyle = "rgba(2,6,23,.92)"; c.fillRect(x0, y0, w, h); c.strokeStyle = ok ? "#22c55e" : "#f59e0b"; c.lineWidth = 2; c.strokeRect(x0, y0, w, h);
       c.fillStyle = ok ? "#4ade80" : "#fbbf24"; c.font = "600 15px system-ui, Segoe UI, Arial"; c.fillText(ok ? "Machining complete — required shape reached" : "Machining complete — some stock is left", x0 + 14, y0 + 24);
       c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#e2e8f0"; c.fillText(`Stock left above the finished outline: max ${st.maxRes.toFixed(2)} mm`, x0 + 14, y0 + 46);
       c.fillText(`Cycle time ${mmss(st.time)} · ${st.lines} program blocks`, x0 + 14, y0 + 64);
       st.checks.slice(0, 5).forEach((q, i) => { c.fillStyle = q.ok ? "#4ade80" : "#fbbf24"; c.fillText(`${q.ok ? "✓" : "!"} #${q.no} ${q.spec.slice(0, 22)} → Ø${q.dia.toFixed(2)}`, x0 + 14, y0 + 84 + i * 18); });
     }
+  };
+
+  /** full-screen tool-life page (also drawn on the recorded canvas) */
+  Sim.prototype.drawLife = function (c) {
+    const L = this.getLife(), x0 = 14, W = CW - 28, top = HEADH + 6;
+    c.fillStyle = "#0b1220"; c.fillRect(0, HEADH, CW, CH - HEADH - FOOT);
+    c.textBaseline = "alphabetic"; c.fillStyle = "#e2e8f0"; c.font = "700 17px system-ui, Segoe UI, Arial"; c.fillText(`TOOL LIFE PREDICTION · ${this.g.name} · ${this.g.cd.name} · one part per cycle`, x0, top + 24);
+    const cols = [["Tool / holder / insert", 14], ["Cut s", 470], ["vc", 530], ["f", 590], ["ap", 645], ["Life / edge", 700], ["Parts / edge", 800], ["Edges", 895], ["Parts / tool", 995]];
+    c.font = "600 12px system-ui, Segoe UI, Arial"; c.fillStyle = "#64748b"; cols.forEach((q) => c.fillText(q[0], q[1], top + 52));
+    c.fillStyle = "#1e293b"; c.fillRect(x0, top + 58, W, 1);
+    const f1 = (v, d) => (v >= 1000 ? Math.round(v).toLocaleString("en-US") : v.toFixed(d));
+    L.forEach((q, i) => {
+      const y = top + 80 + i * 40; c.font = "600 13px system-ui, Segoe UI, Arial"; c.fillStyle = "#e2e8f0"; c.fillText(`T${String(q.tool).padStart(2, "0")} ${q.name}`.slice(0, 62), 14, y);
+      c.font = "12px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#94a3b8"; c.fillText(`${q.holder} · ${q.iso || q.ins}`.slice(0, 66), 14, y + 16);
+      c.font = "13px ui-monospace, Menlo, Consolas, monospace"; c.fillStyle = "#cbd5e1";
+      c.fillText(q.cutS.toFixed(0), 470, y); c.fillText(q.vc.toFixed(0), 530, y); c.fillText(q.f.toFixed(2), 590, y); c.fillText(q.ap.toFixed(2), 645, y);
+      c.fillStyle = "#4ade80"; c.fillText(q.edgeMin.toFixed(1) + " min", 700, y); c.fillText(f1(q.partsEdge, 0), 800, y); c.fillStyle = "#cbd5e1"; c.fillText(`${q.edges} ${q.edgeWord}`, 895, y); c.fillStyle = "#fbbf24"; c.fillText(f1(q.partsTool, 0) + " parts", 995, y);
+    });
+    // wear curves of the first edge: VB against parts made
+    const cx0 = 60, cy0 = top + 80 + L.length * 40 + 24, cw = 760, ch = CH - FOOT - cy0 - 80, maxP = Math.max(10, ...L.map((q) => q.partsEdge)) * 1.08, cols2 = ["#22c55e", "#38bdf8", "#f59e0b", "#e879f9", "#f87171"];
+    c.strokeStyle = "#334155"; c.lineWidth = 1; c.strokeRect(cx0, cy0, cw, ch);
+    c.fillStyle = "#64748b"; c.font = "11px system-ui, Segoe UI, Arial"; c.fillText("Flank wear VB (mm) of one edge against parts made", cx0, cy0 - 20);
+    const ylim = CN.VB_LIMIT * 1.15, Y = (v) => cy0 + ch - (v / ylim) * ch, Xp = (p) => cx0 + (p / maxP) * cw;
+    c.strokeStyle = "#ef4444"; c.setLineDash([6, 4]); c.beginPath(); c.moveTo(cx0, Y(CN.VB_LIMIT)); c.lineTo(cx0 + cw, Y(CN.VB_LIMIT)); c.stroke(); c.setLineDash([]); c.fillStyle = "#ef4444"; c.fillText("wear limit 0.30 mm", cx0 + cw - 100, Y(CN.VB_LIMIT) - 4);
+    L.forEach((q, i) => { c.strokeStyle = cols2[i % 5]; c.lineWidth = 2; c.beginPath(); for (let p = 0; p <= 60; p++) { const pp = (p / 60) * q.partsEdge * 1.1, vb = vbOf(pp / q.partsEdge); const xx = Xp(pp), yy = Y(Math.min(vb, ylim)); p ? c.lineTo(xx, yy) : c.moveTo(xx, yy); } c.stroke(); c.fillStyle = cols2[i % 5]; c.font = "12px system-ui, Segoe UI, Arial"; c.fillText(`T${String(q.tool).padStart(2, "0")}`, Xp(Math.min(maxP, q.partsEdge * 1.1)) - 26, Y(Math.min(vbOf(1.1), ylim)) + 14); });
+    c.fillStyle = "#64748b"; c.font = "11px system-ui, Segoe UI, Arial"; for (let g = 0; g <= 4; g++) { const pv = (maxP * g) / 4; c.fillText(Math.round(pv).toLocaleString("en-US"), Xp(pv) - 8, cy0 + ch + 14); } c.fillText("parts made on one edge", cx0 + cw / 2 - 50, cy0 + ch + 27);
+    // plan text on the right
+    const px = cx0 + cw + 24; c.fillStyle = "#e2e8f0"; c.font = "600 13px system-ui, Segoe UI, Arial"; c.fillText("Indexing plan", px, cy0 + 12);
+    c.font = "12px system-ui, Segoe UI, Arial"; c.fillStyle = "#cbd5e1"; let yy = cy0 + 32;
+    L.forEach((q) => { const t = this.g.tools[q.tool]; c.fillStyle = "#cbd5e1"; c.fillText(`T${String(q.tool).padStart(2, "0")}: ${t.kind === "drill" ? "re-grind" : "index to the next corner"} every ${Math.max(1, Math.floor(q.partsEdge))} parts`, px, yy); yy += 16; c.fillStyle = "#94a3b8"; c.fillText(`   whole tool about ${Math.floor(q.partsTool).toLocaleString("en-US")} parts`, px, yy); yy += 20; });
+    c.fillStyle = "#64748b"; c.font = "11px system-ui, Segoe UI, Arial"; c.fillText("Estimate from the Taylor tool-life equation with typical constants for coated carbide.", x0, CH - FOOT - 22); c.fillText("Calibrate with your own tool-life records; if a tool is also used in another operation, the lives add up.", x0, CH - FOOT - 8);
   };
   Sim.prototype.removedMm3 = function () { return this.vol || 0; };
   void 0;
@@ -571,13 +729,13 @@
       <select id="cnOp" style="${btn}"></select>
       <button id="cnPlay" style="${btn};background:#15803d;border-color:#16a34a">▶ Play</button><button id="cnRe" style="${btn}">⟲ Restart</button>
       <select id="cnSp" style="${btn}"><option value="120">Slow (about 2 min)</option><option value="60" selected>Normal (about 1 min)</option><option value="30">Fast (about 30 s)</option><option value="15">Very fast (about 15 s)</option></select>
-      <button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
+      <button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
       <canvas id="cnCv" width="${CW}" height="${CH}" style="width:min(100%,calc((100vh - 96px) * 16 / 9));height:auto;border-radius:10px;border:1px solid #1e293b;background:#0b1220"></canvas>
       <div id="cnNote" style="color:#94a3b8;font-size:12px;max-width:1280px;text-align:center">Draft program made from the stage drawing. The program on the right is the one that is simulated. Check feeds, speeds, tools and tool-nose compensation on your machine before production.</div>`;
     document.body.appendChild(ov);
     const $ = (id) => ov.querySelector("#" + id), cv = $("cnCv"), c = cv.getContext("2d"); let sim = null, g = null, playing = false, last = 0, raf = 0, rec = null, doneAt = 0, ui = {};
     ranks.forEach((r) => { const o = document.createElement("option"); o.value = r.rank; o.textContent = `OP ${r.op.opNo} · ${r.op.name}`; $("cnOp").appendChild(o); });
-    const load = (rank) => { g = CN.gen(cx, rank); sim = new Sim(g, cx); playing = false; $("cnPlay").textContent = "▶ Play"; doneAt = 0; ui = {}; };
+    const load = (rank) => { g = CN.gen(cx, rank); sim = new Sim(g, cx); sim.partsDone = +$("cnParts").value || 0; setTimeout(() => { try { if (sim) sim.getLife(); } catch (e) { /* ignore */ } }, 60); playing = false; $("cnPlay").textContent = "▶ Play"; doneAt = 0; ui = {}; $("cnLife").textContent = "⏱ Tool life"; };
     const speed = () => Math.max(1, sim.total / (+$("cnSp").value || 60));
     const frame = (ts) => {
       raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (ts - last) / 1000 || 0); last = ts;
@@ -586,6 +744,8 @@
       if (rec && sim && sim.done && ts - doneAt > 2800) { rec.stop(); }
       if (sim) sim.draw(c, ui);
     };
+    $("cnLife").onclick = () => { ui.page = ui.page === "life" ? "" : "life"; $("cnLife").textContent = ui.page === "life" ? "◀ Back to simulation" : "⏱ Tool life"; };
+    $("cnParts").onchange = () => { if (sim) sim.partsDone = Math.max(0, +$("cnParts").value || 0); };
     $("cnOp").onchange = () => { if (rec) return; load(+$("cnOp").value); };
     $("cnPlay").onclick = () => { if (!sim) return; if (sim.done) { sim.reset(); } playing = !playing; $("cnPlay").textContent = playing ? "⏸ Pause" : "▶ Play"; };
     $("cnRe").onclick = () => { if (rec) return; sim.reset(); playing = false; $("cnPlay").textContent = "▶ Play"; };
