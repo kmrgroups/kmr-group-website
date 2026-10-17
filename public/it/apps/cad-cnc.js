@@ -29,6 +29,7 @@
     DCMT0702: { iso: "DCMT 07 02 04", ic: 6.35, L: 7.0, ang: 55, r: 0.4, edges: 2, grade: "coated carbide P15 (boring)" },
     CCMT060204: { iso: "CCMT 06 02 04", ic: 6.35, L: 6.4, ang: 80, r: 0.4, edges: 2, grade: "coated carbide P15 (boring)" },
     CCGT040102: { iso: "CCGT 04 01 02", ic: 4.76, L: 4.8, ang: 80, r: 0.2, edges: 2, grade: "uncoated carbide, micro boring" },
+    CUSTOM: { iso: "SPECIAL (custom) insert", ic: 3, L: 3.2, ang: 55, r: 0.2, edges: 1, grade: "custom - to be designed" },
     TR16ER: { iso: "16 ER ISO 60 deg", ic: 9.525, L: 16.5, ang: 60, r: 0.15, edges: 3, grade: "coated carbide (threading)" },
   };
   const HOLD = { PCLNR2525M12: { w: 25, L: 150, lead: 95 }, MVJNR2525M16: { w: 25, L: 150, lead: 93 }, SER2525M16: { w: 25, L: 150, lead: 90 } };
@@ -44,6 +45,30 @@
     return { cls, fl: cls * D, shank, er };
   };
   CN.INS = INS; CN.HOLD = HOLD; CN.BARS = BARS;
+  /** standard-size and tolerance rules (ISO 286 IT grades, standard drill / reamer series) */
+  const ITR = [3, 6, 10, 18, 30, 50, 80, 120];
+  const IT = { 6: [6, 8, 9, 11, 13, 16, 19, 22], 7: [10, 12, 15, 18, 21, 25, 30, 35], 8: [14, 18, 22, 27, 33, 39, 46, 54], 9: [25, 30, 36, 43, 52, 62, 74, 87], 10: [40, 48, 58, 70, 84, 100, 120, 140], 11: [60, 75, 90, 110, 130, 160, 190, 220], 12: [100, 120, 150, 180, 210, 250, 300, 350], 13: [140, 180, 220, 270, 330, 390, 460, 540] };
+  const itTol = (D, g) => { const ix = ITR.findIndex((q) => D <= q); return IT[g][ix < 0 ? 7 : ix] / 1000; };
+  const itNeed = (D, band) => { for (let g = 13; g >= 6; g--) if (itTol(D, g) <= band + 1e-9) return g; return 5; };   // IT grade the tolerance band asks for
+  const on = (v, st) => Math.abs(v / st - Math.round(v / st)) < 1e-6;
+  const stdDrill = (D) => D >= 1 && D <= 20 ? on(D, 0.1) : D > 20 && on(D, 0.5);
+  const stdReamer = (D) => D >= 1 && D <= 20 && (D <= 10 ? on(D, 0.1) : on(D, 0.5));
+  const stdPitch = (p) => [0.5, 0.6, 0.7, 0.75, 0.8, 1, 1.25, 1.5, 1.75, 2, 2.5, 3, 3.5, 4].some((q) => Math.abs(q - p) < 1e-6);
+  const dnTo = (D) => (D > 20 ? Math.floor(D * 2 + 1e-9) / 2 : Math.floor(D * 10 + 1e-9) / 10);
+  const bandOf = (c, nom) => {
+    const lo = c.lsl != null && c.lsl !== "" ? +c.lsl : null, hi = c.usl != null && c.usl !== "" ? +c.usl : null; if (lo != null && hi != null && hi > lo) return { band: hi - lo, src: "drawing" };
+    const m = String(c.spec || c.text || "").match(/±\s*(\d+(?:\.\d+)?)/); if (m) return { band: 2 * parseFloat(m[1]), src: "drawing" };
+    const t = nom <= 3 ? 0.1 : nom <= 6 ? 0.1 : nom <= 30 ? 0.2 : nom <= 120 ? 0.3 : 0.5; return { band: 2 * t, src: "ISO 2768-m (no tolerance on the drawing)" };
+  };
+  /** how to make a hole of final diameter D with tolerance band: drill / drill + bore / drill + ream (reamer for close tolerances) */
+  const holePlan = (D, band, barFits) => {
+    const g = itNeed(D, band), al = D <= 6 ? 0.2 : D <= 12 ? 0.3 : 0.4;
+    if (g >= 12) return { mode: "drill", g, D, band };
+    if (g >= 9) return barFits ? { mode: "drill+bore", g, D, band } : { mode: "drill+ream", g, D, band, al, pilot: dnTo(D - al) };
+    return { mode: "drill+ream", g, D, band, al, pilot: dnTo(D - al), bore: barFits, tight: g <= 5 };
+  };
+  CN.itTol = itTol; CN.itNeed = itNeed; CN.holePlan = holePlan; CN.bandOf = bandOf; CN.stdDrill = stdDrill; CN.stdReamer = stdReamer; CN.stdPitch = stdPitch;
+
 
   /** list of [u, r] points + the outline edge of each piece -> items: line / arc (G02 / G03) */
   const items = (pts, edges, arcOf) => {
@@ -77,7 +102,7 @@
     const lines = [], tools = {}, warn = []; let nn = 10, curT = 0;
     const N = (s) => { lines.push(`N${nn} ${s}`); nn += 10; }, C = (s) => lines.push(`(${ascii(s)})`);
     const rpmAt = (vc, dia) => Math.min(4000, Math.round((vc * 1000) / (Math.PI * Math.max(dia, 4))));
-    const toolNo = (n, name, kind, extra) => { tools[n] = Object.assign({ n, name, kind }, extra || {}); return n; };
+    const toolNo = (n, name, kind, extra) => { tools[n] = Object.assign({ n, name, kind, std: true }, extra || {}); return n; };
     const tcode = (n) => `T${String(n).padStart(2, "0")}${String(n).padStart(2, "0")}`;
     const changeTool = (n, title) => { C(`${tcode(n)} ${title}`); N("G28 U0. W0."); N(tcode(n)); N("G54"); curT = n; };
     const eOf = (a, b, side) => cx.A.edges.find((e) => e.side === side && sameSeg(a, b, e));
@@ -158,15 +183,16 @@
       let pts = v.pts.map((p) => [uOf(p[0]), p[1]]), roles = v.roles.slice(), edges = v.roles.map((_, i) => eOf(v.pts[i], v.pts[i + 1], "i"));
       if (Math.abs(pts[0][0]) > Math.abs(pts[pts.length - 1][0])) { pts.reverse(); roles.reverse(); edges.reverse(); }
       let tip = v.tip ? [uOf(v.tip[0]), 0] : null;
-      // a part of the bore that is wider than the neck in front of it cannot be reached from this side (it is made from the other side): keep it, do not machine it
-      let cut = pts.length, mn = pts[0][1];
+      // a part of the bore that is wider than the neck in front of it cannot be reached with a normal boring bar: it needs a CUSTOM back-boring tool
+      let cut = pts.length, mn = pts[0][1], pocket = null;
       for (let i = 1; i < pts.length; i++) { if (pts[i][1] > mn + 0.05) { cut = i; break; } mn = Math.min(mn, pts[i][1]); }
       if (cut < pts.length && cut >= 2) {
-        const pocket = pts.slice(cut - 1).concat(tip ? [tip] : []), last = pts[cut - 1], toX = (q) => [xOf(q[0]), q[1]];
-        keeps.push({ keep: [[last[0], 0]].concat(pocket).concat([[pocket[pocket.length - 1][0], 0]]).map(toX) });
-        warn.push(`The bore is wider than its neck beyond depth ${fmt(last[0])} mm. That part cannot be machined from this side; it belongs to the other operation.`);
+        const last = pts[cut - 1], pp = pts.slice(cut - 1).concat(tip ? [tip] : []), toX = (q) => [xOf(q[0]), q[1]];
+        pocket = { pts: pp, rNeck: last[1], uStart: last[0], rMax: Math.max(...pp.map((q) => q[1])), roles: roles.slice(cut - 1) };
+        if (opt.skipPocket) { keeps.push({ keep: [[last[0], 0]].concat(pp).concat([[pp[pp.length - 1][0], 0]]).map(toX) }); }
         pts = pts.slice(0, cut); roles = roles.slice(0, cut - 1); edges = edges.slice(0, cut - 1); tip = [last[0] + 0.6 * last[1], 0];
-        keeps[keeps.length - 1].open = [[pts[0][0], 0]].concat(pts).concat([tip]).map(toX);
+        if (opt.skipPocket) keeps[keeps.length - 1].open = [[pts[0][0], 0]].concat(pts).concat([tip]).map(toX);
+        warn.push(opt.skipPocket ? `The bore is wider than its neck beyond depth ${fmt(last[0])} mm: left unmachined on this side.` : `The pocket behind the dia ${fmt(2 * last[1])} neck (dia ${fmt(2 * pocket.rMax)}) cannot be made with a standard boring bar. A CUSTOM back-boring tool is used in this program; or make that part from the other side with a standard tool.`);
       }
       voidMap.set(v, { pts: pts.map((p) => [xOf(p[0]), p[1]]), tip: tip ? [xOf(tip[0]), 0] : null, roles });
       const flats = []; for (let i = 0; i + 1 < pts.length; i++) if (Math.abs(pts[i][1] - pts[i + 1][1]) < 1e-6 && Math.abs(pts[i + 1][0] - pts[i][0]) > 0.25) flats.push({ u0: pts[i][0], u1: pts[i + 1][0], r: pts[i][1], role: roles[i] });
@@ -175,22 +201,35 @@
       let dD = null; for (const c of mine) { const f = cx.M.get(+c.no); if (f && f.semi && f.kind === "dia" && f.side === "i") { const n = U.nomOf(c); if (n >= 2 && n < 2 * rMin - 0.1) dD = n; } }
       let only = false; if (dD == null) { if (tf.every((f) => Math.abs(f.r - tf[0].r) < 0.02) && pts.every((p, i) => i === 0 || Math.abs(p[1] - tf[0].r) < 0.02 || p[0] > deep.u1 - 1e-6)) { dD = r3(2 * tf[0].r); only = true; } else dD = Math.max(2, Math.floor((2 * rMin - 1.0) * 2) / 2); }
       let lastThis = -1; roles.forEach((r, i) => { if (r === "this") lastThis = i; });
-      bores.push({ pts, edges, tip, flats: tf, deep, rMin, rFin, dD, only, rd: dD / 2, lastThis, nRoles: roles.length });
+      bores.push({ pts, edges, tip, flats: tf, deep, rMin, rFin, dD, only, rd: dD / 2, lastThis, nRoles: roles.length, pocket });
     }
+    const checks = [];   // every dimension: made with a standard tool, or flagged CUSTOM
+    const findC = (dia) => { for (const c of mine) { const f = cx.M.get(+c.no); if (f && f.kind === "dia" && f.side === "i" && Math.abs(U.nomOf(c) - dia) < 0.05) return c; } return null; };
     bores.forEach((b, bi) => {
-      const depth = b.deep.u1, needBore = !b.only || b.pts.some((p, i) => i + 1 < b.pts.length && Math.abs(p[1] - b.pts[i + 1][1]) > 1e-6);
-      let bar = null;
+      const depth = b.deep.u1; let needBore = !b.only || b.pts.some((p, i) => i + 1 < b.pts.length && Math.abs(p[1] - b.pts[i + 1][1]) > 1e-6);
+      const dia = r3(2 * b.rFin), cn = findC(dia), bd = bandOf(cn || {}, dia), barOk = !!barFor(dia), plan = holePlan(dia, bd.band, barOk), label = cn ? `dim ${cn.no}` : `bore ${bi + 1}`;
+      let reamD = 0, bar = null; const chk = { label, dia, band: bd.band, src: bd.src, g: plan.g, steps: [] };
+      checks.push(chk);
+      if (!needBore) {   // straight hole: drilled to size, bored, or drilled and reamed
+        if (plan.mode === "drill+bore" && barOk) { needBore = true; b.dD = Math.min(dnTo(dia - 1.0), dnTo(dia - 0.6)); }
+        else if (plan.mode === "drill+ream") { reamD = dia; b.dD = Math.max(1, plan.pilot); }
+      }
       if (needBore) {
         bar = barFor(2 * b.rFin);
-        if (!bar) {   // too small for any boring bar: the drill makes the final size
-          b.dD = r3(2 * b.rFin); b.rd = b.dD / 2; const big = b.flats.some((f) => f.r > b.rFin + 0.05);
-          warn.push(`Bore dia ${fmt(b.dD)} is too small for the smallest boring bar (it needs a bore of at least dia 8). It is drilled to size${big ? "; the larger section needs a different process (back-boring or another set-up)" : ""}.`);
-          C(`BORE DIA ${fmt(b.dD)} - TOO SMALL FOR A BORING BAR, DRILLED TO SIZE`);
-        } else if (b.dD < bar.D + 1) { b.dD = Math.min(r3(bar.D + 1), r3(2 * b.rFin - 1)); b.rd = b.dD / 2; }
+        if (!bar) {   // too small for any boring bar: the drill (and a reamer if the tolerance is close) makes the final size
+          const big = b.flats.some((f) => f.r > b.rFin + 0.05);
+          if (plan.mode === "drill+ream" && !big) { reamD = dia; b.dD = Math.max(1, plan.pilot); } else { b.dD = dia; }
+          b.rd = b.dD / 2;
+          warn.push(`Bore dia ${fmt(dia)} is too small for the smallest boring bar (it needs a bore of at least dia 8). ${reamD ? "It is drilled and reamed to size." : "It is drilled to size."}${big ? " The larger section needs a different process (back-boring or another set-up)." : ""}`);
+          C(`BORE DIA ${fmt(dia)} - TOO SMALL FOR A BORING BAR, ${reamD ? "DRILL + REAM" : "DRILLED TO SIZE"}`);
+        } else if (b.dD < bar.D + 1) { b.dD = Math.min(r3(bar.D + 1), r3(2 * b.rFin - 1)); }
       }
-      const rd = b.rd, tipDepth = r3(depth + 0.3 * b.dD), dr = drillFor(b.dD, tipDepth);
-      C(`BORE ${bi + 1} - DRILL DIA ${fmt(b.dD)} DEPTH ${fmt(depth)}`);
-      const dn = toolNo(3 + bi * 10, `DRILL DIA ${fmt(b.dD)} ${dr.cls}XD`, "drill", { rd, vc: cd.vcD, ins: "DRILL", fl: dr.fl, shank: dr.shank, collet: dr.er.name, nut: dr.er.nut, holder: `${dr.er.name} collet chuck holder` });
+      if (reamD === 0 && !needBore && plan.mode === "drill+ream") { reamD = dia; }
+      b.dD = b.dD >= dia - 1e-6 ? b.dD : dnTo(b.dD); b.rd = b.dD / 2;
+      const rd = b.rd, tipDepth = r3(depth + 0.3 * b.dD), dr = drillFor(b.dD, tipDepth), drillStd = stdDrill(b.dD);
+      chk.steps.push({ tool: `drill dia ${fmt(b.dD)}`, std: drillStd, why: drillStd ? "" : "no catalogue drill of this diameter (special / step drill)" });
+      C(`BORE ${bi + 1} - DRILL DIA ${fmt(b.dD)}${drillStd ? "" : " (CUSTOM SIZE)"} DEPTH ${fmt(depth)} - ${label} IT${plan.g} BAND ${fmt(bd.band)} (${bd.src})`);
+      const dn = toolNo(3 + bi * 10, `DRILL DIA ${fmt(b.dD)} ${dr.cls}XD${drillStd ? "" : " CUSTOM"}`, "drill", { rd, vc: cd.vcD, ins: "DRILL", fl: dr.fl, shank: dr.shank, collet: dr.er.name, nut: dr.er.nut, holder: `${dr.er.name} collet chuck holder`, std: drillStd, why: drillStd ? "" : `dia ${fmt(b.dD)} is not a standard drill size` });
       changeTool(dn, `DRILL DIA ${fmt(b.dD)} ${dr.cls}XD 118 DEG`);
       N(`G97 S${rpmAt(cd.vcD, b.dD)} M03`); N("G00 X0. Z2."); N("M08");
       N("G74 R0.5"); N(`G74 Z${fmt(-tipDepth)} Q${Math.round(Math.min(3, Math.max(1, b.dD * 0.4)) * 1000)} F${b.dD > 6 ? "0.15" : "0.10"}`);
@@ -215,6 +254,34 @@
         N(`G00 X${fmt(2 * Math.max(p0[1] - 1, 0.3))} Z1.`); N(`G01 X${fmt(2 * p0[1])} Z0. F0.06`);
         it.forEach((q) => N(q.arc ? `G${q.arc.cw ? "02" : "03"} X${fmt(2 * q.to[1])} Z${fmt(-q.to[0])} R${fmt(q.arc.R)}` : `G01 X${fmt(2 * q.to[1])} Z${fmt(-q.to[0])}`));
         const q = full[full.length - 1]; if (q[1] > 0.3) N(`G01 X${fmt(2 * (q[1] - 0.5))}`); N("G00 Z1."); N("G28 U0. W0.");
+        chk.steps.push({ tool: `boring bar ${bar.name}`, std: true, why: "" });
+        if (plan.g <= 8) { chk.note = `IT${plan.g} is very close for a boring bar: use a fine-boring head or ream/hone after boring.`; warn.push(`${label}: tolerance band ${fmt(bd.band)} is about IT${plan.g}; a boring bar can only hold about IT8 - add a finish ream or hone.`); }
+      }
+      if (reamD) {   // reamer for the final size
+        const rr = drillFor(reamD, tipDepth), rs = stdReamer(reamD), rn = toolNo(6 + bi * 10, `REAMER DIA ${fmt(reamD)} H7${rs ? "" : " CUSTOM"}`, "drill", { rd: reamD / 2, vc: Math.round(cd.vcD * 0.5), ins: "DRILL", ream: true, fl: rr.fl, shank: rr.shank, collet: rr.er.name, nut: rr.er.nut, holder: `${rr.er.name} collet chuck holder`, std: rs, why: rs ? "" : `dia ${fmt(reamD)} is not a standard reamer size` });
+        C(`REAM TO DIA ${fmt(reamD)} - CLOSE TOLERANCE (IT${plan.g}), ${rs ? "STANDARD REAMER" : "CUSTOM REAMER"}`);
+        changeTool(rn, `REAMER DIA ${fmt(reamD)} H7`);
+        N(`G97 S${rpmAt(Math.round(cd.vcD * 0.5), reamD)} M03`); N("G00 X0. Z2."); N("M08"); N(`G01 Z${fmt(-tipDepth)} F0.30`); N("G04 P500"); N("G00 Z2."); N("G28 U0. W0.");
+        chk.steps.push({ tool: `reamer dia ${fmt(reamD)}`, std: rs, why: rs ? "" : "no catalogue reamer of this diameter" });
+      }
+      if (b.pocket) {   // pocket behind a narrower neck: a CUSTOM back-boring tool
+        const pk = b.pocket, rN = pk.rNeck, pw = Math.max(0.8, r3(2 * rN - 1.0)), cb = { name: `CUSTOM BACK-BORE BAR DIA ${fmt(pw)}`, D: pw, minBore: r3(2 * rN), ins: "CUSTOM" };
+        const pn = toolNo(7 + bi * 10, cb.name, "bore", { H: 1.6, vc: cd.vcF, ins: "CUSTOM", holder: "CUSTOM back-boring bar", bar: cb, std: false, why: `pocket dia ${fmt(2 * pk.rMax)} behind a dia ${fmt(2 * rN)} neck cannot be reached by a catalogue tool` });
+        chk.steps.push({ tool: cb.name, std: false, why: `pocket dia ${fmt(2 * pk.rMax)} behind the dia ${fmt(2 * rN)} neck` });
+        C(`POCKET DIA ${fmt(2 * pk.rMax)} BEHIND NECK DIA ${fmt(2 * rN)} - CUSTOM BACK-BORING TOOL`);
+        changeTool(pn, `CUSTOM BACK-BORE BAR DIA ${fmt(pw)}`);
+        const pp = pk.pts, uEnd = pp[pp.length - 1][0], rp = (u) => { let best = 0; for (let i = 0; i + 1 < pp.length; i++) { const p = pp[i], q = pp[i + 1]; if (u < Math.min(p[0], q[0]) - 1e-9 || u > Math.max(p[0], q[0]) + 1e-9) continue; best = Math.max(best, Math.abs(q[0] - p[0]) < 1e-9 ? Math.max(p[1], q[1]) : p[1] + ((q[1] - p[1]) * (u - p[0])) / (q[0] - p[0])); } return best; };
+        const xs = fmt(2 * Math.max(rN - 0.6, 0.2));
+        N(`G96 S${cd.vcF} M03`); N(`G00 X${xs} Z2.`);
+        C("POCKET ROUGH - LAYERS FROM THE AXIS OUTWARD");
+        for (let rk = 0.45; rk <= pk.rMax - 0.15 + 1e-9; rk += 0.45) {
+          let ua = null, ub = null; for (let u = pk.uStart; u <= uEnd + 1e-9; u += 0.05) if (rp(u) - 0.15 >= rk) { if (ua == null) ua = u; ub = u; }
+          if (ua == null || ub - ua < 0.05) continue; if (rk < rN) ua = pk.uStart;
+          N(`G00 X${xs} Z${fmt(-ua)}`); N(`G01 X${fmt(2 * r3(rk))} F0.08`); N(`G01 Z${fmt(-ub)} F0.10`); N(`G00 X${xs}`);
+        }
+        C("POCKET FINISH - CONTOUR"); N(`G00 X${xs} Z${fmt(-pk.uStart)}`);
+        pp.forEach((q, i) => { if (i) N(`G01 X${fmt(2 * q[1])} Z${fmt(-q[0])} F0.05`); else N(`G01 X${fmt(2 * q[1])} F0.05`); });
+        N("G00 Z2."); N("G28 U0. W0.");
       }
     });
 
@@ -232,7 +299,8 @@
         const f = cx.M.get(+c.no); if (!f || !f.e || f.side !== "o") return;
         const pm = String(c.spec || c.text || "").match(/[×xX]\s*(\d+(?:\.\d+)?)/), pitch = pm ? parseFloat(pm[1]) : 1.5, rM = f.e.a[1], hh = r3(0.6134 * pitch);
         const ua = uOf(f.e.a[0]), ub = uOf(f.e.b[0]), u0 = Math.min(ua, ub), u1 = Math.max(ua, ub);
-        const tn = toolNo(5, `THREAD TOOL 60 DEG P${fmt(pitch)}`, "thread", { pitch, vc: cd.vcT, ins: "TR16ER", holder: "SER2525M16" });
+        const tn = toolNo(5, `THREAD TOOL 60 DEG P${fmt(pitch)}`, "thread", { pitch, vc: cd.vcT, ins: "TR16ER", holder: "SER2525M16", std: stdPitch(pitch), why: stdPitch(pitch) ? "" : `pitch ${fmt(pitch)} is not a standard ISO pitch` });
+        checks.push({ label: `dim ${c.no}`, thread: true, pitch, steps: [{ tool: `thread tool P${fmt(pitch)}`, std: stdPitch(pitch), why: stdPitch(pitch) ? "" : `pitch ${fmt(pitch)} is not a standard ISO pitch` }] });
         C(`THREAD ${ascii(c.spec || c.text)} PITCH ${fmt(pitch)}`);
         changeTool(tn, `THREAD TOOL 60 DEG P${fmt(pitch)}`);
         N(`G97 S${rpmAt(cd.vcT, 2 * rM)} M03`); N(`G00 X${fmt(2 * (rM + 2))} Z${fmt(-(u0 - 3 * pitch))}`);
@@ -242,7 +310,7 @@
     }
     N("M05"); N("M09"); N("M30"); lines.push("%");
     const Sg = voidMap.size ? Object.assign({}, S, { voids: S.voids.map((v) => (voidMap.has(v) ? Object.assign({}, v, voidMap.get(v)) : v)) }) : S;
-    return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S: Sg, jaws, cd, mine, rank, warn, keeps };
+    return { name: `O${String(4000 + (+op.opNo || 0)).slice(-4)}`, op, lines, tools, d, xw, uOf, xOf, S0, S: Sg, jaws, cd, mine, rank, warn, keeps, checks };
   };
   void 0;
 
@@ -655,6 +723,7 @@
   Sim.prototype._draw = function (c, ui) {
     this.layout(); const k = this.k, W = CW, H = CH;
     { const bg = c.createLinearGradient(0, 0, 0, H); bg.addColorStop(0, "#0d1626"); bg.addColorStop(1, "#070c16"); c.fillStyle = bg; c.fillRect(0, 0, W, H); }
+    if (ui && ui.look === "machine") this.drawMachineBg(c);
     // header
     c.fillStyle = "#111c33"; c.fillRect(0, 0, W, HEADH); c.fillStyle = "#e2e8f0"; c.font = "600 17px system-ui, Segoe UI, Arial"; c.textBaseline = "middle";
     const op = this.g.op; c.fillText(`CNC SIMULATION · OP ${op.opNo} · ${String(op.name || "").toUpperCase()}`, 14, HEADH / 2);
@@ -664,7 +733,8 @@
     c.save(); c.beginPath(); c.rect(0, HEADH + STRIP, CW - PANEL, CH - HEADH - STRIP - FOOT); c.clip();
     c.strokeStyle = "#475569"; c.setLineDash([14, 4, 3, 4]); c.lineWidth = 1; c.beginPath(); c.moveTo(8, this.cy); c.lineTo(CW - PANEL - 8, this.cy); c.stroke(); c.setLineDash([]);
     c.imageSmoothingEnabled = true; const dx = this.sx(this.xlo), dw = (this.xhi - this.xlo) * k, dh = this.Hc * this.cs * k;
-    c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.save(); c.translate(0, this.cy * 2); c.scale(1, -1); c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.restore();
+    if (ui && ui.look === "machine") this.drawMachineBody(c, dx, dw, dh);
+    else { c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.save(); c.translate(0, this.cy * 2); c.scale(1, -1); c.drawImage(this.off, dx, this.cy - dh, dw, dh); c.restore(); }
     // the finished outline (what the program has to make): dark casing + bright line so it shows on metal and on the background
     c.lineJoin = "round";
     for (const pass of [0, 1]) {
@@ -687,7 +757,7 @@
     c.lineWidth = 1; c.strokeStyle = "rgba(34,197,94,.75)"; c.beginPath(); let pen = false;
     for (const q of this.trail) { const [x, r] = this.xr(q[0], q[1]), X = this.sx(x), Y = this.cy - r * k; if (q[2] && pen) c.lineTo(X, Y); else c.moveTo(X, Y); pen = !!q[2]; } c.stroke();
     // tool and holder, real size (mm x scale), the cutting corner marked
-    this.drawTool(c);
+    this.drawTool(c); if (ui && ui.look === "machine") this.drawCoolant(c);
     // chips (drawn larger than life so they can be seen; shape from chipSpec)
     this.drawChips(c);
     c.restore();
@@ -776,7 +846,50 @@
     const px = cx0 + cw + 24; c.fillStyle = "#e2e8f0"; c.font = "600 13px system-ui, Segoe UI, Arial"; c.fillText("Indexing plan", px, cy0 + 12);
     c.font = "12px system-ui, Segoe UI, Arial"; c.fillStyle = "#cbd5e1"; let yy = cy0 + 32;
     L.forEach((q) => { const t = this.g.tools[q.tool]; c.fillStyle = "#cbd5e1"; c.fillText(`T${String(q.tool).padStart(2, "0")}: ${t.kind === "drill" ? "re-grind" : "index to the next corner"} every ${Math.max(1, Math.floor(q.partsEdge))} parts`, px, yy); yy += 16; c.fillStyle = "#94a3b8"; c.fillText(`   whole tool about ${Math.floor(q.partsTool).toLocaleString("en-US")} parts`, px, yy); yy += 20; });
+    // standard tools or CUSTOM: every dimension of this operation
+    yy += 6; c.fillStyle = "#e2e8f0"; c.font = "600 13px system-ui, Segoe UI, Arial"; c.fillText("Standard tool check", px, yy); yy += 18; c.font = "12px system-ui, Segoe UI, Arial";
+    (this.g.checks || []).forEach((k) => {
+      c.fillStyle = "#cbd5e1"; c.fillText(k.thread ? `${k.label}: thread pitch ${k.pitch}` : `${k.label}: dia ${k.dia.toFixed(2)} ±${(k.band / 2).toFixed(2)} (IT${k.g})`, px, yy); yy += 15;
+      k.steps.forEach((q) => { c.fillStyle = q.std ? "#4ade80" : "#f59e0b"; c.fillText(`   ${q.std ? "STANDARD" : "CUSTOM  "}  ${q.tool}`, px, yy); yy += 15; if (!q.std && q.why) { c.fillStyle = "#94a3b8"; c.fillText(`      ${q.why}`.slice(0, 64), px, yy); yy += 15; } });
+      if (k.note) { c.fillStyle = "#94a3b8"; c.fillText(("   " + k.note).slice(0, 66), px, yy); yy += 15; }
+    });
     c.fillStyle = "#64748b"; c.font = "11px system-ui, Segoe UI, Arial"; c.fillText("Estimate from the Taylor tool-life equation with typical constants for coated carbide.", x0, CH - FOOT - 22); c.fillText("Calibrate with your own tool-life records; if a tool is also used in another operation, the lives add up.", x0, CH - FOOT - 8);
+  };
+  /** MACHINE VIEW: the part looks like a round bar turning in the machine (cylinder lighting, rotation shimmer), with coolant on the cut.
+      It is a computer drawing, not camera footage. */
+  Sim.prototype.drawMachineBg = function (c) {
+    const y0 = HEADH + STRIP, y1 = CH - FOOT, w = CW - PANEL;
+    let g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, "#2a3340"); g.addColorStop(0.5, "#3b4656"); g.addColorStop(1, "#1d242e"); c.fillStyle = g; c.fillRect(0, y0, w, y1 - y0);
+    c.fillStyle = "rgba(255,255,255,.035)"; for (let x = 0; x < w; x += 46) c.fillRect(x, y0, 2, y1 - y0);   // panel joints of the enclosure
+    g = c.createRadialGradient(w * 0.45, y0 + 40, 10, w * 0.45, y0 + 40, w * 0.7); g.addColorStop(0, "rgba(255,244,214,.22)"); g.addColorStop(1, "rgba(255,244,214,0)"); c.fillStyle = g; c.fillRect(0, y0, w, y1 - y0);   // work lamp
+    c.fillStyle = "#18202b"; c.fillRect(0, y1 - 46, w, 46); c.fillStyle = "rgba(255,255,255,.08)"; c.fillRect(0, y1 - 46, w, 2);   // slideway cover
+    c.fillStyle = "rgba(255,255,255,.05)"; for (let x = 0; x < w; x += 18) c.fillRect(x, y1 - 44, 8, 40);
+  };
+  Sim.prototype.drawMachineBody = function (c, dx, dw, dh) {
+    const W = Math.ceil(dw), H = Math.ceil(dh * 2); if (!W || !H) return;
+    if (!this.shd || this.shd.width !== W || this.shd.height !== H) { this.shd = document.createElement("canvas"); this.shd.width = W; this.shd.height = H; }
+    const t = this.shd.getContext("2d"); t.clearRect(0, 0, W, H); t.globalCompositeOperation = "source-over";
+    t.drawImage(this.off, 0, 0, W, dh); t.save(); t.translate(0, H); t.scale(1, -1); t.drawImage(this.off, 0, 0, W, dh); t.restore();
+    t.globalCompositeOperation = "source-atop";
+    const g = t.createLinearGradient(0, 0, 0, H);   // round bar: dark edges, bright band above the centre line, soft reflection below
+    g.addColorStop(0, "rgba(0,0,0,.62)"); g.addColorStop(0.2, "rgba(255,255,255,.10)"); g.addColorStop(0.36, "rgba(255,255,255,.42)"); g.addColorStop(0.46, "rgba(255,255,255,.06)"); g.addColorStop(0.62, "rgba(0,0,0,.12)"); g.addColorStop(0.8, "rgba(255,255,255,.12)"); g.addColorStop(1, "rgba(0,0,0,.66)");
+    t.fillStyle = g; t.fillRect(0, 0, W, H);
+    const spin = this.t * 14;   // shimmer lines along the axis: the surface is turning
+    for (let i = 0; i < 26; i++) { const y = ((i * 37.1 + spin * (3 + (i % 5))) % H + H) % H; t.fillStyle = `rgba(255,255,255,${0.05 + 0.07 * ((i * 7) % 3) / 2})`; t.fillRect(0, y, W, 1.2); }
+    t.globalCompositeOperation = "source-over";
+    c.save(); c.shadowColor = "rgba(0,0,0,.6)"; c.shadowBlur = 16; c.shadowOffsetY = 8; c.drawImage(this.shd, dx, this.cy - dh, W, H); c.restore();
+  };
+  Sim.prototype.drawCoolant = function (c) {
+    const m = this.lastM; if (!m || m.type === "rapid" || m.type === "tool" || m.type === "home" || this.done) return;
+    const [x, r] = this.xr(this.pos[0], this.pos[1]), tx = this.sx(x), ty = this.cy - r * this.k, nx = tx + this.sf * 150, ny = ty - 170;
+    c.save(); c.lineCap = "round";
+    for (let i = 0; i < 26; i++) {
+      const s = Math.random(), px = nx + (tx - nx) * s + (Math.random() - 0.5) * 7 * s, py = ny + (ty - ny) * s + 90 * s * (1 - s) * 0.0 + (Math.random() - 0.5) * 7 * s;
+      c.strokeStyle = `rgba(186,230,253,${0.2 + 0.5 * Math.random()})`; c.lineWidth = 1 + 2 * Math.random(); c.beginPath(); c.moveTo(px, py); c.lineTo(px + (tx - nx) * 0.03, py + (ty - ny) * 0.03); c.stroke();
+    }
+    c.fillStyle = "#9aa7b8"; c.fillRect(nx - 5, ny - 28, 10, 26); c.fillStyle = "#475569"; c.fillRect(nx - 3, ny - 2, 6, 6);   // coolant nozzle
+    for (let i = 0; i < 12; i++) { c.fillStyle = `rgba(224,242,254,${0.15 + 0.4 * Math.random()})`; c.beginPath(); c.arc(tx + (Math.random() - 0.5) * 34, ty + (Math.random() - 0.7) * 22, 1 + 2 * Math.random(), 0, 7); c.fill(); }
+    c.restore();
   };
   Sim.prototype.removedMm3 = function () { return this.vol || 0; };
   void 0;
@@ -793,13 +906,13 @@
       <select id="cnOp" style="${btn};max-width:300px"></select>
       <button id="cnPlay" style="${btn};background:#15803d;border-color:#16a34a">▶ Play</button><button id="cnRe" style="${btn}">⟲ Restart</button>
       <select id="cnSp" style="${btn};max-width:190px"><option value="120">Slow (about 2 min)</option><option value="60" selected>Normal (about 1 min)</option><option value="30">Fast (about 30 s)</option><option value="15">Very fast (about 15 s)</option></select>
-      <button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
+      <button id="cnLook" style="${btn}">🎥 Machine view</button><button id="cnLife" style="${btn}">⏱ Tool life</button><label style="color:#94a3b8;font-size:12px">Parts already made on these inserts <input id="cnParts" type="number" min="0" value="0" style="width:70px;background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:6px;padding:4px"></label><button id="cnRec" style="${btn};background:#b91c1c;border-color:#dc2626">⏺ Record video</button><button id="cnNc" style="${btn}">⬇ Program (.nc)</button><button id="cnX" style="${btn}">✕ Close</button></div>
       <canvas id="cnCv" width="${CW}" height="${CH}" style="width:min(100%,calc((100vh - 70px) * 16 / 9));height:auto;border-radius:10px;border:1px solid #1e293b;background:#0b1220"></canvas>
       <div id="cnNote" style="color:#94a3b8;font-size:12px;max-width:1280px;text-align:center">Draft program made from the stage drawing. The program on the right is the one that is simulated. Check feeds, speeds, tools and tool-nose compensation on your machine before production.</div>`;
     document.body.appendChild(ov);
     const $ = (id) => ov.querySelector("#" + id), cv = $("cnCv"), c = cv.getContext("2d"); let sim = null, g = null, playing = false, last = 0, raf = 0, rec = null, doneAt = 0, ui = {};
     ranks.forEach((r) => { const o = document.createElement("option"); o.value = r.rank; o.textContent = `OP ${r.op.opNo} · ${r.op.name}`; $("cnOp").appendChild(o); });
-    const load = (rank) => { g = CN.gen(cx, rank); sim = new Sim(g, cx); sim.partsDone = +$("cnParts").value || 0; setTimeout(() => { try { if (sim) sim.getLife(); } catch (e) { /* ignore */ } }, 60); playing = false; $("cnPlay").textContent = "▶ Play"; doneAt = 0; ui = {}; $("cnLife").textContent = "⏱ Tool life"; };
+    const load = (rank) => { g = CN.gen(cx, rank); sim = new Sim(g, cx); sim.partsDone = +$("cnParts").value || 0; setTimeout(() => { try { if (sim) sim.getLife(); } catch (e) { /* ignore */ } }, 60); playing = false; $("cnPlay").textContent = "▶ Play"; doneAt = 0; ui = { look: ui.look }; $("cnLife").textContent = "⏱ Tool life"; };
     const speed = () => Math.max(1, sim.total / (+$("cnSp").value || 60));
     const frame = (ts) => {
       raf = requestAnimationFrame(frame); const dt = Math.min(0.1, (ts - last) / 1000 || 0); last = ts;
@@ -808,6 +921,7 @@
       if (rec && sim && sim.done && ts - doneAt > 2800 && rec.state === "recording") { try { rec.stop(); } catch (e) { /* already stopped */ } }
       if (sim) sim.draw(c, ui);
     };
+    $("cnLook").onclick = () => { ui.look = ui.look === "machine" ? "" : "machine"; $("cnLook").textContent = ui.look === "machine" ? "◀ Drawing view" : "🎥 Machine view"; };
     $("cnLife").onclick = () => { ui.page = ui.page === "life" ? "" : "life"; $("cnLife").textContent = ui.page === "life" ? "◀ Back to simulation" : "⏱ Tool life"; };
     $("cnParts").onchange = () => { if (sim) sim.partsDone = Math.max(0, +$("cnParts").value || 0); };
     $("cnOp").onchange = () => { if (rec) return; load(+$("cnOp").value); };
@@ -818,10 +932,14 @@
       if (rec) return; if (!cv.captureStream || !window.MediaRecorder) { $("cnNote").textContent = "This browser cannot record video. Use Chrome or Edge."; return; }
       const types = ["video/mp4;codecs=avc1", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"], mt = types.find((t) => MediaRecorder.isTypeSupported(t)) || "";
       const ext = /mp4/.test(mt) ? "mp4" : "webm", chunks = [];
-      sim.reset(); playing = true; $("cnPlay").textContent = "⏸ Pause"; $("cnRec").textContent = "⏺ Recording…"; ui.msg = "● REC";
+      sim.reset(); playing = true; $("cnPlay").textContent = "⏸ Pause"; $("cnRec").textContent = "⏺ Recording… (saves when the run ends)"; $("cnRec").style.background = "#f59e0b"; ui.msg = "";
       try { rec = new MediaRecorder(cv.captureStream(30), mt ? { mimeType: mt, videoBitsPerSecond: 6000000 } : {}); } catch (e) { rec = null; $("cnNote").textContent = "Video recording is not available here: " + e.message; return; }
       rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-      rec.onstop = () => { const name = `${safe(cx.P.part_no)}_OP${g.op.opNo}_CNC-simulation.${ext}`; download(new Blob(chunks, { type: mt || "video/webm" }), name); rec = null; ui.msg = ""; $("cnRec").textContent = "⏺ Record video"; $("cnNote").textContent = `Video saved: ${name}`; };
+      rec.onstop = () => {
+        const name = `${safe(cx.P.part_no)}_OP${g.op.opNo}_CNC-simulation.${ext}`;
+        rec = null; ui.msg = ""; $("cnRec").textContent = "⏺ Record video"; $("cnRec").style.background = "#b91c1c";   // button goes back first, whatever happens to the download
+        try { download(new Blob(chunks, { type: mt || "video/webm" }), name); $("cnNote").textContent = `Video saved: ${name}`; } catch (e) { $("cnNote").textContent = "The video was recorded but could not be saved: " + e.message; }
+      };
       rec.start(250);
     };
     $("cnX").onclick = () => { if (rec) { try { rec.stop(); } catch (e) { /* ignore */ } } cancelAnimationFrame(raf); ov.remove(); document.removeEventListener("keydown", key); if (onClose) onClose(); };
