@@ -12,26 +12,26 @@
   .fm{font:12px/1.35 Arial,Helvetica,sans-serif;color:#000;background:#fff}
   .fm.land{min-width:1040px}.fm.port{min-width:700px}
   .fm table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0}
-  .fm th,.fm td{border:1px solid #000;padding:2px 4px;font-size:11px;vertical-align:middle;overflow-wrap:anywhere;text-align:left;background:none;color:#000;font-weight:400}
-  .fm th{background:#e9ecf1;font-weight:700;font-size:10px;text-transform:uppercase;letter-spacing:.02em}
+  .fm th,.fm td{border:1px solid #4a4f86;padding:2px 4px;font-size:11px;vertical-align:middle;overflow-wrap:anywhere;text-align:left;background:none;color:#000;font-weight:400}
+  .fm th{background:#e8eaf8;font-weight:700;color:#1e1b4b;font-size:10px;text-transform:uppercase;letter-spacing:.02em}
   .fm td.c,.fm th.c{text-align:center}.fm td.n{text-align:right;font-variant-numeric:tabular-nums}
   .fm td.fl{background:#fbd5d5;font-weight:700}.fm td.sg{color:#b00000;font-weight:700;text-align:center}
-  .fm .fmt{margin-bottom:6px}.fm .fmt td{border:0;border-bottom:2.5px solid #000;padding:0 0 4px}
-  .fm .t1{font-size:19px;font-weight:700;letter-spacing:.02em}.fm .t2{font-size:11px;color:#333;margin-top:1px}
+  .fm .fmt{margin-bottom:6px}.fm .fmt td{border:0;border-bottom:2.5px solid #1e1b4b;padding:0 0 4px}
+  .fm .t1{color:#1e1b4b;font-size:19px;font-weight:700;letter-spacing:.02em}.fm .t2{font-size:11px;color:#333;margin-top:1px}
   .fm .tr{text-align:right;width:34%;font-size:10px;line-height:1.5;vertical-align:bottom}
   .fm.msa th{text-transform:none}
   .fm td.sm{font-size:7.5px;letter-spacing:-.3px;white-space:nowrap;padding-left:1px;padding-right:1px}
-  .fm .sec{margin:12px 0 0;padding:3px 6px;background:#1f2937;color:#fff;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+  .fm .sec{margin:12px 0 0;padding:3px 6px;background:#1e1b4b;color:#fff;break-after:avoid;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
   .fm .sub{font-weight:700;font-size:11px;margin:8px 0 3px}
   .fm .note{font-size:10px;color:#333;margin:3px 0 0}
   .fm .two{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start}
   .fm .three{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;align-items:start}
   .fm .blk{margin-top:10px}.fm svg{display:block;width:100%;height:auto}
-  .fm .box{border:1.5px solid #000;padding:6px 8px;margin-top:8px}.fm .box b.res{font-size:13px}
+  .fm .box{border:1.5px solid #1e1b4b;padding:6px 8px;margin-top:8px}.fm .box b.res{font-size:13px}
   .fm ul{margin:4px 0 0;padding-left:18px}.fm li{margin:1px 0;font-size:11px}
   .fm textarea{width:100%;border:0;background:#fff8e1;font:11px Arial;resize:vertical;min-height:32px;padding:2px;box-sizing:border-box}
   .fm .btn.s{padding:2px 8px;font-size:11px}
-  .fm .sign th,.fm .sign td{height:30px}
+  .fm .fsign th,.fm .fsign td{height:22px}
   .fm .leg{font-size:10px;margin:2px 0 0;display:flex;gap:14px;flex-wrap:wrap}
   .fm .scr{font-size:10px;color:#444}
   .fm .eq{font-family:"Cambria Math","Times New Roman",serif}
@@ -39,8 +39,8 @@
     .fmwrap{border:0!important;padding:0!important;overflow:visible!important;border-radius:0}
     .fm.land,.fm.port{min-width:0!important}
     .fm{font-size:8.5pt}.fm th,.fm td{font-size:7.6pt;padding:.8pt 2.5pt}.fm th{font-size:7pt}
-    .fm .t1{font-size:13pt}.fm .fmt{margin-bottom:4px}.fm .sec{margin-top:7px!important}.fm .blk{margin-top:5px}.fm .t2,.fm .tr{font-size:7.6pt}.fm .sec{font-size:8pt;print-color-adjust:exact;-webkit-print-color-adjust:exact}.fm th,.fm td.fl{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-    .fm svg,.fm .box,.fm .avoid,.fm table tr{break-inside:avoid}.fm .scr{display:none}.fm textarea{background:#fff;border:0;min-height:0;font-size:7.6pt}
+    .fm .t1{font-size:13pt}.fm .fmt{margin-bottom:4px}.fm .sec{margin-top:7px!important}.fm .blk{margin-top:5px}.fm .t2,.fm .tr{font-size:7.6pt}.fm .sec{font-size:8pt;print-color-adjust:exact;-webkit-print-color-adjust:exact}.fm .fsign th,.fm .fsign td{height:15pt}.fm th,.fm td.fl{print-color-adjust:exact;-webkit-print-color-adjust:exact}
+    .fm .blk,.fm svg,.fm .box,.fm .avoid,.fm table tr{break-inside:avoid}.fm .scr{display:none}.fm textarea{background:#fff;border:0;min-height:0;font-size:7.6pt}
   }`;
   function css() { if (document.getElementById("aiag-css")) return; const s = document.createElement("style"); s.id = "aiag-css"; s.textContent = CSS; document.head.append(s); }
   css();
@@ -57,7 +57,7 @@
     return `<table><colgroup>${Array.from({ length: n }, () => `<col style="width:${lw}%"><col style="width:${vw}%">`).join("")}</colgroup><tbody>${rows.map((r) => `<tr>${r.map((p) => `<th>${p[0]}</th><td>${p[1] == null || p[1] === "" ? "—" : p[1]}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
   }
   const sec = (t) => `<div class="sec">${t}</div>`;
-  const signoff = (by) => `<table class="sign avoid" style="margin-top:10px"><colgroup><col style="width:13%"><col style="width:20%"><col style="width:7%"><col style="width:10%"><col style="width:15%"><col style="width:20%"><col style="width:7%"><col style="width:8%"></colgroup><tbody><tr><th>Prepared by</th><td>${esc(by || "")}</td><th>Date</th><td></td><th>Reviewed / approved by</th><td></td><th>Date</th><td></td></tr></tbody></table>`;
+  const signoff = (by) => `<table class="fsign avoid" style="margin-top:10px"><colgroup><col style="width:13%"><col style="width:20%"><col style="width:7%"><col style="width:10%"><col style="width:15%"><col style="width:20%"><col style="width:7%"><col style="width:8%"></colgroup><tbody><tr><th>Prepared by</th><td>${esc(by || "")}</td><th>Date</th><td></td><th>Reviewed / approved by</th><td></td><th>Date</th><td></td></tr></tbody></table>`;
   const shortDate = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ""); return m ? m[3] + "-" + m[2] : ""; };
 
   /* ---------- charts printed under the columns of a data grid ----------
@@ -68,7 +68,7 @@
     let out = "";
     for (let b = 0; b < B; b++) {
       const i0 = b * C, i1 = Math.min(N, i0 + C), pct = (100 - 14) / C;
-      const rows = o.grid.map((g) => `<tr><th style="font-size:9px">${g.name}</th>${Array.from({ length: C }, (_, k) => { const i = i0 + k; if (i >= i1) return "<td></td>"; const c = g.cell(i) || {}; return `<td class="${c.cls || "c"}">${c.t == null ? "" : c.t}</td>`; }).join("")}</tr>`).join("");
+      const rows = o.grid.map((g) => `<tr><th style="font-size:9px">${g.name}</th>${Array.from({ length: C }, (_, k) => { const i = i0 + k; if (i >= i1) return "<td></td>"; const c = g.cell(i) || {}; return `<td class="${(c.cls || "c") + (/\bn\b/.test(c.cls || "") && !/\bsm\b/.test(c.cls || "") ? " sm" : "")}">${c.t == null ? "" : c.t}</td>`; }).join("")}</tr>`).join("");
       const tbl = `<table style="table-layout:fixed"><colgroup><col style="width:14%">${Array.from({ length: C }, () => `<col style="width:${pct}%">`).join("")}</colgroup><tbody>${rows}</tbody></table>`;
       const svgs = o.charts.map((c, ci) => {
         const H = (c.h || 150) + 12, T = 20, Bm = 8, [lo, hi] = rg[ci], Y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - Bm), X = (i) => LW + (i - i0 + 0.5) * cw, d = c.d == null ? 3 : c.d;
@@ -82,8 +82,8 @@
           <path d="${line("ucl")}" fill="none" stroke="#c00000" stroke-width="1.3" stroke-dasharray="6 3"/><path d="${line("lcl")}" fill="none" stroke="#c00000" stroke-width="1.3" stroke-dasharray="6 3"/><path d="${line("cl")}" fill="none" stroke="#006400" stroke-width="1.4"/>
           ${c.ref != null ? `<line x1="${LW}" x2="${W}" y1="${Y(c.ref)}" y2="${Y(c.ref)}" stroke="#1d4ed8" stroke-width="1.2" stroke-dasharray="2 3"/>${lab(c.ref, "Master", "#1d4ed8")}` : ""}
           ${lab(last.ucl, "UCL", "#c00000")}${lab(last.cl, "CL", "#006400")}${lab(last.lcl, "LCL", "#c00000")}
-          <polyline fill="none" stroke="#000" stroke-width="1.2" points="${pts.map((i) => X(i).toFixed(1) + "," + Y(c.vals[i]).toFixed(1)).join(" ")}"/>
-          ${pts.map((i) => (c.flagged && c.flagged[i] ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(c.vals[i]).toFixed(1)}" r="5.2" fill="#c00000" stroke="#000" stroke-width=".8"/>` : `<rect x="${(X(i) - 2.8).toFixed(1)}" y="${(Y(c.vals[i]) - 2.8).toFixed(1)}" width="5.6" height="5.6" fill="#000"/>`)).join("")}</svg>`;
+          <polyline fill="none" stroke="#1e1b4b" stroke-width="1.2" points="${pts.map((i) => X(i).toFixed(1) + "," + Y(c.vals[i]).toFixed(1)).join(" ")}"/>
+          ${pts.map((i) => (c.flagged && c.flagged[i] ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(c.vals[i]).toFixed(1)}" r="5.2" fill="#c00000" stroke="#000" stroke-width=".8"/>` : `<rect x="${(X(i) - 2.8).toFixed(1)}" y="${(Y(c.vals[i]) - 2.8).toFixed(1)}" width="5.6" height="5.6" fill="#1e1b4b"/>`)).join("")}</svg>`;
       }).join("");
       out += `<div class="blk">${B > 1 ? `<div class="sub" style="margin-top:0">Subgroups ${i0 + 1} to ${i1}</div>` : ""}${tbl}${svgs}</div>`;
     }
