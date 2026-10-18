@@ -483,8 +483,37 @@ def app_tsk():
     return window(a, "ActionTrack", b)
 
 
+def app_spc():
+    a = "#0891B2"
+    b = heading("Shaft diameter · X-bar R chart", "25 groups of 5 · limits from the data")
+    b += kpi(0, 38, 100, "Signals", "1", RED) + kpi(106, 38, 100, "Cp", "1.42", OK) + kpi(212, 38, 100, "Cpk", "1.21", AMBER) + kpi(318, 38, 102, "Readings", "125", a)
+    b += f"<rect x='0' y='100' width='420' height='116' rx='9' fill='#fff' stroke='{LINE}'/>"
+    b += f"<line x1='12' x2='408' y1='122' y2='122' stroke='{RED}' stroke-width='1.2' stroke-dasharray='5 3'/><line x1='12' x2='408' y1='158' y2='158' stroke='{OK}' stroke-width='1.2'/><line x1='12' x2='408' y1='194' y2='194' stroke='{RED}' stroke-width='1.2' stroke-dasharray='5 3'/>"
+    b += f"<text x='14' y='118' {FONT} font-size='8' fill='{RED}'>UCL</text><text x='14' y='154' {FONT} font-size='8' fill='{OK}'>CL</text><text x='14' y='206' {FONT} font-size='8' fill='{RED}'>LCL</text>"
+    ys = [160, 152, 165, 150, 158, 168, 155, 149, 162, 156, 170, 151, 160, 154, 166, 112, 157, 163, 150, 159, 167, 153, 161, 155]
+    pts = " ".join(f"{30 + i * 16},{y}" for i, y in enumerate(ys))
+    b += f"<polyline points='{pts}' fill='none' stroke='{a}' stroke-width='1.6'/>"
+    for i, y in enumerate(ys):
+        b += f"<circle cx='{30 + i * 16}' cy='{y}' r='{5 if y < 120 else 2.6}' fill='{RED if y < 120 else a}'/>"
+    return window(a, "SPC Charts", b)
+
+
+def app_msa():
+    a = "#0F766E"
+    b = heading("Bore gauge BG-12 · Gage R&R", "3 appraisers · 10 parts · 3 trials")
+    b += kpi(0, 38, 100, "%GRR", "26.7%", AMBER) + kpi(106, 38, 100, "Categories", "5", OK) + kpi(212, 38, 100, "Repeatability", "0.202", a) + kpi(318, 38, 102, "Decision", "Conditional", AMBER)
+    rows = [("Part-to-part", 96, OK), ("Repeatability (equipment)", 20, a), ("Reproducibility (appraiser)", 23, a), ("Gage R&R", 27, AMBER)]
+    for i, (t, w, col) in enumerate(rows):
+        y = 110 + i * 26
+        b += f"<text x='0' y='{y + 11}' {FONT} font-size='10' fill='{INK}'>{t}</text><rect x='170' y='{y}' width='240' height='14' rx='7' fill='#E8EEF6'/><rect x='170' y='{y}' width='{int(240 * w / 100)}' height='14' rx='7' fill='{col}'/>"
+    b += f"<rect x='0' y='218' width='420' height='4' rx='2' fill='{LINE}'/>"
+    return window(a, "MSA Studies", b)
+
+
 ART = {
     "app-hrms": lambda: svg(bg("#0EA5E9") + app_hrm(), "HRM &amp; Payroll"),
+    "app-msa": lambda: svg(bg("#0F766E") + app_msa(), "MSA Studies"),
+    "app-spc": lambda: svg(bg("#0891B2") + app_spc(), "SPC Charts"),
     "app-tsk": lambda: svg(bg("#4F46E5") + app_tsk(), "ActionTrack"),
     "app-balloon": lambda: svg(bg("#A855F7") + app_balloon(), "Balloon Inspector"),
     "app-pd": lambda: svg(bg("#F59E0B") + app_pd(), "Process Documents"),
