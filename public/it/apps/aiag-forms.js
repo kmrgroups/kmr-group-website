@@ -19,6 +19,13 @@
   .fm .fmt{margin-bottom:6px}.fm .fmt td{border:0;border-bottom:2.5px solid #1e1b4b;padding:0 0 4px}
   .fm .t1{color:#1e1b4b;font-size:19px;font-weight:700;letter-spacing:.02em}.fm .t2{font-size:11px;color:#333;margin-top:1px}
   .fm .tr{text-align:right;width:34%;font-size:10px;line-height:1.5;vertical-align:bottom}
+  .fm table.pg,.fm table.pg>thead>tr>td,.fm table.pg>tbody>tr>td,.fm table.pg>tfoot>tr>td{border:0;padding:0;background:none;font-size:inherit;table-layout:auto}
+  .fm table.ph,.fm table.pf{table-layout:fixed;margin:0 0 6px}.fm table.pf{margin:6px 0 0}
+  .fm table.ph td,.fm table.pf td{border:0;padding:0 0 3px;vertical-align:middle;font-size:9px;line-height:1.3}
+  .fm table.ph{border-bottom:1.5px solid #1e1b4b}.fm table.pf{border-top:1px solid #4a4f86}.fm table.pf td{font-size:8px;padding-top:3px;color:#333}
+  .fm .pl{width:34%;text-align:left}.fm .pc{width:34%;text-align:center}.fm .pr{width:32%;text-align:right}.fm table.pf .pc{width:36%}.fm table.pf .pl{width:38%}
+  .fm table.ph .pc{font-size:11px}.fm table.ph .pl b{font-size:12px}.fm img.lg{height:13mm;max-width:52mm;object-fit:contain;display:block}
+  .fm ul,.fm .fsign,.fm .note{break-inside:avoid;page-break-inside:avoid}.fm .box+ul,.fm ul+.fsign,.fm .note+.fsign,.fm .fsign+.note{break-before:avoid;page-break-before:avoid}.fm .sec{page-break-after:avoid}
   .fm.msa th{text-transform:none}
   .fm td.sm{font-size:7.5px;letter-spacing:-.3px;white-space:nowrap;padding-left:1px;padding-right:1px}
   .fm .sec{margin:12px 0 0;padding:3px 6px;background:#1e1b4b;color:#fff;break-after:avoid;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase}
@@ -40,15 +47,24 @@
     .fm.land,.fm.port{min-width:0!important}
     .fm{font-size:8.5pt}.fm th,.fm td{font-size:7.6pt;padding:.8pt 2.5pt}.fm th{font-size:7pt}
     .fm .t1{font-size:13pt}.fm .fmt{margin-bottom:4px}.fm .sec{margin-top:7px!important}.fm .blk{margin-top:5px}.fm .t2,.fm .tr{font-size:7.6pt}.fm .sec{font-size:8pt;print-color-adjust:exact;-webkit-print-color-adjust:exact}.fm .fsign th,.fm .fsign td{height:15pt}.fm th,.fm td.fl{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-    .fm .blk,.fm svg,.fm .box,.fm .avoid,.fm table tr{break-inside:avoid}.fm .scr{display:none}.fm textarea{background:#fff;border:0;min-height:0;font-size:7.6pt}
+    .fm .blk,.fm svg,.fm .box,.fm .avoid,.fm table tr{break-inside:avoid;page-break-inside:avoid}.fm table.pg>tbody>tr,.fm table.pg>thead>tr,.fm table.pg>tfoot>tr{break-inside:auto;page-break-inside:auto}.fm table.pg>thead{display:table-header-group}.fm table.pg>tfoot{display:table-footer-group}.fm .scr{display:none}.fm textarea{background:#fff;border:0;min-height:0;font-size:7.6pt}
   }`;
   function css() { if (document.getElementById("aiag-css")) return; const s = document.createElement("style"); s.id = "aiag-css"; s.textContent = CSS; document.head.append(s); }
   css();
 
   /* ---------- blocks used by every form ---------- */
-  const wrap = (cls, inner) => `<div class="fmwrap"><div class="fm ${cls} no-sno">${inner}</div></div>`;
+  /* the whole form sits in a table whose head and foot repeat on every printed page (works in every browser, also on phones):
+     head = customer logo (left), report title, unique report ref. no.; foot = format no. / revision / date, printed on, company */
+  function frame() {
+    const ri = window.KMRReport ? KMRReport.info() : null; if (!ri) return ["", ""];
+    const lg = window.KMRReport && KMRReport.logoSrc ? KMRReport.logoSrc() : null;
+    const hdr = `<table class="ph"><tbody><tr><td class="pl">${lg ? `<img class="lg" src="${esc(lg)}" alt="">` : `<b>${esc(ri.company)}</b>`}</td><td class="pc"><b>${esc(ri.title)}</b>${ri.doc ? "<br>" + esc(ri.doc) : ""}</td><td class="pr">Report ref. no.<br><b>${esc(ri.ref)}</b></td></tr></tbody></table>`;
+    const ftr = `<table class="pf"><tbody><tr><td class="pl">Format no. ${esc(ri.format)} · Rev. ${esc(ri.rev)} · Rev. date ${esc(ri.date)}</td><td class="pc">Printed ${esc(ri.printed)}${ri.by ? " by " + esc(ri.by) : ""}${ri.company ? "<br>" + esc(ri.company) : ""}</td><td class="pr">Report ref. ${esc(ri.ref)}</td></tr></tbody></table>`;
+    return [hdr, ftr];
+  }
+  const wrap = (cls, inner) => { const [h, ft] = frame(); return `<div class="fmwrap"><div class="fm ${cls} no-sno"><table class="pg"><thead><tr><td>${h}</td></tr></thead><tfoot><tr><td>${ft}</td></tr></tfoot><tbody><tr><td>${inner}</td></tr></tbody></table></div></div>`; };
   function title(main, sub, ri) {
-    const r = ri ? `<span class="scr"><b>Report ref. no.</b> ${esc(ri.ref)}<br><b>Format</b> ${esc(ri.format)} · Rev ${esc(ri.rev)} · ${esc(ri.date)}</span>` : "";
+    const r = "";
     return `<table class="fmt"><tbody><tr><td><div class="t1">${main}</div><div class="t2">${sub}</div></td><td class="tr">${r}</td></tr></tbody></table>`;
   }
   /* header grid: rows of [label, value] pairs; pairs per row must be equal */
@@ -71,7 +87,7 @@
       const rows = o.grid.map((g) => `<tr><th style="font-size:9px">${g.name}</th>${Array.from({ length: C }, (_, k) => { const i = i0 + k; if (i >= i1) return "<td></td>"; const c = g.cell(i) || {}; return `<td class="${(c.cls || "c") + (/\bn\b/.test(c.cls || "") && !/\bsm\b/.test(c.cls || "") ? " sm" : "")}">${c.t == null ? "" : c.t}</td>`; }).join("")}</tr>`).join("");
       const tbl = `<table style="table-layout:fixed"><colgroup><col style="width:14%">${Array.from({ length: C }, () => `<col style="width:${pct}%">`).join("")}</colgroup><tbody>${rows}</tbody></table>`;
       const svgs = o.charts.map((c, ci) => {
-        const H = (c.h || 150) + 12, T = 20, Bm = 8, [lo, hi] = rg[ci], Y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - Bm), X = (i) => LW + (i - i0 + 0.5) * cw, d = c.d == null ? 3 : c.d;
+        const H = Math.round((c.h || 150) * 0.78) + 12, T = 20, Bm = 8, [lo, hi] = rg[ci], Y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - Bm), X = (i) => LW + (i - i0 + 0.5) * cw, d = c.d == null ? 3 : c.d;
         const idx = Array.from({ length: i1 - i0 }, (_, k) => i0 + k), line = (k) => idx.filter((i) => c.lim[i] && Number.isFinite(c.lim[i][k])).map((i, j) => (j ? "L" : "M") + X(i).toFixed(1) + " " + Y(c.lim[i][k]).toFixed(1)).join("");
         const last = c.lim[i1 - 1] || {}, lab = (v, t, col) => (Number.isFinite(v) ? `<text x="${LW - 6}" y="${Y(v) + 3.5}" text-anchor="end" font-size="11" fill="${col}" font-family="Arial">${t} ${Number(v).toFixed(d)}</text>` : "");
         const pts = idx.filter((i) => Number.isFinite(c.vals[i]));

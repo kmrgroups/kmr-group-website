@@ -55,6 +55,7 @@
 
   function css() {
     const i = info(), L = st.logo || i.logo, o = st.over;
+    if (o.inForm) return `@page{${o.land ? "size:A4 landscape;" : ""}margin:10mm 10mm 14mm;@bottom-right{content:"Page " counter(page) " of " counter(pages);font:500 8px Arial,sans-serif;color:#333;vertical-align:bottom;text-align:right}}`;   // header and footer are printed inside the form itself
     const box = (n, body) => `@${n}{${body}}`;
     const txt = "font:600 9px 'Segoe UI',Arial,sans-serif;color:#111;white-space:normal;line-height:1.3;";
     const left = L ? box("top-left", `content:url(${q(L)});vertical-align:middle;text-align:left;width:34%;`) : box("top-left", `content:${q(i.company)};${txt}font-size:12px;font-weight:700;vertical-align:middle;text-align:left;width:34%;`);
@@ -70,5 +71,5 @@
   const unmount = () => { const s = document.getElementById("kmr-report-frame"); if (s) s.remove(); };
   window.addEventListener("beforeprint", mount); window.addEventListener("afterprint", unmount);
   prepLogo(); window.addEventListener("storage", (e) => { if (e.key === "kmr-portal") prepLogo(); });
-  window.KMRReport = { set(o) { st.over = Object.assign({}, o || {}); }, info, formats: FORMATS, tool: TOOL, refresh: prepLogo };
+  window.KMRReport = { logoSrc() { return st.logo || portal().logo || null; }, set(o) { st.over = Object.assign({}, o || {}); }, info, formats: FORMATS, tool: TOOL, refresh: prepLogo };
 })();

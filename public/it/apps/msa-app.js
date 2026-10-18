@@ -172,7 +172,7 @@
   function paint() { S.painted = true; const st = S.st, A = (S.an = analyse(st)); $("#m_report").innerHTML = reportHtml(st, A); document.querySelectorAll("[data-meth]").forEach((b) => (b.onclick = () => { S.method = b.dataset.meth; st.config.method = S.method; S.dirty = true; paint(); })); }
   function reportHtml(st, A) {
     const t = st.type, d = Math.min(5, Math.max(3, ...[st.lsl, st.usl].map((v) => (v == null ? 0 : (String(v).split(".")[1] || "").length))) + 1);
-    if (window.KMRReport) KMRReport.set({ key: t, doc: st.no || "" });
+    if (window.KMRReport) KMRReport.set({ key: t, doc: st.no || "", inForm: true });
     const x = { d, co: (QP.ctx && QP.ctx.company) || "", ri: window.KMRReport ? KMRReport.info() : null, TYPES, M, C };
     const isA = A.res && A.res.method === "anova";
     const tog = t === "grr" && A.ready ? `<div class="seg noprint"><button data-meth="anova" class="${isA ? "on" : ""}"${A.anova && !A.anova.error ? "" : " disabled"}>ANOVA method</button><button data-meth="range" class="${!isA ? "on" : ""}">Average &amp; range method</button></div>` : "";

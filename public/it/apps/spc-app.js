@@ -165,7 +165,7 @@
 
   /* ----- 3: the study report: AIAG-style forms (aiag-forms.js / aiag-spc.js) ----- */
   function xctx(ch, A, ed) {
-    if (window.KMRReport) KMRReport.set({ key: S.view === "cap" && A.vr ? "cap" : "chart", doc: ch.no || "", land: !(S.view === "cap" && A.vr) });
+    if (window.KMRReport) KMRReport.set({ key: S.view === "cap" && A.vr ? "cap" : "chart", doc: ch.no || "", inForm: true, land: !(S.view === "cap" && A.vr) });
     return { d: dpOf(ch), co: (QP.ctx && QP.ctx.company) || "", ri: window.KMRReport ? KMRReport.info() : null, ed, canTask: !!(window.KMRTask && KMRTask.on) && ed, VAR, TYPES, C, hasF };
   }
   const reportHtml = (ch, A, ed) => AIAGForm.spcControl(ch, A, xctx(ch, A, ed));
