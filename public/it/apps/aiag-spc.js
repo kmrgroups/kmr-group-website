@@ -36,7 +36,7 @@
     const flagged = A.flagged, dfl = A.dflagged;
     if (vr) {
       const n = A.n, nmax = t === "imr" ? 1 : Math.min(25, Math.max(...R.map((r) => nz(r).length))), V = R.map(nz);
-      const fl = (set, i, v, dd) => ({ t: f(v, dd), cls: "n" + (set[i] ? " fl" : "") });
+      const fl = (set, i, v, dd) => ({ t: f(v, dd), cls: "n" + (t === "imr" ? " sm" : "") + (set[i] ? " fl" : "") });
       grid = [{ name: "SUBGROUP NO.", cell: (i) => ({ t: R[i].seq || i + 1, cls: "c" }) }, { name: "DATE / LABEL", cell: (i) => ({ t: esc(lbl(ch, R[i], i)), cls: "c" }) }];
       if (t === "imr") {
         grid.push({ name: "INDIVIDUAL X", cell: (i) => fl(flagged, i, A.vals[i], d + 1) }, { name: "MOVING RANGE MR", cell: (i) => (A.dvals[i] == null ? { t: "", cls: "c" } : fl(dfl, i, A.dvals[i], d + 1)) });

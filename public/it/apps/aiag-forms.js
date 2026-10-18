@@ -40,7 +40,7 @@
     .fm.land,.fm.port{min-width:0!important}
     .fm{font-size:8.5pt}.fm th,.fm td{font-size:7.6pt;padding:.8pt 2.5pt}.fm th{font-size:7pt}
     .fm .t1{font-size:13pt}.fm .fmt{margin-bottom:4px}.fm .sec{margin-top:7px!important}.fm .blk{margin-top:5px}.fm .t2,.fm .tr{font-size:7.6pt}.fm .sec{font-size:8pt;print-color-adjust:exact;-webkit-print-color-adjust:exact}.fm th,.fm td.fl{print-color-adjust:exact;-webkit-print-color-adjust:exact}
-    .fm .blk,.fm .box,.fm .avoid,.fm table tr{break-inside:avoid}.fm .scr{display:none}.fm textarea{background:#fff;border:0;min-height:0;font-size:7.6pt}
+    .fm svg,.fm .box,.fm .avoid,.fm table tr{break-inside:avoid}.fm .scr{display:none}.fm textarea{background:#fff;border:0;min-height:0;font-size:7.6pt}
   }`;
   function css() { if (document.getElementById("aiag-css")) return; const s = document.createElement("style"); s.id = "aiag-css"; s.textContent = CSS; document.head.append(s); }
   css();
