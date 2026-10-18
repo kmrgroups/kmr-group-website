@@ -34,8 +34,8 @@
       if (go === "std") KMRStd.draw($("#std"), "spc");
       else if (go === "list") await drawList();
       else if (go === "dash") await drawDash();
-      else if (hp.id) { S.ch = await call("kmr_spc_get", { p_id: hp.id }); S.edit = null; render(); }
-      else if (TYPES[hp.new]) { S.ch = { id: null, chart_type: hp.new, subgroup_size: hp.new === "imr" ? 1 : 5, rows: [], status: "active", rules: { rules: [1, 2, 3], run: 7, trend: 7 } }; S.edit = null; render(); }
+      else if (hp.id) { S.view = hp.view === "cap" ? "cap" : "chart"; S.ch = await call("kmr_spc_get", { p_id: hp.id }); S.edit = null; render(); }
+      else if (TYPES[hp.new]) { S.view = "chart"; S.ch = { id: null, chart_type: hp.new, subgroup_size: hp.new === "imr" ? 1 : 5, rows: [], status: "active", rules: { rules: [1, 2, 3], run: 7, trend: 7 } }; S.edit = null; render(); }
       else { setGo("go=list"); route(); }
     } catch (e) { say(e.message); }
   }
@@ -100,12 +100,13 @@
       ${vals.map((v, i) => (Number.isFinite(v) ? `<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="${flagged[i] ? 5.5 : 3.4}" fill="${flagged[i] ? "#dc2626" : "#0f766e"}" stroke="#fff"><title>${esc(labels[i])}: ${v.toFixed(d)}</title></circle>` : "")).join("")}
       ${labels.map((lb, i) => (i % step === 0 ? `<text x="${X(i)}" y="${H - 8}" text-anchor="middle">${esc(String(lb).slice(0, 8))}</text>` : "")).join("")}</svg></div>`;
   }
-  function svgHist(X, tol, cap, d) {
+  function svgHist(X, tol, cap, d, big) {
     const H = C.histogram(X), W = 780, Ht = 190, L = 20, R = 20, T = 16, B = 30; if (!H.counts.length) return "";
-    const lo = Math.min(H.edges[0], tol.lsl != null ? tol.lsl : Infinity), hi = Math.max(H.edges[H.edges.length - 1], tol.usl != null ? tol.usl : -Infinity), span = hi - lo || 1, x = (v) => L + ((v - lo) / span) * (W - L - R), mx = Math.max(...H.counts), y = (c) => T + (1 - c / mx) * (Ht - T - B);
+    const lo = Math.min(H.edges[0], tol.lsl != null ? tol.lsl : Infinity), hi = Math.max(H.edges[H.edges.length - 1], tol.usl != null ? tol.usl : -Infinity), span = hi - lo || 1, x = (v) => L + ((v - lo) / span) * (W - L - R), pdf = (v, m, sg) => (sg > 0 ? Math.exp(-0.5 * ((v - m) / sg) ** 2) / (sg * Math.sqrt(2 * Math.PI)) : 0), cv = (sg) => (big && cap && sg > 0 ? H.width * X.filter(Number.isFinite).length * pdf(cap.mean, cap.mean, sg) : 0), mx = Math.max(...H.counts, cv(cap && cap.sdWithin), cv(cap && cap.sdOverall)), y = (c) => T + (1 - c / mx) * (Ht - T - B);
+    const curve = (sg, col, dash) => { if (!big || !cap || !(sg > 0)) return ""; const N = X.filter(Number.isFinite).length, pts = Array.from({ length: 61 }, (_, k) => { const v = lo + (span * k) / 60; return x(v).toFixed(1) + "," + y(H.width * N * pdf(v, cap.mean, sg)).toFixed(1); }); return `<polyline points="${pts.join(" ")}" fill="none" stroke="${col}" stroke-width="2"${dash ? ' stroke-dasharray="6 3"' : ""}/>`; };
     const vl = (v, col, lb) => (v == null ? "" : `<line x1="${x(v)}" x2="${x(v)}" y1="${T}" y2="${Ht - B}" stroke="${col}" stroke-width="1.6" stroke-dasharray="5 3"/><text x="${x(v)}" y="${T - 3}" text-anchor="middle" fill="${col}">${lb} ${Number(v).toFixed(d)}</text>`);
     return `<div class="cc"><h4>Histogram of all readings against the specification</h4><svg class="svgw" viewBox="0 0 ${W} ${Ht}">${H.counts.map((c, i) => `<rect x="${x(H.edges[i]) + 1}" y="${y(c)}" width="${Math.max(1, x(H.edges[i + 1]) - x(H.edges[i]) - 2)}" height="${Ht - B - y(c)}" fill="#14b8a6" opacity=".8"/>`).join("")}
-      ${vl(tol.lsl, "#dc2626", "LSL")}${vl(tol.usl, "#dc2626", "USL")}${vl(tol.target, "#2563eb", "Target")}${cap ? vl(cap.mean, "#16a34a", "Mean") : ""}<line x1="${L}" x2="${W - R}" y1="${Ht - B}" y2="${Ht - B}" stroke="#94a3b8"/>${[lo, lo + span / 2, hi].map((v) => `<text x="${x(v)}" y="${Ht - 10}" text-anchor="middle">${v.toFixed(d)}</text>`).join("")}</svg></div>`;
+      ${curve(cap && cap.sdWithin, "#16a34a")}${curve(cap && cap.sdOverall, "#2563eb", 1)}${vl(tol.lsl, "#dc2626", "LSL")}${vl(tol.usl, "#dc2626", "USL")}${vl(tol.target, "#2563eb", "Target")}${cap ? vl(cap.mean, "#16a34a", "Mean") : ""}<line x1="${L}" x2="${W - R}" y1="${Ht - B}" y2="${Ht - B}" stroke="#94a3b8"/>${[lo, lo + span / 2, hi].map((v) => `<text x="${x(v)}" y="${Ht - 10}" text-anchor="middle">${v.toFixed(d)}</text>`).join("")}</svg></div>`;
   }
 
   /* ================= the study page ================= */
@@ -120,12 +121,12 @@
       <h2 style="margin:0 0 2px">${saved ? esc(ch.title) : "New study — " + esc(TYPES[t][0])}</h2><div class="mut" style="margin-bottom:12px">${esc(TYPES[t][1])}${saved ? " · " + esc(ch.no) : ""}${ch.status === "closed" ? " · closed" : ""}${ch.sample ? " · sample data" : ""}</div>
       <div class="step noprint"><div class="sh"><span class="sn">1</span> About the study</div>${setupHtml(ch, saved, ed)}</div>
       <div class="step noprint"><div class="sh"><span class="sn">2</span> Enter the readings</div>${(ed ? entryHtml(ch) : '<p class="mut">This study is closed or you can only view it.</p>') + tableHtml(ch, A, ed)}${saved ? "" : '<p class="mut noprint" style="font-size:12.5px;margin:8px 0 0">Nothing is stored until you press <b>Save the study</b> in step 1 — the report below builds as you type.</p>'}</div>
-      <div class="step" data-nofilter><div class="sh"><span class="sn">3</span> Study report${saved ? "" : ' <span class="mut" style="font-weight:400;font-size:13px">(live preview)</span>'}</div><div id="rep">${reportHtml(ch, A, saved && ed)}</div></div>`;
+      <div class="step" data-nofilter><div class="sh"><span class="sn">3</span> Study report${saved ? "" : ' <span class="mut" style="font-weight:400;font-size:13px">(live preview)</span>'}</div>${viewBar(ch)}<div id="rep">${repOf(ch, A, saved && ed)}</div></div>`;
     wire(ch, A);
   }
 
   function syncSetup(ch) { const p = readSetup(ch); delete p.id; Object.assign(ch, p); }
-  function liveReport(ch) { if (ch.id || !$("#rep")) return; syncSetup(ch); S.an = analyse(ch, ch.rows); $("#rep").innerHTML = reportHtml(ch, S.an, false); }
+  function liveReport(ch) { if (ch.id || !$("#rep")) return; syncSetup(ch); S.an = analyse(ch, ch.rows); $("#rep").innerHTML = repOf(ch, S.an, false); }
   /* ----- 1: setup (always on the page, no pop-up) ----- */
   function setupHtml(ch, saved, ed) {
     const t = ch.chart_type, vr = VAR.includes(t), ru = ch.rules || {}, rl = ru.rules || [1, 2, 3], meta = ru.meta || {}, dis = saved && !ed ? " disabled" : "";
@@ -186,15 +187,58 @@
     }).join("")}</tbody></table></div>${rows.length > 30 ? `<p><a href="#" id="showAll">${S.all ? "Show only the last 30" : "Show all " + rows.length}</a></p>` : ""}`;
   }
 
-  /* ----- 3: report (as in the AIAG SPC manual) ----- */
-  function reportHtml(ch, A, ed) {
-    const t = ch.chart_type, vr = A.vr, d = dpOf(ch), meta = (ch.rules || {}).meta || {}, tol = A.tol, co = (QP.ctx && QP.ctx.company) || "";
-    const head = `<table class="tb2 rh"><tbody><tr><th>Company</th><td>${esc(co)}</td><th>Study no.</th><td>${esc(ch.no)}</td></tr>
+  function headOf(ch, A) {
+    const t = ch.chart_type, vr = A.vr, meta = (ch.rules || {}).meta || {}, tol = A.tol, co = (QP.ctx && QP.ctx.company) || "";
+    return `<table class="tb2 rh"><tbody><tr><th>Company</th><td>${esc(co)}</td><th>Study no.</th><td>${esc(ch.no)}</td></tr>
       <tr><th>Part number / name</th><td>${esc([ch.part_no, ch.part_name].filter(Boolean).join(" · ") || "—")}</td><th>Characteristic</th><td>${esc(ch.characteristic || "—")}</td></tr>
       <tr><th>Process / machine</th><td>${esc(ch.process || "—")}</td><th>Specification</th><td>${vr && tol.ok ? esc(tol.symbol) + (ch.unit ? " " + esc(ch.unit) : "") : "—"}</td></tr>
       <tr><th>Chart type</th><td>${esc(TYPES[t][0])} — ${esc(TYPES[t][1])}</td><th>Group size / frequency</th><td>${vr && t !== "imr" ? esc(ch.subgroup_size) + " readings" : t === "np" ? esc(ch.subgroup_size) + " inspected" : "—"}${meta.freq ? " · " + esc(meta.freq) : ""}</td></tr>
       <tr><th>Gauge used</th><td>${esc(meta.gauge || "—")}</td><th>Unit of measure</th><td>${esc(ch.unit || "—")}</td></tr>
       <tr><th>Period covered</th><td>${ch.rows.length ? fmt(ch.rows[0].taken_at) + " to " + fmt(ch.rows[ch.rows.length - 1].taken_at) : "—"}</td><th>Prepared by</th><td>${esc(meta.by || "—")}</td></tr></tbody></table>`;
+  }
+  /* ----- 3b: capability study report (Cp, Cpk, Pp, Ppk) ----- */
+  function capReportHtml(ch, A, ed) {
+    const t = ch.chart_type, d = dpOf(ch), tol = A.tol, cap = A.cap, res = A.res, meta = (ch.rules || {}).meta || {}, head = headOf(ch, A);
+    const note = (m) => head + `<div class="empty" style="margin-top:12px">${m}</div>`;
+    if (!A.vr) return note("A capability study (Cp, Cpk) needs measured values. Counted data (rejects, defects) is judged by the p, np, c or u chart and its centre line — the average fraction or number of defects.");
+    if (!tol.ok) return note("Enter the specification in step 1 (choose how the tolerance is written and type the values). Cp, Cpk, Pp and Ppk are worked out from it.");
+    if (!hasF("spc.capability-analysis")) return note('🔒 Capability analysis is not part of your plan. <a href="#" id="capLock">Find out how to add it</a>');
+    if (!res || !cap) return note("Enter at least two " + (t === "imr" ? "readings" : "groups") + " in step 2 and the capability report appears here.");
+    const sigN = new Set(A.sig.map((s) => s.i)).size, nG = A.rows.length, few = (t === "imr" ? nG < 100 : nG < 25), skewed = Math.abs(cap.skew) > 1, hasG = !!meta.gauge;
+    const chk = (ok, title, txt) => `<tr><td style="width:34px;text-align:center;font-size:17px">${ok ? "✔" : "⚠"}</td><td><b>${title}</b><br><span class="mut">${txt}</span></td></tr>`;
+    const st = (v) => (v == null ? "" : `<span class="chip ${v >= 1.33 ? "g" : v >= 1 ? "a" : "r"}">${C.verdict(v)}</span>`);
+    const x = (v, dd) => (v == null ? "—" : f(v, dd));
+    const ppmf = (v) => (v == null ? "—" : Math.round(v).toLocaleString("en-IN"));
+    const row = (nm, mean, v, ex) => `<tr><td><b>${nm}</b></td><td>${mean}</td><td>${ex}</td><td><b>${x(v, 2)}</b></td><td>${st(v)}</td></tr>`;
+    const lo = tol.lsl, hi = tol.usl, cs = [];
+    cs.push(sigN ? `<b>The process was not stable</b> (${sigN} signal${sigN > 1 ? "s" : ""} on the control chart). Cp and Cpk describe a stable process; treat the figures as a rough guide until the causes are removed.` : "The control chart shows no signals: the process was stable during this study, so the indices are meaningful.");
+    cs.push(`<b>Within-group capability:</b> Cp ${x(cap.cp, 2)}${cap.cpk != null ? ", Cpk " + x(cap.cpk, 2) + " — " + C.verdict(cap.cpk).toLowerCase() : ""}.${cap.cp != null && cap.cpk != null && cap.cp - cap.cpk > 0.15 ? " Cp is clearly higher than Cpk: the process spread would fit but the average is off-centre — re-centre first." : ""}`);
+    cs.push(`<b>Long-term performance:</b> Pp ${x(cap.pp, 2)}${cap.ppk != null ? ", Ppk " + x(cap.ppk, 2) + " — " + C.verdict(cap.ppk).toLowerCase() : ""}. Expected ${ppmf(cap.ppmOverall)} ppm outside the specification (overall spread).`);
+    if (cap.ppk != null) cs.push(cap.ppk >= 1.67 ? "Meets the usual PPAP initial-study requirement (Ppk ≥ 1.67)." : cap.ppk >= 1.33 ? "Below the usual PPAP initial-study requirement (Ppk ≥ 1.67) but meets 1.33 for ongoing production. Follow your customer's requirement." : "Does not meet the usual requirements (Ppk ≥ 1.67 initial study, Cpk ≥ 1.33 in production). Reduce variation, re-centre the process, or agree a containment and reaction plan with the customer.");
+    if (few) cs.push(`Only ${nG} ${t === "imr" ? "readings" : "groups"}. The manual asks for ${t === "imr" ? "100 readings" : "at least 25 groups (100 or more readings)"} before the indices are relied on.`);
+    if (skewed) cs.push("The readings are clearly skewed. The indices assume a roughly normal distribution — check the histogram, and use a method for non-normal data if needed.");
+    return `${head}<h4 class="rt">Before quoting the numbers — checks</h4>
+      <table class="tb2" data-nofilter><tbody>${chk(!sigN, "Process stable?", sigN ? sigN + " signal(s) on the control chart — see the control chart report." : "No signals on the control chart.")}${chk(hasG, "Measurement system known?", hasG ? esc(meta.gauge) + " — confirm its Gage R&R is acceptable (under 10%, or up to 30% with agreement)." : "Name the gauge used in step 1 and keep its MSA on file.")}${chk(!few, "Enough data?", nG + " " + (t === "imr" ? "readings" : "groups") + " (" + cap.n + " readings in all); the manual asks for 25 groups / 100 readings.")}${chk(!skewed, "Roughly normal?", "Skewness " + f(cap.skew, 2) + ", kurtosis " + f(cap.kurt, 2) + (skewed ? " — clearly skewed." : " — acceptable."))}</tbody></table>
+      ${svgHist(res.all, tol, cap, d, true)}
+      <p class="mut" style="font-size:12.5px;margin:2px 0 8px"><span style="color:#16a34a;font-weight:700">━</span> normal curve from the within-group spread &nbsp; <span style="color:#2563eb;font-weight:700">╌</span> normal curve from the overall spread &nbsp; · &nbsp; ${cap.outOfSpec} of ${cap.n} readings are outside the specification</p>
+      <h4 class="rt">Capability and performance indices</h4>
+      <div class="sc"><table class="tb2" data-nofilter><thead><tr><th>Index</th><th>Spread used (σ)</th><th>Formula</th><th>Value</th><th>Verdict</th></tr></thead><tbody>
+        ${row("Cp", "within · " + f(cap.sdWithin, d + 3), cap.cp, "(USL − LSL) / 6σ")}${row("CPU", "within", cap.cpu, "(USL − X̄) / 3σ")}${row("CPL", "within", cap.cpl, "(X̄ − LSL) / 3σ")}${row("Cpk", "within", cap.cpk, "smaller of CPU and CPL")}
+        ${row("Pp", "overall · " + f(cap.sdOverall, d + 3), cap.pp, "(USL − LSL) / 6s")}${row("PPU", "overall", cap.ppu, "(USL − X̄) / 3s")}${row("PPL", "overall", cap.ppl, "(X̄ − LSL) / 3s")}${row("Ppk", "overall", cap.ppk, "smaller of PPU and PPL")}${cap.cpm != null ? row("Cpm", "overall, about target", cap.cpm, "(USL − LSL) / 6√(s² + (X̄ − T)²)") : ""}</tbody></table></div>
+      <p class="mut" style="font-size:12.5px;margin:4px 0 0">σ within = ${A.n > 1 ? (t === "xs" ? "S̄ / c₄" : "R̄ / d₂") : "MR̄ / 1.128"}; s overall = standard deviation of all ${cap.n} readings. Mean ${f(cap.mean, d + 2)} · lowest ${f(cap.min, d + 2)} · highest ${f(cap.max, d + 2)} · LSL ${lo != null ? f(lo, d + 2) : "—"} · USL ${hi != null ? f(hi, d + 2) : "—"}${tol.target != null ? " · target " + f(tol.target, d + 2) : ""}${tol.tolerance != null ? " · tolerance " + f(tol.tolerance, d + 2) : ""}.</p>
+      <div class="sc"><table class="tb2" data-nofilter style="margin-top:8px"><thead><tr><th>Expected outside the specification</th><th>Total</th></tr></thead><tbody><tr><td>Within-group spread</td><td><b>${ppmf(cap.ppmWithin)} ppm</b></td></tr><tr><td>Overall spread</td><td><b>${ppmf(cap.ppmOverall)} ppm</b></td></tr></tbody></table></div>
+      <h4 class="rt">How to read the verdict</h4>
+      <table class="tb2" data-nofilter><thead><tr><th>Index value</th><th>Verdict</th><th>Meaning</th></tr></thead><tbody><tr><td>1.67 or more</td><td><span class="chip g">Capable</span></td><td>Meets the usual initial-study requirement (PPAP, Ppk).</td></tr><tr><td>1.33 to 1.67</td><td><span class="chip g">Acceptable</span></td><td>Usual requirement for ongoing production (Cpk).</td></tr><tr><td>1.00 to 1.33</td><td><span class="chip a">Marginal</span></td><td>Process needs close control; improvement action expected.</td></tr><tr><td>Below 1.00</td><td><span class="chip r">Not capable</span></td><td>Process cannot reliably meet the specification — act on the process, 100% inspect meanwhile.</td></tr></tbody></table>
+      <h4 class="rt">Conclusion</h4><ul style="margin:0 0 10px;padding-left:20px">${cs.map((z) => `<li>${z}</li>`).join("")}</ul>
+      <table class="tb2 sign"><tbody><tr><th>Prepared by</th><td>${esc(meta.by || "")}</td><th>Date</th><td></td><th>Reviewed / approved by</th><td></td><th>Date</th><td></td></tr></tbody></table>
+      <p class="mut" style="font-size:11.5px;margin:6px 0 0">Prepared as a process capability study according to the AIAG Statistical Process Control manual (Cp, Cpk from the within-group spread; Pp, Ppk from the overall spread) and the PPAP initial process study guidance.</p>`;
+  }
+  const repOf = (ch, A, ed) => (S.view === "cap" ? capReportHtml(ch, A, ed) : reportHtml(ch, A, ed));
+  const viewBar = (ch) => (VAR.includes(ch.chart_type) ? `<div class="seg noprint" id="s_view" style="margin:0 0 10px"><button type="button" data-view="chart" class="${S.view === "cap" ? "" : "on"}">Control chart report</button><button type="button" data-view="cap" class="${S.view === "cap" ? "on" : ""}">Capability report (Cp, Cpk)</button></div>` : "");
+  /* ----- 3: report (as in the AIAG SPC manual) ----- */
+  function reportHtml(ch, A, ed) {
+    const t = ch.chart_type, vr = A.vr, d = dpOf(ch), meta = (ch.rules || {}).meta || {}, tol = A.tol, co = (QP.ctx && QP.ctx.company) || "";
+    const head = headOf(ch, A);
     if (!A.res) return head + `<div class="empty" style="margin-top:12px">${ch.rows.length ? "Enter at least two " + (vr ? "groups" : "readings") + " to draw the charts." : "No readings yet. Enter them in step 2 and the charts, limits and conclusion appear here."}</div>`;
     const lbl = A.rows.map((r) => lblOf(ch, r)), sigN = new Set(A.sig.map((s) => s.i)).size, cap = A.cap, res = A.res;
     // limits table with the constants used
@@ -242,6 +286,7 @@
   function wire(ch, A) {
     const b = (id, fn) => { const e = $("#" + id); if (e) e.onclick = fn; };
     if (VAR.includes(ch.chart_type)) Tol.wire("tl");
+    document.querySelectorAll("#s_view button").forEach((x) => (x.onclick = () => { if (!ch.id) syncSetup(ch); S.view = x.dataset.view; render(); }));
     document.querySelectorAll("#s_rules button").forEach((x) => (x.onclick = () => { x.classList.toggle("on"); liveReport(ch); }));
     if (!ch.id) { const fs = document.querySelector("#chart fieldset"); if (fs) { let tm; fs.addEventListener("input", (e) => { if (e.target.id === "s_sub") return; clearTimeout(tm); tm = setTimeout(() => liveReport(ch), 250); }); const sb = $("#s_sub"); if (sb) sb.onchange = () => { syncSetup(ch); render(); }; } }
     b("b_setup", async () => {
