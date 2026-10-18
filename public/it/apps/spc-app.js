@@ -115,15 +115,17 @@
     return ch.chart_type === "c" ? `${v[0]} defects` : ch.chart_type === "u" ? `${v[0]} defects in ${v[1]}` : `${v[0]} of ${v[1]}`;
   }
   function render() {
-    const ch = S.ch, el = $("#chart"), saved = !!ch.id, ed = canEdit() && ch.status === "active", A = (S.an = saved ? analyse(ch, ch.rows) : analyse(ch, [])), t = ch.chart_type;
+    const ch = S.ch, el = $("#chart"), saved = !!ch.id, ed = canEdit() && ch.status === "active", A = (S.an = analyse(ch, ch.rows)), t = ch.chart_type;
     el.innerHTML = `<div class="row noprint"><a href="#go=list" class="btn o s">← All studies</a><div style="flex:1"></div>${saved ? `<button class="btn o s" id="b_print">Print report</button><button class="btn o s" id="b_exp">Export</button>${canEdit() ? `<button class="btn o s" id="b_close">${ch.status === "active" ? "Close study" : "Reopen study"}</button><button class="btn r s" id="b_del">Delete</button>` : ""}` : ""}</div>
       <h2 style="margin:0 0 2px">${saved ? esc(ch.title) : "New study — " + esc(TYPES[t][0])}</h2><div class="mut" style="margin-bottom:12px">${esc(TYPES[t][1])}${saved ? " · " + esc(ch.no) : ""}${ch.status === "closed" ? " · closed" : ""}${ch.sample ? " · sample data" : ""}</div>
       <div class="step noprint"><div class="sh"><span class="sn">1</span> About the study</div>${setupHtml(ch, saved, ed)}</div>
-      <div class="step noprint"><div class="sh"><span class="sn">2</span> Enter the readings</div>${saved ? (ed ? entryHtml(ch) : '<p class="mut">This study is closed or you can only view it.</p>') + tableHtml(ch, A, ed) : '<p class="mut" style="margin:0">Save the study details above first. Then the entry boxes appear here.</p>'}</div>
-      <div class="step" data-nofilter><div class="sh"><span class="sn">3</span> Study report</div>${saved ? reportHtml(ch, A, ed) : '<p class="mut" style="margin:0">The report appears here as soon as you have entered readings.</p>'}</div>`;
+      <div class="step noprint"><div class="sh"><span class="sn">2</span> Enter the readings</div>${(ed ? entryHtml(ch) : '<p class="mut">This study is closed or you can only view it.</p>') + tableHtml(ch, A, ed)}${saved ? "" : '<p class="mut noprint" style="font-size:12.5px;margin:8px 0 0">Nothing is stored until you press <b>Save the study</b> in step 1 — the report below builds as you type.</p>'}</div>
+      <div class="step" data-nofilter><div class="sh"><span class="sn">3</span> Study report${saved ? "" : ' <span class="mut" style="font-weight:400;font-size:13px">(live preview)</span>'}</div><div id="rep">${reportHtml(ch, A, saved && ed)}</div></div>`;
     wire(ch, A);
   }
 
+  function syncSetup(ch) { const p = readSetup(ch); delete p.id; Object.assign(ch, p); }
+  function liveReport(ch) { if (ch.id || !$("#rep")) return; syncSetup(ch); S.an = analyse(ch, ch.rows); $("#rep").innerHTML = reportHtml(ch, S.an, false); }
   /* ----- 1: setup (always on the page, no pop-up) ----- */
   function setupHtml(ch, saved, ed) {
     const t = ch.chart_type, vr = VAR.includes(t), ru = ch.rules || {}, rl = ru.rules || [1, 2, 3], meta = ru.meta || {}, dis = saved && !ed ? " disabled" : "";
@@ -141,7 +143,7 @@
         <div class="frm"><div><label>Run length for signal 2</label><input id="s_run" type="number" min="5" max="12" value="${esc(ru.run || 7)}"></div><div><label>Rise / fall length for signal 3</label><input id="s_trend" type="number" min="5" max="12" value="${esc(ru.trend || 7)}"></div>
         <div><label>Work out the limits from the first … groups <span class="mut">(blank = all)</span></label><input id="s_lf" type="number" min="3" value="${esc(ch.limits_from || "")}"></div></div></details>
       <div class="w" style="margin-top:10px"><label>Notes</label><textarea id="s_notes" rows="2">${esc(ch.notes || "")}</textarea></div>
-      ${!saved || ed ? `<div class="row" style="margin-top:10px"><button class="btn" id="b_setup">${saved ? "Save changes" : "Save the study and start entering readings"}</button></div>` : ""}</fieldset>`;
+      ${!saved || ed ? `<div class="row" style="margin-top:10px"><button class="btn" id="b_setup">${saved ? "Save changes" : "Save the study"}</button></div>` : ""}</fieldset>`;
   }
   function readSetup(ch) {
     const t = ch.chart_type, vr = VAR.includes(t), o = vr ? Tol.read("tl") : null, old = ch.rules || {};
@@ -240,18 +242,19 @@
   function wire(ch, A) {
     const b = (id, fn) => { const e = $("#" + id); if (e) e.onclick = fn; };
     if (VAR.includes(ch.chart_type)) Tol.wire("tl");
-    document.querySelectorAll("#s_rules button").forEach((x) => (x.onclick = () => x.classList.toggle("on")));
+    document.querySelectorAll("#s_rules button").forEach((x) => (x.onclick = () => { x.classList.toggle("on"); liveReport(ch); }));
+    if (!ch.id) { const fs = document.querySelector("#chart fieldset"); if (fs) { let tm; fs.addEventListener("input", (e) => { if (e.target.id === "s_sub") return; clearTimeout(tm); tm = setTimeout(() => liveReport(ch), 250); }); const sb = $("#s_sub"); if (sb) sb.onchange = () => { syncSetup(ch); render(); }; } }
     b("b_setup", async () => {
       const p = readSetup(ch); if (!p.title.trim()) { say("Give the study a name."); $("#s_title").focus(); return; } if (!p.rules.rules.length) { say("Choose at least one signal to look for."); return; }
       if (VAR.includes(ch.chart_type) && $("#tl_type") && !Tol.read("tl").ok && (V("tl_n") || V("tl_a"))) { say("Check the specification values: the upper limit must be above the lower limit."); return; }
-      try { const r = await call("kmr_spc_save", { p }); say("Saved.", true); if (!ch.id) goChart(r.id); else { S.ch = await call("kmr_spc_get", { p_id: ch.id }); render(); } } catch (e) { say(e.message); }
+      try { const r = await call("kmr_spc_save", { p }); if (!ch.id && ch.rows.length) { const rows = ch.rows.map((x) => ({ label: x.label, taken_at: x.taken_at, vals: x.vals, note: x.note })); for (let i = 0; i < rows.length; i += 400) await call("kmr_spc_points_add", { p_chart: r.id, p_rows: rows.slice(i, i + 400) }); } say("Saved.", true); if (!ch.id) goChart(r.id); else { S.ch = await call("kmr_spc_get", { p_id: ch.id }); render(); } } catch (e) { say(e.message); }
     });
     b("b_print", () => window.print()); b("b_exp", () => exportJson(ch));
     b("b_close", async () => { try { await call("kmr_spc_save", { p: Object.assign({}, ch, { status: ch.status === "active" ? "closed" : "active" }) }); goChart(ch.id); } catch (e) { say(e.message); } });
     b("b_del", async () => { if (!confirm("Delete this study and all its readings? This cannot be undone.")) return; try { await call("kmr_spc_delete", { p_id: ch.id }); say("Study deleted.", true); setGo("go=list"); route(); } catch (e) { say(e.message); } });
     b("showAll", (e) => { e.preventDefault(); S.all = !S.all; render(); }); b("capLock", (e) => { e.preventDefault(); if (window.KMRLock) KMRLock.need("spc.capability-analysis"); });
     const reload = async (msg) => { S.ch = await call("kmr_spc_get", { p_id: ch.id }); S.edit = null; render(); if (msg) say(msg, true); };
-    const add = async (rows) => { try { await call("kmr_spc_points_add", { p_chart: ch.id, p_rows: rows }); await reload(rows.length + (rows.length > 1 ? " readings added." : " reading added.")); setTimeout(() => { const i = document.querySelector(".e_v"); if (i) i.focus(); }, 50); } catch (e) { say(e.message); } };
+    const add = async (rows) => { if (!ch.id) { syncSetup(ch); let sq = ch.rows.length ? Math.max(...ch.rows.map((r) => r.seq)) : 0; rows.forEach((r) => { sq++; ch.rows.push({ id: "d" + sq, seq: sq, label: r.label, vals: r.vals, note: r.note, taken_at: r.taken_at || new Date().toISOString() }); }); render(); setTimeout(() => { const i = document.querySelector(".e_v"); if (i) i.focus(); }, 50); return; } try { await call("kmr_spc_points_add", { p_chart: ch.id, p_rows: rows }); await reload(rows.length + (rows.length > 1 ? " readings added." : " reading added.")); setTimeout(() => { const i = document.querySelector(".e_v"); if (i) i.focus(); }, 50); } catch (e) { say(e.message); } };
     b("e_add", () => {
       const vals = [...document.querySelectorAll(".e_v")].map((i) => num(i.value)), t = ch.chart_type; let v = vals.filter((x) => x != null);
       if (VAR.includes(t)) { if (v.length < (t === "imr" ? 1 : 2)) { say("Enter " + (t === "imr" ? "the reading." : "at least two readings in the group.")); return; } }
@@ -262,10 +265,10 @@
     const pa = $("#e_paste"); if (pa) pa.oninput = () => { $("#e_pc").textContent = parsePaste(ch, pa.value).length + " row(s) found"; };
     b("e_padd", () => { const r = parsePaste(ch, V("e_paste")); if (!r.length) { say("Nothing to add — check that the lines hold numbers."); return; } add(r.slice(0, 500).map((x) => ({ label: x.label, vals: x.vals }))); });
     document.querySelectorAll(".e_v").forEach((i, k, all) => i.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); if (k < all.length - 1) all[k + 1].focus(); else $("#e_add").click(); } }));
-    document.querySelectorAll("[data-ed]").forEach((x) => (x.onclick = () => { S.edit = x.dataset.ed; render(); }));
-    b("x_c", () => { S.edit = null; render(); });
-    document.querySelectorAll("[data-xs]").forEach((x) => (x.onclick = async () => { const v = nums(V("x_vals")); if (!v.length) { say("Check the readings."); return; } try { await call("kmr_spc_point_save", { p: { id: x.dataset.xs, label: V("x_label"), vals: v, note: V("x_note") } }); await reload("Saved."); } catch (e) { say(e.message); } }));
-    document.querySelectorAll("[data-rm]").forEach((x) => (x.onclick = async () => { if (!confirm("Delete this reading?")) return; try { await call("kmr_spc_point_delete", { p_id: x.dataset.rm }); await reload(); } catch (e) { say(e.message); } }));
+    document.querySelectorAll("[data-ed]").forEach((x) => (x.onclick = () => { if (!ch.id) syncSetup(ch); S.edit = x.dataset.ed; render(); }));
+    b("x_c", () => { S.edit = null; if (!ch.id) syncSetup(ch); render(); });
+    document.querySelectorAll("[data-xs]").forEach((x) => (x.onclick = async () => { const v = nums(V("x_vals")); if (!v.length) { say("Check the readings."); return; } if (!ch.id) { const r = ch.rows.find((y) => y.id === x.dataset.xs); if (r) { r.label = V("x_label"); r.vals = v; r.note = V("x_note"); } S.edit = null; syncSetup(ch); render(); return; } try { await call("kmr_spc_point_save", { p: { id: x.dataset.xs, label: V("x_label"), vals: v, note: V("x_note") } }); await reload("Saved."); } catch (e) { say(e.message); } }));
+    document.querySelectorAll("[data-rm]").forEach((x) => (x.onclick = async () => { if (!confirm("Delete this reading?")) return; if (!ch.id) { syncSetup(ch); ch.rows = ch.rows.filter((r) => r.id !== x.dataset.rm); render(); return; } try { await call("kmr_spc_point_delete", { p_id: x.dataset.rm }); await reload(); } catch (e) { say(e.message); } }));
     ["cause", "action"].forEach((k) => document.querySelectorAll(`[data-${k}]`).forEach((x) => (x.onchange = async () => { try { await call("kmr_spc_point_save", { p: { id: x.dataset[k], [k]: x.value } }); const r = ch.rows.find((y) => y.id === x.dataset[k]); if (r) r[k] = x.value.trim() || null; say("Saved.", true); } catch (e) { say(e.message); } })));
     document.querySelectorAll("[data-task]").forEach((x) => (x.onclick = () => {
       const s = A.sig[Number(x.dataset.task)], lb = lblOf(ch, s.row);
