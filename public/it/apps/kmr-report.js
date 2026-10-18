@@ -54,11 +54,11 @@
   }
 
   function css() {
-    const i = info(), L = st.logo || i.logo;
+    const i = info(), L = st.logo || i.logo, o = st.over;
     const box = (n, body) => `@${n}{${body}}`;
     const txt = "font:600 9px 'Segoe UI',Arial,sans-serif;color:#111;white-space:normal;line-height:1.3;";
     const left = L ? box("top-left", `content:url(${q(L)});vertical-align:middle;text-align:left;width:34%;`) : box("top-left", `content:${q(i.company)};${txt}font-size:12px;font-weight:700;vertical-align:middle;text-align:left;width:34%;`);
-    return `@page{margin:25mm 10mm 17mm;
+    return `@page{${o.land ? "size:A4 landscape;" : ""}margin:25mm 10mm 17mm;
       ${left}
       ${box("top-center", `content:${q(i.title + (i.doc ? "\n" + i.doc : ""))};${txt}font-size:11px;font-weight:700;vertical-align:middle;text-align:center;white-space:pre-line;width:36%;`)}
       ${box("top-right", `content:${q("Report ref. no.\n" + i.ref)};${txt}vertical-align:middle;text-align:right;white-space:pre-line;width:30%;`)}
