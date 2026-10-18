@@ -199,7 +199,10 @@
   const kp = (a, b, c) => `<div class="kpi" style="--c:${c || "var(--b1)"};cursor:default"><b>${a}</b><span>${b}</span></div>`;
   function headTable(st, A) {
     const t = st.type, cfg = st.config || {}, tl = A.tl, co = (QP.ctx && QP.ctx.company) || "";
+    if (window.KMRReport) KMRReport.set({ key: t, doc: st.no || "" });
+    const ri = window.KMRReport ? KMRReport.info() : null;
     return `<table class="tb2 rh"><tbody><tr><th>Company</th><td>${esc(co)}</td><th>Study no.</th><td>${esc(st.no || "(not saved yet)")}</td></tr>
+      ${ri ? `<tr><th>Report ref. no.</th><td>${esc(ri.ref)}</td><th>Format no. · rev.</th><td>${esc(ri.format)} · Rev ${esc(ri.rev)} · ${esc(ri.date)}</td></tr>` : ""}
       <tr><th>Gauge number / name</th><td>${esc([st.gauge_id, st.gauge_name].filter(Boolean).join(" · ") || "—")}</td><th>Study type</th><td>${esc(TYPES[t][0])}</td></tr>
       <tr><th>Characteristic</th><td>${esc(st.characteristic || "—")}${st.unit ? " (" + esc(st.unit) + ")" : ""}</td><th>Specification / tolerance</th><td>${tl && tl.ok ? esc(tl.symbol) + (tl.tolerance != null ? " · tolerance " + tl.tolerance : "") : "—"}</td></tr>
       <tr><th>Part number / name</th><td>${esc([st.part_no, st.part_name].filter(Boolean).join(" · ") || "—")}</td><th>Date · done by</th><td>${fmt(st.study_date)}${st.conducted_by ? " · " + esc(st.conducted_by) : ""}</td></tr>

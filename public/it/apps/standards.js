@@ -237,9 +237,12 @@ ops:[
 ['ISO','7.2 / 7.3','Competence and awareness','Every screen of every app shows a short guide after each completed field (what to look at next); it can be switched off once the user knows the screens.']]
 };
 var CSS='.kstd table{width:100%;border-collapse:collapse}.kstd th,.kstd td{padding:8px 10px;border-bottom:1px solid var(--line,#e2e6ea);text-align:left;vertical-align:top;font-size:13px}.kstd th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut,#667)}.kstd .ch{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}.kstd .ch button{border:1px solid var(--line,#cfd6dd);background:transparent;color:inherit;border-radius:999px;padding:4px 11px;font-size:12px;cursor:pointer}.kstd .ch button.on{background:#0b6b4b;color:#fff;border-color:#0b6b4b}.kstd .mut{color:var(--mut,#667);font-size:13px}@media print{.kstd .ch button:not(.on){display:none}.kstd .noprint{display:none}}';
+var REP=[['ISO','7.5.2','Creating and updating documented information - identification and format','Every report printed or saved as PDF carries the customer logo top left, an automatically generated unique report reference number, and the report format number, revision and revision date in the footer of every page, with who printed it and when.'],
+['ISO','7.5.3.2','Control of documented information - change control and versions','The revision and revision date of each report format are kept in one register for all apps; when a layout changes, the revision is raised, so a printed report shows which format version it was made on.'],
+['IATF','7.5.3.2.1','Control of records - retention and retrieval','The unique reference number and page numbering (page x of y) let a printed report be found, matched to the record and checked for missing pages.']];
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})}
 function draw(el,key,o){
- o=o||{};var rows=A[key]||[];if(!el)return;
+ o=o||{};var rows=(A[key]||[]).concat(A[key]?REP:[]);if(!el)return;
  if(!document.getElementById('kstd-css')){var s=document.createElement('style');s.id='kstd-css';s.textContent=CSS;document.head.appendChild(s)}
  var ev=o.evidence||null,sel=el._kstd||'';
  var cnt={};rows.forEach(function(r){cnt[r[0]]=(cnt[r[0]]||0)+1});

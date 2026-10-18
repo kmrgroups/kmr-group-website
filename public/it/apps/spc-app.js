@@ -189,7 +189,10 @@
 
   function headOf(ch, A) {
     const t = ch.chart_type, vr = A.vr, meta = (ch.rules || {}).meta || {}, tol = A.tol, co = (QP.ctx && QP.ctx.company) || "";
+    if (window.KMRReport) KMRReport.set({ key: S.view === "cap" && vr ? "cap" : "chart", doc: ch.no || "" });
+    const ri = window.KMRReport ? KMRReport.info() : null;
     return `<table class="tb2 rh"><tbody><tr><th>Company</th><td>${esc(co)}</td><th>Study no.</th><td>${esc(ch.no)}</td></tr>
+      ${ri ? `<tr><th>Report ref. no.</th><td>${esc(ri.ref)}</td><th>Format no. · rev.</th><td>${esc(ri.format)} · Rev ${esc(ri.rev)} · ${esc(ri.date)}</td></tr>` : ""}
       <tr><th>Part number / name</th><td>${esc([ch.part_no, ch.part_name].filter(Boolean).join(" · ") || "—")}</td><th>Characteristic</th><td>${esc(ch.characteristic || "—")}</td></tr>
       <tr><th>Process / machine</th><td>${esc(ch.process || "—")}</td><th>Specification</th><td>${vr && tol.ok ? esc(tol.symbol) + (ch.unit ? " " + esc(ch.unit) : "") : "—"}</td></tr>
       <tr><th>Chart type</th><td>${esc(TYPES[t][0])} — ${esc(TYPES[t][1])}</td><th>Group size / frequency</th><td>${vr && t !== "imr" ? esc(ch.subgroup_size) + " readings" : t === "np" ? esc(ch.subgroup_size) + " inspected" : "—"}${meta.freq ? " · " + esc(meta.freq) : ""}</td></tr>
