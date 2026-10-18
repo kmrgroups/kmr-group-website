@@ -4,6 +4,7 @@
 (function () {
   "use strict";
   { const sc = document.createElement("script"); sc.src = "/it/apps/kmr-table.js"; sc.defer = true; document.head.append(sc); }
+  { const sd = document.createElement("script"); sd.src = "/it/apps/kmr-dev.js"; document.head.append(sd); }   // developer-only "Sample data" button in the footer
   { const sr = document.createElement("script"); sr.src = "/it/apps/kmr-report.js"; document.head.append(sr); }   // report frame: customer logo, unique reference, format revision footer on every printed page
   let portal = null; try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {}
   const demo = /[?&]demo=1(&|$)/.test(location.search);
