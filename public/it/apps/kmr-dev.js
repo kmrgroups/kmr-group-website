@@ -42,9 +42,11 @@
     box.querySelector("#kdFlush").onclick = () => { if (confirm("Remove the sample data of " + NAME + " from " + slug() + "? Real records are not touched.")) act("flush", box); };
   }
   function addButton() {
-    const slot = document.getElementById("kmrPlant") || document.querySelector(".kmr-foot .kmr-slot:last-child"); if (!slot || document.getElementById("kmrDevSample")) return;
+    if (document.getElementById("kmrDevSample")) return;
+    const role = document.getElementById("role"), slot = document.getElementById("kmrPlant") || document.querySelector(".kmr-foot .kmr-slot:last-child"); if (!role && !slot) return;
     const b = document.createElement("button"); b.type = "button"; b.id = "kmrDevSample"; b.className = "noprint"; b.title = "Developer only: load or remove sample data for this app";
-    b.style.cssText = "font:700 12px 'Segoe UI',Arial;border:1px solid #7C3AED;color:#5b21b6;background:#f5f3ff;border-radius:8px;padding:2px 10px;cursor:pointer;margin-left:8px;white-space:nowrap"; b.textContent = "🧪 Sample data"; b.onclick = open; slot.append(b);
+    b.style.cssText = "font:700 12.5px 'Segoe UI',Arial;border:1px solid #fbbf24;color:#1a1305;background:linear-gradient(180deg,#ffe08a,#f3c55a);border-radius:999px;padding:4px 12px;cursor:pointer;margin-left:8px;white-space:nowrap"; b.textContent = "🧪 Sample data (developer)"; b.onclick = open;
+    if (role) role.insertAdjacentElement("beforebegin", b); else slot.append(b);   // next to the signed-in e-mail at the top; footer when the app has no top chip
   }
   async function init() {
     if (!hasSession() || !slug()) return;
