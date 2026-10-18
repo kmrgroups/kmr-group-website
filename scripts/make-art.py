@@ -500,9 +500,9 @@ def app_spc():
 
 def app_msa():
     a = "#0F766E"
-    b = heading("Bore gauge BG-12 · Gage R&R", "3 appraisers · 10 parts · 3 trials")
+    b = heading("Bore gauge BG-12 · Gage R&amp;R", "3 appraisers · 10 parts · 3 trials")
     b += kpi(0, 38, 100, "%GRR", "26.7%", AMBER) + kpi(106, 38, 100, "Categories", "5", OK) + kpi(212, 38, 100, "Repeatability", "0.202", a) + kpi(318, 38, 102, "Decision", "Conditional", AMBER)
-    rows = [("Part-to-part", 96, OK), ("Repeatability (equipment)", 20, a), ("Reproducibility (appraiser)", 23, a), ("Gage R&R", 27, AMBER)]
+    rows = [("Part-to-part", 96, OK), ("Repeatability (equipment)", 20, a), ("Reproducibility (appraiser)", 23, a), ("Gage R&amp;R", 27, AMBER)]
     for i, (t, w, col) in enumerate(rows):
         y = 110 + i * 26
         b += f"<text x='0' y='{y + 11}' {FONT} font-size='10' fill='{INK}'>{t}</text><rect x='170' y='{y}' width='240' height='14' rx='7' fill='#E8EEF6'/><rect x='170' y='{y}' width='{int(240 * w / 100)}' height='14' rx='7' fill='{col}'/>"

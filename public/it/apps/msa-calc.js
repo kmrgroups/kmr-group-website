@@ -100,6 +100,6 @@
     } else { const k = mean(pairs.map((p) => p.kappa)); out.decision = k >= 0.75 ? "Acceptable" : k >= 0.4 ? "Conditional" : "Not acceptable"; }
     return out;
   }
-  const api = { grrRange, grrAnova, bias, linearity, attribute, kappa, fCdf, ibeta, tTwoSided, tInv, decide };
+  const api = { grrRange, grrAnova, bias, linearity, attribute, kappa, fCdf, ibeta, tTwoSided, tInv, decide, K1, K2, K3, D4 };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.MSACalc = api;
 })(typeof window !== "undefined" ? window : globalThis);

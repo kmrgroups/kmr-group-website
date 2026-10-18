@@ -40,14 +40,19 @@ input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{pa
 table.tb2{width:100%;border-collapse:collapse;font-size:13.5px}table.tb2 th{text-align:left;color:var(--mut);font-size:11.5px;text-transform:uppercase;padding:6px;border-bottom:1px solid var(--line)}table.tb2 td{padding:6px;border-bottom:1px solid var(--line);vertical-align:top}.sc{overflow-x:auto}
 .gtab input{width:78px;padding:7px}.gtab td{padding:3px}.gtab th{padding:3px 6px;font-size:11px}.ab{border:1.5px solid var(--line);background:var(--card);border-radius:8px;padding:6px 0;width:100%;font-weight:700;cursor:pointer}.ab.on{background:var(--b1);color:#fff;border-color:var(--b1)}.gr{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0}.gr input{width:84px;padding:8px}
 @media print{header,.tabs,.fab,.kmr-foot,.noprint,.kmr-demo{display:none!important}body{background:#fff;padding:0}.panel{border:0;padding:0}}
+.tcards{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}.tcard{text-align:left;border:1.5px solid var(--line);background:var(--card);border-radius:12px;padding:10px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px}.tcard:hover{border-color:var(--b1);box-shadow:0 2px 10px #0001}.tcard b{font-size:15px;color:var(--b1)}.tcard span{font-weight:600}.tcard small{color:var(--mut);line-height:1.35}.tcard.lk{opacity:.6}
+.step{border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px;background:var(--card)}.sh{font-weight:800;font-size:16px;margin-bottom:10px;display:flex;align-items:center;gap:8px}.sn{width:26px;height:26px;border-radius:50%;background:var(--b1);color:#fff;display:inline-grid;place-items:center;font-size:14px}
+.tolbox{border:1px dashed var(--line);border-radius:10px;padding:10px;background:var(--bg)}.tolout{margin-top:8px;font-size:13.5px}h4.rt{margin:16px 0 6px;font-size:14px;border-bottom:2px solid var(--b1);padding-bottom:3px}
+table.rh th{width:17%;background:var(--bg)}table.rh td{width:33%}table.sign th{background:var(--bg);width:11%}table.sign td{height:34px}.tb2 textarea{min-width:150px;font-size:13px;padding:6px}
+@media print{.step.noprint,.noprint{display:none!important}.step{border:0;padding:0}.sh{font-size:17px}.cc{break-inside:avoid}h4.rt{break-after:avoid}}
+.atabs{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}.atab{border:1px solid var(--line);border-radius:12px;padding:8px;background:var(--bg)}.ah{font-weight:800;margin-bottom:6px;color:var(--b1)}.ds th,.ds td{text-align:center;font-size:12.5px}.ds td:first-child,.ds th:first-child{text-align:left}
+@media(max-width:640px){table.rh,table.rh tbody,table.rh tr,table.rh th,table.rh td,table.sign,table.sign tbody,table.sign tr,table.sign th,table.sign td{display:block;width:auto!important}table.rh th,table.sign th{padding-top:8px}table.rh td{padding-bottom:6px}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>MSA Studies</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
 <div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="list" href="#go=list">Studies</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a></div>
 <main><div class="panel"><div id="msg"></div>
 <section id="std"></section><section id="list" class="hide"></section><section id="study" class="hide"></section><section id="dash" class="hide"></section></div></main>
-<button class="fab hide" id="fab">＋ New study</button>
-<div class="modal" id="m"><div class="in" id="mb"></div></div>
-<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{},names:{}};</script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{},names:{}};</script><script src="/it/apps/qp-core.js"></script><script src="/it/apps/kmr-tol.js"></script>
 <script src="/it/apps/spc-calc.js"></script><script src="/it/apps/msa-calc.js"></script>
 <script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/msa-demo.js"><\/script>')}</script>
 <script src="/it/apps/tsk-assign.js"></script><script src="/it/apps/msa-app.js"></script><script src="/it/apps/back.js"></script></body></html>
