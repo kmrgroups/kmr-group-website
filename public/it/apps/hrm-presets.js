@@ -142,6 +142,8 @@ def run_once():
         con.close()
     punches = []
     for code, at, direction in rows:
+        if str(code).strip().lstrip("0") == "":
+            continue                              # the empty starter row, not a person
         d = str(direction or "").strip().lower()
         punches.append({"bio_id": str(code).strip().lstrip("0") or "0", "time": to_dt(at).strftime("%Y-%m-%d %H:%M:%S"), "verify": "finger", "direction": "in" if d in IN_WORDS else "out" if d in OUT_WORDS else None})
     for i in range(0, len(punches), 2000):
