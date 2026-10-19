@@ -90,6 +90,79 @@ if __name__ == "__main__":
         time.sleep(EVERY_MIN * 60)
 `;
   }
-  const api = { HOLIDAYS, holidays, holidayYears, LEAVE_TYPES, SHIFTS, MACHINES, brandOf, BRAND_ALIAS, bridgeScript };
+
+  /* Realtime machines (RS9w ...) used with Realtime's "Attendance Tracker" program on a PC: that program can copy every punch into a MySQL or SQL Server table
+     ("Data Converter > Realtime Data Integration"). This bridge reads that table and sends the punches here. The machine and Realtime's own program are not touched. */
+  function realtimeBridgeScript(o) {
+    return `#!/usr/bin/env python3
+"""KMR HRM bridge for Realtime machines (Attendance Tracker program).
+Reads the punches that Realtime Attendance Tracker copies into a database table ("Data Converter > Realtime Data Integration")
+and sends them to KMR HRM & Payroll. Nothing is changed in the machine or in Realtime's program: it only READS the table.
+Setup (once):   pip install requests pymysql          (MySQL)      or      pip install requests pyodbc       (SQL Server)
+Run:            python kmr_realtime_bridge.py           (leave it running; checks every ${o.every || 2} minutes)
+                python kmr_realtime_bridge.py --once    (read once and stop)
+Safe to run again at any time: punches already received are ignored here, and the last 2 days are re-sent on purpose so nothing is missed."""
+import sys, time, json, os, datetime
+import requests
+
+DB_KIND = "${o.db || "mysql"}"                  # "mysql" or "sqlserver"
+DB_HOST, DB_PORT = "${o.host || "localhost"}", ${o.dbport || 3306}
+DB_NAME, DB_USER, DB_PASS = "${o.dbname || "attendance"}", "${o.dbuser || "kmr_reader"}", "PASTE-THE-DATABASE-PASSWORD"
+TABLE = "AttendanceLogs"                          # same table name as on the Realtime screen
+URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-HRM-MACHINE-SCREEN"}"
+EVERY_MIN = ${o.every || 2}
+STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kmr_realtime_state.json")
+IN_WORDS, OUT_WORDS = ("in", "i", "0", "check in"), ("out", "o", "1", "check out")
+
+def connect():
+    if DB_KIND == "sqlserver":
+        import pyodbc
+        return pyodbc.connect("DRIVER={ODBC Driver 17 for SQL Server};SERVER=%s,%s;DATABASE=%s;UID=%s;PWD=%s" % (DB_HOST, DB_PORT or 1433, DB_NAME, DB_USER, DB_PASS))
+    import pymysql
+    return pymysql.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS, database=DB_NAME, connect_timeout=15)
+
+def last_sent():
+    try:
+        return datetime.datetime.strptime(json.load(open(STATE))["last"], "%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return datetime.datetime(1970, 1, 1)
+
+def to_dt(v):
+    return v if isinstance(v, datetime.datetime) else datetime.datetime.strptime(str(v)[:19], "%Y-%m-%d %H:%M:%S")
+
+def run_once():
+    since = last_sent() - datetime.timedelta(days=2)
+    con = connect()
+    try:
+        cur = con.cursor()
+        ph = "?" if DB_KIND == "sqlserver" else "%s"
+        cur.execute("SELECT EmployeeCode, LogDateTime, Direction FROM " + TABLE + " WHERE LogDateTime >= " + ph + " ORDER BY LogDateTime", (since,))
+        rows = cur.fetchall()
+    finally:
+        con.close()
+    punches = []
+    for code, at, direction in rows:
+        d = str(direction or "").strip().lower()
+        punches.append({"bio_id": str(code).strip().lstrip("0") or "0", "time": to_dt(at).strftime("%Y-%m-%d %H:%M:%S"), "verify": "finger", "direction": "in" if d in IN_WORDS else "out" if d in OUT_WORDS else None})
+    for i in range(0, len(punches), 2000):
+        r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
+        r.raise_for_status()
+    if punches:
+        json.dump({"last": max(p["time"] for p in punches)}, open(STATE, "w"))
+    print(datetime.datetime.now().strftime("%H:%M:%S"), len(punches), "punch(es) sent")
+
+if __name__ == "__main__":
+    while True:
+        try:
+            run_once()
+        except Exception as e:
+            print("Could not read/send:", e, "- will try again")
+        if "--once" in sys.argv:
+            break
+        time.sleep(EVERY_MIN * 60)
+`;
+  }
+
+  const api = { HOLIDAYS, holidays, holidayYears, LEAVE_TYPES, SHIFTS, MACHINES, brandOf, BRAND_ALIAS, bridgeScript, realtimeBridgeScript };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.HRMPresets = api;
 })(typeof window !== "undefined" ? window : globalThis);
