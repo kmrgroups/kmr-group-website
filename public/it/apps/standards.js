@@ -120,6 +120,16 @@ d8:[
 ['PPAP','Element 1 · Design records / change','Change after a problem','When the corrective action changes the product or the process, D7 reminds the team to check whether the customer must be told or a PPAP resubmitted.'],
 ['VDA','P7','Customer care, customer satisfaction, service','Complaints are answered from one register with due dates; late 8Ds and overdue actions are shown on the dashboard.'],
 ['VDA','P7.4','Failure analysis and corrective actions','Root causes are found for occurrence and for escape, verified, and followed by actions with an owner, a due date and an effectiveness check.']],
+qms:[
+['ISO','7.2','Competence','The manual is a self-learning tool: every clause is explained in plain words with steps, documents, records and a filled-in example, and each reader marks the clauses they understood.'],
+['ISO','7.3','Awareness','Staff can see why each requirement exists and what their part is; the Start here page and the glossary use plain words only.'],
+['ISO','7.1.6','Organisational knowledge','The explanations, implementation steps and samples are kept as company know-how that new people can learn from.'],
+['ISO','7.5.2','Creating and updating documented information','Every printed manual or analysis carries the customer logo, a unique reference number and the format revision on every page, with the watermark Educational Purpose Only.'],
+['ISO','9.1.3','Analysis and evaluation','The coverage analysis compares every clause with the features of the KMR apps and shows which clauses are covered, partly covered or still missing.'],
+['ISO','10.3','Continual improvement','The list of clauses not yet covered, grouped by the app where each would be built, is the improvement plan for the apps.'],
+['IATF','7.2.3','Internal auditor competency','Auditors can study the automotive requirements clause by clause, with the ISO clause each one extends.'],
+['IATF','7.3.1','Awareness - supplemental','Learning material on product safety, ethics, customer requirements and statistical concepts for all staff.'],
+['VDA','P1','Potential analysis','The coverage view shows how far the system is from the standard before an audit.']],
 spc:[
 ['SPC','Chapter II','Control charts for variables','X-bar and R, X-bar and S, and individuals with moving range, with centre line and limits worked out from the data and the standard constants for the group size.'],
 ['SPC','Chapter II','Control charts for attributes','p (fraction defective), np (number defective), c (number of defects) and u (defects per unit); the limits follow the sample size of each point.'],
@@ -291,5 +301,5 @@ function draw(el,key,o){
  el.innerHTML=h;
  el.querySelectorAll('.ch button').forEach(function(b){b.onclick=function(){el._kstd=b.dataset.k;draw(el,key,o)}});
 }
-window.KMRStd={draw:draw,rows:function(k){return A[k]||[]},cat:CAT};
+window.KMRStd={draw:draw,rows:function(k){return A[k]||[]},keys:function(){return Object.keys(A)},cat:CAT};
 })();
