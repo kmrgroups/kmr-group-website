@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   const { $, esc, say } = QP, A = window.AIAGForm, QM = window.QMS;
-  const APPS = { sales: "Sales Flow", calibration: "Calibration Hub", apqp: "APQP Planner", ppap: "PPAP", rmp: "Raw Material & Packing", mmd: "Machines, Moulds & Dies", mnt: "Maintenance", msa: "MSA Studies", crm: "CRM & RFQ", d8: "8D Problem Solving", spc: "SPC Charts", tsk: "ActionTrack", hrms: "HRM & Payroll", mom: "Minutes of Meetings", cad: "CAD", capacity: "Capacity Planner", pd: "Process Documents", balloon: "Balloon Inspector", ops: "Operations" };
+  const APPS = { sales: "Sales Flow", calibration: "Calibration Hub", apqp: "APQP Planner", ppap: "PPAP", rmp: "Raw Material & Packing", mmd: "Machines, Moulds & Dies", mnt: "Maintenance", msa: "MSA Studies", crm: "CRM & RFQ", d8: "8D Problem Solving", aud: "Internal Audit", spc: "SPC Charts", tsk: "ActionTrack", hrms: "HRM & Payroll", mom: "Minutes of Meetings", cad: "CAD", capacity: "Capacity Planner", pd: "Process Documents", balloon: "Balloon Inspector", ops: "Operations" };
   const HINT = { calib: "calibration", hrm: "hrms" };
   const appName = (k) => APPS[HINT[k] || k] || k;
   const FW = { iso: ["ISO"], iatf: ["IATF"], vda: ["VDA"], cp: ["CP"], apqp: ["APQP"], ppap: ["PPAP"], fmea: ["VF", "F4"], msa: ["MSA"], spc: ["SPC"] };

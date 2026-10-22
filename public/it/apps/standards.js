@@ -130,6 +130,16 @@ qms:[
 ['IATF','7.2.3','Internal auditor competency','Auditors can study the automotive requirements clause by clause, with the ISO clause each one extends.'],
 ['IATF','7.3.1','Awareness - supplemental','Learning material on product safety, ethics, customer requirements and statistical concepts for all staff.'],
 ['VDA','P1','Potential analysis','The coverage view shows how far the system is from the standard before an audit.']],
+aud:[
+['ISO','9.2.1','Internal audit - requirements','Audits are planned and recorded with type, area, auditor, date and shift. The result of each audit goes into a numbered report; findings are reported to the area audited with an owner and a due date.'],
+['ISO','9.2.2','Internal audit - programme','The audit programme for the year is one list with planned and done audits, late audits, completion in percent and the shifts covered. Auditors are named and cannot audit their own work, which keeps the audit objective.'],
+['ISO','10.2.1','Nonconformity and corrective action','Each finding has an action with an owner and a due date. The action is closed only after someone checks that it worked; an audit cannot be closed while an action is open or unchecked.'],
+['ISO','7.5.3','Control of documented information','Audit plans and reports print with the customer logo, a unique audit number and the format revision on every page. An issued audit is locked; only an administrator can reopen it, and the reopening is logged.'],
+['IATF','9.2.2.1','Internal audit programme','The programme is built on the audit types (system, process, product, supplier) and shows what is done and what is late. Priority by risk and performance is the planner\u2019s decision; the app does not rank risk by itself.'],
+['IATF','9.2.2.2','Quality management system audit','System audits are planned with ISO 9001 and IATF 16949 questions. The app does not yet check that all processes are covered over the three-year certification cycle.'],
+['IATF','9.2.2.3','Manufacturing process audit','Process audits use a checklist with ratings 10, 8, 4 or 0 and a score and grade. Each audit records the shift, and the dashboard shows which shifts have been audited.'],
+['IATF','9.2.2.4','Product audit','Product audits are planned and recorded with a checklist for dimensions, appearance, packing and traceability, and the findings are followed through actions.'],
+['VDA','P5.4','Supplier performance and development','Supplier audits use their own checklist, record findings and follow the supplier\u2019s corrective actions to closure.']],
 spc:[
 ['SPC','Chapter II','Control charts for variables','X-bar and R, X-bar and S, and individuals with moving range, with centre line and limits worked out from the data and the standard constants for the group size.'],
 ['SPC','Chapter II','Control charts for attributes','p (fraction defective), np (number defective), c (number of defects) and u (defects per unit); the limits follow the sample size of each point.'],
