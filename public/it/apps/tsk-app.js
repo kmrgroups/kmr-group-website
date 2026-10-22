@@ -17,7 +17,7 @@
   const STC = { open: "x", progress: "b", blocked: "r", done: "g", cancelled: "x" };
   const PR = { urgent: "Urgent", high: "High", normal: "Normal", low: "Low" };
   const PRC = { urgent: "r", high: "a", normal: "b", low: "x" };
-  const SRC = { mom: "Minutes of Meetings", sales: "Sales Flow", mnt: "Maintenance", calib: "Calibration Hub", apqp: "APQP Planner", ppap: "PPAP", rmp: "Material Planning", mmd: "Manufacturing", hrms: "HRM & Payroll", spc: "SPC Charts", msa: "MSA Studies", crm: "CRM & RFQ", direct: "Created here" };
+  const SRC = { mom: "Minutes of Meetings", sales: "Sales Flow", mnt: "Maintenance", calib: "Calibration Hub", apqp: "APQP Planner", ppap: "PPAP", rmp: "Material Planning", mmd: "Manufacturing", hrms: "HRM & Payroll", spc: "SPC Charts", msa: "MSA Studies", crm: "CRM & RFQ", d8: "8D Problem Solving", direct: "Created here" };
   const days = (a, b) => Math.round((Date.parse(a + "T00:00:00Z") - Date.parse(b + "T00:00:00Z")) / 864e5);
   function dueText(t) {
     if (!t.due) return { s: "No due date", c: "" };

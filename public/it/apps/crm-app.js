@@ -48,7 +48,7 @@
   /* ================= router ================= */
   const SECS = ["std", "dash", "leads", "cust", "rfq", "rfqp", "quote", "quotep", "setup"];
   async function route() {
-    closeM(); closeDoc(); const hp = hashParts(); let g = ["std", "dash", "leads", "cust", "rfq", "quote", "setup"].includes(hp.go) ? hp.go : "dash";
+    closeM(); closeDoc(); const hp = hashParts(); let g = ["std", "dash", "leads", "cust", "rfq", "quote", "setup"].includes(hp.go) ? hp.go : "std";
     const sec = g === "rfq" && (hp.id || hp.new) ? "rfqp" : g === "quote" && hp.id ? "quotep" : g;
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.t === g)); SECS.forEach((s) => $("#" + s).classList.toggle("hide", s !== sec)); say("");
     try {
@@ -190,7 +190,7 @@
       S.L = await call("kmr_crm_load"); $("#role").textContent = S.L.role;
       const stab = document.querySelector('.tab[data-t="setup"]'); if (stab && !isAdmin()) stab.classList.add("hide");
       window.addEventListener("beforeunload", (e) => { if (S.dirty) { e.preventDefault(); e.returnValue = ""; } });
-      if (!location.hash) setGo("go=dash"); await route();
+      await route();
     } catch (e) { say(e.message); }
   }
   if (document.readyState === "complete") start(); else window.addEventListener("load", start);

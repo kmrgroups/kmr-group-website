@@ -21,6 +21,7 @@
   const onLink = (sel, fn) => document.querySelectorAll(sel).forEach((el) => el.addEventListener("click", (e) => { if (!plain(e)) return; e.preventDefault(); fn(el, e); }));
   const META = {
     msa: { color: "#0F766E", desc: "Prove your gauges before you trust the numbers: Gage R&R (range and ANOVA), bias, linearity, stability and attribute agreement, with a clear decision and a register of every study.", demo: "/it/msa.html?demo=1" },
+    d8: { color: "#B91C1C", desc: "Solve a customer complaint or an internal rejection step by step, D0 to D8: team, problem, containment, root causes, corrective actions, prevention and a printed 8D report. A step is ticked only when its proof is there.", demo: "/it/d8.html?demo=1" },
     crm: { color: "#BE185D", desc: "From the first enquiry to a priced, numbered quotation: leads and follow-ups, customers and suppliers, RFQs with a costing sheet that works out the price, supplier prices side by side, and quotations with revisions.", demo: "/it/crm.html?demo=1" },
     spc: { color: "#0891B2", desc: "Control charts from the readings you type or paste in: X̄-R, X̄-S, I-MR, p, np, c and u, with signals explained, cause and action notes, and Cp / Cpk / Pp / Ppk.", demo: "/it/spc.html?demo=1" },
     tsk: { color: "#4F46E5", desc: "Assign tasks to people with a due date and priority, follow them to done, and get a message on your phone or computer. Create tasks straight from Minutes of Meetings and Sales Flow.", demo: "/it/tasks.html?demo=1" },
@@ -42,7 +43,7 @@
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
-  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1 };
+  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
@@ -119,7 +120,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "tsk"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "tsk"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};
