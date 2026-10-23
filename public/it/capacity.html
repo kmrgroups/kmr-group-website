@@ -519,6 +519,22 @@ input[data-locked], select[data-locked], textarea[data-locked] { background: var
 .codebar { display: flex; justify-content: space-between; align-items: center; gap: 8px; padding: 6px 8px 6px 12px; background: var(--surface-2); border-bottom: 1px solid var(--line); font: 600 11.5px var(--mono); color: var(--muted); flex-wrap: wrap; }
 .codebox pre { margin: 0; padding: 12px; max-height: 260px; overflow: auto; font: 11.5px/1.5 var(--mono); background: var(--surface); color: var(--text); white-space: pre; }
 
+/* ---------- Quick Workout ---------- */
+.qw-in { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 14px 16px; align-items: start; }
+.qw-f { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.qw-f > span { font-size: 12px; font-weight: 600; }
+.qw-f small { font-size: 11.5px; color: var(--muted); line-height: 1.3; }
+.qw-f .cell-inp { width: 100%; box-sizing: border-box; text-align: left; }
+.qw-chk { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; line-height: 1.45; cursor: pointer; }
+.qw-chk input { margin-top: 3px; width: 17px; height: 17px; flex: none; }
+.qw-fix td { background: var(--surface-2); font-size: 12.5px; padding-top: 8px; padding-bottom: 10px; }
+.qw-fixin { position: sticky; left: 0; width: min(100%, calc(100vw - 380px)); white-space: normal; }
+.qw-opt { display: inline-block; margin: 3px 4px 0 0; padding: 2px 9px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line-strong); font-weight: 600; }
+.qw-m { display: grid; grid-template-columns: 110px 1fr 46px 110px; gap: 10px; align-items: center; padding: 3px 0; font-size: 12.5px; }
+.qw-ml { max-height: 420px; overflow: auto; }
+.nav-more { margin: 10px 12px 0; padding: 8px 10px; border: 1px dashed var(--line-strong); background: transparent; color: var(--muted); border-radius: 8px; font: inherit; font-size: 12px; cursor: pointer; text-align: left; width: calc(100% - 24px); }
+.nav-more:hover { color: var(--text); border-style: solid; }
+@media (max-width: 760px) { .qw-m { grid-template-columns: 84px 1fr 40px; } .qw-m .small { display: none; } }
 </style>
 <script>
 /* ======================================================================
@@ -697,11 +713,11 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
       const salesQty = Math.max(0, num(part.qty, 0));
       const qty = mode === 'dynamic' ? (((net[op.partNo] || {}).byOp || {})[op.id] || 0) : (((net[op.partNo] || {}).staticByOp || {})[op.id] ?? salesQty);
       const due = validDue(part.due, y, m) || monthEnd;
-      const pph = op.cycleTime > 0 ? (3600 / op.cycleTime) * oee : 0;
       const alloc = splits[op.id] && splits[op.id].length ? splits[op.id] : [{ machine: op.machine, share: 1 }];
       const seqList = seqMap.get(op.partNo);
       alloc.forEach((a, idx) => {
         const mc = mIndex.get(a.machine);
+        const ctm = num((op.altCt || {})[a.machine], 0) || op.cycleTime, pph = ctm > 0 ? (3600 / ctm) * oee : 0;
         const hrs = mc ? mc.hoursPerDay : s.hoursPerDay;
         const q = alloc.length === 1 ? qty : Math.round(qty * a.share);
         const reqHours = pph > 0 ? q / pph : 0;
@@ -711,8 +727,8 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
           opId: op.id, partNo: op.partNo, partName: op.partName, process: op.process,
           seq: seqList.indexOf(op.id), homeMachine: op.machine, machine: a.machine,
           moved: a.machine !== op.machine, split: alloc.length > 1,
-          cycleTime: op.cycleTime, qty: q, partQty: salesQty, due,
-          pph, effCT: oee > 0 ? op.cycleTime / oee : op.cycleTime,
+          cycleTime: ctm, qty: q, partQty: salesQty, due,
+          pph, effCT: oee > 0 ? ctm / oee : ctm,
           hoursPerDay: hrs, reqHours, reqDays,
           rowBalance: s.daysPerMonth - reqDays     // Excel Capacity-workout!L
         };
@@ -932,6 +948,117 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
   const CLS_NAME = { A: 'Runner', B: 'Repeater', C: 'Stranger' };
   function daysBetween(a, b) { return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5); }
 
+  /* ---------- Quick Workout: the method of the plant's own capacity workout sheet ------------------------------
+     Per process:  PPH of a machine = 3600 ÷ its cycle time × OEE.  Machines listed for the same process run side by side,
+     so the process makes the SUM of their PPH.  Capacity/day = PPH × hours per day.  Days required = quantity ÷ capacity per day.
+     Auto load balancing: the quantity is shared between the machines so that no machine is loaded more than another
+     (faster machine gets more).  A machine used by several processes is balanced across all of them together.
+     Takt time = working time of the month ÷ quantity.   A process keeps takt when its own time per piece (3600 ÷ PPH) is not longer.
+     Throughput = the pieces per month the slowest process can deliver.  Throughput time = time for one lot to pass every process. */
+  function workout(state, o) {
+    o = o || {};
+    const s = state.settings, y = state.year, m = state.month, key = periodKey(y, m), plan = getPlan(state, key), q = plan.quick || {};
+    const mode = (o.mode || state.capMode) === 'dynamic' ? 'dynamic' : 'static';
+    const oee = Math.min(100, Math.max(1, num(q.oee, s.oee || 85))) / 100;
+    const baseHpd = num(s.hoursPerDay, 22), baseShifts = Math.max(1, num(s.shifts, baseHpd > 16 ? 3 : baseHpd > 8 ? 2 : 1));
+    const shifts = Math.max(1, Math.round(num(q.shifts, baseShifts)));
+    const hrsShift = q.hrsShift != null && q.hrsShift !== '' ? Math.max(1, num(q.hrsShift, baseHpd / baseShifts)) : (q.shifts != null ? baseHpd / baseShifts : baseHpd / baseShifts);
+    const hpd = (q.shifts != null || q.hrsShift != null) ? shifts * hrsShift : baseHpd;
+    const days = Math.max(1, num(q.days, s.daysPerMonth || 25));
+    const balance = q.balance !== false;
+    const lot = Math.max(1, num(q.lot, s.lotSize || 100)), lag = Math.max(0, num(s.transferLagHours, 2));
+    const seqMap = new Map(); state.operations.forEach(op => { const l = seqMap.get(op.partNo) || []; l.push(op.id); seqMap.set(op.partNo, l); });
+    const net = netDemand(state, plan, seqMap, {});
+    const partSel = q.part && q.part !== 'ALL' && seqMap.has(q.part) ? q.part : 'ALL';
+    const mInfo = new Map();
+    state.machines.filter(x => x.active !== false).forEach(mc => {
+      const ov = (plan.machines && plan.machines[mc.code]) || {};
+      mInfo.set(mc.code, { code: mc.code, hpd: num(mc.hoursPerDay, hpd), avail: num(ov.availDays, num(mc.availDays, days)), known: true });
+    });
+    const need = c => { if (!mInfo.has(c)) mInfo.set(c, { code: c, hpd, avail: days, known: false }); return mInfo.get(c); };
+    const ops = [];
+    state.operations.forEach(op => {
+      if (partSel !== 'ALL' && op.partNo !== partSel) return;
+      const sales = Math.max(0, num(((plan.parts || {})[op.partNo] || {}).qty, 0));
+      const n = net[op.partNo] || {};
+      const qty = mode === 'dynamic' ? ((n.byOp || {})[op.id] || 0) : ((n.staticByOp || {})[op.id] ?? sales);
+      const codes = [op.machine].concat(op.alternates || []).filter((c, i, a) => c && a.indexOf(c) === i);
+      const cands = codes.map(c => { const ct = num((op.altCt || {})[c], 0) || (c === op.machine ? op.cycleTime : (op.cycleTime || 0)); const mi = need(c);
+        return { code: c, ct, rate: ct > 0 ? 3600 / ct * oee : 0, mi, share: 0 }; }).filter(c => c.rate > 0);
+      ops.push({ op, sales, qty, cands, supplier: !op.machine && !(op.cycleTime > 0) && /supplier|outside|forg|harden/i.test(op.process + ' ' + (op.source || '')) });
+    });
+    // --- allocate ---
+    const live = ops.filter(x => x.qty > 0 && x.cands.length);
+    live.forEach(x => {
+      if (!balance) { x.cands.forEach((c, i) => c.share = i === 0 ? 1 : 0); return; }
+      const t = x.cands.reduce((a, c) => a + c.rate * c.mi.hpd * c.mi.avail, 0) || 1;
+      x.cands.forEach(c => c.share = c.rate * c.mi.hpd * c.mi.avail / t);
+    });
+    const load = () => { const L = new Map(); live.forEach(x => x.cands.forEach(c => L.set(c.code, (L.get(c.code) || 0) + x.qty * c.share / c.rate))); return L; };
+    if (balance) {
+      for (let it = 0; it < 400; it++) {
+        const L = load(), U = new Map();
+        L.forEach((hrs, code) => { const mi = mInfo.get(code); U.set(code, hrs / Math.max(1e-9, mi.hpd * mi.avail)); });
+        let moved = 0;
+        live.forEach(x => {
+          if (x.cands.length < 2) return;
+          const ub = x.cands.reduce((a, c) => a + c.share * (U.get(c.code) || 0), 0);
+          let tot = 0; const nw = x.cands.map(c => { const u = Math.max(1e-6, U.get(c.code) || 0); const w = c.share * Math.pow(Math.max(1e-6, ub) / u, 0.5); tot += w; return w; });
+          x.cands.forEach((c, i) => { const ns = tot > 0 ? nw[i] / tot : c.share; moved = Math.max(moved, Math.abs(ns - c.share)); c.share = ns; });
+        });
+        if (moved < 1e-7) break;
+      }
+    }
+    // --- results per process ---
+    const procs = ops.map(x => {
+      const { op, qty, cands } = x;
+      const rate = cands.reduce((a, c) => a + c.rate, 0);
+      const capDay = cands.reduce((a, c) => a + c.rate * c.mi.hpd, 0), capMonth = cands.reduce((a, c) => a + c.rate * c.mi.hpd * c.mi.avail, 0);
+      const availDays = capDay > 0 ? capMonth / capDay : 0;
+      const useCap = balance ? capDay : (cands[0] ? cands[0].rate * cands[0].mi.hpd : 0), useMonth = balance ? capMonth : (cands[0] ? cands[0].rate * cands[0].mi.hpd * cands[0].mi.avail : 0);
+      const daysReq = useCap > 0 ? qty / useCap : 0, loadPct = useMonth > 0 ? qty / useMonth * 100 : 0;
+      // whole pieces per machine (largest remainder)
+      const raw = cands.map(c => qty * c.share); const fl = raw.map(Math.floor); let left = Math.round(qty) - fl.reduce((a, b) => a + b, 0);
+      raw.map((v, i) => [v - fl[i], i]).sort((a, b) => b[0] - a[0]).forEach(([, i]) => { if (left > 0) { fl[i]++; left--; } });
+      const mach = cands.map((c, i) => ({ code: c.code, ct: c.ct, pph: c.rate, share: c.share, qty: fl[i], hours: c.rate > 0 ? fl[i] / c.rate : 0,
+        days: c.rate > 0 && c.mi.hpd > 0 ? fl[i] / c.rate / c.mi.hpd : 0, availDays: c.mi.avail, known: c.mi.known }));
+      const procTime = rate > 0 ? 3600 / rate : 0;   // seconds per piece for the whole process
+      const taktSec = qty > 0 ? days * hpd * 3600 / qty : 0;
+      const status = !cands.length ? (x.supplier ? 'supplier' : 'nodata') : qty <= 0 ? 'idle' : loadPct > 100.0001 ? 'over' : loadPct >= num(s.warnPct, 90) ? 'tight' : 'ok';
+      let fix = null;
+      if (status === 'over') {
+        const ratio = loadPct / 100, n = cands.length, avgCt = cands.reduce((a, c) => a + c.ct, 0) / n;
+        fix = { extraMachines: Math.max(1, Math.ceil(n * ratio - 1e-9) - n), extraDays: Math.max(0, daysReq - availDays), ctCutPct: (1 - 1 / ratio) * 100,
+          oeeNeeded: oee * ratio * 100, ctNeeded: avgCt / ratio, hoursNeeded: hpd * ratio, shortPcs: Math.max(0, qty - useMonth) };
+      }
+      return { opId: op.id, partNo: op.partNo, partName: op.partName, process: op.process, seq: (seqMap.get(op.partNo) || []).indexOf(op.id), qty, sales: x.sales,
+        machines: mach, rate, procTime, capDay, capMonth: useMonth, daysReq, availDays, loadPct, balDays: availDays - daysReq, taktSec, meetsTakt: qty <= 0 || procTime <= taktSec + 1e-9, status, fix,
+        supplier: x.supplier, noCt: !cands.length && !x.supplier, noMachine: !op.machine };
+    });
+    // --- machines ---
+    const mm = new Map();
+    procs.forEach(p => p.machines.forEach(c => { const mi = mInfo.get(c.code); const r = mm.get(c.code) || { code: c.code, known: mi.known, hpd: mi.hpd, availDays: mi.avail, hours: 0, procs: [] };
+      r.hours += c.hours; r.procs.push(p.process); mm.set(c.code, r); }));
+    const machines = [...mm.values()].map(r => Object.assign(r, { reqDays: r.hpd > 0 ? r.hours / r.hpd : 0, util: r.hpd * r.availDays > 0 ? r.hours / (r.hpd * r.availDays) * 100 : 0 })).sort((a, b) => b.util - a.util);
+    // --- per part: output, throughput time ---
+    const parts = [];
+    new Set(procs.map(p => p.partNo)).forEach(pn => {
+      const ps = procs.filter(p => p.partNo === pn).sort((a, b) => a.seq - b.seq), run = ps.filter(p => p.rate > 0);
+      const sales = ps.length ? ps[0].sales : 0, worst = run.filter(p => p.qty > 0).sort((a, b) => b.loadPct - a.loadPct)[0] || null;
+      const maxLoad = worst ? worst.loadPct / 100 : 0, canMake = maxLoad > 1 ? Math.floor(sales / maxLoad) : sales;
+      const lotHrs = run.reduce((a, p) => a + lot / p.rate, 0), lagHrs = Math.max(0, run.length - 1) * lag, touch = run.reduce((a, p) => a + p.machines.reduce((x, c) => x + c.ct * c.share, 0), 0);
+      parts.push({ partNo: pn, partName: ps[0] ? ps[0].partName : pn, sales, taktSec: sales > 0 ? days * hpd * 3600 / sales : 0, bottleneck: worst, canMake, shortPcs: Math.max(0, sales - canMake),
+        lot, lotHrs, lagHrs, throughputHrs: lotHrs + lagHrs, throughputDays: hpd > 0 ? (lotHrs + lagHrs) / hpd : 0, touchSec: touch, fits: maxLoad <= 1 + 1e-9 });
+    });
+    const gaps = [];
+    procs.forEach(p => { if (p.noCt && p.qty > 0) gaps.push(`${p.partNo} · ${p.process}: no cycle time, so it loads nothing`); });
+    procs.forEach(p => p.machines.forEach(c => { if (!c.known) gaps.push(`${p.process}: machine ${c.code} is not in the machine master`); }));
+    const over = procs.filter(p => p.status === 'over');
+    return { key, mode, balance, partSel, oee: oee * 100, shifts, hrsShift: hpd / shifts, hpd, days, lot, lag, procs, machines, parts, gaps,
+      totals: { over: over.length, tight: procs.filter(p => p.status === 'tight').length, ok: procs.filter(p => p.status === 'ok').length, idle: procs.filter(p => p.status === 'idle').length, nodata: procs.filter(p => p.status === 'nodata').length },
+      splits: Object.fromEntries(procs.filter(p => p.machines.length > 1 && p.qty > 0).map(p => [p.opId, p.machines.map(c => ({ machine: c.code, share: Math.round(c.share * 10000) / 10000 }))])) };
+  }
+
   function verdict(state) {
     const s = state.settings, base = compute(state, { scenario: 'standard' });
     const plan = base.plan, clsOf = p => (plan.cls || {})[p] || (state.partClass || {})[p] || 'B';
@@ -1149,7 +1276,7 @@ window.DEPLOY_ASSETS = {"sql": "-- =============================================
     return { rows, maxDays, totalExtra: fin.totals.req - base.totals.req, baseReq: base.totals.req, newReq: fin.totals.req, baseOver: [...baseOver.values()].filter(v => v > 1e-6).length, scenario: sc };
   }
 
-  const Engine = { MONTHS, pad, periodKey, iso, daysInMonth, buildCalendar, compute, netDemand, autoLevel, verdict, suggestMinStock, cellOf, getPlan, num };
+  const Engine = { MONTHS, pad, periodKey, iso, daysInMonth, buildCalendar, compute, netDemand, autoLevel, workout, verdict, suggestMinStock, cellOf, getPlan, num };
   if (typeof module !== 'undefined' && module.exports) module.exports = Engine;
   else root.Engine = Engine;
 })(typeof window !== 'undefined' ? window : globalThis);
@@ -1591,15 +1718,16 @@ const ICONS = {
 const icon = (n, cls) => `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[n] || ''}"/></svg>`;
 
 const PAGES = [
-  { id: 'standards', group: 'Plan', label: 'Standards alignment', title: 'Standards alignment', desc: 'The standards and clauses this app supports.' },
-  { id: 'bulletin', group: 'Plan', label: 'Verdict & Actions', title: 'Verdict & Action Bulletin', desc: 'Can we make the sales plan? Can we deliver on time? Every problem, how to overcome it, and what to do first.' },
-  { id: 'overview', group: 'Plan', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
-  { id: 'plan', group: 'Plan', label: 'Monthly Plan', title: 'Monthly Plan', desc: 'Enter this month’s quantity and customer due date for each part.' },
-  { id: 'stock', group: 'Plan', label: 'Stock & Balance', title: 'Stock & Balance', desc: 'Stock on hand at every stage, taken off the sales quantity — what is still to be made at every process (Dynamic capacity).' },
-  { id: 'capacity', group: 'Analyse', label: 'Capacity Plan', title: 'Capacity Plan', desc: 'Required vs available days per machine — same as the Excel “Capacity Plan” sheet.' },
-  { id: 'workout', group: 'Analyse', label: 'Capacity Workout', title: 'Capacity Workout', desc: 'Operation-level calculation — same as the Excel “Capacity-workout” sheet.' },
-  { id: 'schedule', group: 'Analyse', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
-  { id: 'balance', group: 'Analyse', label: 'Load Balancer', title: 'Load Balancer', desc: 'Move or split work from overloaded machines to machines with spare days.' },
+  { id: 'standards', group: 'Start here', label: 'Standards alignment', title: 'Standards alignment', desc: 'The standards and clauses this app supports.' },
+  { id: 'quick', group: 'Start here', label: 'Quick Workout', title: 'Quick Workout', desc: 'Enter the quantity and working time, see in one screen if the machines can make it — takt time, throughput, load shared between machines, and what to do if not.' },
+  { id: 'plan', group: 'Start here', label: 'Monthly Plan', title: 'Monthly Plan', desc: 'Enter this month’s quantity and customer due date for each part.' },
+  { id: 'balance', group: 'Start here', label: 'Load Balancer', title: 'Load Balancer', desc: 'Move or split work from overloaded machines to machines with spare days.' },
+  { id: 'bulletin', group: 'More detail', label: 'Verdict & Actions', title: 'Verdict & Action Bulletin', desc: 'Can we make the sales plan? Can we deliver on time? Every problem, how to overcome it, and what to do first.' },
+  { id: 'overview', group: 'More detail', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
+  { id: 'stock', group: 'More detail', label: 'Stock & Balance', title: 'Stock & Balance', desc: 'Stock on hand at every stage, taken off the sales quantity — what is still to be made at every process (Dynamic capacity).' },
+  { id: 'capacity', group: 'More detail', label: 'Capacity Plan', title: 'Capacity Plan', desc: 'Required vs available days per machine — same as the Excel “Capacity Plan” sheet.' },
+  { id: 'workout', group: 'More detail', label: 'Capacity Workout', title: 'Capacity Workout', desc: 'Operation-level calculation — same as the Excel “Capacity-workout” sheet.' },
+  { id: 'schedule', group: 'More detail', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
   { id: 'masters', group: 'Setup', label: 'Masters', title: 'Machines & Routings', desc: window.KMR_PLATFORM ? 'Read from KMR Apps › Operations Master (machines, cycle times, plant standards) and the holiday calendar of HRM & Payroll.' : 'Machines, parts, operations, cycle times, plant standards and working calendar.' },
   { id: 'settings', group: 'Setup', label: 'Settings', title: 'Settings', desc: window.KMR_PLATFORM ? 'Appearance and data backup for this plan. Company details and users are managed in KMR Apps › Administration.' : 'Company, cloud connection, users & access, and data backup. Admins only.' },
   { id: 'help', group: 'Setup', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' }
@@ -1635,10 +1763,19 @@ let cloud = { feat: null, status: 'local', stamp: null, dirty: false, timer: nul
 
 function defaultState() { return clone(window.SEED_DATA); }
 
+/* An alternate machine may carry its own cycle time:  "EPI-B-80=65, EPI-B-05"  (no "=" means the same cycle time as the first machine) */
+function parseAlts(o) {
+  const ct = Object.assign({}, o.altCt || {}), codes = [];
+  (Array.isArray(o.alternates) ? o.alternates : String(o.alternates || '').split(',')).forEach(a => {
+    const m = String(a).split('='), c = m[0].trim(); if (!c) return;
+    if (m[1] !== undefined && Number(m[1]) > 0) ct[c] = Number(m[1]); codes.push(c);
+  });
+  o.alternates = codes; o.altCt = ct; return o;
+}
 function normalise(s) {
   s.settings = Object.assign(clone(window.SEED_DATA.settings), s.settings || {});
   s.machines = (s.machines || []).map(m => Object.assign({ cell: E.cellOf(m.code), availDays: null, hoursPerDay: null, remarks: '', active: true }, m));
-  s.operations = (s.operations || []).map(o => Object.assign({ alternates: [] }, o, { cycleTime: Number(o.cycleTime) || 0 }));
+  s.operations = (s.operations || []).map(o => parseAlts(Object.assign({ alternates: [] }, o, { cycleTime: Number(o.cycleTime) || 0 })));
   s.plans = s.plans || {};
   if (typeof s.month !== 'number') s.month = new Date().getMonth();
   if (typeof s.year !== 'number') s.year = new Date().getFullYear();
@@ -2056,7 +2193,8 @@ function renderShell() {
   const crit = (model.totals.counts.critical || 0) + (model.totals.counts.sunday || 0);
   const lateN = model.totals.lateOps;
   let group = '';
-  const nav = visiblePages().map(p => {
+  const moreOpen = ui.moreOpen || PAGES.some(x => x.group === 'More detail' && x.id === ui.page);
+  const nav = visiblePages().filter(p => p.group !== 'More detail' || moreOpen).map(p => {
     let g = '';
     if (p.group !== group) { group = p.group; g = `<div class="nav-group">${h(group)}</div>`; }
     const badge = p.id === 'capacity' && crit ? `<span class="badge" title="${crit} machines over capacity">${crit}</span>` : (p.id === 'schedule' && lateN ? `<span class="badge" title="${lateN} late operations">${lateN}</span>` : '');
@@ -2064,7 +2202,7 @@ function renderShell() {
   }).join('');
   $('#side').innerHTML = `
     <div class="brand"><div class="logo">${logo}</div><div class="brand-text"><div class="brand-name">${h(s.companyName)}</div><div class="brand-sub">${h(s.subtitle || 'Capacity Planner')}</div></div></div>
-    <nav class="nav" aria-label="Main">${nav}</nav>
+    <nav class="nav" aria-label="Main">${nav}${moreOpen && ui.page && !PAGES.some(x => x.group === 'More detail' && x.id === ui.page) ? '' : ''}${PAGES.some(x => x.group === 'More detail' && x.id === ui.page) ? '' : `<button class="nav-more" data-act="toggleMore" aria-expanded="${moreOpen}">${moreOpen ? 'Hide detailed screens' : 'More detail (stock, schedule, workout sheet…)'}</button>`}</nav>
     <div class="side-foot">${cloudActive() ? `<div class="me-line hide-rail" title="${h((Cloud.session() || {}).email)}">${h((Cloud.session() || {}).email)}<span class="role-chip">${h(roleLabel())}</span></div>` : ''}<div class="sync-pill hide-rail" id="syncPill">${syncPillHtml()}</div>${cloudActive() ? `<button class="side-out" data-act="signOut" title="Sign out">${icon('logout')}<span class="lbl-t">Sign out</span></button>` : ''}${window.KMR_PLATFORM ? "" : `<div class="hide-rail">Powered by <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></div>`}</div>`;
 
   const y = state.year, years = []; for (let i = y - 3; i <= y + 4; i++) years.push(i);
@@ -2078,7 +2216,7 @@ function renderShell() {
         <select id="selYear" aria-label="Year">${years.map(v => `<option ${v === y ? 'selected' : ''}>${v}</option>`).join('')}</select>
         <button data-act="nextMonth" aria-label="Next month">${icon('right')}</button>
       </div>
-      <div class="seg" role="group" aria-label="Capacity type">
+      ${ui.page === 'quick' ? '' : `<div class="seg" role="group" aria-label="Capacity type">
         <button data-capmode="static" class="${model.mode !== 'dynamic' ? 'on' : ''}" title="Static: the sales quantity goes straight to every process">Static</button>
         <button data-capmode="dynamic" class="${model.mode === 'dynamic' ? 'on' : ''}" title="Dynamic: stock at every stage is taken off the sales quantity first">Dynamic</button>
       </div>
@@ -2086,7 +2224,7 @@ function renderShell() {
         <button data-scn="standard" class="${sc === 'standard' ? 'on' : ''}" title="Available days as entered (Excel basis)">Standard</button>
         <button data-scn="sunday" class="${sc === 'sunday' ? 'on' : ''}" title="${isLocked('scn:sunday') ? 'Not in your plan' : `Add the ${sun} Sundays of this month`}">${isLocked('scn:sunday') ? '🔒 ' : ''}+${sun} Sundays</button>
         <button data-scn="levelled" class="${sc === 'levelled' ? 'on' : ''}" title="${isLocked('scn:levelled') ? 'Not in your plan' : 'Preview with Auto-Level moves applied'}">${isLocked('scn:levelled') ? '🔒 ' : ''}Levelled</button>
-      </div>
+      </div>`}
       <button class="btn primary" data-act="exportMenu">${icon('download')}<span class="hide-sm">Export</span></button>
       ${cloudActive() ? `<button class="acct" data-act="accountMenu" title="${h((Cloud.session() || {}).email)} · ${h(roleLabel())}" aria-label="My account">${h(((Cloud.session() || {}).email || '?').slice(0, 2).toUpperCase())}</button>` : ''}
     </div></div>`;
@@ -2493,6 +2631,91 @@ Pages.plan = () => {
 };
 
 
+/* ---------------------------------------------------------------- QUICK WORKOUT (one screen: demand -> time -> every process -> fix) */
+const QW_TIER = { over: 'critical', tight: 'tight', ok: 'ok', idle: 'idle', supplier: 'idle', nodata: 'sunday' };
+const QW_LABEL = { over: 'Not enough capacity', tight: 'Nearly full', ok: 'Enough', idle: 'Nothing to make', supplier: 'Outside supplier', nodata: 'Cycle time missing' };
+function qwModel() { return E.workout(state); }
+function qwQuick() { const p = state.plans[model.key]; return (p && p.quick) || {}; }
+Pages.quick = () => {
+  const w = qwModel(), plan = planOf(), q = qwQuick(), s = state.settings;
+  const partNos = [...new Set(state.operations.map(o => o.partNo))];
+  const partName = pn => (state.operations.find(o => o.partNo === pn) || {}).partName || pn;
+  const one = w.partSel !== 'ALL' ? w.partSel : (partNos.length === 1 ? partNos[0] : null);
+  const baseHpd = Number(s.hoursPerDay) || 22, baseSh = Number(s.shifts) || (baseHpd > 16 ? 3 : baseHpd > 8 ? 2 : 1);
+  const changed = ['shifts', 'hrsShift', 'days', 'oee'].some(k => q[k] != null && q[k] !== '');
+  const num0 = (v, d) => (v == null || v === '' ? d : v);
+  const inp = (k, label, val, min, max, step, hint) => `<label class="qw-f"><span>${label}</span><input class="cell-inp" type="number" min="${min}" max="${max}" step="${step}" inputmode="decimal" data-qw="${k}" value="${val}" aria-label="${label}"><small>${hint}</small></label>`;
+  const totalSales = w.parts.reduce((a, p) => a + p.sales, 0);
+  const worstPart = w.parts.slice().sort((a, b) => b.shortPcs - a.shortPcs)[0];
+  const allFit = w.parts.length && w.parts.every(p => p.fits);
+  const verdict = !w.parts.length ? ['idle', 'No quantity yet', 'Enter the monthly quantity above to see the result.']
+    : allFit ? ['ok', 'YES — we can make it', `Every process has enough time for ${fmtInt(totalSales)} pcs in ${w.days} working days.`]
+    : ['critical', 'NO — not with today’s machines', `${w.totals.over} process${w.totals.over > 1 ? 'es are' : ' is'} short. Only about ${fmtInt(w.parts.reduce((a, p) => a + p.canMake, 0))} of ${fmtInt(totalSales)} pcs can be made.`];
+  const bp = one ? w.parts.find(p => p.partNo === one) : worstPart;
+  const takt = one && bp ? bp.taktSec : null;
+  const rows = w.procs.map(p => {
+    const mchips = p.machines.map(c => `<span class="tag" title="${c.known ? '' : 'Not in the machine master · '}cycle time ${c.ct}s → ${fmt(c.pph, 1)} pcs/hour">${h(c.code)} · ${c.ct}s${p.machines.length > 1 && p.qty > 0 ? ` · <b>${Math.round(c.share * 100)}%</b>` : ''}</span>`).join(' ');
+    const bar = p.rate > 0 && p.qty > 0 ? `<div class="lbar" title="${fmt(p.loadPct, 0)}% of the available time"><i class="fill-${QW_TIER[p.status]}" style="width:${Math.min(100, p.loadPct).toFixed(1)}%"></i></div>` : '';
+    const fixTxt = p.fix ? `<tr class="qw-fix"><td colspan="12"><div class="qw-fixin"><b>To fix “${h(p.process)}”, any one of:</b>
+        <span class="qw-opt">+${p.fix.extraMachines} machine${p.fix.extraMachines > 1 ? 's' : ''} of the same kind</span>
+        <span class="qw-opt">cut cycle time by ${fmt(p.fix.ctCutPct, 0)}% (to about ${fmt(p.fix.ctNeeded, 0)} s)</span>
+        <span class="qw-opt">${fmt(p.fix.hoursNeeded, 1)} h per day instead of ${fmt(w.hpd, 1)} h</span>
+        <span class="qw-opt">${p.fix.oeeNeeded <= 100 ? `OEE ${fmt(p.fix.oeeNeeded, 0)}% instead of ${fmt(w.oee, 0)}%` : 'OEE alone cannot fix it'}</span>
+        <span class="qw-opt">${fmt(p.fix.extraDays, 1)} more working days</span>
+        <span class="muted small"> · short by ${fmtInt(p.fix.shortPcs)} pcs</span></div></td></tr>` : '';
+    return `<tr class="${p.status === 'over' ? 'qw-over' : ''}">
+      <td><b>${h(p.process)}</b>${w.partSel === 'ALL' && partNos.length > 1 ? `<div class="small muted mono">${h(p.partNo)}</div>` : ''}</td>
+      <td>${p.machines.length ? mchips : `<span class="muted small">${p.supplier ? 'done outside (supplier)' : 'no machine / cycle time in the master'}</span>`}</td>
+      <td class="r num">${p.qty > 0 ? fmtInt(p.qty) : '–'}</td>
+      <td class="r num">${p.rate > 0 ? fmtInt(p.capDay) : '–'}</td>
+      <td class="r num"><b>${p.rate > 0 && p.qty > 0 ? fmt(p.daysReq, 1) : '–'}</b></td>
+      <td class="r num">${p.rate > 0 ? fmt(p.availDays, 0) : '–'}</td>
+      <td style="min-width:96px">${bar}<div class="small muted">${p.rate > 0 && p.qty > 0 ? fmt(p.loadPct, 0) + '%' : ''}</div></td>
+      <td class="r num">${p.rate > 0 && p.qty > 0 ? `${fmt(p.procTime, 1)} <span class="muted small">/ ${fmt(p.taktSec, 1)}</span>` : '–'}</td>
+      <td><span class="pill ${QW_TIER[p.status]}">${QW_LABEL[p.status]}</span></td></tr>${fixTxt}`;
+  }).join('');
+  const mrows = w.machines.map(m => `<div class="qw-m"><span class="mono">${h(m.code)}</span><div class="lbar"><i class="fill-${m.util > 100.0001 ? 'critical' : m.util >= 90 ? 'tight' : 'ok'}" style="width:${Math.min(100, m.util).toFixed(1)}%"></i></div><span class="num">${fmt(m.util, 0)}%</span><span class="small muted">${fmt(m.reqDays, 1)} of ${fmt(m.availDays, 0)} days</span></div>`).join('');
+  const tp = bp;
+  return `
+  ${!state.operations.length ? note('warn', 'info', '<b>No machines or cycle times yet.</b> Load them in the Operations Master (KMR Apps), then come back here.') : ''}
+  <section class="card"><div class="card-h"><div><h2>① What do we have to make, and how long do we work?</h2><div class="sub">Change anything here and the result below updates at once. Nothing is saved to the master — these are “what if” settings for ${monthName()}.</div></div>
+    ${changed ? `<button class="btn sm" data-act="qwReset">Back to plant standard</button>` : ''}</div>
+    <div class="card-b qw-in">
+      <label class="qw-f"><span>Part</span><select class="cell-inp" data-qw="part" aria-label="Part">${partNos.length > 1 ? `<option value="ALL" ${w.partSel === 'ALL' ? 'selected' : ''}>All parts together</option>` : ''}${partNos.map(pn => `<option value="${h(pn)}" ${w.partSel === pn || (partNos.length === 1 && pn === partNos[0]) ? 'selected' : ''}>${h(pn)} · ${h(partName(pn))}</option>`).join('')}</select><small>${partNos.length} part${partNos.length === 1 ? '' : 's'} in the routing list</small></label>
+      ${one ? `<label class="qw-f"><span>Quantity to make in ${monthName()}</span><input class="cell-inp" type="number" min="0" step="100" inputmode="numeric" data-qty="${h(one)}" value="${((plan.parts || {})[one] || {}).qty || 0}" aria-label="Quantity"><small>pieces (what the customer wants this month)</small></label>`
+        : `<div class="qw-f"><span>Quantity</span><b class="num" style="font-size:20px">${fmtInt(totalSales)}</b><small>pieces in total · set each part under <a href="${pageHref('plan')}" data-nav="plan">Monthly Plan</a></small></div>`}
+      ${inp('shifts', 'Shifts per day', num0(q.shifts, baseSh), 1, 4, 1, 'how many shifts run')}
+      ${inp('hrsShift', 'Hours per shift', fmt(num0(q.hrsShift, baseHpd / baseSh), 1), 1, 12, 0.5, 'working hours in one shift')}
+      ${inp('days', 'Working days in the month', num0(q.days, Number(s.daysPerMonth) || 25), 1, 31, 1, 'days machines can run')}
+      ${inp('oee', 'OEE %', num0(q.oee, Number(s.oee) || 85), 1, 100, 1, 'share of time a machine really makes good parts')}
+      ${inp('lot', 'Lot size (for lead time)', num0(q.lot, Number(s.lotSize) || 100), 1, 100000, 1, 'pieces moved together')}
+    </div>
+    <div class="card-b" style="padding-top:0"><label class="qw-chk"><input type="checkbox" data-qwbal ${w.balance ? 'checked' : ''}> <b>Share the work between machines automatically</b> <span class="muted">— where a process lists several machines, each gets a share that matches its speed, so none is loaded more than another. Switch off to load only the first machine.</span></label></div>
+  </section>
+
+  <section class="kpis" style="margin-top:16px" aria-label="Result">
+    <div class="kpi"><span class="lbl">Can we make it?</span><span class="val" style="font-size:20px"><span class="pill ${verdict[0]} plain" style="font-size:14px">${verdict[1]}</span></span><span class="foot">${h(verdict[2])}</span></div>
+    <div class="kpi"><span class="lbl">Takt time ${one ? '' : '(worst part)'}</span><span class="val">${bp && bp.taktSec ? fmt(bp.taktSec, 1) + ' s' : '–'}</span><span class="foot">one piece must be finished every ${bp && bp.taktSec ? fmt(bp.taktSec, 1) : '–'} seconds (${fmt(w.hpd, 1)} h × ${w.days} days ÷ quantity)</span></div>
+    <div class="kpi"><span class="lbl">Throughput (what we can deliver)</span><span class="val">${bp ? fmtInt(bp.canMake) : '–'}</span><span class="foot">pcs a month${bp && bp.bottleneck ? ` — the slowest process is <b>${h(bp.bottleneck.process)}</b>` : ''}</span></div>
+    <div class="kpi"><span class="lbl">Throughput time of a lot</span><span class="val">${tp && tp.throughputHrs ? fmt(tp.throughputDays, 1) + ' d' : '–'}</span><span class="foot">${tp && tp.throughputHrs ? `${fmt(tp.throughputHrs, 1)} h for ${fmtInt(w.lot)} pcs to pass every process (incl. ${fmt(w.lag, 0)} h hand-over between processes)` : 'needs cycle times'}</span></div>
+  </section>
+
+  <section class="card" style="margin-top:16px"><div class="card-h"><div><h2>② Process by process</h2><div class="sub">Pieces per hour of a machine = 3600 ÷ cycle time × OEE. Machines of one process add up. <b>Days needed</b> = quantity ÷ pieces per day. The last-but-one column compares the process’s own time per piece with the takt time.</div></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="qwApply" title="Save these machine shares in the plan, so Capacity Plan and Loading Schedule use them">${icon('check')}Use this balance in the plan</button><button class="btn" data-act="qwPrint">${icon('print')}Print report</button></div></div>
+    <div class="tbl-wrap" id="tw-quick" data-nofilter><table class="tbl"><thead><tr><th>Process</th><th>Machines · cycle time · share of work</th><th class="r">Pieces to make</th><th class="r">Capacity per day</th><th class="r">Days needed</th><th class="r">Days available</th><th>Load</th><th class="r" title="seconds per piece of this process / takt time">Time per piece / takt (s)</th><th>Result</th></tr></thead><tbody>${rows || '<tr><td colspan="12" class="muted" style="padding:20px">No routing yet.</td></tr>'}</tbody></table></div>
+  </section>
+
+  <div class="grid-2e" style="margin-top:16px">
+    <section class="card"><div class="card-h"><div><h2>③ How full is every machine?</h2><div class="sub">After sharing the work. Above 100% the machine cannot finish in the days available.</div></div></div><div class="card-b qw-ml">${mrows || '<span class="muted">No machine is loaded.</span>'}</div></section>
+    <section class="card"><div class="card-h"><div><h2>④ What to do next</h2></div></div><div class="card-b prose">
+      ${w.totals.over ? `<p><b>${w.totals.over} process${w.totals.over > 1 ? 'es' : ''} need more capacity.</b> Pick one way out for each (the line under it): another machine, a faster cycle, longer hours, or more days. The most overloaded is <b>${h(w.procs.filter(p => p.status === 'over').sort((a, b) => b.loadPct - a.loadPct)[0].process)}</b> at ${fmt(Math.max(...w.procs.filter(p => p.status === 'over').map(p => p.loadPct)), 0)}%.</p>` : '<p><b>All processes fit.</b> Press “Use this balance in the plan” so the schedule follows it.</p>'}
+      ${w.gaps.length ? `<p><b>Please complete these in the Operations Master:</b></p><ul>${w.gaps.slice(0, 8).map(g => `<li>${h(g)}</li>`).join('')}</ul>` : ''}
+      <p class="small muted">Need to see days, due dates or stock? Open <a href="${pageHref('capacity')}" data-nav="capacity">Capacity Plan</a>, <a href="${pageHref('schedule')}" data-nav="schedule">Loading Schedule</a> or <a href="${pageHref('bulletin')}" data-nav="bulletin">Verdict &amp; Actions</a> under “More detail”.</p>
+    </div></section>
+  </div>`;
+};
+
+
 /* ---------------------------------------------------------------- VERDICT & ACTION BULLETIN */
 Pages.bulletin = () => {
   const v = E.verdict(state), cap = v.capacity, del = v.delivery;
@@ -2753,6 +2976,12 @@ function settingsGeneral() {
 /* ---------------------------------------------------------------- HELP */
 Pages.help = () => `
   <div class="grid-2">
+  <section class="card"><div class="card-h"><div><h2>Quick Workout — the easy way, in 4 steps</h2><div class="sub">Same method as the plant’s own capacity workout sheet</div></div></div><div class="card-b prose">
+    <ol><li><b>Quantity and time.</b> Pick the part, type the quantity for the month, and check shifts, hours per shift, working days and OEE.</li>
+    <li><b>Read the verdict.</b> Takt time = working time ÷ quantity. Throughput = what the slowest process can really deliver. Throughput time = how long a lot needs to pass every process.</li>
+    <li><b>Look at each process.</b> Machines of one process work side by side — their pieces per hour add up, and the work is shared by speed so no machine is loaded more than another (auto load balancing). Red means not enough time.</li>
+    <li><b>Fix it.</b> Under every red process you see the ways out with numbers: extra machines, a shorter cycle time, longer hours, better OEE or more days. Press <b>Use this balance in the plan</b> to carry the machine shares into the Capacity Plan and Loading Schedule.</li></ol>
+    <p class="small muted">A machine can have its own cycle time when it is an alternate: in the Operations Master › Cycle times, write the alternates as <span class="mono">EPI-B-80=65, EPI-B-05=60</span> (machine = seconds). Without “=” the machine uses the same cycle time as the first machine. If your sheet shows an engineering-data cycle time next to the measured one, store the longer of the two.</p></div></section>
   <section class="card"><div class="card-h"><div><h2>How to use the planner each month</h2></div></div><div class="card-b prose">
     <ol>
       <li><b>Pick the month</b> at the top of the screen. Each month keeps its own quantities, due dates, available days and remarks.</li>
@@ -2840,6 +3069,8 @@ document.addEventListener('change', ev => {
   if (d.userrole) return setUserRole(d.userrole, el);
   const need = fieldNeeds(el);
   if (need && !can(need)) { toast('You do not have permission to change this.'); return render(); }
+  if (d.qw) { const p = ensurePlan(); p.quick = p.quick || {}; const v = el.value; if (d.qw === 'part') p.quick.part = v; else if (v === '') delete p.quick[d.qw]; else p.quick[d.qw] = Math.max(0, Number(v) || 0); return commit(); }
+  if (el.matches && el.matches('[data-qwbal]')) { const p = ensurePlan(); p.quick = p.quick || {}; p.quick.balance = el.checked; return commit(); }
   if (d.qty) { const p = ensurePlan(); const pp = p.parts[d.qty] = p.parts[d.qty] || {}; pp.qty = Math.max(0, Number(el.value) || 0); if (!pp.due) pp.due = model.monthEnd; return commit(); }
   if (d.minon) { const p = ensurePlan(); p.minOn = el.value === '1'; return commit(); }
   if (d.cover) { const p = ensurePlan(); p['cover' + d.cover] = Math.max(0, Math.round(Number(el.value) || 0)); return commit(); }
@@ -2933,12 +3164,12 @@ function applyOpsData() {
   state.machines = (m.machines || []).map(x => ({ code: x.code, cell: x.cell || '', availDays: x.availDays == null ? null : Number(x.availDays),
     hoursPerDay: x.hoursPerDay == null ? null : Number(x.hoursPerDay), remarks: x.remarks || '', active: x.active !== false }));
   state.operations = (m.operations || []).map((o, i) => ({ id: i + 1, partNo: o.partNo || '', partName: o.partName || o.partNo || '', process: o.process || '',
-    machine: o.machine || '', cycleTime: Number(o.cycleTime) || 0, alternates: Array.isArray(o.alternates) ? o.alternates : [] }));
+    machine: o.machine || '', cycleTime: Number(o.cycleTime) || 0, alternates: Array.isArray(o.alternates) ? o.alternates : [] })).map(parseAlts);
   state.partClass = {}; state.partMinDays = {};
   (m.parts || []).forEach(x => { if (x.partNo) { state.partClass[x.partNo] = ['A', 'B', 'C'].includes(x.abcClass) ? x.abcClass : 'B'; if (x.minStockDays != null && Number(x.minStockDays) > 0) state.partMinDays[x.partNo] = Number(x.minStockDays); } });
   applyProcessPlan();
   const st = m.standards || {}, s = state.settings;
-  ['oee', 'hoursPerDay', 'daysPerMonth', 'warnPct', 'transferLagHours', 'lotSize', 'levelTargetPct'].forEach(k => { if (st[k] !== undefined && st[k] !== '' && !isNaN(Number(st[k]))) s[k] = Number(st[k]); });
+  ['oee', 'hoursPerDay', 'shifts', 'daysPerMonth', 'warnPct', 'transferLagHours', 'lotSize', 'levelTargetPct'].forEach(k => { if (st[k] !== undefined && st[k] !== '' && !isNaN(Number(st[k]))) s[k] = Number(st[k]); });
   if (st.weeklyOff !== undefined) s.weeklyOff = kmrWeeklyOff(st.weeklyOff);
   if (m.has_hrm) { s.holidays = m.holidays || []; s.holidayNames = m.holidayNames || {}; }
 }
@@ -2961,7 +3192,7 @@ function applyProcessPlan() {
       const ct = rec && rec.ct > 0 ? Number(rec.ct) : 0;
       if (!machine) state.planGaps.push({ partNo: p.partNo, process: x.name, issue: x.machineId ? `machine ${x.machineId} is not in the Operations Master` : 'no machine chosen in the Process Plan — pick one from the Operations Master' });
       if (!ct) state.planGaps.push({ partNo: p.partNo, process: x.name, issue: 'no cycle time in the Operations Master › Cycle times (this step loads 0 days until it is added)' });
-      add.push({ partNo: p.partNo, partName: p.partName || p.partNo, process: x.name || 'Operation', machine, cycleTime: ct, alternates: rec && rec.alternates ? String(rec.alternates).split(',').map(a => a.trim()).filter(Boolean) : [], fromPlan: true });
+      add.push(parseAlts({ partNo: p.partNo, partName: p.partName || p.partNo, process: x.name || 'Operation', machine, cycleTime: ct, alternates: rec && rec.alternates ? String(rec.alternates).split(',').map(a => a.trim()).filter(Boolean) : [], fromPlan: true }));
     });
   });
   state.operations = keep.concat(add).sort((a, b) => a.partNo.localeCompare(b.partNo)).map((o, i) => Object.assign({}, o, { id: i + 1 }));
@@ -2993,6 +3224,16 @@ function kmrMastersPage() {
 }
 
 const Actions = {
+  toggleMore() { ui.moreOpen = !ui.moreOpen; render(); },
+  qwReset() { const p = ensurePlan(); const keep = p.quick && p.quick.part ? { part: p.quick.part } : null; if (keep) p.quick = keep; else delete p.quick; commit(); toast('Back to the plant standard.'); },
+  qwApply() {
+    const w = E.workout(state), p = ensurePlan(); if (Array.isArray(p.splits)) p.splits = {};
+    Object.keys(p.splits).forEach(k => { if (w.procs.some(x => String(x.opId) === String(k))) delete p.splits[k]; });
+    Object.entries(w.splits).forEach(([k, v]) => { p.splits[k] = v; });
+    state.scenario = 'standard'; commit();
+    toast(Object.keys(w.splits).length ? `Machine shares saved for ${Object.keys(w.splits).length} process${Object.keys(w.splits).length > 1 ? 'es' : ''} — Capacity Plan and Loading Schedule now follow them.` : 'Nothing to share: every process has one machine.');
+  },
+  qwPrint() { printQuick(); },
   suggestMin() {
     if (model.mode !== 'dynamic' && can('editor')) toast('Worked out for Dynamic capacity — switch to Dynamic to use it.');
     const res = E.suggestMinStock(state);
@@ -3506,6 +3747,26 @@ function exportWorkbook() {
   const bytes = XLSX.write({ title: `Capacity Plan ${per}`, author: s.companyName, sheets: [plan, work, sched, set] });
   download(`${safeName(s.companyName)}_Capacity_Plan_${state.year}-${E.pad(state.month + 1)}.xlsx`, new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   toast('Excel workbook downloaded');
+}
+
+/* ---------- Quick Workout report ---------- */
+function printQuick() {
+  const w = E.workout(state), s = state.settings, area = $('#printArea'), prev = ui.page;
+  const lbl = { over: 'Not enough', tight: 'Nearly full', ok: 'Enough', idle: '–', supplier: 'Supplier', nodata: 'No cycle time' };
+  const rows = w.procs.map(p => `<tr><td>${p.seq + 1}</td><td><b>${h(p.process)}</b>${w.partSel === 'ALL' ? ` <span class="muted">${h(p.partNo)}</span>` : ''}</td>
+    <td>${p.machines.map(c => `${h(c.code)} (${c.ct}s${p.machines.length > 1 ? ', ' + Math.round(c.share * 100) + '%' : ''})`).join('<br>') || '–'}</td>
+    <td class="r num">${p.qty > 0 ? fmtInt(p.qty) : '–'}</td><td class="r num">${p.rate > 0 ? fmtInt(p.capDay) : '–'}</td><td class="r num">${p.rate > 0 && p.qty > 0 ? fmt(p.daysReq, 1) : '–'}</td><td class="r num">${p.rate > 0 ? fmt(p.availDays, 0) : '–'}</td>
+    <td class="r num">${p.rate > 0 && p.qty > 0 ? fmt(p.loadPct, 0) + '%' : '–'}</td><td class="r num">${p.rate > 0 && p.qty > 0 ? fmt(p.procTime, 1) + ' / ' + fmt(p.taktSec, 1) : '–'}</td><td>${lbl[p.status]}${p.fix ? `<div class="small">+${p.fix.extraMachines} machine(s) or ${fmt(p.fix.extraDays, 1)} more days</div>` : ''}</td></tr>`).join('');
+  area.innerHTML = `<h2 style="margin:0 0 4px">Capacity Workout · ${E.MONTHS[state.month]} ${state.year}</h2>
+    <p class="small muted" style="margin:0 0 10px">${h(s.companyName)} · ${w.shifts} shift(s) × ${fmt(w.hrsShift, 1)} h = ${fmt(w.hpd, 1)} h/day · ${w.days} days · OEE ${fmt(w.oee, 0)}% · ${w.balance ? 'work shared between machines by speed' : 'first machine only'}</p>
+    <table class="tbl"><thead><tr><th>#</th><th>Process</th><th>Machines (cycle time, share)</th><th class="r">Pieces</th><th class="r">Capacity / day</th><th class="r">Days needed</th><th class="r">Days available</th><th class="r">Load</th><th class="r">Time per piece / takt (s)</th><th>Result</th></tr></thead><tbody>${rows}</tbody></table>
+    <h3 style="margin:14px 0 6px">Part summary</h3><table class="tbl"><thead><tr><th>Part</th><th class="r">Quantity</th><th class="r">Takt (s)</th><th>Slowest process</th><th class="r">Can be made</th><th class="r">Throughput time of ${fmtInt(w.lot)} pcs</th></tr></thead><tbody>
+    ${w.parts.map(p => `<tr><td>${h(p.partNo)} · ${h(p.partName)}</td><td class="r num">${fmtInt(p.sales)}</td><td class="r num">${fmt(p.taktSec, 1)}</td><td>${p.bottleneck ? h(p.bottleneck.process) + ' (' + fmt(p.bottleneck.loadPct, 0) + '%)' : '–'}</td><td class="r num">${fmtInt(p.canMake)}</td><td class="r num">${fmt(p.throughputDays, 1)} days (${fmt(p.throughputHrs, 1)} h)</td></tr>`).join('')}</tbody></table>`;
+  if (window.KMRReport) KMRReport.set({ key: 'workout', title: 'Capacity Workout · ' + E.MONTHS[state.month] + ' ' + state.year });
+  document.body.classList.add('print-report');
+  const done = () => { document.body.classList.remove('print-report'); area.innerHTML = ''; window.removeEventListener('afterprint', done); ui.page = prev; if (window.KMRReport) KMRReport.set({}); };
+  window.addEventListener('afterprint', done);
+  setTimeout(() => { window.print(); setTimeout(() => { if (document.body.classList.contains('print-report') && !matchMedia('print').matches) done(); }, 1500); }, 60);
 }
 
 /* ---------- Print report ---------- */

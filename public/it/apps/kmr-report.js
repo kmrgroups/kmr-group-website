@@ -15,6 +15,7 @@
   const CODE = { balloon: "BAL", pd: "PD", capacity: "CAP", sales: "SAL", calib: "CAL", apqp: "APQP", ppap: "PPAP", rmp: "RMP", mmd: "MMD", mnt: "MNT", mom: "MOM", hrms: "HRM", tsk: "TSK", msa: "MSA", spc: "SPC", crm: "CRM", d8: "8D", qms: "QMS", aud: "AUD" };
   /* format register: one line per report format. Format no. = KMR/<app>/F-nn. Raise rev + date whenever that report's layout changes. */
   const FORMATS = {
+    capacity: { workout: { no: 2, rev: "01", date: "2026-10-23", name: "Capacity workout — takt, throughput, load balance" } },
     aud: { plan: { no: 1, rev: "01", date: "2026-10-22", name: "Internal audit plan" }, report: { no: 2, rev: "01", date: "2026-10-22", name: "Internal audit report" }, register: { no: 3, rev: "01", date: "2026-10-22", name: "Internal audit programme" }, actions: { no: 4, rev: "01", date: "2026-10-22", name: "Audit findings and actions list" } },
     qms: { manual: { no: 1, rev: "01", date: "2026-10-22", name: "Standards learning manual" }, coverage: { no: 2, rev: "01", date: "2026-10-22", name: "Standards coverage analysis" } },
     d8: { report: { no: 1, rev: "01", date: "2026-10-22", name: "8D problem solving report" }, register: { no: 2, rev: "01", date: "2026-10-22", name: "8D register" }, actions: { no: 3, rev: "01", date: "2026-10-22", name: "8D action list" } },

@@ -253,7 +253,10 @@ capacity:[
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Machine capacity is planned against demand.'],
 ['IATF','8.2.3.1.3','Organizational manufacturing feasibility','Load against capacity shows whether the demand can be met.'],
 ['ISO','8.1','Operational planning and control','Capacity and loading are planned before orders are accepted.'],
-['VDA','P3','Planning of product and process development','Cycle time and machine data feed the feasibility of new parts.']],
+['VDA','P3','Planning of product and process development','Cycle time and machine data feed the feasibility of new parts.'],
+['APQP','Phase 2 - 3','Feasibility and process capacity','Quick Workout works out takt time and capacity per process from the cycle time of each machine, and says in one screen whether the planned quantity can be made.'],
+['ISO','8.5.1','Control of production provision','Work is shared between the machines of a process by speed (auto load balancing), so the planned quantity is produced inside the available time; throughput time of a lot shows the flow.'],
+['IATF','7.1.3.1','Plant, facility and equipment planning','Overloaded processes list the ways out (extra machine, cycle time, hours, OEE, days) with the numbers.']],
 pd:[
 ['CP','Control Plan (prototype, pre-launch, production)','Control Plan content','Control Plan is generated from the process flow and FMEA.'],
 ['VF','7 steps; Action Priority (AP)','Process FMEA','PFMEA with severity, occurrence, detection and Action Priority.'],
