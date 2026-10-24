@@ -255,7 +255,7 @@
   } };
 
   /* ---------- Calibration ---------- */
-  KMRPA.calibration = { name: "Calibration Hub", code: "calibration", std: "calibration", load: async function (call) {
+  KMRPA.calibration = { name: "Calibration Hub", code: "calibration", ctxFn: "kmr_cal_context", std: "calibration", load: async function (call) {
     var D = await call("kmr_cal_load"), S = std, td = todayIso(), DUE = 30, ms = function (d) { return Date.parse(d + "T00:00:00"); };
     var I = D.instruments || [], use = I.filter(function (i) { return i.status === "In use"; }), dd = function (i) { return i.next_due ? Math.round((ms(i.next_due) - ms(td)) / 864e5) : null; };
     var od = use.filter(function (i) { return i.next_due && dd(i) < 0; }), soon = use.filter(function (i) { var d = dd(i); return d != null && d >= 0 && d <= DUE; }), nocal = use.filter(function (i) { return !i.next_due; });
@@ -293,7 +293,7 @@
   } };
 
   /* ---------- Sales Flow ---------- */
-  KMRPA.sales = { name: "Sales Flow", code: "sales", std: "sales", controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = d.toISOString().slice(0, 7); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
+  KMRPA.sales = { name: "Sales Flow", code: "sales", ctxFn: "kmr_sf_context", std: "sales", controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = d.toISOString().slice(0, 7); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
     var r = await call("kmr_sf_month", { p_month: v.month + "-01" }), S = std, td = todayIso(), L = r.lines || [], dsp = {};
     (r.despatch || []).forEach(function (d) { (dsp[d.line_id] = dsp[d.line_id] || {})[d.day] = +d.qty; });
     var dim = new Date(+v.month.slice(0, 4), +v.month.slice(5, 7), 0).getDate(), upto = td < v.month + "-01" ? 0 : td.slice(0, 7) === v.month ? +td.slice(8) : dim, f = Math.min(1, upto / dim);

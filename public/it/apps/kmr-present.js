@@ -13,7 +13,9 @@
     ".kp .bar input,.kp .bar select{padding:7px 9px;border:1px solid var(--line,#d6dbe4);border-radius:8px;font:inherit;background:var(--card,#fff);color:inherit}" +
     ".kp .kb{padding:8px 14px;border-radius:8px;border:1px solid var(--b1,#2f6fdb);background:var(--b1,#2f6fdb);color:#fff;font-weight:600;cursor:pointer;font:inherit}.kp .kb.o{background:transparent;color:var(--b1,#2f6fdb)}.kp .kb.s{padding:4px 9px;font-size:12px}" +
     ".kp .stage{background:var(--card,#fff);border:1px solid var(--line,#d6dbe4);border-radius:12px;display:flex;flex-direction:column;min-height:min(72vh,640px)}" +
-    ".kp:fullscreen{background:var(--bg,#f4f6fa);padding:14px;overflow:auto}.kp:fullscreen .stage{min-height:calc(100vh - 110px)}" +
+    ".kp:fullscreen{background:var(--bg,#f4f6fa);padding:10px 14px;display:flex;flex-direction:column;height:100vh;box-sizing:border-box;overflow:hidden}.kp:fullscreen .stage{flex:1;min-height:0}.kp:fullscreen .bar{margin-bottom:6px}.kp:fullscreen .nav{margin-top:6px}" +
+    ".kp .ss{padding:7px 18px;border-top:1px solid var(--line,#d6dbe4);font-size:12px;color:var(--tx,#1b2433);background:var(--bg,#f4f6fa)}.kp .ss b{color:var(--b1,#2f6fdb)}.kp .ss span.c{display:inline-block;margin:1px 10px 1px 0;white-space:nowrap}.kp .sc{display:block;font-size:11px;color:var(--b1,#2f6fdb);margin-top:3px}" +
+    ".kp .gap{border-left:5px solid var(--kr);background:var(--bg,#f4f6fa);padding:8px 10px;border-radius:8px;font-size:13px;margin:6px 0}.kp .gap.l-g{border-left-color:var(--kg)}.kp .gap.l-a{border-left-color:var(--ka)}.kp .gap.l-n{border-left-color:var(--kn)}" +
     ".kp .sh{display:flex;align-items:center;gap:12px;padding:12px 18px;border-bottom:1px solid var(--line,#d6dbe4)}.kp .sh img{height:42px;max-width:150px;object-fit:contain}.kp .sh .t{flex:1}.kp .sh h2{margin:0;font-size:20px}.kp .sh .m{font-size:12px;color:var(--mut,#667)}" +
     ".kp .sb{flex:1;padding:16px 18px;overflow:auto}.kp .sf{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:8px 18px;border-top:1px solid var(--line,#d6dbe4);font-size:11px;color:var(--mut,#667)}" +
     ".kp .kg{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.kp .kc{border:1px solid var(--line,#d6dbe4);border-left:6px solid var(--kn);border-radius:10px;padding:10px 12px;position:relative}" +
@@ -69,9 +71,29 @@
     return '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto" role="img" aria-label="' + esc(c.title) + '">' + g + body + xl + "</svg>" + lg;
   }
 
+  var STATIC = { "ISO|9.3.2": "Management review inputs", "ISO|9.3.3": "Management review outputs", "ISO|10.2": "Nonconformity and corrective action", "ISO|10.3": "Continual improvement", "ISO|9.1.3": "Analysis and evaluation", "IATF|9.1.1.1": "Monitoring and measurement of manufacturing processes", "IATF|10.2.3": "Problem solving" };
+  var stdName = function (k) { var c = (window.KMRStd && KMRStd.cat) || {}; return (c[k] && c[k][0]) || k; };
+  var uniq = function (a) { var seen = {}, o = []; (a || []).forEach(function (x) { var k = x[0] + "|" + x[1]; if (!seen[k]) { seen[k] = 1; o.push(x); } }); return o; };
+  function gapText(k) {
+    if (!k) return "";
+    if (k.target == null || k.value == null || isNaN(k.value)) return k.name + ": " + fmtV(k) + " — information only, no target is set.";
+    var d = Math.abs(k.value - k.target), ds = d.toFixed(d >= 100 ? 0 : 1).replace(/\.0$/, "") + (k.unit === "%" ? " points" : k.unit && k.unit !== "₹" ? " " + k.unit : ""), tg = (k.dir === "low" ? "at most " : "at least ") + (k.fmt ? k.fmt(k.target) : k.target + (k.unit === "%" ? "%" : k.unit && k.unit !== "₹" ? " " + k.unit : ""));
+    var bad = k.dir === "low" ? k.value > k.target : k.value < k.target;
+    return k.name + ": now " + fmtV(k) + ", target " + tg + (bad ? " — gap of " + ds + " " + (k.dir === "low" ? "above" : "below") + " the target." : " — on target.");
+  }
+
   function mount(el, cfg) {
     if (!document.getElementById("kp-css")) { var st = document.createElement("style"); st.id = "kp-css"; st.textContent = CSS; document.head.appendChild(st); }
     var S = { i: 0, vals: {}, data: null, acts: [], local: false, form: null };
+    el.innerHTML = '<div class="kp"></div>'; var root = el.firstChild;
+    var rowsAll = (window.KMRStd && cfg.stdKey ? KMRStd.rows(cfg.stdKey) : []);
+    function stdStrip(list) {
+      list = uniq(list); if (!list.length) return "";
+      return '<div class="ss"><b>Standards &amp; clauses:</b> ' + list.slice(0, 18).map(function (x) {
+        var t = STATIC[x[0] + "|" + x[1]] || ""; if (!t) rowsAll.some(function (r) { var tk = String(r[1]).split("/").map(function (y) { return y.trim(); }); if (r[0] === x[0] && tk.indexOf(String(x[1])) >= 0) { t = r[2]; return true; } return false; });
+        return '<span class="c"><b>' + esc(stdName(x[0])) + "</b> " + esc(x[1]) + (t ? " – " + esc(t) : "") + "</span>";
+      }).join("") + "</div>";
+    }
     (cfg.controls || []).forEach(function (c) { S.vals[c.id] = c.value; });
     var today = new Date().toISOString().slice(0, 10);
     var ref = function () { var d = new Date(), p = function (n) { return String(n).padStart(2, "0"); }; return "KMR/" + String(cfg.app || "app").toUpperCase() + "/PRS/" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()); };
@@ -100,17 +122,19 @@
     function kpiCard(k) {
       var l = light(k), tg = k.target != null ? (k.dir === "low" ? "target ≤ " : "target ≥ ") + (k.fmt ? k.fmt(k.target) : (k.unit === "₹" ? "₹" + Math.round(k.target).toLocaleString("en-IN") : k.target + (k.unit && k.unit !== "₹" ? (k.unit === "%" ? "%" : " " + k.unit) : ""))) : "for information";
       var dlt = k.prev != null && k.value != null ? (function () { var d = k.value - k.prev, up = d > 0, good = k.dir === "low" ? !up : up; return d === 0 ? "no change from last month" : '<span style="color:' + (k.target == null ? "#667" : good ? COL.g : COL.r) + '">' + (up ? "▲ " : "▼ ") + Math.abs(d).toFixed(Math.abs(d) >= 100 ? 0 : 1).replace(/\.0$/, "") + "</span> vs last month"; })() : "";
-      return '<div class="kc l-' + l + '"><span class="tl"><i class="dot l-' + l + '"></i></span><div class="nm">' + esc(k.name) + "</div><b>" + esc(fmtV(k)) + "</b><small>" + tg + "</small>" + (dlt ? "<small>" + dlt + "</small>" : "") + spark(k.trend, COL[l] || COL.n) + "</div>";
+      return '<div class="kc l-' + l + '"><span class="tl"><i class="dot l-' + l + '"></i></span><div class="nm">' + esc(k.name) + "</div><b>" + esc(fmtV(k)) + "</b><small>" + tg + "</small>" + (dlt ? "<small>" + dlt + "</small>" : "") + spark(k.trend, COL[l] || COL.n) + (k.std && k.std.length ? '<span class="sc">' + k.std.map(function (x) { return esc(stdName(x[0]) + " " + x[1]); }).join(" · ") + "</span>" : "") + "</div>";
     }
     function slides() {
       var D = S.data, K = D.kpis || [], out = [], cnt = { g: 0, a: 0, r: 0, n: 0 }; K.forEach(function (k) { cnt[light(k)]++; });
-      out.push({ t: "Management review", b: '<div style="text-align:center;padding:30px 10px">' + (logo() ? '<img src="' + esc(logo()) + '" alt="" style="height:80px;max-width:280px;object-fit:contain">' : "") + '<div class="big" style="margin-top:14px">' + esc(cfg.appName) + '</div><div style="font-size:20px;margin:6px 0">KPI review aligned to the standards</div><div style="font-size:18px;font-weight:600">' + esc(D.period || "") + '</div><div class="note">' + esc(cfg.company || "") + " · " + new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) + '</div><div style="margin-top:18px"><span class="dot l-g"></span> ' + cnt.g + " on target &nbsp; <span class=\"dot l-a\"></span> " + cnt.a + " watch &nbsp; <span class=\"dot l-r\"></span> " + cnt.r + " off target</div></div>" });
-      out.push({ t: "KPI scorecard", b: '<div class="kg">' + K.map(kpiCard).join("") + '</div><div class="note"><i class="dot l-g"></i> on target &nbsp; <i class="dot l-a"></i> within tolerance &nbsp; <i class="dot l-r"></i> off target &nbsp; <i class="dot"></i> for information. Figures come live from the app\'s own records for the period.</div>' });
+      var ALLS = uniq([].concat.apply([], K.map(function (k) { return k.std || []; })));
+      var MR = [["ISO", "9.3.2"], ["ISO", "9.3.3"]];
+      out.push({ std: MR.concat(ALLS).slice(0, 12), t: "Management review", b: '<div style="text-align:center;padding:30px 10px">' + (logo() ? '<img src="' + esc(logo()) + '" alt="" style="height:80px;max-width:280px;object-fit:contain">' : "") + '<div class="big" style="margin-top:14px">' + esc(cfg.appName) + '</div><div style="font-size:20px;margin:6px 0">KPI review aligned to the standards</div><div style="font-size:18px;font-weight:600">' + esc(D.period || "") + '</div><div class="note">' + esc(cfg.company || "") + " · " + new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) + '</div><div style="margin-top:18px"><span class="dot l-g"></span> ' + cnt.g + " on target &nbsp; <span class=\"dot l-a\"></span> " + cnt.a + " watch &nbsp; <span class=\"dot l-r\"></span> " + cnt.r + " off target</div></div>" });
+      out.push({ std: ALLS, t: "KPI scorecard", b: '<div class="kg">' + K.map(kpiCard).join("") + '</div><div class="note"><i class="dot l-g"></i> on target &nbsp; <i class="dot l-a"></i> within tolerance &nbsp; <i class="dot l-r"></i> off target &nbsp; <i class="dot"></i> for information. Figures come live from the app\'s own records for the period.</div>' });
       (D.charts || []).forEach(function (c) {
         var rel = K.filter(function (k) { return c.kpi && k.id === c.kpi; })[0];
-        out.push({ t: c.title, b: '<div class="cg"><div>' + chartSvg(c) + '</div><div>' + (rel ? kpiCard(rel) : "") + (c.note ? '<div class="note">' + c.note + "</div>" : "") + (rel && rel.why ? '<div class="note"><b>How it is measured:</b> ' + esc(rel.why) + "</div>" : "") + "</div></div>" });
+        out.push({ std: (rel && rel.std && rel.std.length ? rel.std : ALLS), t: c.title, b: '<div class="cg"><div>' + chartSvg(c) + '</div><div>' + (rel ? kpiCard(rel) : "") + (c.note ? '<div class="note">' + c.note + "</div>" : "") + (rel && rel.why ? '<div class="note"><b>How it is measured:</b> ' + esc(rel.why) + "</div>" : "") + "</div></div>" });
       });
-      (D.extra || []).forEach(function (x) { out.push({ t: x.title, b: x.html }); });
+      (D.extra || []).forEach(function (x) { out.push({ std: ALLS, t: x.title, b: x.html }); });
       /* standards alignment: each clause with the KPI that gives its evidence */
       var rows = (window.KMRStd && cfg.stdKey ? KMRStd.rows(cfg.stdKey) : []), cat = (window.KMRStd && KMRStd.cat) || {};
       var link = rows.map(function (r) {
@@ -120,7 +144,7 @@
       }).sort(function (a, b) { return (b.ks.length ? 1 : 0) - (a.ks.length ? 1 : 0); });
       var per = 6; for (var p = 0; p < link.length; p += per) {
         var pg = link.slice(p, p + per);
-        out.push({ t: "Standards alignment" + (link.length > per ? " (" + (p / per + 1) + "/" + Math.ceil(link.length / per) + ")" : ""), b: '<table><thead><tr><th>Standard · clause</th><th>Requirement</th><th>How the app meets it</th><th>KPI evidence (live)</th><th>Status</th></tr></thead><tbody>' + pg.map(function (x) {
+        out.push({ std: pg.map(function (x) { return [x.r[0], String(x.r[1]).split("/")[0].trim()]; }), t: "Standards alignment" + (link.length > per ? " (" + (p / per + 1) + "/" + Math.ceil(link.length / per) + ")" : ""), b: '<table><thead><tr><th>Standard · clause</th><th>Requirement</th><th>How the app meets it</th><th>KPI evidence (live)</th><th>Status</th></tr></thead><tbody>' + pg.map(function (x) {
           return "<tr><td><b>" + esc((cat[x.r[0]] || [x.r[0]])[0]) + "</b><br>" + esc(x.r[1]) + "</td><td>" + esc(x.r[2]) + "</td><td>" + esc(x.r[3]) + "</td><td>" + (x.ks.length ? x.ks.map(function (k) { return '<i class="dot l-' + light(k) + '"></i> ' + esc(k.name) + ": <b>" + esc(fmtV(k)) + "</b>"; }).join("<br>") : '<span style="color:#667">Process control in place - no numeric KPI</span>') + '</td><td style="text-align:center"><i class="dot l-' + (x.ks.length ? x.l : "g") + '"></i><br><small>' + (x.ks.length ? { g: "Met", a: "Watch", r: "Gap", n: "—" }[x.l] : "In place") + "</small></td></tr>";
         }).join("") + "</tbody></table>" });
       }
@@ -128,41 +152,47 @@
       var al = S.acts.slice().sort(function (a, b) { var o = { r: 0, a: 1, b: 2, g: 3 }; return o[actLight(a)] - o[actLight(b)] || String(a.due || "").localeCompare(String(b.due || "")); });
       var open = al.filter(function (a) { return a.status !== "Done"; }).length, done = al.length - open, late = al.filter(function (a) { return actState(a) === "Delayed"; }).length;
       var sug = K.filter(function (k) { return light(k) === "r" || light(k) === "a"; }).filter(function (k) { return !S.acts.some(function (a) { return a.kpi === k.id && a.status !== "Done"; }); });
-      out.push({ t: "Action plans and status", act: true, b: (S.local ? '<div class="note" style="color:#b26a00">These actions are saved on this device only until the database update (migration 0088) is applied.</div>' : "") +
+      out.push({ std: [["ISO", "9.3.3"], ["ISO", "10.2"], ["ISO", "10.3"]].concat([].concat.apply([], S.acts.map(function (a) { var k = K.filter(function (x) { return x.id === a.kpi; })[0]; return k ? (k.std || []) : []; }))), t: "Action plans and status", act: true, b: (S.local ? '<div class="note" style="color:#b26a00">These actions are saved on this device only until the database update (migration 0088) is applied.</div>' : "") +
         '<div style="margin-bottom:8px"><i class="dot l-r"></i> ' + late + ' delayed &nbsp; <i class="dot l-a"></i> ' + al.filter(function (a) { return actState(a) === "In progress"; }).length + ' in progress &nbsp; <i class="dot l-b"></i> ' + al.filter(function (a) { return actState(a) === "Open"; }).length + ' open &nbsp; <i class="dot l-g"></i> ' + done + " done" + (cfg.canEdit ? ' &nbsp; <button class="kb s noprint" data-add="">+ Add action</button>' : "") + "</div>" +
-        (cfg.canEdit && sug.length ? '<div class="noprint note">Suggested from the scorecard: ' + sug.map(function (k) { return '<span class="chip" data-sug="' + esc(k.id) + '"><i class="dot l-' + light(k) + '"></i> ' + esc(k.name) + "</span>"; }).join("") + "</div>" : "") +
+        (cfg.canEdit && sug.length ? '<div class="noprint note">Gaps found on the scorecard — click one to plan its action: ' + sug.map(function (k) { return '<span class="chip" data-sug="' + esc(k.id) + '"><i class="dot l-' + light(k) + '"></i> ' + esc(k.name) + "</span>"; }).join("") + "</div>" : "") +
         (S.form ? formHtml(S.form, K) : "") +
-        (al.length ? '<table><thead><tr><th>S.No</th><th>Action</th><th>KPI / standard</th><th>Owner</th><th>Target date</th><th>Status</th>' + (cfg.canEdit ? '<th class="noprint"></th>' : "") + "</tr></thead><tbody>" + al.map(function (a, i) {
+        (al.length ? '<table><thead><tr><th>S.No</th><th>Action</th><th>Gap it closes (KPI now → target) / standard</th><th>Owner</th><th>Target date</th><th>Status</th>' + (cfg.canEdit ? '<th class="noprint"></th>' : "") + "</tr></thead><tbody>" + al.map(function (a, i) {
           var k = K.filter(function (x) { return x.id === a.kpi; })[0];
-          return "<tr><td>" + (i + 1) + "</td><td>" + esc(a.title) + (a.note ? '<div class="note" style="margin:2px 0">' + esc(a.note) + "</div>" : "") + "</td><td>" + (k ? esc(k.name) : "") + (a.standard ? "<br><small>" + esc(a.standard) + "</small>" : "") + "</td><td>" + esc(a.owner || "") + "</td><td>" + esc(String(a.due || "").slice(0, 10)) + '</td><td><i class="dot l-' + actLight(a) + '"></i> ' + (cfg.canEdit ? '<select data-st="' + esc(a.id) + '" class="noprint">' + ["Open", "In progress", "Done"].map(function (s) { return "<option" + (s === a.status ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select><span class=\"kp-printonly\">" + esc(actState(a)) + "</span>" : esc(actState(a))) + (actState(a) === "Delayed" ? " <small style=\"color:#d64545\">delayed</small>" : "") + "</td>" + (cfg.canEdit ? '<td class="noprint"><button class="kb o s" data-edit="' + esc(a.id) + '">Edit</button> <button class="kb o s" data-del="' + esc(a.id) + '">Delete</button></td>' : "") + "</tr>";
+          return "<tr><td>" + (i + 1) + "</td><td>" + esc(a.title) + (a.note ? '<div class="note" style="margin:2px 0">' + esc(a.note) + "</div>" : "") + "</td><td>" + (k ? '<i class="dot l-' + light(k) + '"></i> ' + esc(gapText(k)) : '<span style="color:#667">General improvement — no KPI gap</span>') + (a.standard ? "<br><small>" + esc(a.standard) + "</small>" : "") + "</td><td>" + esc(a.owner || "") + "</td><td>" + esc(String(a.due || "").slice(0, 10)) + '</td><td><i class="dot l-' + actLight(a) + '"></i> ' + (cfg.canEdit ? '<select data-st="' + esc(a.id) + '" class="noprint">' + ["Open", "In progress", "Done"].map(function (s) { return "<option" + (s === a.status ? " selected" : "") + ">" + s + "</option>"; }).join("") + "</select><span class=\"kp-printonly\">" + esc(actState(a)) + "</span>" : esc(actState(a))) + (actState(a) === "Delayed" ? " <small style=\"color:#d64545\">delayed</small>" : "") + "</td>" + (cfg.canEdit ? '<td class="noprint"><button class="kb o s" data-edit="' + esc(a.id) + '">Edit</button> <button class="kb o s" data-del="' + esc(a.id) + '">Delete</button></td>' : "") + "</tr>";
         }).join("") + "</tbody></table>" : '<div class="note">No action plans yet. ' + (cfg.canEdit ? "Add one, or pick a suggestion from the scorecard." : "") + "</div>") });
       var worst = K.filter(function (k) { return light(k) === "r"; }).slice(0, 5);
-      out.push({ t: "Summary and decisions", b: '<div class="kg"><div class="kc l-g"><div class="nm">On target</div><b>' + cnt.g + '</b></div><div class="kc l-a"><div class="nm">Within tolerance</div><b>' + cnt.a + '</b></div><div class="kc l-r"><div class="nm">Off target</div><b>' + cnt.r + '</b></div><div class="kc l-b" style="border-left-color:#2f6fdb"><div class="nm">Actions open / delayed</div><b>' + open + " / " + late + "</b></div></div>" +
+      out.push({ std: [["ISO", "9.3.2"], ["ISO", "9.3.3"], ["ISO", "10.3"]].concat(worst.reduce(function (a, k) { return a.concat(k.std || []); }, [])), t: "Summary and decisions", b: '<div class="kg"><div class="kc l-g"><div class="nm">On target</div><b>' + cnt.g + '</b></div><div class="kc l-a"><div class="nm">Within tolerance</div><b>' + cnt.a + '</b></div><div class="kc l-r"><div class="nm">Off target</div><b>' + cnt.r + '</b></div><div class="kc l-b" style="border-left-color:#2f6fdb"><div class="nm">Actions open / delayed</div><b>' + open + " / " + late + "</b></div></div>" +
         (worst.length ? '<h3 style="margin:16px 0 6px">Needs management attention</h3><ul>' + worst.map(function (k) { return "<li><b>" + esc(k.name) + ":</b> " + esc(fmtV(k)) + " against a target of " + (k.dir === "low" ? "at most " : "at least ") + esc(k.fmt ? k.fmt(k.target) : k.target + (k.unit === "%" ? "%" : "")) + "</li>"; }).join("") + "</ul>" : '<h3 style="margin:16px 0 6px">All measured KPIs are on target or within tolerance.</h3>') + '<div class="note">Decisions and responsibilities are recorded in the action plans.</div>' });
       return out;
     }
     function formHtml(f, K) {
-      return '<div class="noprint" style="border:1px solid var(--line,#d6dbe4);border-radius:10px;padding:10px;margin-bottom:10px"><div class="frm"><div style="grid-column:1/-1"><label>Action *</label><input id="kf_t" value="' + esc(f.title || "") + '"></div><div><label>KPI</label><select id="kf_k"><option value="">—</option>' + K.map(function (k) { return '<option value="' + esc(k.id) + '"' + (k.id === f.kpi ? " selected" : "") + ">" + esc(k.name) + "</option>"; }).join("") + '</select></div><div><label>Standard / clause</label><input id="kf_s" value="' + esc(f.standard || "") + '"></div><div><label>Owner *</label><input id="kf_o" value="' + esc(f.owner || "") + '"></div><div><label>Target date *</label><input type="date" id="kf_d" value="' + esc(String(f.due || "").slice(0, 10)) + '"></div><div><label>Status</label><select id="kf_st">' + ["Open", "In progress", "Done"].map(function (s) { return "<option" + (s === (f.status || "Open") ? " selected" : "") + ">" + s + "</option>"; }).join("") + '</select></div><div style="grid-column:1/-1"><label>Note / evidence</label><input id="kf_n" value="' + esc(f.note || "") + '"></div></div><button class="kb s" id="kf_ok">Save action</button> <button class="kb o s" id="kf_no">Cancel</button> <span id="kf_m" class="note"></span></div>';
+      var k0 = K.filter(function (k) { return k.id === f.kpi; })[0], mark = { r: "● Off target", a: "● Watch", g: "● On target", n: "○ Info" };
+      return '<div class="noprint" style="border:1px solid var(--line,#d6dbe4);border-radius:10px;padding:10px;margin-bottom:10px"><div class="frm"><div style="grid-column:1/-1"><label>1. Which KPI gap is this action for? *</label><select id="kf_k"><option value="">— choose the KPI —</option>' + K.map(function (k) { return '<option value="' + esc(k.id) + '"' + (k.id === f.kpi ? " selected" : "") + ">" + mark[light(k)] + " · " + esc(k.name) + " (" + esc(fmtV(k)) + ")</option>"; }).join("") + '<option value="__gen"' + (f.id && !f.kpi ? " selected" : "") + '>General improvement (not tied to one KPI)</option></select><div id="kf_gap" class="gap l-' + (k0 ? light(k0) : "n") + '">' + (k0 ? esc(gapText(k0)) : "Choose the KPI first — the gap (now against target) is shown here, and the action is recorded against it.") + '</div></div><div style="grid-column:1/-1"><label>2. What will be done to close the gap? *</label><input id="kf_t" value="' + esc(f.title || "") + '"></div><div><label>3. Owner *</label><input id="kf_o" value="' + esc(f.owner || "") + '"></div><div><label>4. Target date *</label><input type="date" id="kf_d" value="' + esc(String(f.due || "").slice(0, 10)) + '"></div><div><label>Status</label><select id="kf_st">' + ["Open", "In progress", "Done"].map(function (s) { return "<option" + (s === (f.status || "Open") ? " selected" : "") + ">" + s + "</option>"; }).join("") + '</select></div><div><label>Standard / clause (filled from the KPI)</label><input id="kf_s" value="' + esc(f.standard || "") + '"></div><div style="grid-column:1/-1"><label>Note / evidence</label><input id="kf_n" value="' + esc(f.note || "") + '"></div></div><button class="kb s" id="kf_ok">Save action</button> <button class="kb o s" id="kf_no">Cancel</button> <span id="kf_m" class="note"></span></div>';
     }
 
     /* ----- shell ----- */
     function shell(sl, i, forPrint) {
       var hdr = '<div class="sh">' + (logo() ? '<img src="' + esc(logo()) + '" alt="">' : "") + '<div class="t"><h2>' + esc(sl.t) + '</h2><div class="m">' + esc(cfg.appName) + " · " + esc((S.data || {}).period || "") + "</div></div><div class=\"m\" style=\"text-align:right\">Ref: " + esc(REF) + "<br>Slide " + (i + 1) + "</div></div>";
       var ftr = '<div class="sf"><span>Format F-PRS-01 · Rev 00 · Management review presentation · ' + esc(cfg.company || "") + '</span><span>Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></span></div>';
-      return '<div class="stage">' + hdr + '<div class="sb">' + sl.b + "</div>" + ftr + "</div>";
+      return '<div class="stage">' + hdr + '<div class="sb"><div class="si">' + sl.b + "</div></div>" + stdStrip(sl.std) + ftr + "</div>";
     }
     function draw() {
-      if (!S.data) { el.innerHTML = '<div class="kp"><div class="note">Loading the live data…</div></div>'; return; }
+      if (!S.data) { root.innerHTML = '<div class="note">Loading the live data…</div>'; return; }
       var sl = slides(); if (S.i >= sl.length) S.i = sl.length - 1; if (S.i < 0) S.i = 0;
       var ctl = (cfg.controls || []).map(function (c) {
         return "<div><label>" + esc(c.label) + "</label>" + (c.type === "select" ? '<select data-c="' + c.id + '">' + (c.options || []).map(function (o) { return "<option value=\"" + esc(o[0]) + '"' + (String(o[0]) === String(S.vals[c.id]) ? " selected" : "") + ">" + esc(o[1]) + "</option>"; }).join("") + "</select>" : '<input data-c="' + c.id + '" type="' + (c.type || "text") + '" value="' + esc(S.vals[c.id]) + '">') + "</div>";
       }).join("");
-      var root = el.querySelector(".kp"), fs = root && document.fullscreenElement === root;
-      el.innerHTML = '<div class="kp"><div class="bar noprint">' + ctl + '<span style="flex:1"></span><button class="kb o" data-x="prev">◀ Back</button><button class="kb o" data-x="next">Next ▶</button><button class="kb o" data-x="full">Full screen</button><button class="kb" data-x="print">Print / PDF</button></div>' + shell(sl[S.i], S.i) + '<div class="nav noprint">' + sl.map(function (s, j) { return '<button class="dt' + (j === S.i ? " on" : "") + '" data-g="' + j + '" title="' + esc(s.t) + '"></button>'; }).join("") + "</div></div>";
-      bind(sl, fs);
+      root.innerHTML = '<div class="bar noprint">' + ctl + '<span style="flex:1"></span><button class="kb o" data-x="prev">◀ Back</button><button class="kb o" data-x="next">Next ▶</button><button class="kb o" data-x="full">Full screen</button><button class="kb" data-x="print">Print / PDF</button></div>' + shell(sl[S.i], S.i) + '<div class="nav noprint">' + sl.map(function (s, j) { return '<button class="dt' + (j === S.i ? " on" : "") + '" data-g="' + j + '" title="' + esc(s.t) + '"></button>'; }).join("") + "</div>";
+      bind(sl); fit();
     }
+    function fit() {
+      var sb = root.querySelector(".sb"), si = root.querySelector(".si"); if (!sb || !si) return; si.style.zoom = "";
+      if (document.fullscreenElement !== root) return;
+      var r = Math.min(1, sb.clientHeight / si.scrollHeight, sb.clientWidth / si.scrollWidth); if (r < 1) si.style.zoom = Math.max(0.45, r - 0.01).toFixed(3);
+    }
+    document.addEventListener("fullscreenchange", function () { setTimeout(fit, 60); });
+    window.addEventListener("resize", function () { if (document.fullscreenElement === root) fit(); });
     function bind(sl) {
-      var root = el.querySelector(".kp");
       root.querySelectorAll("[data-c]").forEach(function (c) { c.onchange = function () { S.vals[c.dataset.c] = c.value; reload(); }; });
       root.querySelectorAll("[data-g]").forEach(function (b) { b.onclick = function () { S.i = +b.dataset.g; draw(); }; });
       root.querySelectorAll("[data-x]").forEach(function (b) {
@@ -173,7 +203,7 @@
           else if (x === "print") printAll();
         };
       });
-      if (!el._kpKey) { el._kpKey = true; document.addEventListener("keydown", function (e) { if (!document.body.contains(el) || el.offsetParent === null) return; if (/INPUT|SELECT|TEXTAREA/.test((e.target || {}).tagName || "")) return; if (e.key === "ArrowRight") { S.i++; draw(); } else if (e.key === "ArrowLeft") { S.i--; draw(); } }); }
+      if (!el._kpKey) { el._kpKey = true; document.addEventListener("keydown", function (e) { if (!document.body.contains(el) || el.offsetParent === null) return; if (/INPUT|SELECT|TEXTAREA/.test((e.target || {}).tagName || "")) return; if (e.key === "ArrowRight") { S.i++; draw(); } else if (e.key === "ArrowLeft") { S.i--; draw(); } else if (e.key === "f" || e.key === "F") { root.querySelector("[data-x=full]").click(); } }); }
       var K = S.data.kpis || [];
       var open = function (f) { S.form = f; S.i = sl.findIndex(function (s) { return s.act; }); draw(); };
       root.querySelectorAll("[data-add]").forEach(function (b) { b.onclick = function () { open({}); }; });
@@ -181,11 +211,18 @@
       root.querySelectorAll("[data-edit]").forEach(function (b) { b.onclick = function () { open(S.acts.filter(function (a) { return a.id === b.dataset.edit; })[0] || {}); }; });
       root.querySelectorAll("[data-del]").forEach(function (b) { b.onclick = function () { if (confirm("Delete this action?")) delAct(b.dataset.del).then(draw); }; });
       root.querySelectorAll("[data-st]").forEach(function (s) { s.onchange = function () { saveAct({ id: s.dataset.st, status: s.value }).then(draw).catch(function (e) { alert(e.message); }); }; });
+      var kk = root.querySelector("#kf_k"); if (kk) kk.onchange = function () {
+        var k = K.filter(function (x) { return x.id === kk.value; })[0], g = root.querySelector("#kf_gap"), st = root.querySelector("#kf_s"), t = root.querySelector("#kf_t");
+        g.className = "gap l-" + (k ? light(k) : "n"); g.textContent = k ? gapText(k) : "General improvement — not tied to one KPI.";
+        if (k && st && !st.value && k.std && k.std[0]) st.value = stdName(k.std[0][0]) + " " + k.std[0][1];
+        if (k && t && !t.value.trim() && k.target != null) t.value = "Bring " + k.name + " to " + (k.dir === "low" ? "at most " : "at least ") + (k.fmt ? k.fmt(k.target) : k.target + (k.unit === "%" ? "%" : ""));
+      };
       var no = root.querySelector("#kf_no"); if (no) no.onclick = function () { S.form = null; draw(); };
       var ok = root.querySelector("#kf_ok"); if (ok) ok.onclick = function () {
         var v = function (id) { return root.querySelector("#" + id).value.trim(); }, m = root.querySelector("#kf_m");
+        if (!v("kf_k")) { m.textContent = "Choose which KPI gap this action is for."; m.style.color = "#d64545"; return; }
         if (!v("kf_t") || !v("kf_o") || !v("kf_d")) { m.textContent = "Action, owner and target date are needed."; m.style.color = "#d64545"; return; }
-        var a = { id: S.form.id, title: v("kf_t"), kpi: v("kf_k"), standard: v("kf_s"), owner: v("kf_o"), due: v("kf_d"), status: v("kf_st"), note: v("kf_n") };
+        var a = { id: S.form.id, title: v("kf_t"), kpi: v("kf_k") === "__gen" ? "" : v("kf_k"), standard: v("kf_s"), owner: v("kf_o"), due: v("kf_d"), status: v("kf_st"), note: v("kf_n") };
         saveAct(a).then(function () { S.form = null; draw(); }).catch(function (e) { m.textContent = e.message; m.style.color = "#d64545"; });
       };
     }
@@ -198,7 +235,7 @@
     }
     function reload() {
       S.data = null; draw();
-      Promise.all([loadActs(), Promise.resolve(cfg.load(S.vals))]).then(function (r) { S.data = r[1] || { kpis: [], charts: [] }; draw(); }).catch(function (e) { el.innerHTML = '<div class="kp"><div class="note" style="color:#d64545">' + esc(e.message || e) + "</div></div>"; });
+      Promise.all([loadActs(), Promise.resolve(cfg.load(S.vals))]).then(function (r) { S.data = r[1] || { kpis: [], charts: [] }; draw(); }).catch(function (e) { root.innerHTML = '<div class="note" style="color:#d64545">' + esc(e.message || e) + "</div>"; });
     }
     reload();
     return { reload: reload };

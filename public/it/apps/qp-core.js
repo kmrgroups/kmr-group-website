@@ -46,7 +46,7 @@
     if (safe) { document.querySelectorAll('link[rel~="icon"]').forEach((l) => l.remove()); const ic = document.createElement("link"); ic.rel = "icon"; ic.href = safe; document.head.append(ic); }
   }
 
-  async function init(code) {
+  async function init(code, ctxFn) {
     if (!DEMO) {
       const { createClient } = await import("https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/+esm");
       sb = createClient(CFG.URL, await findKey());
@@ -55,7 +55,7 @@
       if (!slug) { const r = (document.referrer.match(/\/it\/app\/([^/?#]+)/) || [])[1]; if (r) slug = decodeURIComponent(r).toLowerCase(); }
       if (!slug) throw new Error("Open this app from your company’s KMR Apps page.");
     }
-    ctx = await call("kmr_qp_context", { p_code: code });
+    ctx = ctxFn ? await call(ctxFn, {}) : await call("kmr_qp_context", { p_code: code });
     if (!ctx) throw new Error("You do not have access to this app, or the subscription is not active.");
     canEdit = ["admin", "editor"].includes(ctx.role);
     $("#co").textContent = ctx.company; $("#role").textContent = ctx.role; showBrand();
