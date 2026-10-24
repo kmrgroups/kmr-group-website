@@ -38,32 +38,7 @@
   const BRAND_ALIAS = { "eSSL / ZKTeco": "eSSL" };
 
   /* The bridge program: runs on any PC in the same network as the machine, reads the punches by the machine's IP and sends them here. */
-  function bridgeScript(o) {
-    return `#!/usr/bin/env python3
-"""KMR HRM bridge - reads the attendance punches from a biometric machine by its IP address and sends them to KMR HRM & Payroll.
-Machine: ${o.name || "(machine)"} (${o.ip})
-Works with machines that speak the ZKTeco protocol (ZKTeco, eSSL, Realtime and most look-alikes) on their network port (usually 4370).
-Double-click this file (kmr_bridge.pyw) on a PC that is on the same network as the machine and stays switched on.
-No window opens: a small KMR icon appears near the clock (system tray). Green = punches are being sent, red = a problem (hover to read it).
-Right-click the icon: Send now, Start with Windows, Open log, Quit. The first run installs what it needs and sets itself to start with Windows.
-It checks every ${o.every || 5} minutes. Nothing is lost when the PC or the internet is off: every run sends the punches again from the last one confirmed, and punches already received are ignored.
-Other ways:  python kmr_bridge.pyw --once   (read once and stop)      python kmr_bridge.pyw --console   (run in a window, no tray icon)"""
-import sys, time, json, os, datetime, threading, subprocess, socket, zlib
-
-IP, PORT, COMM_KEY = "${o.ip || "192.168.1.201"}", ${o.port || 4370}, ${o.commkey || 0}
-URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-MACHINE-SCREEN"}"
-EVERY_MIN = ${o.every || 5}
-NAME = "KMR bridge ${String(o.name || o.ip || "").replace(/[^A-Za-z0-9 ._-]/g, "")}".strip()
-HERE = os.path.dirname(os.path.abspath(__file__))
-STATE = os.path.join(HERE, "kmr_bridge_state.json")
-LOGF = os.path.join(HERE, "kmr_bridge.log")
-VERIFY = {0: "password", 1: "finger", 2: "card", 3: "password", 4: "card", 15: "face", 25: "palm"}
-DIRECTION = {0: "in", 1: "out", 4: "in", 5: "out"}
-NL = chr(10)
-STATUS = {"text": "Starting...", "ok": True}
-WAKE = threading.Event()
-
-def log(msg):
+  const PY_COMMON = `def log(msg):
     line = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ") + str(msg)
     try:
         if os.path.exists(LOGF) and os.path.getsize(LOGF) > 400000:
@@ -93,26 +68,6 @@ def save_state(**kw):
     st = load_state()
     st.update(kw)
     json.dump(st, open(STATE, "w"))
-
-def last_sent():
-    return load_state().get("last", "1970-01-01 00:00:00")
-
-def run_once():
-    import requests
-    from zk import ZK
-    since = last_sent()
-    conn = ZK(IP, port=PORT, timeout=15, password=COMM_KEY, force_udp=False, ommit_ping=True).connect()
-    try:
-        rows = [a for a in conn.get_attendance() if a.timestamp.strftime("%Y-%m-%d %H:%M:%S") >= since]
-    finally:
-        conn.disconnect()
-    punches = [{"bio_id": str(a.user_id), "time": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"), "verify": VERIFY.get(a.status, "other"), "direction": DIRECTION.get(a.punch)} for a in rows]
-    for i in range(0, len(punches), 2000):
-        r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
-        r.raise_for_status()
-    if punches:
-        save_state(last=max(p["time"] for p in punches))
-    return len(punches)
 
 def cycle():
     try:
@@ -211,11 +166,12 @@ def run_tray():
 if __name__ == "__main__":
     lock = socket.socket()
     try:
-        lock.bind(("127.0.0.1", 47000 + zlib.crc32((IP + str(PORT)).encode()) % 1000))
+        lock.bind(("127.0.0.1", 47000 + zlib.crc32(LOCKKEY.encode()) % 1000))
     except OSError:
         sys.exit(0)                                   # already running: do nothing
     try:
-        need("requests", "requests"); need("zk", "pyzk")
+        for _m, _p in PKGS:
+            need(_m, _p)
         if "--once" not in sys.argv and "--console" not in sys.argv:
             need("PIL", "pillow"); need("pystray", "pystray")
     except Exception as e:
@@ -234,6 +190,52 @@ if __name__ == "__main__":
             log("No tray icon (" + str(e) + "); running without it")
             worker()
 `;
+
+  function bridgeScript(o) {
+    return `#!/usr/bin/env python3
+"""KMR HRM bridge - reads the attendance punches from a biometric machine by its IP address and sends them to KMR HRM & Payroll.
+Machine: ${o.name || "(machine)"} (${o.ip})
+Works with machines that speak the ZKTeco protocol (ZKTeco, eSSL, Realtime and most look-alikes) on their network port (usually 4370).
+Double-click this file (kmr_bridge.pyw) on a PC that is on the same network as the machine and stays switched on.
+No window opens: a small KMR icon appears near the clock (system tray). Green = punches are being sent, red = a problem (hover to read it).
+Right-click the icon: Send now, Start with Windows, Open log, Quit. The first run installs what it needs and sets itself to start with Windows.
+It checks every ${o.every || 5} minutes. Nothing is lost when the PC or the internet is off: every run sends the punches again from the last one confirmed, and punches already received are ignored.
+Other ways:  python kmr_bridge.pyw --once   (read once and stop)      python kmr_bridge.pyw --console   (run in a window, no tray icon)"""
+import sys, time, json, os, datetime, threading, subprocess, socket, zlib
+
+IP, PORT, COMM_KEY = "${o.ip || "192.168.1.201"}", ${o.port || 4370}, ${o.commkey || 0}
+URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-MACHINE-SCREEN"}"
+EVERY_MIN = ${o.every || 5}
+NAME = "KMR bridge ${String(o.name || o.ip || "").replace(/[^A-Za-z0-9 ._-]/g, "")}".strip()
+LOCKKEY = IP + str(PORT)
+PKGS = (("requests", "requests"), ("zk", "pyzk"))
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATE = os.path.join(HERE, "kmr_bridge_state.json")
+LOGF = os.path.join(HERE, "kmr_bridge.log")
+VERIFY = {0: "password", 1: "finger", 2: "card", 3: "password", 4: "card", 15: "face", 25: "palm"}
+DIRECTION = {0: "in", 1: "out", 4: "in", 5: "out"}
+NL = chr(10)
+STATUS = {"text": "Starting...", "ok": True}
+WAKE = threading.Event()
+
+def run_once():
+    import requests
+    from zk import ZK
+    since = load_state().get("last", "1970-01-01 00:00:00")
+    conn = ZK(IP, port=PORT, timeout=15, password=COMM_KEY, force_udp=False, ommit_ping=True).connect()
+    try:
+        rows = [a for a in conn.get_attendance() if a.timestamp.strftime("%Y-%m-%d %H:%M:%S") >= since]
+    finally:
+        conn.disconnect()
+    punches = [{"bio_id": str(a.user_id), "time": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"), "verify": VERIFY.get(a.status, "other"), "direction": DIRECTION.get(a.punch)} for a in rows]
+    for i in range(0, len(punches), 2000):
+        r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
+        r.raise_for_status()
+    if punches:
+        save_state(last=max(p["time"] for p in punches))
+    return len(punches)
+
+`+PY_COMMON;
   }
 
   /* Realtime machines (RS9w ...) used with Realtime's "Attendance Tracker" program on a PC: that program can copy every punch into a MySQL or SQL Server table
@@ -241,14 +243,14 @@ if __name__ == "__main__":
   function realtimeBridgeScript(o) {
     return `#!/usr/bin/env python3
 """KMR HRM bridge for Realtime machines (Attendance Tracker program).
+Double-click this file (kmr_realtime_bridge.pyw) on the PC that has Realtime Attendance Tracker: no window opens, a small KMR icon appears near the clock (green = sending, red = problem), it starts with Windows by itself and catches up on every missed day.
 Reads the punches that Realtime Attendance Tracker copies into a database table ("Data Converter > Realtime Data Integration")
 and sends them to KMR HRM & Payroll. Nothing is changed in the machine or in Realtime's program: it only READS the table.
 Setup (once):   pip install requests pymysql          (MySQL)      or      pip install requests pyodbc       (SQL Server)
 Run:            python kmr_realtime_bridge.py           (leave it running; checks every ${o.every || 2} minutes)
                 python kmr_realtime_bridge.py --once    (read once and stop)
 Safe to run again at any time: punches already received are ignored here, and the last 2 days are re-sent on purpose so nothing is missed."""
-import sys, time, json, os, datetime
-import requests
+import sys, time, json, os, datetime, threading, subprocess, socket, zlib
 
 DB_KIND = "${o.db || "mysql"}"                  # "mysql" or "sqlserver"
 DB_HOST, DB_PORT = "${o.host || "localhost"}", ${o.dbport || 3306}
@@ -256,7 +258,16 @@ DB_NAME, DB_USER, DB_PASS = "${o.dbname || "attendance"}", "${o.dbuser || "kmr_r
 TABLE = "AttendanceLogs"                          # same table name as on the Realtime screen
 URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-HRM-MACHINE-SCREEN"}"
 EVERY_MIN = ${o.every || 2}
-STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kmr_realtime_state.json")
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATE = os.path.join(HERE, "kmr_realtime_state.json")
+LOGF = os.path.join(HERE, "kmr_realtime_bridge.log")
+NAME = "KMR bridge ${String(o.name || "Realtime").replace(/[^A-Za-z0-9 ._-]/g, "")}".strip()
+LOCKKEY = DB_HOST + DB_NAME + "rt"
+PKGS = (("requests", "requests"), ("pymysql", "pymysql")) if DB_KIND != "sqlserver" else (("requests", "requests"), ("pyodbc", "pyodbc"))
+NL = chr(10)
+STATUS = {"text": "Starting...", "ok": True}
+WAKE = threading.Event()
+
 IN_WORDS, OUT_WORDS = ("in", "i", "0", "check in"), ("out", "o", "1", "check out")
 
 def connect():
@@ -268,7 +279,7 @@ def connect():
 
 def last_sent():
     try:
-        return datetime.datetime.strptime(json.load(open(STATE))["last"], "%Y-%m-%d %H:%M:%S")
+        return datetime.datetime.strptime(load_state()["last"], "%Y-%m-%d %H:%M:%S")
     except Exception:
         return datetime.datetime(1970, 1, 1)
 
@@ -285,6 +296,7 @@ def run_once():
         rows = cur.fetchall()
     finally:
         con.close()
+    import requests
     punches = []
     for code, at, direction in rows:
         if str(code).strip().lstrip("0") == "":
@@ -295,19 +307,10 @@ def run_once():
         r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
         r.raise_for_status()
     if punches:
-        json.dump({"last": max(p["time"] for p in punches)}, open(STATE, "w"))
-    print(datetime.datetime.now().strftime("%H:%M:%S"), len(punches), "punch(es) sent")
+        save_state(last=max(p["time"] for p in punches))
+    return len(punches)
 
-if __name__ == "__main__":
-    while True:
-        try:
-            run_once()
-        except Exception as e:
-            print("Could not read/send:", e, "- will try again")
-        if "--once" in sys.argv:
-            break
-        time.sleep(EVERY_MIN * 60)
-`;
+`+PY_COMMON;
   }
 
   const api = { HOLIDAYS, holidays, holidayYears, LEAVE_TYPES, SHIFTS, MACHINES, brandOf, BRAND_ALIAS, bridgeScript, realtimeBridgeScript };
