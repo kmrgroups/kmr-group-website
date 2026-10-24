@@ -274,6 +274,7 @@ cad:[
 ['VDA','P3','Process development - work holding and datums','Each turning and sawing sheet shows how the part is held (jaws, vice, length stop), the axial datum B and the program zero, so set-up and first-piece checks use the same reference as the Control Plan.'],
 ['MSA','Gage selection','Gauge for each characteristic','The characteristic table of each sheet lists the gauge from the SOP next to the limits, so the measuring method is chosen for the tolerance shown.']],
 capacity:[
+['ISO','9.3.2','Management review inputs','The Presentation tab shows utilisation, overloaded machines, late operations and takt failures against targets, with action plans and status.'],
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Machine capacity is planned against demand.'],
 ['IATF','8.2.3.1.3','Organizational manufacturing feasibility','Load against capacity shows whether the demand can be met.'],
 ['ISO','8.1','Operational planning and control','Capacity and loading are planned before orders are accepted.'],

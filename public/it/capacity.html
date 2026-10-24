@@ -3,7 +3,7 @@
 <head>
 <script src="/it/company-config.js"></script>
 <script src="/it/apps/sso.js"></script>
-<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script>
+<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/apps/kmr-present.js"></script>
 <script>window.KMR_PLATFORM = true; document.write('<style>.kmr-company{display:none!important}</style>');</script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <meta charset="UTF-8">
@@ -1747,6 +1747,7 @@ const PAGES = [
   { id: 'loading', group: 'Start here', label: 'Loading Plan', title: 'Machine Loading Plan', desc: 'Day-by-day machine loading with the load balanced between machines, expected finish and throughput time for every part.' },
   { id: 'pmaster', group: 'Start here', label: 'Process Master', title: 'Process Master', desc: 'Part by part: the processes in order, the machines that can run each process, and the cycle time on each machine.' },
   { id: 'settings', group: 'Setup', label: 'Settings', title: 'Settings', desc: window.KMR_PLATFORM ? 'Appearance and data backup for this plan. Company details and users are managed in KMR Apps › Administration.' : 'Company, cloud connection, users & access, branding and backup.' },
+  { id: 'present', group: 'Start here', label: 'Presentation', title: 'Presentation', desc: 'KPIs against the standards, with action plans and status.' },
   { id: 'help', group: 'Setup', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' },
   { id: 'quick', group: 'Classic screens', label: 'Process workout', title: 'Process Workout', desc: 'Process-by-process workout: pieces per hour, days needed, takt time and throughput.' },
   { id: 'overview', group: 'Classic screens', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
@@ -2663,6 +2664,24 @@ Pages.plan = () => {
    NEW SCREENS — Can we make it? · Demand & Stock · Loading Plan · Process Master
    Rough-cut check first (is there time on every machine?), then the finite machine loading (do the dates hold?).
    ==================================================================================================== */
+Pages.present = () => '<div id="preshost"></div>';
+PageAfter.present = () => {
+  const el = document.getElementById('preshost'); if (!el || !window.KMRPresent) { if (el) el.textContent = 'Presentation engine not loaded.'; return; }
+  const st = (n, c) => [[n, c]];
+  KMRPresent.mount(el, { app: 'capacity', code: 'capacity', stdKey: 'capacity', appName: 'Capacity Planner', company: state.settings.companyName || '', slug: 'capacity', call: async () => { throw new Error('local'); }, canEdit: true, controls: [],
+    load: async () => {
+      const t = model.totals, ms = model.machines.filter(m => m.reqDays > 0).sort((a, b) => b.util - a.util).slice(0, 12), over = model.machines.filter(m => m.tier === 'critical' || m.tier === 'sunday');
+      return { period: monthName() + ' · ' + scenarioLabel(), kpis: [
+        { id: 'ut', name: 'Plant utilisation', value: t.util, unit: '%', target: 85, tol: 12, dir: 'low', std: [['IATF', '8.1'], ['ISO', '7.1.3'], ['VDA', '6.3 P5']], why: t.req.toFixed(0) + ' of ' + t.avail.toFixed(0) + ' machine-days needed. Above ~85% leaves no room for breakdowns.' },
+        { id: 'ov', name: 'Machines over capacity', value: over.length, target: 0, amber: 2, dir: 'low', std: [['IATF', '8.1'], ['ISO', '8.1'], ['VDA', '6.3 P5']], why: 'Needs overtime, Sunday work, outsourcing or load balancing.' },
+        { id: 'late', name: 'Operations that will miss the due date', value: t.lateOps, target: 0, amber: 2, dir: 'low', std: [['IATF', '8.2.1'], ['VDA', '6.3 P7']], why: 'Out of ' + t.activeOps + ' active operations.' },
+        { id: 'tk', name: 'Operations that cannot reach takt', value: t.taktFail, target: 0, amber: 2, dir: 'low', std: [['IATF', '8.5.1.1'], ['VDA', '6.3 P6']], why: 'Cycle time is too long for the customer takt on one machine.' },
+        { id: 'sp', name: 'Spare machine-days', value: t.bal, std: [['ISO', '7.1.3']], why: 'Available minus required; negative means a shortage.' },
+        { id: 'vol', name: 'Monthly volume (pcs)', value: t.qtyParts, std: [['ISO', '8.2.1']], why: 'Customer quantity entered in the monthly plan.' }],
+        charts: [{ title: 'Utilisation by machine (%)', kind: 'bar', kpi: 'ut', labels: ms.map(m => m.code), series: [{ name: 'Utilisation %', values: ms.map(m => Math.round(m.util)) }] },
+          { title: 'Required vs available days', kind: 'bar', kpi: 'ov', labels: ms.map(m => m.code), series: [{ name: 'Required', values: ms.map(m => +m.reqDays.toFixed(1)) }, { name: 'Available', values: ms.map(m => +m.availDays.toFixed(1)) }] }] };
+    } });
+};
 const NEW_PAGES = ['answer', 'demand', 'loading', 'pmaster'];
 const MSTAT = { critical: ['critical', 'Overloaded'], sunday: ['critical', 'Overloaded'], tight: ['tight', 'Fully loaded'], ok: ['ok', 'Spare time'], idle: ['idle', 'Not used'] };
 const mstat = m => m.balDays < -1e-6 ? MSTAT.critical : MSTAT[m.tier] || MSTAT.idle;
