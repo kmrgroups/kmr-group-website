@@ -26,22 +26,22 @@
     xfOf({}, null);
     const sst = [], sstMap = new Map(); const si = (t) => { let i = sstMap.get(t); if (i == null) { i = sst.length; sst.push(t); sstMap.set(t, i); } return i; };
     const entries = [], sheetRels = []; const ct = [];
-    let chartN = 0, drawN = 0;
+    let chartN = 0, drawN = 0, tableN = 0;
     const colPx = (sh, c) => (sh.cols[c] != null ? sh.cols[c] : DEFCOL), rowPx = (sh, r) => (sh.rows[r] != null ? sh.rows[r] : DEFROW);
     const sheetXml = async (sh, sIdx) => {
-      const [mr, mc] = sh.dims(); const rows = new Map();
+      const [mr, mc] = sh.dims(); const rows = new Map(); const gp = (sh.ext && sh.ext.grp) || { rows: [], cols: [] }; const lvl = (arr, i) => arr.reduce((n, o) => n + (i >= o.a && i <= o.b ? 1 : 0), 0); gp.rows.forEach((o) => { for (let i = o.a; i <= Math.min(o.b, o.a + 5000); i++) if (!rows.has(i)) rows.set(i, []); });
       sh.each((r, c, cell) => { if (!rows.has(r)) rows.set(r, []); rows.get(r).push([c, cell]); });
       Object.keys(sh.rows).forEach((r) => { if (!rows.has(+r)) rows.set(+r, []); }); Object.keys(sh.hiddenRows || {}).forEach((r) => { if (!rows.has(+r)) rows.set(+r, []); });
       let x = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' + `<worksheet xmlns="${M}" xmlns:r="${R}">`;
       const fr = sh.freeze || { r: 0, c: 0 };
       x += `<sheetViews><sheetView workbookViewId="0"${sh.grid === false ? ' showGridLines="0"' : ""}${sIdx === wb.active ? ' tabSelected="1"' : ""}>${fr.r || fr.c ? `<pane${fr.c ? ` xSplit="${fr.c}"` : ""}${fr.r ? ` ySplit="${fr.r}"` : ""} topLeftCell="${C.addr(fr.r + 1, fr.c + 1)}" activePane="${fr.r && fr.c ? "bottomRight" : fr.r ? "bottomLeft" : "topRight"}" state="frozen"/>` : ""}</sheetView></sheetViews>`;
       x += `<sheetFormatPr defaultColWidth="${((DEFCOL - 5) / 7).toFixed(2)}" defaultRowHeight="${(DEFROW * 0.75).toFixed(2)}" customHeight="1"/>`;
-      const ck = Object.keys(sh.cols).concat(Object.keys(sh.hiddenCols || {})).map(Number).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
-      if (ck.length) x += "<cols>" + ck.map((c) => `<col min="${c}" max="${c}" width="${Math.max(0, (colPx(sh, c) - 5) / 7).toFixed(2)}" customWidth="1"${sh.hiddenCols && sh.hiddenCols[c] ? ' hidden="1"' : ""}/>`).join("") + "</cols>";
+      const ck = Object.keys(sh.cols).concat(Object.keys(sh.hiddenCols || {})).concat(gp.cols.reduce((a, o) => { for (let i = o.a; i <= Math.min(o.b, o.a + 500); i++) a.push(i); return a; }, [])).map(Number).filter((v, i, a) => a.indexOf(v) === i).sort((a, b) => a - b);
+      if (ck.length) x += "<cols>" + ck.map((c) => `<col min="${c}" max="${c}" width="${Math.max(0, (colPx(sh, c) - 5) / 7).toFixed(2)}" customWidth="1"${sh.hiddenCols && sh.hiddenCols[c] ? ' hidden="1"' : ""}${lvl(gp.cols, c) ? ` outlineLevel="${lvl(gp.cols, c)}"` : ""}/>`).join("") + "</cols>";
       x += "<sheetData>";
       for (const r of [...rows.keys()].sort((a, b) => a - b)) {
         const cells = rows.get(r).sort((a, b) => a[0] - b[0]); const rh = sh.rows[r];
-        x += `<row r="${r}"${rh != null ? ` ht="${(rh * 0.75).toFixed(2)}" customHeight="1"` : ""}${sh.hiddenRows && sh.hiddenRows[r] ? ' hidden="1"' : ""}>`;
+        x += `<row r="${r}"${rh != null ? ` ht="${(rh * 0.75).toFixed(2)}" customHeight="1"` : ""}${sh.hiddenRows && sh.hiddenRows[r] ? ' hidden="1"' : ""}${lvl(gp.rows, r) ? ` outlineLevel="${lvl(gp.rows, r)}"` : ""}>`;
         for (const [c, cell] of cells) {
           const a = C.addr(r, c), s = xfOf(wb.style(cell.s), cell.nf), sa = s ? ` s="${s}"` : "";
           if (cell.f) {
@@ -53,6 +53,7 @@
         x += "</row>";
       }
       x += "</sheetData>";
+      if (sh.ext && sh.ext.protect) x += '<sheetProtection sheet="1" objects="1" scenarios="1"/>';
       if (sh.filter && sh.filter.range) x += `<autoFilter ref="${esc(sh.filter.range)}"/>`;
       if (sh.merges.length) x += `<mergeCells count="${sh.merges.length}">${sh.merges.map((m) => `<mergeCell ref="${esc(m)}"/>`).join("")}</mergeCells>`;
       let pr = 1;
@@ -76,6 +77,7 @@
         drawN++; const dn = drawN; const dxml = await drawing(sh, sIdx, dn); entries.push({ name: `xl/drawings/drawing${dn}.xml`, data: dxml.xml }); entries.push({ name: `xl/drawings/_rels/drawing${dn}.xml.rels`, data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">${dxml.rels}</Relationships>` });
         ct.push(`<Override PartName="/xl/drawings/drawing${dn}.xml" ContentType="application/vnd.openxmlformats-officedocument.drawing+xml"/>`); ro.push(`<Relationship Id="rId1" Type="${R}/drawing" Target="../drawings/drawing${dn}.xml"/>`); x += '<drawing r:id="rId1"/>';
       }
+      const tbs = (sh.ext && sh.ext.tables) || []; if (tbs.length) { x += `<tableParts count="${tbs.length}">`; tbs.forEach((t, k) => { tableN = (typeof tableN === "number" ? tableN : 0) + 1; const tn = tableN, rid = "rIdT" + k; const m = /^\$?([A-Za-z]+)\$?(\d+):\$?([A-Za-z]+)\$?(\d+)$/.exec(t.range), a = C.parseAddr(m[1] + m[2]), b = C.parseAddr(m[3] + m[4]); const cols = []; for (let c = a.c; c <= b.c; c++) cols.push(t.hdr === false ? "Column" + (c - a.c + 1) : String(wb.text(sh, a.r, c).text || "Column" + (c - a.c + 1))); const tx = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><table xmlns="${M}" id="${tn}" name="${esc(t.name)}" displayName="${esc(t.name)}" ref="${t.range}"${t.hdr === false ? ' headerRowCount="0"' : ""}${t.total ? ' totalsRowCount="1"' : ""}>${t.filt !== false && t.hdr !== false ? `<autoFilter ref="${t.range}"/>` : ""}<tableColumns count="${cols.length}">${cols.map((n, i) => `<tableColumn id="${i + 1}" name="${esc(n)}"/>`).join("")}</tableColumns><tableStyleInfo name="TableStyleMedium2" showFirstColumn="0" showLastColumn="0" showRowStripes="${t.band === false ? 0 : 1}" showColumnStripes="0"/></table>`; entries.push({ name: `xl/tables/table${tn}.xml`, data: tx }); ct.push(`<Override PartName="/xl/tables/table${tn}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>`); ro.push(`<Relationship Id="${rid}" Type="${R}/table" Target="../tables/table${tn}.xml"/>`); x += `<tablePart r:id="${rid}"/>`; }); x += "</tableParts>"; }
       sheetRels[sIdx] = ro; return x + "</worksheet>";
     };
     const anchorPx = (sh, px, isCol) => { let i = 1, acc = 0; for (;;) { const w = isCol ? colPx(sh, i) : rowPx(sh, i); if (acc + w > px) return [i - 1, Math.round((px - acc) * 9525)]; acc += w; i++; if (i > 20000) return [i - 1, 0]; } };
@@ -91,27 +93,47 @@
     function chartXml(sh, ch) {
       const data = Charts.data(wb, sh, ch); const q = (n) => "'" + sh.name.replace(/'/g, "''") + "'!" + n;
       const ref = (r1, c1, r2, c2) => q("$" + C.nCol(c1) + "$" + r1 + ":$" + C.nCol(c2) + "$" + r2);
-      const pal = Charts.PALETTE; const type = ch.type;
+      const pal = Charts.PALETTE;
       const strC = (arr) => `<c:strCache><c:ptCount val="${arr.length}"/>${arr.map((v, i) => `<c:pt idx="${i}"><c:v>${esc(v)}</c:v></c:pt>`).join("")}</c:strCache>`, numC = (arr) => `<c:numCache><c:formatCode>General</c:formatCode><c:ptCount val="${arr.length}"/>${arr.map((v, i) => (v == null ? "" : `<c:pt idx="${i}"><c:v>${v}</c:v></c:pt>`)).join("")}</c:numCache>`;
-      const ser = data.series.map((s, i) => {
+      const tp0 = ch.type, dlb = ch.labels ? '<c:dLbls><c:showLegendKey val="0"/><c:showVal val="1"/><c:showCatName val="0"/><c:showSerName val="0"/><c:showPercent val="0"/><c:showBubbleSize val="0"/></c:dLbls>' : "";
+      const trendX = (i, col) => (ch.trend && (i === 0 || ch.trendAll) ? `<c:trendline><c:spPr><a:ln w="19050"><a:solidFill><a:srgbClr val="${col.slice(2)}"/></a:solidFill><a:prstDash val="dash"/></a:ln></c:spPr><c:trendlineType val="${{ linear: "linear", exp: "exp", poly: "poly", avg: "movingAvg" }[ch.trend] || "linear"}"/>${ch.trend === "poly" ? '<c:order val="2"/>' : ""}${ch.trend === "avg" ? '<c:period val="3"/>' : ""}<c:dispRSqr val="0"/><c:dispEq val="0"/></c:trendline>` : "");
+      const mk = (s, i, type) => {
         const col = argb(s.color || pal[i % pal.length]); const tx = `<c:tx><c:strRef><c:f>${esc(s.nameRef ? q(s.nameRef) : '""')}</c:f>${strC([s.name])}</c:strRef></c:tx>`;
-        const sp = type === "line" || type === "scatter" ? `<c:spPr><a:ln w="28575"><a:solidFill><a:srgbClr val="${col.slice(2)}"/></a:solidFill></a:ln></c:spPr>` : `<c:spPr><a:solidFill><a:srgbClr val="${col.slice(2)}"/></a:solidFill></c:spPr>`;
+        const sp = type === "line" || type === "scatter" || type === "radar" ? `<c:spPr><a:ln w="28575"><a:solidFill><a:srgbClr val="${col.slice(2)}"/></a:solidFill></a:ln></c:spPr>` : `<c:spPr><a:solidFill><a:srgbClr val="${col.slice(2)}"/></a:solidFill></c:spPr>`;
         const dpt = type === "pie" || type === "doughnut" ? data.cats.map((_, j) => `<c:dPt><c:idx val="${j}"/><c:bubble3D val="0"/><c:spPr><a:solidFill><a:srgbClr val="${argb(pal[j % pal.length]).slice(2)}"/></a:solidFill></c:spPr></c:dPt>`).join("") : "";
-        const cat = type === "scatter" ? `<c:xVal><c:numRef><c:f>${esc(ref(...data.catRange))}</c:f>${numC(data.cats.map(Number))}</c:numRef></c:xVal>` : `<c:cat><c:strRef><c:f>${esc(ref(...data.catRange))}</c:f>${strC(data.cats.map(String))}</c:strRef></c:cat>`;
-        const val = `<c:${type === "scatter" ? "yVal" : "val"}><c:numRef><c:f>${esc(ref(...s.range))}</c:f>${numC(s.values)}</c:numRef></c:${type === "scatter" ? "yVal" : "val"}>`;
-        return `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${tx}${sp}${type === "line" ? '<c:marker><c:symbol val="circle"/><c:size val="5"/></c:marker>' : ""}${type === "scatter" ? '<c:marker><c:symbol val="circle"/><c:size val="6"/></c:marker>' : ""}${dpt}${cat}${val}${type === "line" ? '<c:smooth val="0"/>' : type === "scatter" ? '<c:smooth val="0"/>' : ""}</c:ser>`;
-      }).join("");
-      const ax = '<c:axId val="111"/><c:axId val="222"/>';
-      let plot;
-      if (type === "col" || type === "bar") plot = `<c:barChart><c:barDir val="${type === "bar" ? "bar" : "col"}"/><c:grouping val="${ch.stacked ? "stacked" : "clustered"}"/><c:varyColors val="0"/>${ser}<c:gapWidth val="80"/>${ch.stacked ? '<c:overlap val="100"/>' : ""}${ax}</c:barChart>`;
-      else if (type === "line") plot = `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${ser}<c:marker val="1"/>${ax}</c:lineChart>`;
-      else if (type === "area") plot = `<c:areaChart><c:grouping val="${ch.stacked ? "stacked" : "standard"}"/><c:varyColors val="0"/>${ser}${ax}</c:areaChart>`;
-      else if (type === "pie") plot = `<c:pieChart><c:varyColors val="1"/>${ser}<c:firstSliceAng val="0"/></c:pieChart>`;
-      else if (type === "doughnut") plot = `<c:doughnutChart><c:varyColors val="1"/>${ser}<c:firstSliceAng val="0"/><c:holeSize val="55"/></c:doughnutChart>`;
-      else plot = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${ser}${ax}</c:scatterChart>`;
-      const axes = /pie|doughnut/.test(type) ? "" : (type === "scatter" ? `<c:valAx><c:axId val="111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="b"/><c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="222"/><c:crosses val="autoZero"/></c:valAx>` : `<c:catAx><c:axId val="111"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${type === "bar" ? "l" : "b"}"/><c:numFmt formatCode="General" sourceLinked="0"/><c:tickLblPos val="nextTo"/><c:crossAx val="222"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>`) + `<c:valAx><c:axId val="222"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="0"/><c:axPos val="${type === "bar" ? "b" : "l"}"/><c:majorGridlines><c:spPr><a:ln><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines><c:numFmt formatCode="General" sourceLinked="1"/><c:tickLblPos val="nextTo"/><c:crossAx val="111"/><c:crosses val="autoZero"/></c:valAx>`;
+        const xy = type === "scatter" || type === "bubble";
+        const cat = xy ? `<c:xVal><c:numRef><c:f>${esc(ref(...data.catRange))}</c:f>${numC(data.cats.map(Number))}</c:numRef></c:xVal>` : `<c:cat><c:strRef><c:f>${esc(ref(...data.catRange))}</c:f>${strC(data.cats.map(String))}</c:strRef></c:cat>`;
+        const val = `<c:${xy ? "yVal" : "val"}><c:numRef><c:f>${esc(ref(...s.range))}</c:f>${numC(s.values)}</c:numRef></c:${xy ? "yVal" : "val"}>`;
+        const bs = type === "bubble" ? (() => { const z = data.series[1] || s; return `<c:bubbleSize><c:numRef><c:f>${esc(ref(...z.range))}</c:f>${numC(z.values)}</c:numRef></c:bubbleSize><c:bubble3D val="0"/>`; })() : "";
+        const mkr = type === "line" ? (ch.marker === false ? '<c:marker><c:symbol val="none"/></c:marker>' : '<c:marker><c:symbol val="circle"/><c:size val="5"/></c:marker>') : type === "scatter" || type === "radar" ? '<c:marker><c:symbol val="circle"/><c:size val="6"/></c:marker>' : "";
+        return `<c:ser><c:idx val="${i}"/><c:order val="${i}"/>${tx}${sp}${type === "col" || type === "bar" ? '<c:invertIfNegative val="0"/>' : ""}${mkr}${dpt}${dlb}${trendX(i, col)}${cat}${val}${bs}${type === "line" || type === "scatter" ? `<c:smooth val="${ch.smooth ? 1 : 0}"/>` : ""}</c:ser>`;
+      };
+      const barLike = { col: "col", bar: "bar", histogram: "col", waterfall: "col", funnel: "bar", treemap: "col", box: "col" };
+      const type = barLike[tp0] || tp0; const comboK = (i) => (ch.stypes || [])[i] || (i === 0 ? "col" : "line");
+      const grp = ch.pct ? "percentStacked" : ch.stacked ? "stacked" : "clustered";
+      const ax = '<c:axId val="111"/><c:axId val="222"/>', ax2 = '<c:axId val="333"/><c:axId val="444"/>';
+      let plot, hasSec = false;
+      const gap = ch.gap == null ? 80 : ch.gap;
+      if (type === "col" || type === "bar") plot = `<c:barChart><c:barDir val="${type === "bar" ? "bar" : "col"}"/><c:grouping val="${grp}"/><c:varyColors val="0"/>${data.series.map((s, i) => mk(s, i, type)).join("")}<c:gapWidth val="${gap}"/>${ch.stacked || ch.pct ? '<c:overlap val="100"/>' : ""}${ax}</c:barChart>`;
+      else if (type === "combo" || type === "pareto") {
+        const sec = tp0 === "pareto" ? [1] : ch.sec || []; hasSec = sec.length > 0; const kd = (i) => (tp0 === "pareto" ? (i === 0 ? "col" : "line") : comboK(i));
+        const cols = data.series.map((s, i) => [s, i]).filter(([, i]) => kd(i) === "col"), lines = data.series.map((s, i) => [s, i]).filter(([, i]) => kd(i) !== "col");
+        plot = (cols.length ? `<c:barChart><c:barDir val="col"/><c:grouping val="${grp === "percentStacked" ? "clustered" : grp}"/><c:varyColors val="0"/>${cols.map(([s, i]) => mk(s, i, "col")).join("")}<c:gapWidth val="${gap}"/>${ch.stacked ? '<c:overlap val="100"/>' : ""}${ax}</c:barChart>` : "") + [false, true].map((sc) => { const l = lines.filter(([, i]) => (sec.indexOf(i) >= 0) === sc); return l.length ? `<c:lineChart><c:grouping val="standard"/><c:varyColors val="0"/>${l.map(([s, i]) => mk(s, i, "line")).join("")}<c:marker val="1"/>${sc ? ax2 : ax}</c:lineChart>` : ""; }).join("");
+      } else if (type === "line") plot = `<c:lineChart><c:grouping val="${ch.pct ? "percentStacked" : ch.stacked ? "stacked" : "standard"}"/><c:varyColors val="0"/>${data.series.map((s, i) => mk(s, i, "line")).join("")}<c:marker val="1"/>${ax}</c:lineChart>`;
+      else if (type === "area") plot = `<c:areaChart><c:grouping val="${ch.pct ? "percentStacked" : ch.stacked ? "stacked" : "standard"}"/><c:varyColors val="0"/>${data.series.map((s, i) => mk(s, i, "area")).join("")}${ax}</c:areaChart>`;
+      else if (type === "pie") plot = `<c:pieChart><c:varyColors val="1"/>${data.series.slice(0, 1).map((s, i) => mk(s, i, "pie")).join("")}<c:firstSliceAng val="0"/></c:pieChart>`;
+      else if (type === "doughnut") plot = `<c:doughnutChart><c:varyColors val="1"/>${data.series.slice(0, 1).map((s, i) => mk(s, i, "doughnut")).join("")}<c:firstSliceAng val="0"/><c:holeSize val="55"/></c:doughnutChart>`;
+      else if (type === "radar") plot = `<c:radarChart><c:radarStyle val="marker"/><c:varyColors val="0"/>${data.series.map((s, i) => mk(s, i, "radar")).join("")}${ax}</c:radarChart>`;
+      else if (type === "bubble") plot = `<c:bubbleChart><c:varyColors val="0"/>${data.series.slice(0, 1).map((s, i) => mk(s, i, "bubble")).join("")}<c:bubbleScale val="100"/><c:showNegBubbles val="0"/>${ax}</c:bubbleChart>`;
+      else plot = `<c:scatterChart><c:scatterStyle val="lineMarker"/><c:varyColors val="0"/>${data.series.map((s, i) => mk(s, i, "scatter")).join("")}${ax}</c:scatterChart>`;
+      const ttl = (t, rot) => (t ? `<c:title><c:tx><c:rich><a:bodyPr${rot ? ' rot="-5400000" vert="horz"' : ""}/><a:p><a:r><a:rPr lang="en-US" sz="1000"/><a:t>${esc(t)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title>` : "");
+      const scal = (mn, mx, lg) => `<c:scaling>${lg ? '<c:logBase val="10"/>' : ""}<c:orientation val="minMax"/>${mx != null && isFinite(mx) ? `<c:max val="${mx}"/>` : ""}${mn != null && isFinite(mn) ? `<c:min val="${mn}"/>` : ""}</c:scaling>`;
+      const catAx = (id, cr, pos, del, t) => `<c:catAx><c:axId val="${id}"/><c:scaling><c:orientation val="minMax"/></c:scaling><c:delete val="${del ? 1 : 0}"/><c:axPos val="${pos}"/>${ttl(t, pos === "l")}<c:numFmt formatCode="General" sourceLinked="0"/><c:tickLblPos val="nextTo"/><c:crossAx val="${cr}"/><c:crosses val="autoZero"/><c:auto val="1"/><c:lblAlgn val="ctr"/><c:lblOffset val="100"/></c:catAx>`;
+      const valAx = (id, cr, pos, o) => `<c:valAx><c:axId val="${id}"/>${scal(o.min, o.max, o.log)}<c:delete val="0"/><c:axPos val="${pos}"/>${o.grid === false ? "" : '<c:majorGridlines><c:spPr><a:ln><a:solidFill><a:srgbClr val="D9D9D9"/></a:solidFill></a:ln></c:spPr></c:majorGridlines>'}${ttl(o.title, pos === "l" || pos === "r")}<c:numFmt formatCode="${o.pct ? "0%" : "General"}" sourceLinked="${o.pct ? 0 : 1}"/><c:tickLblPos val="nextTo"/><c:crossAx val="${cr}"/><c:crosses val="${o.right ? "max" : "autoZero"}"/><c:crossBetween val="${o.mid ? "midCat" : "between"}"/></c:valAx>`;
+      const horiz = type === "bar", xy = type === "scatter" || type === "bubble";
+      const axes = /pie|doughnut/.test(type) ? "" : xy ? valAx(111, 222, "b", { title: ch.xTitle, grid: false, mid: true }) + valAx(222, 111, "l", { title: ch.yTitle, min: ch.ymin, max: ch.ymax, log: ch.log, grid: ch.grid, mid: true }) : catAx(111, 222, horiz ? "l" : "b", false, ch.xTitle) + valAx(222, 111, horiz ? "b" : "l", { title: ch.yTitle, min: ch.ymin, max: ch.ymax, log: ch.log, grid: ch.grid, pct: ch.pct }) + (hasSec ? catAx(333, 444, "b", true) + valAx(444, 333, "r", { right: true, min: ch.y2min, max: ch.y2max, grid: false }) : "");
       const title = ch.title ? `<c:title><c:tx><c:rich><a:bodyPr/><a:p><a:r><a:rPr lang="en-US" sz="1400" b="1"/><a:t>${esc(ch.title)}</a:t></a:r></a:p></c:rich></c:tx><c:overlay val="0"/></c:title><c:autoTitleDeleted val="0"/>` : '<c:autoTitleDeleted val="1"/>';
-      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${R}"><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}${axes}</c:plotArea>${ch.legend === "none" ? "" : `<c:legend><c:legendPos val="${ch.legend === "right" ? "r" : "b"}"/><c:overlay val="0"/></c:legend>`}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
+      return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="${R}"><c:roundedCorners val="0"/><c:chart>${title}<c:plotArea><c:layout/>${plot}${axes}</c:plotArea>${ch.legend === "none" ? "" : `<c:legend><c:legendPos val="${{ right: "r", top: "t", left: "l" }[ch.legend] || "b"}"/><c:overlay val="0"/></c:legend>`}<c:plotVisOnly val="1"/><c:dispBlanksAs val="gap"/></c:chart></c:chartSpace>`;
     }
     const sheetsXml = []; for (let i = 0; i < wb.sheets.length; i++) sheetsXml.push(await sheetXml(wb.sheets[i], i));
     // styles
@@ -169,10 +191,10 @@
       const root = Z.parse(sxml).documentElement, sd = kid(root, "sheetData"), shared = {};
       const sv = kid(kid(root, "sheetViews"), "sheetView"); if (sv) { if (at(sv, "showGridLines") === "0") sh.grid = false; const pn = kid(sv, "pane"); if (pn && at(pn, "state") && /frozen/.test(at(pn, "state"))) sh.freeze = { r: +at(pn, "ySplit") || 0, c: +at(pn, "xSplit") || 0 }; }
       const fp = kid(root, "sheetFormatPr"); let dcw = fp && at(fp, "defaultColWidth") ? +at(fp, "defaultColWidth") : null, drh = fp && at(fp, "defaultRowHeight") ? +at(fp, "defaultRowHeight") : null;
-      Z.deep(kid(root, "cols"), "col").forEach((c) => { const w = +at(c, "width"), mn = +at(c, "min"), mx = Math.min(+at(c, "max"), mn + 300); const px = Math.round(w * 7 + 5); for (let i = mn; i <= mx; i++) { if (Math.abs(px - DEFCOL) > 1 && at(c, "customWidth") !== "0") sh.cols[i] = px; if (at(c, "hidden") === "1") sh.hiddenCols[i] = 1; } });
+      Z.deep(kid(root, "cols"), "col").forEach((c) => { const w = +at(c, "width"), mn = +at(c, "min"), mx = Math.min(+at(c, "max"), mn + 300); const px = Math.round(w * 7 + 5); for (let i = mn; i <= mx; i++) { if (Math.abs(px - DEFCOL) > 1 && at(c, "customWidth") !== "0") sh.cols[i] = px; if (at(c, "hidden") === "1") sh.hiddenCols[i] = 1; if (+at(c, "outlineLevel") > 0) (sh._ol = sh._ol || { r: {}, c: {} }).c[i] = +at(c, "outlineLevel"); } });
       if (dcw && Math.abs(dcw * 7 + 5 - DEFCOL) > 1 && !Z.deep(kid(root, "cols"), "col").length) { /* sheet default width differs: apply to used columns later */ }
       K(sd, "row").forEach((row) => {
-        const r = +at(row, "r"); if (at(row, "ht") && at(row, "customHeight") !== "0") { const h = Math.round(+at(row, "ht") / 0.75); if (Math.abs(h - DEFROW) > 1) sh.rows[r] = h; } if (at(row, "hidden") === "1") sh.hiddenRows[r] = 1;
+        const r = +at(row, "r"); if (at(row, "ht") && at(row, "customHeight") !== "0") { const h = Math.round(+at(row, "ht") / 0.75); if (Math.abs(h - DEFROW) > 1) sh.rows[r] = h; } if (at(row, "hidden") === "1") sh.hiddenRows[r] = 1; if (+at(row, "outlineLevel") > 0) (sh._ol = sh._ol || { r: {}, c: {} }).r[r] = +at(row, "outlineLevel");
         K(row, "c").forEach((c) => {
           const a = at(c, "r"), pa = C.parseAddr(a); if (!pa) return; const t = at(c, "t"), s = +at(c, "s") || 0, fEl = kid(c, "f"), vEl = kid(c, "v"); const cell = {}; const st = xfs[s]; if (st) cell.s = st;
           let val = null; if (t === "s" && vEl) val = sst[+vEl.textContent] ?? ""; else if (t === "str" && vEl) val = vEl.textContent; else if (t === "b" && vEl) val = vEl.textContent === "1"; else if (t === "e" && vEl) val = Object.values(C.ERR).find((e) => e.code === vEl.textContent) || C.ERR.VALUE; else if (t === "inlineStr") val = Z.deep(kid(c, "is"), "t").map((x) => x.textContent).join(""); else if (vEl && vEl.textContent !== "") val = parseFloat(vEl.textContent);
@@ -197,6 +219,9 @@
       });
       Z.deep(kid(root, "dataValidations"), "dataValidation").forEach((d) => { const ty = at(d, "type"); if (!["list", "whole", "decimal"].includes(ty)) return; const f1 = (kid(d, "formula1") || {}).textContent || "", f2 = (kid(d, "formula2") || {}).textContent; sh.dv.push({ range: at(d, "sqref").split(" ")[0], type: ty, op: at(d, "operator") || "between", list: ty === "list" ? (/^".*"$/.test(f1) ? f1.slice(1, -1) : "=" + f1) : undefined, v1: ty !== "list" ? f1 : undefined, v2: f2, msg: at(d, "error") || "" }); });
       // charts
+      if (sh._ol) { const grp = { rows: [], cols: [] }; ["r", "c"].forEach((ax) => { const m = sh._ol[ax], ks = Object.keys(m).map(Number).sort((a, b) => a - b), mx = Math.max(0, ...ks); for (let L = 1; L <= mx; L++) { let a = null, prev = null; ks.concat([1e9]).forEach((k) => { const ok = k < 1e9 && m[k] >= L; if (ok && a != null && k === prev + 1) { prev = k; return; } if (a != null) grp[ax === "r" ? "rows" : "cols"].push({ a, b: prev, c: !!(ax === "r" ? sh.hiddenRows : sh.hiddenCols)[prev] }); a = ok ? k : null; prev = ok ? k : null; }); } }); sh.ext = Object.assign({}, sh.ext, { grp }); delete sh._ol; }
+      if (kid(root, "sheetProtection") && at(kid(root, "sheetProtection"), "sheet") !== "0") sh.ext = Object.assign({}, sh.ext, { protect: { pw: null } });
+      try { const tp = kid(root, "tableParts"); if (tp) { const rx2 = await zip.text(path(p).replace(/([^/]+)$/, "_rels/$1.rels")); const rm = {}; if (rx2) Z.deep(Z.parse(rx2).documentElement, "Relationship").forEach((r) => (rm[r.getAttribute("Id")] = r.getAttribute("Target"))); const list = []; for (const tpart of Z.deep(tp, "tablePart")) { const tgt = rm[tpart.getAttributeNS(R, "id") || tpart.getAttribute("r:id")]; if (!tgt) continue; const tx = await zip.text(tgt.startsWith("/") ? tgt.slice(1) : (path(p).replace(/[^/]+$/, "") + tgt).split("/").reduce((a, q) => (q === ".." ? (a.pop(), a) : (a.push(q), a)), []).join("/")); if (!tx) continue; const te = Z.parse(tx).documentElement; const tz = Z.deep(te, "tableStyleInfo")[0]; list.push({ id: "t" + Math.random().toString(36).slice(2, 7), name: at(te, "displayName") || at(te, "name") || "Table" + (list.length + 1), range: String(at(te, "ref")).replace(/\$/g, ""), style: "blue", hdr: at(te, "headerRowCount") !== "0", total: +at(te, "totalsRowCount") > 0, band: !tz || at(tz, "showRowStripes") !== "0", filt: true }); } if (list.length) sh.ext = Object.assign({}, sh.ext, { tables: list }); } } catch (e) { /* tables are optional */ }
       const dr = kid(root, "drawing"); if (dr) { try { await readCharts(zip, sh, path(p), dr, wb); } catch (e) { /* charts are optional */ } }
     }
     if (!wb.sheets.length) wb.sheets.push(new C.Sheet("Sheet1"));

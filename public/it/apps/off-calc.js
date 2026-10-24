@@ -3,7 +3,7 @@
 (function () {
   "use strict";
   class E { constructor(c) { this.code = c; } toString() { return this.code; } }
-  const ERR = { DIV0: new E("#DIV/0!"), VALUE: new E("#VALUE!"), REF: new E("#REF!"), NAME: new E("#NAME?"), NA: new E("#N/A"), NUM: new E("#NUM!"), NULL: new E("#NULL!"), CIRC: new E("#CIRC!") };
+  const ERR = { DIV0: new E("#DIV/0!"), VALUE: new E("#VALUE!"), REF: new E("#REF!"), NAME: new E("#NAME?"), NA: new E("#N/A"), NUM: new E("#NUM!"), NULL: new E("#NULL!"), CIRC: new E("#CIRC!"), SPILL: new E("#SPILL!"), CALC: new E("#CALC!") };
   const isE = (v) => v instanceof E;
   const MAXR = 1048576, MAXC = 16384;
   const colN = (s) => { let n = 0; for (const ch of s.toUpperCase()) n = n * 26 + ch.charCodeAt(0) - 64; return n; };
@@ -109,9 +109,11 @@
       if (ch === "'") { let j = i + 1, s = ""; while (j < n) { if (f[j] === "'") { if (f[j + 1] === "'") { s += "'"; j += 2; continue; } break; } s += f[j++]; } if (f[j + 1] === "!") { t.push({ t: "sheet", v: s, i, j: j + 2 }); i = j + 2; continue; } throw new Error("quote"); }
       if (/[0-9]/.test(ch) || (ch === "." && /[0-9]/.test(f[i + 1] || ""))) { const m = /^(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?/.exec(f.slice(i)); t.push({ t: "num", v: parseFloat(m[0]), i, j: i + m[0].length }); i += m[0].length; continue; }
       if (ch === "#") { const m = /^#(DIV\/0!|VALUE!|REF!|NAME\?|N\/A|NUM!|NULL!)/i.exec(f.slice(i)); if (m) { t.push({ t: "err", v: m[0].toUpperCase(), i, j: i + m[0].length }); i += m[0].length; continue; } }
+      if (ch === "[") { let d = 0, j = i; for (; j < n; j++) { if (f[j] === "[") d++; else if (f[j] === "]") { d--; if (!d) break; } } if (d === 0) { t.push({ t: "name", v: f.slice(i, j + 1), i, j: j + 1 }); i = j + 1; continue; } }
       if (/[A-Za-z_$]/.test(ch)) {
-        const m = /^(\$?[A-Za-z]{1,3}\$?\d+|\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}(?![A-Za-z0-9_(])|\$?\d+:\$?\d+(?![\d(])|[A-Za-z_\\][A-Za-z0-9_.]*)/.exec(f.slice(i)); if (!m) { throw new Error("char " + ch); }
+        const m = /^(\$?[A-Za-z]{1,3}\$?\d+(?![A-Za-z_.])|\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}(?![A-Za-z0-9_(])|\$?\d+:\$?\d+(?![\d(])|[A-Za-z_\\][A-Za-z0-9_.]*)/.exec(f.slice(i)); if (!m) { throw new Error("char " + ch); }
         let w = m[0], k = i + w.length;
+        if (f[k] === "[" && /^[A-Za-z_][A-Za-z0-9_.]*$/.test(w)) { let d = 0, j = k; for (; j < n; j++) { if (f[j] === "[") d++; else if (f[j] === "]") { d--; if (!d) break; } } if (d === 0) { t.push({ t: "name", v: f.slice(i, j + 1), i, j: j + 1 }); i = j + 1; continue; } }
         if (f[k] === "!" && /^[A-Za-z_][A-Za-z0-9_.]*$/.test(w)) { t.push({ t: "sheet", v: w, i, j: k + 1 }); i = k + 1; continue; }
         if (/^\$?[A-Za-z]{1,3}\$?\d+$/.test(w) && !(/^[A-Za-z]/.test(w) && f[k] === "(")) { t.push({ t: "ref", v: w, i, j: k }); i = k; continue; }
         if (/^\$?[A-Za-z]{1,3}:\$?[A-Za-z]{1,3}$/.test(w)) { t.push({ t: "colrange", v: w, i, j: k }); i = k; continue; }
@@ -125,8 +127,10 @@
     }
     return t;
   }
+  const K_ = {};
   /* ---------- parser (precedence climbing) ---------- */
-  function parse(src) {
+  function parse(src, row, shn) {
+    if (src.indexOf("[") >= 0 && K_.structRef) src = K_.structRef(src, row, shn);
     const toks = tokenize(src); let p = 0; const peek = () => toks[p], next = () => toks[p++];
     const isOp = (v) => toks[p] && toks[p].t === "op" && toks[p].v === v;
     function expr(minPrec) {
@@ -171,12 +175,13 @@
   /* ---------- workbook model ---------- */
   class Sheet {
     constructor(name, data) {
-      this.name = name; this.m = new Map(); this.cols = {}; this.rows = {}; this.merges = []; this.freeze = { r: 0, c: 0 }; this.charts = []; this.cf = []; this.hidden = false; this.filter = null; this.dv = []; this.tab = null; this.grid = true; this.hiddenRows = {}; this.hiddenCols = {};
+      this.name = name; this.m = new Map(); this.cols = {}; this.rows = {}; this.merges = []; this.freeze = { r: 0, c: 0 }; this.charts = []; this.cf = []; this.hidden = false; this.filter = null; this.dv = []; this.tab = null; this.grid = true; this.hiddenRows = {}; this.hiddenCols = {}; this.ext = {};
       if (data) {
+        if (data.ext) this.ext = JSON.parse(JSON.stringify(data.ext));
         Object.keys(data.cells || {}).forEach((a) => { const p = parseAddr(a); if (p) this.m.set(key(p.r, p.c), Object.assign({}, data.cells[a])); });
         this.cols = Object.assign({}, data.cols); this.rows = Object.assign({}, data.rows); this.merges = (data.merges || []).slice(); this.freeze = Object.assign({ r: 0, c: 0 }, data.freeze); this.charts = JSON.parse(JSON.stringify(data.charts || [])); this.cf = JSON.parse(JSON.stringify(data.cf || [])); this.hidden = !!data.hidden; this.filter = data.filter ? JSON.parse(JSON.stringify(data.filter)) : null; this.dv = JSON.parse(JSON.stringify(data.dv || [])); this.tab = data.tab || null; this.grid = data.grid !== false; this.hiddenRows = Object.assign({}, data.hiddenRows); this.hiddenCols = Object.assign({}, data.hiddenCols);
       }
-      this.cache = new Map();
+      this.cache = new Map(); this.sv = new Map(); this.so = new Map(); this.sp = new Map();
     }
     get(r, c) { return this.m.get(key(r, c)); }
     set(r, c, cell) { if (cell && (cell.v != null || cell.f || cell.s)) this.m.set(key(r, c), cell); else this.m.delete(key(r, c)); }
@@ -185,7 +190,7 @@
     dims() { let mr = 0, mc = 0; this.m.forEach((cell, k) => { const [r, c] = unkey(k); if (cell.v != null || cell.f) { if (r > mr) mr = r; if (c > mc) mc = c; } }); return [mr, mc]; }
     toJSON() {
       const cells = {}; const keys = [...this.m.keys()].sort((a, b) => a - b); keys.forEach((k) => { const [r, c] = unkey(k), cell = this.m.get(k), o = {}; if (cell.v != null) o.v = cell.v; if (cell.f) o.f = cell.f; if (cell.s) o.s = cell.s; if (cell.nf) o.nf = cell.nf; if (cell.l) o.l = cell.l; if (cell.n) o.n = cell.n; if (Object.keys(o).length) cells[addr(r, c)] = o; });
-      return { name: this.name, cells, cols: this.cols, rows: this.rows, merges: this.merges, freeze: this.freeze, charts: this.charts, cf: this.cf, hidden: this.hidden || undefined, filter: this.filter || undefined, dv: this.dv.length ? this.dv : undefined, tab: this.tab || undefined, grid: this.grid === false ? false : undefined, hiddenRows: Object.keys(this.hiddenRows).length ? this.hiddenRows : undefined, hiddenCols: Object.keys(this.hiddenCols).length ? this.hiddenCols : undefined };
+      return { ext: Object.keys(this.ext).length ? this.ext : undefined, name: this.name, cells, cols: this.cols, rows: this.rows, merges: this.merges, freeze: this.freeze, charts: this.charts, cf: this.cf, hidden: this.hidden || undefined, filter: this.filter || undefined, dv: this.dv.length ? this.dv : undefined, tab: this.tab || undefined, grid: this.grid === false ? false : undefined, hiddenRows: Object.keys(this.hiddenRows).length ? this.hiddenRows : undefined, hiddenCols: Object.keys(this.hiddenCols).length ? this.hiddenCols : undefined };
     }
   }
   class Workbook {
@@ -196,16 +201,41 @@
     style(i) { return this.styles[i || 0] || this.styles[0]; }
     styleId(o) { const keys = Object.keys(o).filter((k) => o[k] != null && o[k] !== "" && o[k] !== false).sort(), c = {}; keys.forEach((k) => (c[k] = o[k])); const j = JSON.stringify(c); let i = this.styleIdx.get(j); if (i == null) { i = this.styles.push(c) - 1; this.styleIdx.set(j, i); } return i; }
     sheet(n) { if (typeof n === "number") return this.sheets[n]; const l = String(n).toLowerCase(); return this.sheets.find((s) => s.name.toLowerCase() === l); }
-    invalidate() { this.sheets.forEach((s) => s.cache.clear()); this.rand.clear(); }
+    invalidate() { this.sheets.forEach((s) => { s.cache.clear(); s.sv.clear(); s.so.clear(); s.sp.clear(); }); this.rand.clear(); this.spillDone = false; }
+    /* dynamic arrays: a formula whose result is several cells "spills" into the empty cells below / to the right of it */
+    isDyn(cell, cr, shn) {
+      if (!cell.f) return false; if (cell.ast && cell.ast.ma !== undefined) return cell.ast.ma;
+      if (!/[:{]/.test(cell.f) && !arrRe().test(cell.f)) return false;
+      if (!cell.ast) { try { cell.ast = parse(cell.f.slice(1), cr, shn); } catch (e) { cell.ast = { k: "err", v: "#NAME?" }; } }
+      return (cell.ast.ma = mayArr(cell.ast));
+    }
+    ensureSpills() {
+      if (this.spillDone) return; this.spillDone = true;
+      const dyn = []; this.sheets.forEach((sh) => sh.m.forEach((cell, k) => { if (cell.f && this.isDyn(cell, unkey(k)[0], sh)) dyn.push([sh, k]); }));
+      if (!dyn.length) return;
+      for (let pass = 0; pass < 2; pass++) {
+        dyn.forEach(([sh, k]) => { const [r, c] = unkey(k); this.value(sh, r, c); });
+        if (pass === 0) { let any = false; this.sheets.forEach((s) => { if (s.sp.size) any = true; }); if (!any) break; this.sheets.forEach((s) => s.cache.clear()); }
+      }
+    }
+    unspill(sh, ak) { const s = sh.sp.get(ak); if (!s) return; for (let i = 0; i < s.h; i++) for (let j = 0; j < s.w; j++) { if (!i && !j) continue; const k = key(s.r + i, s.c + j); if (sh.so.get(k) === ak) { sh.so.delete(k); sh.sv.delete(k); } } sh.sp.delete(ak); }
+    spill(sh, r, c, g) {
+      const ak = key(r, c), h = g.length, w = g[0].length; this.unspill(sh, ak);
+      if (r + h - 1 > MAXR || c + w - 1 > MAXC) return ERR.SPILL;
+      for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) { if (!i && !j) continue; const k = key(r + i, c + j); if (sh.m.has(k)) return ERR.SPILL; const o = sh.so.get(k); if (o !== undefined && o !== ak) return ERR.SPILL; }
+      for (let i = 0; i < h; i++) for (let j = 0; j < w; j++) { if (!i && !j) continue; const k = key(r + i, c + j), x = g[i][j]; sh.sv.set(k, x === undefined ? null : x); sh.so.set(k, ak); }
+      sh.sp.set(ak, { r, c, h, w }); const x0 = g[0][0]; return x0 === undefined ? null : x0;
+    }
     /* the value of a cell (formula evaluated, cached) */
     value(sh, r, c) {
-      const cell = sh.get(r, c); if (!cell) return null; if (!cell.f) return cell.v == null ? null : cell.v;
+      const cell = sh.get(r, c); if (!cell) { if (!this.spillDone) this.ensureSpills(); const x = sh.sv.get(key(r, c)); return x === undefined ? null : x; } if (!cell.f) return cell.v == null ? null : cell.v;
       const k = key(r, c), ch = sh.cache.get(k); if (ch !== undefined) return ch;
       if (cell.busy) return ERR.CIRC; cell.busy = true;
       try {
-        if (!cell.ast) { try { cell.ast = parse(cell.f.slice(1)); } catch (e) { cell.ast = { k: "err", v: "#NAME?" }; } }
+        if (!cell.ast) { try { cell.ast = parse(cell.f.slice(1), r, sh); } catch (e) { cell.ast = { k: "err", v: "#NAME?" }; } }
         let v;
         if (this.depth > 250) { v = this.deep(sh, r, c, cell); } else { this.depth++; try { v = ev(cell.ast, { wb: this, sh, r, c }); } finally { this.depth--; } }
+        if (v instanceof Rng || Array.isArray(v)) { const dy = this.isDyn(cell, r, sh) ? asGrid(v) : null; if (dy && (dy.length > 1 || dy[0].length > 1)) v = this.spill(sh, r, c, dy); }
         if (v instanceof Rng) v = v.first(); if (Array.isArray(v)) v = v.length ? (Array.isArray(v[0]) ? v[0][0] : v[0]) : null; if (v === undefined) v = null;
         sh.cache.set(k, v); return v;
       } finally { cell.busy = false; }
@@ -215,7 +245,7 @@
       const order = [], seen = new Set(), stack = [[sh, r, c, cell, false]];
       while (stack.length) {
         const [s2, r2, c2, cl, done] = stack.pop(); const kk = s2.name + "|" + key(r2, c2); if (done) { order.push([s2, r2, c2]); continue; } if (seen.has(kk)) continue; seen.add(kk); stack.push([s2, r2, c2, cl, true]);
-        if (!cl.ast) { try { cl.ast = parse(cl.f.slice(1)); } catch (e) { cl.ast = { k: "err", v: "#NAME?" }; } }
+        if (!cl.ast) { try { cl.ast = parse(cl.f.slice(1), r2, s2); } catch (e) { cl.ast = { k: "err", v: "#NAME?" }; } }
         precedents(cl.ast, s2, this, (ps, a1, b1, a2, b2) => { const n = (a2 - a1 + 1) * (b2 - b1 + 1); if (n > ps.m.size) { ps.m.forEach((x, k2) => { const [rr, cc] = unkey(k2); if (rr >= a1 && rr <= a2 && cc >= b1 && cc <= b2 && x.f && !ps.cache.has(k2)) stack.push([ps, rr, cc, x, false]); }); } else for (let i = a1; i <= a2; i++) for (let j = b1; j <= b2; j++) { const x = ps.get(i, j); if (x && x.f && !ps.cache.has(key(i, j))) stack.push([ps, i, j, x, false]); } });
       }
       const save = this.depth; this.depth = 0; try { for (const [s2, r2, c2] of order) { if (!(s2 === sh && r2 === r && c2 === c)) { const x = s2.get(r2, c2); if (x && !x.busy) this.value(s2, r2, c2); } } return ev(cell.ast, { wb: this, sh, r, c }); } finally { this.depth = save; }
@@ -267,24 +297,49 @@
     if (a == null) a = typeof b === "string" ? "" : typeof b === "boolean" ? false : 0; if (b == null) b = typeof a === "string" ? "" : typeof a === "boolean" ? false : 0;
     const ta = t(a), tb = t(b); if (ta !== tb) return ta < tb ? -1 : 1; if (ta === 1) { const x = a.toLowerCase(), y = b.toLowerCase(); return x < y ? -1 : x > y ? 1 : 0; } return a < b ? -1 : a > b ? 1 : 0;
   };
+  /* array helpers: broadcasting, spill detection */
+  const isArr = (v) => (v instanceof Rng && (v.rows > 1 || v.cols > 1)) || (Array.isArray(v) && (v.length > 1 || (v[0] && v[0].length > 1)));
+  const trimR = (v) => { if (v.r2 - v.r1 < 3000) return v; const d = v.sh.dims(); return new Rng(v.wb, v.sh, v.r1, v.c1, Math.max(v.r1, Math.min(v.r2, d[0])), Math.min(v.c2, Math.max(v.c1, d[1]))); };
+  const asGrid = (v) => (v instanceof Rng ? trimR(v).grid() : Array.isArray(v) ? (Array.isArray(v[0]) ? v : [v]) : null);
+  const gridOf = (v) => (v instanceof Rng ? trimR(v).grid() : Array.isArray(v) ? (Array.isArray(v[0]) ? v : [v]) : [[v]]);
+  function bc(vals, fn) {
+    const gs = vals.map(gridOf), R = Math.max(...gs.map((g) => g.length)), W = Math.max(...gs.map((g) => g[0].length)), out = [];
+    for (let i = 0; i < R; i++) { const row = []; for (let j = 0; j < W; j++) { let bad = false; const xs = gs.map((g) => { const ri = g.length === 1 ? 0 : i, ci = g[0].length === 1 ? 0 : j; if (ri >= g.length || ci >= g[0].length) { bad = true; return null; } return g[ri][ci]; }); row.push(bad ? ERR.NA : fn(xs)); } out.push(row); }
+    return out;
+  }
+  const ARRFN = new Set("TRANSPOSE XLOOKUP INDEX OFFSET INDIRECT CHOOSE ARRAYFORMULA".split(" ")), LIFT = new Set("IF IFERROR IFNA ABS SQRT EXP LN LOG10 SIN COS TAN INT SIGN ROUND ROUNDUP ROUNDDOWN TRUNC MOD POWER CEILING FLOOR LEN UPPER LOWER PROPER TRIM LEFT RIGHT MID SUBSTITUTE VALUE TEXT ISNUMBER ISTEXT ISBLANK ISERROR ISNA ISEVEN ISODD NOT YEAR MONTH DAY WEEKDAY DATEVALUE CODE CHAR REPT FIND SEARCH EXACT N DATE HOUR MINUTE SECOND EDATE EOMONTH".split(" "));
+  let arrReC = null, arrReN = -1; function arrRe() { if (arrReN !== ARRFN.size) { arrReN = ARRFN.size; arrReC = new RegExp("(^|[^A-Z0-9_.])(" + [...ARRFN].map((x) => x.replace(/\./g, "\\.")).join("|") + ")\\(", "i"); } return arrReC; }
+  function mayArr(n) {
+    if (!n) return false; switch (n.k) {
+      case "range": return n.r2 > n.r1 || n.c2 > n.c1; case "arr": return n.rows.length > 1 || (n.rows[0] && n.rows[0].length > 1);
+      case "bin": return mayArr(n.a) || mayArr(n.b); case "un": case "pct": case "paren": return mayArr(n.a);
+      case "fn": { const nm = n.name.replace(/^_XLFN\./, ""); if (ARRFN.has(nm)) return true; if (LIFT.has(nm)) return n.args.some(mayArr); return false; }
+    } return false;
+  }
   function ev(n, ctx) {
     switch (n.k) {
       case "num": return n.v; case "str": return n.v; case "bool": return n.v; case "empty": return null;
       case "err": return Object.values(ERR).find((e) => e.code === n.v) || ERR.VALUE;
       case "paren": return ev(n.a, ctx);
+      case "val": return n.v;
       case "ref": { const sh = n.sheet ? ctx.wb.sheet(n.sheet) : ctx.sh; if (!sh) return ERR.REF; if (n.r < 1 || n.c < 1) return ERR.REF; return new Rng(ctx.wb, sh, n.r, n.c, n.r, n.c); }
       case "range": { const sh = n.sheet ? ctx.wb.sheet(n.sheet) : ctx.sh; if (!sh) return ERR.REF; return new Rng(ctx.wb, sh, n.r1, n.c1, n.r2, n.c2); }
-      case "name": { const nm = ctx.wb.names[n.name.toLowerCase()] || ctx.wb.names[n.name]; if (!nm) return ERR.NAME; try { return ev(parse(nm.replace(/^=/, "")), ctx); } catch (e) { return ERR.NAME; } }
+      case "name": { if (ctx.locals) { const lv = ctx.locals[n.name.toLowerCase()]; if (lv !== undefined) return lv; } const nm = ctx.wb.names[n.name.toLowerCase()] || ctx.wb.names[n.name]; if (!nm) return ERR.NAME; try { return ev(parse(nm.replace(/^=/, "")), ctx); } catch (e) { return ERR.NAME; } }
       case "arr": return n.rows.map((r) => r.map((x) => scalar(ev(x, ctx))));
-      case "un": { const v = toNum(scalar(ev(n.a, ctx))); return isE(v) ? v : -v; }
-      case "pct": { const v = toNum(scalar(ev(n.a, ctx))); return isE(v) ? v : v / 100; }
+      case "un": { const a = ev(n.a, ctx); if (isArr(a)) return bc([a], (x) => { const v = toNum(x[0]); return isE(v) ? v : -v; }); const v = toNum(scalar(a)); return isE(v) ? v : -v; }
+      case "pct": { const a = ev(n.a, ctx); if (isArr(a)) return bc([a], (x) => { const v = toNum(x[0]); return isE(v) ? v : v / 100; }); const v = toNum(scalar(a)); return isE(v) ? v : v / 100; }
       case "bin": return binop(n, ctx);
       case "fn": return call(n, ctx);
     }
     return ERR.VALUE;
   }
   function binop(n, ctx) {
-    const a = scalar(ev(n.a, ctx)), b = scalar(ev(n.b, ctx)); if (isE(a)) return a; if (isE(b)) return b; const op = n.op;
+    const av = ev(n.a, ctx), bv = ev(n.b, ctx);
+    if (isArr(av) || isArr(bv)) return bc([av, bv], (x) => binS(n.op, x[0], x[1]));
+    return binS(n.op, scalar(av), scalar(bv));
+  }
+  function binS(op, a, b) {
+    if (isE(a)) return a; if (isE(b)) return b;
     if (op === "&") return toStr(a) + toStr(b);
     if (op === "=" || op === "<>" || op === "<" || op === ">" || op === "<=" || op === ">=") { const c = cmp(a, b); return op === "=" ? c === 0 : op === "<>" ? c !== 0 : op === "<" ? c < 0 : op === ">" ? c > 0 : op === "<=" ? c <= 0 : c >= 0; }
     const x = toNum(a), y = toNum(b); if (isE(x)) return x; if (isE(y)) return y;
@@ -467,6 +522,7 @@
   def("ARRAYFORMULA", (a, c) => ev(a[0], c));
   def("ERROR.TYPE", (a, c) => { const v = sc(a[0], c); return isE(v) ? { "#NULL!": 1, "#DIV/0!": 2, "#VALUE!": 3, "#REF!": 4, "#NAME?": 5, "#NUM!": 6, "#N/A": 7 }[v.code] || ERR.NA : ERR.NA; });
   function call(n, ctx) {
+    if (LIFT.has(n.name) && n.args.some((x) => mayArr(x))) { const vals = n.args.map((x) => ev(x, ctx)), f0 = F[n.name]; if (vals.some(isArr)) return bc(vals, (xs) => { try { return f0(xs.map((x) => ({ k: "val", v: x })), ctx); } catch (e) { return ERR.VALUE; } }); return f0(vals.map((x) => ({ k: "val", v: x })), ctx); }
     const f = F[n.name]; if (!f) { const u = F[n.name.replace(/^_XLFN\./, "")]; if (u) return u(n.args, ctx); return ERR.NAME; }
     try { return f(n.args, ctx); } catch (e) { if (e instanceof RangeError) throw e; return ERR.VALUE; }
   }
@@ -528,5 +584,5 @@
     });
   }
   /* a range inside a formula that spans two refs needs both ends adjusted separately: handled because ":" is not a token of its own here (ref : ref) */
-  window.Calc = { Workbook, Sheet, Rng, ERR, isE, Fmt, parse, tokenize, parseInput, shift, adjust, rewrite, colN, nCol, addr, parseAddr, key, unkey, toSerial, fromSerial, dser, ymd, MAXR, MAXC, F, toNum, toStr, cmp, MON, DAY, parseDate };
+  window.Calc = Object.assign(K_, { precedents, ARRFN, LIFT, def, ev, sc, N, nums, arr2, crit, ifs, scalar, isArr, bc, gridOf, asGrid, mayArr, Workbook, Sheet, Rng, ERR, isE, Fmt, parse, tokenize, parseInput, shift, adjust, rewrite, colN, nCol, addr, parseAddr, key, unkey, toSerial, fromSerial, dser, ymd, MAXR, MAXC, F, toNum, toStr, cmp, MON, DAY, parseDate });
 })();

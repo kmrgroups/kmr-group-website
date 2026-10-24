@@ -122,7 +122,7 @@
         const sh = cs(); r = Math.max(1, Math.min(MAXROW, r)); c = Math.max(1, Math.min(MAXCOL, c)); er = Math.max(1, Math.min(MAXROW, er == null ? r : er)); ec = Math.max(1, Math.min(MAXCOL, ec == null ? c : ec));
         if (r > NR - 5 || c > NC - 2 || er > NR - 5 || ec > NC - 2) { const sv = view(sh); sv.vr = Math.max(sv.vr, r + 40, er + 40); sv.vc = Math.max(sv.vc, c + 6, ec + 6); layout(); }
         cur = { r, c }; ext = { r: er, c: ec }; whole = wh || null; sel = expandSel({ r1: Math.min(r, er), c1: Math.min(c, ec), r2: Math.max(r, er), c2: Math.max(c, ec) });
-        S.x.chartDeselect && S.x.chartDeselect(); syncBar(); drawOverlay(); statusStats(); rb && rb.refresh(); scrollInto(ext.r, ext.c);
+        S.x.chartDeselect && S.x.chartDeselect(); syncBar(); drawOverlay(); statusStats(); if (S.x.onSelect) S.x.onSelect(); rb && rb.refresh(); scrollInto(ext.r, ext.c);
       }
       mix({ setSel, layout, render: () => render() });
       function scrollInto(r, c) {
@@ -162,7 +162,7 @@
         if (st.wr) cls += " wr"; if (cell && cell.n) cls += " nt"; if (cell && cell.l) cls += " lk";
         style = styleCss(cell && cell.s || 0) + `left:${x}px;top:${y}px;width:${ww}px;height:${h}px;justify-content:${ha === "right" ? "flex-end" : ha === "center" ? "center" : "flex-start"};text-align:${ha};`;
         if (f.color) style += `color:${f.color};`;
-        if (cf) { if (cf.bg) style += `background:${cf.bg};`; if (cf.fc) style += `color:${cf.fc};`; if (cf.b) style += "font-weight:700;"; if (cf.i) style += "font-style:italic;"; if (cf.bar) extra += `<i class="db" style="width:${Math.max(2, Math.round((ww - 2) * cf.bar.pct))}px;background:${cf.bar.color}"></i>`; }
+        if (cf) { if (cf.bg) style += `background:${cf.bg};`; if (cf.fc) style += `color:${cf.fc};`; if (cf.b) style += "font-weight:700;"; if (cf.i) style += "font-style:italic;"; if (cf.html) extra += cf.html; if (cf.bar) extra += `<i class="db" style="width:${Math.max(2, Math.round((ww - 2) * cf.bar.pct))}px;background:${cf.bar.color}"></i>`; }
         const fbx = S.x.filterBtn ? S.x.filterBtn(sh, r, c) : null; if (fbx) extra += `<b class="fb${fbx.on ? " on" : ""}" data-fb="${c}">▾</b>`;
         return `<div class="${cls}" style="${style}" data-r="${r}" data-c="${c}" ${cell && cell.n ? `title="${esc(cell.n)}"` : ""}><span>${esc(text)}</span>${extra}</div>`;
       }
@@ -175,11 +175,12 @@
         const area = (o.re - o.rs + 1) * (o.ce - o.cs + 1);
         if (area > sh.m.size * 1.5) sh.m.forEach((cell, k) => { const [r, c] = C.unkey(k); if (r >= o.rs && r <= o.re && c >= o.cs && c <= o.ce) cells.push([r, c, cell]); });
         else for (let r = o.rs; r <= o.re; r++) for (let c = o.cs; c <= o.ce; c++) { const cell = sh.get(r, c); if (cell) cells.push([r, c, cell]); }
+        if (sh.sp && sh.sp.size) sh.sp.forEach((z) => { const r1 = Math.max(o.rs, z.r), r2 = Math.min(o.re, z.r + z.h - 1), c1 = Math.max(o.cs, z.c), c2 = Math.min(o.ce, z.c + z.w - 1); for (let r = r1; r <= r2; r++) for (let c = c1; c <= c2; c++) if (!(r === z.r && c === z.c) && !sh.m.has(C.key(r, c))) cells.push([r, c, null]); });
         const cf0 = S.x.cfAny && S.x.cfAny(sh);
         if (cf0) { const have = new Set(cells.map((a) => C.key(a[0], a[1]))); for (let r = o.rs; r <= o.re; r++) for (let c = o.cs; c <= o.ce; c++) if (!have.has(C.key(r, c)) && S.x.cfEval(sh, r, c, null)) cells.push([r, c, null]); }
         const fb = S.x.filterBtn;
         cells.forEach(([r, c, cell]) => {
-          const k = C.key(r, c); if (mg.covered.has(k)) return; if (!cell && !(S.x.cfEval && S.x.cfEval(sh, r, c, null))) return; const hh = rh(sh, r), ww = cw(sh, c); if (!hh || !ww) return; const m = mg.anchors.get(k); let w = ww, hgt = hh;
+          const k = C.key(r, c); if (mg.covered.has(k)) return; if (!cell && !sh.so.has(k) && !(S.x.cfEval && S.x.cfEval(sh, r, c, null))) return; const hh = rh(sh, r), ww = cw(sh, c); if (!hh || !ww) return; const m = mg.anchors.get(k); let w = ww, hgt = hh;
           if (m) { w = CX[m.c2 + 1] - CX[m.c1]; hgt = RY[m.r2 + 1] - RY[m.r1]; drawn.add(k); } let nx = 0; if (!m) { for (let cc = c + 1; cc <= Math.min(o.ce + 6, c + 12); cc++) { const n2 = sh.get(r, cc); if ((n2 && (n2.v != null || n2.f)) || mg.covered.has(C.key(r, cc))) break; nx += cw(sh, cc); } }
           h += cellHtml(sh, r, c, cell, CX[c] - o.bx, RY[r] - o.by, w, hgt, nx);
         });
@@ -201,7 +202,7 @@
         return h + `<div class="corner" title="Select all"></div>`;
       }
       function render() {
-        raf = 0; if (!CX) layout(); sgv.scrollLeft = 0; sgv.scrollTop = 0; const sh = cs(); sl = sgs.scrollLeft; st = sgs.scrollTop; const vw = sgv.clientWidth, vh = sgv.clientHeight; if (!vw || !vh) return;
+        raf = 0; wb.ensureSpills(); if (!CX) layout(); sgv.scrollLeft = 0; sgv.scrollTop = 0; const sh = cs(); sl = sgs.scrollLeft; st = sgs.scrollTop; const vw = sgv.clientWidth, vh = sgv.clientHeight; if (!vw || !vh) return;
         const fr = sh.freeze.r || 0, fc = sh.freeze.c || 0, qw = vw - HW - FW, qh = vh - HH - FH;
         if (st + vh > RY[NR + 1] - 300 && NR < MAXROW) { view(sh).vr = Math.min(MAXROW, NR + 200); layout(); }
         const cS = Math.max(fc + 1, cAt(FW + sl)), cE = Math.min(NC, cAt(FW + sl + qw) + 1), rS = Math.max(fr + 1, rAt(FH + st)), rE = Math.min(NR, rAt(FH + st + qh) + 1);
@@ -227,6 +228,7 @@
         if (!ro) h += `<div class="fh" data-fh="1" style="left:${q.x + q.w - 5}px;top:${q.y + q.h - 5}px"></div>`;
         const dv = S.x.dvAt && S.x.dvAt(sh, a.r, a.c); if (dv && dv.type === "list" && !ro) h += `<div class="dd" data-dd="1" style="left:${ac.x + ac.w - 19}px;top:${ac.y + ac.h - 1}px">▾</div>`;
         if (fill) { const f = rectOf(fill.r1, fill.c1, fill.r2, fill.c2); h += `<div class="fp" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px"></div>`; }
+        if (S.x.overlayExtra) h += S.x.overlayExtra(sh, rectOf) || "";
         sgx.innerHTML = h; sgx.style.pointerEvents = "none";
       }
       S.drawOverlay = drawOverlay;
@@ -241,12 +243,12 @@
         if (j.ops.length) { j.a = { cur: { ...cur }, ext: { ...ext }, sheet: wb.active }; undo.push(j); if (undo.length > 120) undo.shift(); redo.length = 0; S.bump(); mergeCache = null; changed(); layout(); sched(); rb && rb.refresh(); }
         return ok;
       }
-      function putCell(sh, r, c, n) { const o = sh.get(r, c); if (J) J.ops.push({ t: "cell", sh, r, c, o: clone(o), n: clone(n) }); if (n && (n.v != null || n.f || n.s || n.n || n.l)) sh.set(r, c, n); else sh.del(r, c); }
+      function putCell(sh, r, c, n) { const o = sh.get(r, c); if (sh.ext.protect && !(S.x.unprotecting) && !wb.style(o && o.s).unl) throw new Error("This cell is locked because the sheet is protected. Use Review ▸ Unprotect sheet to change it."); if (J) J.ops.push({ t: "cell", sh, r, c, o: clone(o), n: clone(n) }); if (n && (n.v != null || n.f || n.s || n.n || n.l)) sh.set(r, c, n); else sh.del(r, c); }
       function setMeta(sh, p, v) { if (J) J.ops.push({ t: "meta", sh, p, o: jc(sh[p]), n: jc(v) }); sh[p] = v; }
-      const stateOf = (sh) => { const m = new Map(); sh.m.forEach((c, k) => m.set(k, clone(c))); return { sh, m, cols: jc(sh.cols), rows: jc(sh.rows), merges: jc(sh.merges), cf: jc(sh.cf), charts: jc(sh.charts), dv: jc(sh.dv), filter: jc(sh.filter), hiddenRows: jc(sh.hiddenRows), hiddenCols: jc(sh.hiddenCols), freeze: jc(sh.freeze), name: sh.name }; };
-      const restore = (s) => { const sh = s.sh; sh.m = new Map(); s.m.forEach((c, k) => sh.m.set(k, clone(c))); ["cols", "rows", "merges", "cf", "charts", "dv", "filter", "hiddenRows", "hiddenCols", "freeze", "name"].forEach((p) => (sh[p] = jc(s[p]))); sh.cache = new Map(); };
+      const stateOf = (sh) => { const m = new Map(); sh.m.forEach((c, k) => m.set(k, clone(c))); return { sh, m, cols: jc(sh.cols), rows: jc(sh.rows), merges: jc(sh.merges), cf: jc(sh.cf), charts: jc(sh.charts), dv: jc(sh.dv), filter: jc(sh.filter), hiddenRows: jc(sh.hiddenRows), hiddenCols: jc(sh.hiddenCols), freeze: jc(sh.freeze), ext: jc(sh.ext), name: sh.name }; };
+      const restore = (s) => { const sh = s.sh; sh.m = new Map(); s.m.forEach((c, k) => sh.m.set(k, clone(c))); ["cols", "rows", "merges", "cf", "charts", "dv", "filter", "hiddenRows", "hiddenCols", "freeze", "ext", "name"].forEach((p) => (sh[p] = jc(s[p]))); if (!sh.ext) sh.ext = {}; sh.cache = new Map(); };
       function structOp(fn) { // snapshot every sheet before and after (insert/delete/sort/etc.)
-        if (!J) return; const before = wb.sheets.map(stateOf); const names = jc(wb.names); fn(); const after = wb.sheets.map(stateOf); J.ops.push({ t: "state", o: before, n: after, no: names, nn: jc(wb.names) });
+        if (!J) return; if (cs().ext.protect && !S.x.unprotecting) throw new Error("This sheet is protected. Use Review ▸ Unprotect sheet first."); const before = wb.sheets.map(stateOf); const names = jc(wb.names); fn(); const after = wb.sheets.map(stateOf); J.ops.push({ t: "state", o: before, n: after, no: names, nn: jc(wb.names) });
       }
       function sheetsOp(fn) { if (!J) return; const o = wb.sheets.slice(), oa = wb.active; fn(); J.ops.push({ t: "sheets", o, oa, n: wb.sheets.slice(), na: wb.active }); }
       mix({ tx, putCell, setMeta, structOp, sheetsOp });
@@ -301,7 +303,7 @@
         ta.style.fontSize = ((st0.fs || 11) * 1.3333 * Zm).toFixed(2) + "px"; ta.style.fontFamily = st0.ff ? `'${st0.ff}',Calibri,Arial,sans-serif` : ""; ta.style.fontWeight = st0.b ? "700" : ""; ta.style.fontStyle = st0.i ? "italic" : ""; ta.style.height = Math.max(q.h, lines.length * (st0.fs || 11) * 1.6 * Zm + 6) + "px";
       }
       function startEdit(text, keepSel) {
-        if (ro) { say("This file is open for viewing only."); return; } const a = anchorOf(cur.r, cur.c); const sh = cs(); if (text == null) text = rawText(sh, a.r, a.c);
+        if (ro) { say("This file is open for viewing only."); return; } const a = anchorOf(cur.r, cur.c); const sh = cs(); if (sh.ext.protect && !wb.style((sh.get(a.r, a.c) || {}).s).unl) { say("This cell is locked because the sheet is protected. Use Review ▸ Unprotect sheet to change it."); return; } if (text == null) text = rawText(sh, a.r, a.c);
         ed = { r: a.r, c: a.c, ptr: null, sheet: sh.name }; ta.hidden = false; ta.value = text; fi.value = text; placeEditor(); ta.focus({ preventScroll: true }); const e = ta.value.length; ta.setSelectionRange(keepSel ? 0 : e, e); S.x.acShow && S.x.acShow(ta, true);
       }
       S.startEdit = startEdit;
@@ -311,7 +313,7 @@
       function commit(dr, dc) {
         if (!ed) return true; const text = (ed.src === "bar" ? fi : ta).value, { r, c } = ed, sh = cs(); const old = rawText(sh, r, c); let ok = true;
         if (text !== old || !sh.get(r, c)) { const err = S.x.dvCheck ? S.x.dvCheck(sh, r, c, text) : null; if (err) { say(err); ta.focus(); return false; } }
-        ed = null; ta.hidden = true; S.x.acHide && S.x.acHide(); if (text !== old) tx(() => setInput(sh, r, c, text), "edit");
+        ed = null; ta.hidden = true; S.x.acHide && S.x.acHide(); if (text !== old) tx(() => { setInput(sh, r, c, text); if (S.x.onEdit) S.x.onEdit(sh, r, c, text); }, "edit");
         sgv.focus({ preventScroll: true }); if (dr || dc) moveSel(dr, dc, false); else { syncBar(); drawOverlay(); } sched(); return ok;
       }
       S.commit = commit; S.cancelEdit = cancelEdit;
@@ -547,8 +549,7 @@
       S.clearSel = clearSel;
 
       /* ---------- rows, columns, sheets ---------- */
-      function insertRC(axis, at, n) { // n>0 insert, n<0 delete (|n| items)
-        tx(() => structOp(() => {
+      function insertCore(axis, at, n) {
           const all = wb.sheets, target = cs(); const a = Math.abs(n);
           all.forEach((sh) => { const nm = new Map(); sh.m.forEach((cell, key) => { const [r, c] = C.unkey(key); const v = axis === "r" ? r : c; let nv = v; if (n > 0) { if (v >= at) nv = v + a; } else { if (sh !== target) nv = v; else if (v >= at && v < at + a) return; else if (v >= at + a) nv = v - a; } const o = clone(cell); if (o.f) { const f2 = C.adjust(o.f, sh.name, target.name, axis, at, n); o.f = f2; } if (sh === target) nm.set(axis === "r" ? C.key(nv, c) : C.key(r, nv), o); else nm.set(key, o); }); sh.m = nm; sh.cache = new Map(); });
           Object.keys(wb.names).forEach((k) => { wb.names[k] = C.adjust(wb.names[k], target.name, target.name, axis, at, n); });
@@ -558,11 +559,14 @@
           target.merges = target.merges.map(adjStr).filter(Boolean); target.cf = target.cf.map((r) => { const rg = adjStr(r.range); return rg ? Object.assign({}, r, { range: rg }) : null; }).filter(Boolean); target.dv = (target.dv || []).map((r) => { const rg = adjStr(r.range); return rg ? Object.assign({}, r, { range: rg }) : null; }).filter(Boolean);
           if (target.filter && target.filter.range) { const rg = adjStr(target.filter.range); target.filter = rg ? Object.assign({}, target.filter, { range: rg }) : null; }
           target.charts.forEach((ch) => { const rg = adjStr(ch.range); if (rg) ch.range = rg; });
+          if (S.x.structExt) S.x.structExt(target, axis, at, n, adjStr, mapKey);
           const fz = target.freeze; if (axis === "r" && n > 0 && at <= fz.r) fz.r += a; if (axis === "c" && n > 0 && at <= fz.c) fz.c += a;
-        }), n > 0 ? "insert" : "delete");
+      }
+      function insertRC(axis, at, n) { // n>0 insert, n<0 delete (|n| items)
+        tx(() => structOp(() => insertCore(axis, at, n)), n > 0 ? "insert" : "delete");
         mergeCache = null; layout(); setSel(cur.r, cur.c, ext.r, ext.c); sched();
       }
-      S.insertRC = insertRC;
+      S.insertRC = insertRC; S.insertCore = insertCore;
       function hideRC(axis, hide) { const sh = cs(); const lo = axis === "r" ? sel.r1 : sel.c1, hi = axis === "r" ? sel.r2 : sel.c2; tx(() => { const p = axis === "r" ? "hiddenRows" : "hiddenCols"; const o = Object.assign({}, sh[p]); for (let i = lo; i <= Math.min(hi, 20000); i++) { if (hide) o[i] = 1; else delete o[i]; } if (!hide) { const u = Object.assign({}, o); for (let i = Math.max(1, lo - 1); i <= hi + 1; i++) delete u[i]; setMeta(sh, p, u); } else setMeta(sh, p, o); }); }
       S.hideRC = hideRC;
       function autoFit(axis, i) {
@@ -594,7 +598,7 @@
       api.st.querySelector("#szr").oninput = (e) => setZoom(+e.target.value);
 
       /* ---------- features module ---------- */
-      mix({ clone, jc, isDateNf, NF, FONTS, SIZES, curNf, curStyle, bumpDec, toggle, hideRC, goTo, lowerBound, wbSheetActive: () => wb.active, redrawRibbon: () => rb && rb.redraw(), refreshRibbon: () => rb && rb.refresh(), setPrint: (o) => Object.assign(print, o), get zoom() { return Zm; }, sched, get whole() { return whole; }, set whole(v) { whole = v; }, setWhole(v) { whole = v; } });
+      mix({ clearSel, clone, jc, isDateNf, NF, FONTS, SIZES, curNf, curStyle, bumpDec, toggle, hideRC, goTo, lowerBound, wbSheetActive: () => wb.active, redrawRibbon: () => rb && rb.redraw(), refreshRibbon: () => rb && rb.refresh(), setPrint: (o) => Object.assign(print, o), get zoom() { return Zm; }, sched, get whole() { return whole; }, set whole(v) { whole = v; }, setWhole(v) { whole = v; } });
       if (window.OffSheetX) OffSheetX(S);
 
       /* ---------- ribbon ---------- */
@@ -638,6 +642,7 @@
         ] },
         { id: "chart", label: "Chart", ctx: true, when: () => !!(S.x.chartSel && S.x.chartSel()), groups: [{ label: "Chart", items: S.x.chartTabItems ? S.x.chartTabItems() : [] }] }
       ];
+      (window.OffSheetP || []).forEach((f) => f(S, tabs, B));
       function pasteOrSay(mode, tr) { if (!clip) { say("Copy some cells first, then paste."); return; } pasteClip(mode, tr); }
       rb = make(api.rib, tabs, { first: "home", nofocus: false });
       const bumpRb = () => rb.refresh();
