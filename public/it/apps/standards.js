@@ -301,6 +301,7 @@ pd:[
 ['ISO','7.5.3 / 8.5.6','Documented information; control of changes','The freeze history keeps every revision with its reason, and each stage drawing records the freeze revision it was made from.'],
 ['APQP','Phase 3','Process design - released process route','The frozen operation-wise list of characteristics is the released input for the SOP, the Control Plan and the stage drawings.']],
 balloon:[
+['ISO','9.3.2','Management review inputs','The Presentation section shows characteristics, special characteristics, low-confidence readings, missing tolerances and results with action plans.'],
 ['PPAP','Element 9','Dimensional results','Ballooned drawing and inspection results list every dimension.'],
 ['PPAP','Element 1','Design records','The drawing is the reference for every ballooned characteristic.'],
 ['IATF','8.2.3.1.2','Customer-designated special characteristics','Key/critical characteristics are flagged on the drawing.'],

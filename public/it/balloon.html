@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <script src="/it/apps/sso.js"></script>
-<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script>
+<script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/apps/kmr-present.js"></script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Balloon Inspector</title>
@@ -213,6 +213,10 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
           <label>Inspector<input data-h="inspector"></label>
           <label>Date<input data-h="date" type="date"></label>
         </div>
+      </details>
+      <details id="dPres">
+        <summary>Presentation <span class="mut">KPIs, standards, action plans</span></summary>
+        <div id="preshost"></div>
       </details>
       <details id="dSet">
         <summary>Settings <span id="setSum">ISO 2768-m, grid 8×6</span></summary>

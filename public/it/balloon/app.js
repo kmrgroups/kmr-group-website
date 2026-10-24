@@ -1417,3 +1417,27 @@ window.BI={S,loadFile,renderAll,syncHeader,toast,busy,getSnapshot,applySnapshot,
 syncHeader(); setSum(); renderAll();
 { const ok=convertersAllowed()&&typeof DecompressionStream!=="undefined"; const el=$("convStatus"); el.className="conv "+(ok?"ok":"no");
   el.textContent=ok?"DWG and STEP converter ready — runs on this device, free.":"DWG and STEP conversion isn't available in this viewer. Save as DXF or PDF with a free tool (LibreCAD, ODA File Converter, FreeCAD) and open that."; }
+
+
+/* ---------- presentation: KPIs of the drawing on screen ---------- */
+(function(){
+  const d=document.getElementById("dPres"); if(!d) return;
+  d.addEventListener("toggle",()=>{ if(!d.open) return; const el=$("preshost"); el.innerHTML="";
+    if(!window.KMRPresent){ el.textContent="Presentation engine not loaded."; return; }
+    const code="balloon-"+(S.header.partNo||"drawing").replace(/[^A-Za-z0-9]+/g,"-");
+    KMRPresent.mount(el,{app:"balloon",code:code,stdKey:"balloon",appName:"Balloon Inspector · "+(S.header.partNo||"drawing"),company:S.header.customer||"",slug:code,call:async()=>{throw new Error("local");},canEdit:true,controls:[],
+    load:async()=>{
+      const I=S.items, n=I.length, sp=I.filter(i=>i.cls&&String(i.cls).trim()&&String(i.cls).trim()!=="—").length, p=I.filter(i=>result(i)==="pass").length, f=I.filter(i=>result(i)==="fail").length,
+        low=I.filter(i=>i.conf!=null&&i.conf<0.7).length, notol=I.filter(i=>{ const [l,u]=limits(i); return i.nominal!=null&&i.nominal!==""&&(l==null||u==null||isNaN(l)||isNaN(u)); }).length, by={};
+      I.forEach(i=>{ const k=i.type||"other"; by[k]=(by[k]||0)+1; });
+      return {period:(S.header.partNo||"Drawing")+" rev "+(S.header.rev||"-")+" · "+S.sheets.length+" sheet(s)",kpis:[
+        {id:"n",name:"Characteristics ballooned",value:n,std:[["IATF","8.3.4.3"],["AIAG","PPAP"],["ISO","8.5.1"]],why:"Every dimension and note on the drawing numbered for the inspection report."},
+        {id:"sp",name:"Special characteristics marked",value:sp,std:[["IATF","8.3.3.3"],["AIAG","Control Plan"]],why:"Must flow to the FMEA and Control Plan."},
+        {id:"chk",name:"Read with low confidence — to check",value:low,target:0,amber:3,dir:"low",std:[["ISO","7.5.3"],["IATF","8.3.4.4"]],why:"AI reading below 70% — confirm against the drawing."},
+        {id:"nt",name:"Dimensions without tolerance limits",value:notol,target:0,amber:2,dir:"low",std:[["AIAG","PPAP"],["IATF","8.3.4.3"]],why:"Inspection cannot judge pass or fail without limits."},
+        {id:"ok",name:"Measured and passed",value:n?p/n*100:null,unit:"%",std:[["AIAG","PPAP"],["ISO","8.6"]],why:p+" pass, "+f+" fail, "+(n-p-f)+" not measured."},
+        {id:"fl",name:"Failed characteristics",value:f,target:0,amber:1,dir:"low",std:[["ISO","8.7"],["IATF","8.7.1"]],why:"Needs a nonconformance record and containment."}],
+        charts:[{title:"Characteristics by type",kind:"bar",kpi:"n",labels:Object.keys(by),series:[{name:"Count",values:Object.keys(by).map(k=>by[k])}]}]};
+    }});
+  });
+})();
