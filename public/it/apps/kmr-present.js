@@ -95,7 +95,7 @@
       }).join("") + "</div>";
     }
     (cfg.controls || []).forEach(function (c) { S.vals[c.id] = c.value; });
-    var today = new Date().toISOString().slice(0, 10);
+    var today = (function (d) { var p = function (n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); })(new Date());
     var ref = function () { var d = new Date(), p = function (n) { return String(n).padStart(2, "0"); }; return "KMR/" + String(cfg.app || "app").toUpperCase() + "/PRS/" + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + "-" + p(d.getHours()) + p(d.getMinutes()); };
     var REF = ref(), logo = function () { var i = document.querySelector("#clogo img"); return i ? i.getAttribute("src") : ""; };
     var lsKey = "kmr_pres_" + (cfg.slug || "") + "_" + cfg.app;

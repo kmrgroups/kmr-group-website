@@ -4,6 +4,8 @@
 (function () {
   "use strict";
   var KMRPA = (window.KMRPA = window.KMRPA || {});
+  var localIso = function (d) { var p = function (n) { return String(n).padStart(2, "0"); }; return d.getFullYear() + "-" + p(d.getMonth() + 1) + "-" + p(d.getDate()); };
+  var ym = function (d) { return localIso(d).slice(0, 7); };
   var today = function () { return new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }); };
   var N = function (v) { return v == null || v === "" || isNaN(+v) ? null : +v; };
   var pct = function (a, b) { return b ? a / b * 100 : null; };
@@ -114,7 +116,7 @@
   } };
 
   var days = function (a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 864e5); };
-  var todayIso = function () { return new Date().toISOString().slice(0, 10); };
+  var todayIso = function () { return localIso(new Date()); };
   var monthKey = function (d) { return String(d).slice(0, 7); };
   var last12 = function () { var o = [], d = new Date(); d.setDate(1); for (var i = 11; i >= 0; i--) { var x = new Date(d.getFullYear(), d.getMonth() - i, 1); o.push(x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0")); } return o; };
 
@@ -262,7 +264,7 @@
     var oot = (D.oot || []).filter(function (o) { return o.status !== "Closed"; }), rec = D.records || [], cert = rec.filter(function (r) { return r.cert_no; }).length, msa = D.msa || [];
     var grr = msa.map(function (m) { return +((m.results || {}).pctGRR); }).filter(function (x) { return isFinite(x); }), bad = grr.filter(function (g) { return g > 30; }).length;
     var by = {}; I.forEach(function (i) { var k = i.department || "—"; by[k] = by[k] || { t: 0, o: 0 }; by[k].t++; if (od.indexOf(i) >= 0) by[k].o++; });
-    var mo = {}; for (var k = 0; k < 6; k++) { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); mo[d.toISOString().slice(0, 7)] = 0; }
+    var mo = {}; for (var k = 0; k < 6; k++) { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); mo[ym(d)] = 0; }
     use.forEach(function (i) { if (i.next_due && mo[i.next_due.slice(0, 7)] != null) mo[i.next_due.slice(0, 7)]++; });
     var dk = Object.keys(by);
     return { period: "As on " + today(), kpis: [
@@ -278,7 +280,7 @@
   } };
 
   /* ---------- Raw Material Planning ---------- */
-  KMRPA.rmp = { name: "Raw Material Planning", code: "rmp", std: "rmp", deps: ["/it/apps/rmp-calc.js"], controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 4; k++) { var m = d.toISOString().slice(0, 7); o.push([m, m]); d.setMonth(d.getMonth() + 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
+  KMRPA.rmp = { name: "Raw Material Planning", code: "rmp", std: "rmp", deps: ["/it/apps/rmp-calc.js"], controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 4; k++) { var m = ym(d); o.push([m, m]); d.setMonth(d.getMonth() + 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
     var data = await call("kmr_rmp_load", { p_month: v.month }), P = window.RMPCalc.plan(data, v.month), S = std, L = P.lines || [];
     var ord = L.filter(function (l) { return l.order > 0; }), late = L.filter(function (l) { return l.late; }), sh = L.filter(function (l) { return l.short > 0; });
     var val = ord.reduce(function (a, l) { return a + (l.value || 0); }, 0), top = ord.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 10);
@@ -293,7 +295,7 @@
   } };
 
   /* ---------- Sales Flow ---------- */
-  KMRPA.sales = { name: "Sales Flow", code: "sales", ctxFn: "kmr_sf_context", std: "sales", controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = d.toISOString().slice(0, 7); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
+  KMRPA.sales = { name: "Sales Flow", code: "sales", ctxFn: "kmr_sf_context", std: "sales", controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = ym(d); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
     var r = await call("kmr_sf_month", { p_month: v.month + "-01" }), S = std, td = todayIso(), L = r.lines || [], dsp = {};
     (r.despatch || []).forEach(function (d) { (dsp[d.line_id] = dsp[d.line_id] || {})[d.day] = +d.qty; });
     var dim = new Date(+v.month.slice(0, 4), +v.month.slice(5, 7), 0).getDate(), upto = td < v.month + "-01" ? 0 : td.slice(0, 7) === v.month ? +td.slice(8) : dim, f = Math.min(1, upto / dim);
