@@ -291,4 +291,28 @@
       { id: "va", name: "Order value", value: val, unit: "₹", std: S("ISO 8.4.1"), why: "Total value of the orders to place." }],
       charts: [barOf("Order value by material (₹)", Object.fromEntries(top.map(function (l) { return [l.code, l.value]; })), "₹", "va"), barOf("Order value by supplier (₹)", sup, "₹", "va")] };
   } };
+
+  /* ---------- Sales Flow ---------- */
+  KMRPA.sales = { name: "Sales Flow", code: "sales", std: "sales", controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = d.toISOString().slice(0, 7); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
+    var r = await call("kmr_sf_month", { p_month: v.month + "-01" }), S = std, td = todayIso(), L = r.lines || [], dsp = {};
+    (r.despatch || []).forEach(function (d) { (dsp[d.line_id] = dsp[d.line_id] || {})[d.day] = +d.qty; });
+    var dim = new Date(+v.month.slice(0, 4), +v.month.slice(5, 7), 0).getDate(), upto = td < v.month + "-01" ? 0 : td.slice(0, 7) === v.month ? +td.slice(8) : dim, f = Math.min(1, upto / dim);
+    var rows = L.map(function (l) { var dem = +l.demand_qty || 0, done = Object.keys(dsp[l.id] || {}).reduce(function (a, k) { return a + dsp[l.id][k]; }, 0), exp = l.sched_type === "date" ? (l.sched_date && l.sched_date <= td ? dem : 0) : dem * f, price = +l.price || 0; return { l: l, dem: dem, done: done, exp: exp, price: price, cur: l.currency || "INR", ratio: exp > 0 ? done / exp : null }; });
+    var plan = rows.filter(function (x) { return x.dem > 0; }), tot = plan.reduce(function (a, x) { return a + x.dem; }, 0), dn = plan.reduce(function (a, x) { return a + Math.min(x.done, x.dem); }, 0), ex = plan.reduce(function (a, x) { return a + x.exp; }, 0);
+    var behind = plan.filter(function (x) { return x.ratio != null && x.ratio < 0.7; }), slip = plan.filter(function (x) { return x.ratio != null && x.ratio >= 0.7 && x.ratio < 0.9; }), nothing = plan.filter(function (x) { return x.exp > 0 && x.done === 0; });
+    var unp = rows.reduce(function (a, x) { return a + (x.dem === 0 ? x.done : Math.max(x.done - x.dem, 0)); }, 0), np = plan.filter(function (x) { return !(x.price > 0); }).length;
+    var worst = plan.filter(function (x) { return x.exp - x.done > 0; }).sort(function (a, b) { return (b.exp - b.done) - (a.exp - a.done); }).slice(0, 10), days = {};
+    Object.keys(dsp).forEach(function (id) { Object.keys(dsp[id]).forEach(function (d) { days[d] = (days[d] || 0) + dsp[id][d]; }); });
+    var dk = Object.keys(days).sort(), name = function (x) { return x.l.part_code || x.l.part_no || x.l.part || x.l.id; };
+    return { period: v.month + " · " + upto + " of " + dim + " days", kpis: [
+      { id: "ach", name: "Despatched against plan", value: pct(dn, tot), unit: "%", std: S("IATF 8.2.1", "IATF 9.1.1.1", "ISO 9.1.2"), why: "Pieces despatched ÷ the month's customer demand." },
+      { id: "otd", name: "Despatched against due-by-today", value: ex ? dn / ex * 100 : null, unit: "%", target: 100, tol: 10, dir: "high", std: S("IATF 9.1.1.1", "IATF 8.2.1", "VDA 6.3 P7"), why: "Pieces despatched ÷ pieces scheduled up to today. Below 90% is slipping." },
+      { id: "bh", name: "Parts behind plan (under 70%)", value: behind.length, target: 0, amber: 2, dir: "low", std: S("IATF 8.2.1", "VDA 6.3 P7"), why: "Needs a recovery plan with date and owner." },
+      { id: "sl", name: "Parts slipping (70–90%)", value: slip.length, target: 0, amber: 3, dir: "low", std: S("IATF 8.2.1"), why: "Early warning before they go behind." },
+      { id: "no", name: "Parts due but nothing despatched", value: nothing.length, target: 0, amber: 1, dir: "low", std: S("IATF 8.2.1", "ISO 8.5.4"), why: "Check stock, quality holds and the customer schedule." },
+      { id: "up", name: "Unplanned despatch (pcs)", value: unp, std: S("ISO 8.2.1", "IATF 8.2.1"), why: "Despatched with no customer demand, or above the planned quantity." },
+      { id: "np", name: "Planned parts without a price", value: np, target: 0, amber: 3, dir: "low", std: S("ISO 8.2.3"), why: "Value cannot be reported without a price." }],
+      charts: [{ title: "Pending quantity — top 10 parts", kind: "bar", kpi: "otd", labels: worst.map(name), series: [{ name: "Due by today", values: worst.map(function (x) { return Math.round(x.exp); }) }, { name: "Despatched", values: worst.map(function (x) { return x.done; }) }] },
+        { title: "Daily despatch (pcs)", kind: "bar", kpi: "ach", labels: dk.map(function (d) { return d.slice(8); }), series: [{ name: "Pieces", values: dk.map(function (d) { return days[d]; }) }] }] };
+  } };
 })();
