@@ -163,7 +163,7 @@
         style = styleCss(cell && cell.s || 0) + `left:${x}px;top:${y}px;width:${ww}px;height:${h}px;justify-content:${ha === "right" ? "flex-end" : ha === "center" ? "center" : "flex-start"};text-align:${ha};`;
         if (f.color) style += `color:${f.color};`;
         if (cf) { if (cf.bg) style += `background:${cf.bg};`; if (cf.fc) style += `color:${cf.fc};`; if (cf.b) style += "font-weight:700;"; if (cf.i) style += "font-style:italic;"; if (cf.html) extra += cf.html; if (cf.bar) extra += `<i class="db" style="width:${Math.max(2, Math.round((ww - 2) * cf.bar.pct))}px;background:${cf.bar.color}"></i>`; }
-        const fbx = S.x.filterBtn ? S.x.filterBtn(sh, r, c) : null; if (fbx) extra += `<b class="fb${fbx.on ? " on" : ""}" data-fb="${c}">▾</b>`;
+        const fbx = S.x.filterBtn ? S.x.filterBtn(sh, r, c) : null; if (fbx) extra += `<b class="fb${fbx.on ? " on" : ""}" data-fb="${c}" data-fr="${r}">▾</b>`;
         return `<div class="${cls}" style="${style}" data-r="${r}" data-c="${c}" ${cell && cell.n ? `title="${esc(cell.n)}"` : ""}><span>${esc(text)}</span>${extra}</div>`;
       }
       function quad(sh, o) {
@@ -390,7 +390,7 @@
       sgv.addEventListener("mousedown", (e) => {
         if (e.button === 2) { const h = hit(e); if (h.area === "cell" && !(h.r >= sel.r1 && h.r <= sel.r2 && h.c >= sel.c1 && h.c <= sel.c2)) setSel(h.r, h.c); else if (h.area === "ch" && !(h.c >= sel.c1 && h.c <= sel.c2 && whole === "col")) { setSel(1, h.c, 1, h.c, "col"); sel.r2 = MAXROW; syncBar(); drawOverlay(); } else if (h.area === "rh" && !(h.r >= sel.r1 && h.r <= sel.r2 && whole === "row")) { setSel(h.r, 1, h.r, 1, "row"); sel.c2 = MAXCOL; syncBar(); drawOverlay(); } return; }
         if (e.button !== 0) return; if (e.target === ta) return; if (e.target.closest && e.target.closest(".chart")) return;
-        const fbEl = e.target.closest && e.target.closest(".fb"); if (fbEl) { e.preventDefault(); S.x.filterMenu && S.x.filterMenu(+fbEl.dataset.fb, fbEl); return; }
+        const fbEl = e.target.closest && e.target.closest(".fb"); if (fbEl) { e.preventDefault(); S.x.filterMenu && S.x.filterMenu(+fbEl.dataset.fb, fbEl, +fbEl.dataset.fr); return; }
         if (e.target.dataset && e.target.dataset.dd) { e.preventDefault(); S.x.dvMenu && S.x.dvMenu(e.target); return; }
         const h = hit(e);
         if (ed) { if (ed.ptr !== undefined && /^=/.test((ed.src === "bar" ? fi : ta).value) && h.area === "cell" && canPoint(ed.src === "bar" ? fi : ta)) { e.preventDefault(); point(h.r, h.c, h.r, h.c); drag = { t: "ptr", r: h.r, c: h.c }; return; } if (!commit(0, 0)) { e.preventDefault(); return; } }

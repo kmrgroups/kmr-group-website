@@ -195,13 +195,13 @@
   }
   class Workbook {
     constructor(data) {
-      data = data || {}; this.styles = (data.styles && data.styles.length ? data.styles : [{}]).map((s) => Object.assign({}, s)); this.sheets = (data.sheets && data.sheets.length ? data.sheets : [{ name: "Sheet1" }]).map((s) => new Sheet(s.name, s)); this.names = Object.assign({}, data.names); this.active = data.active || 0; this.calcIter = !!data.calcIter; this.styleIdx = new Map(); this.styles.forEach((s, i) => this.styleIdx.set(JSON.stringify(s), i)); this.depth = 0; this.rand = new Map();
+      data = data || {}; this.styles = (data.styles && data.styles.length ? data.styles : [{}]).map((s) => Object.assign({}, s)); this.sheets = (data.sheets && data.sheets.length ? data.sheets : [{ name: "Sheet1" }]).map((s) => new Sheet(s.name, s)); this.names = Object.assign({}, data.names); this.active = data.active || 0; this.calcIter = !!data.calcIter; this.manual = !!data.manual; this.styleIdx = new Map(); this.styles.forEach((s, i) => this.styleIdx.set(JSON.stringify(s), i)); this.depth = 0; this.rand = new Map();
     }
-    toJSON() { return { styles: this.styles, sheets: this.sheets.map((s) => s.toJSON()), names: this.names, active: this.active }; }
+    toJSON() { return { styles: this.styles, sheets: this.sheets.map((s) => s.toJSON()), names: this.names, active: this.active, manual: this.manual || undefined }; }
     style(i) { return this.styles[i || 0] || this.styles[0]; }
     styleId(o) { const keys = Object.keys(o).filter((k) => o[k] != null && o[k] !== "" && o[k] !== false).sort(), c = {}; keys.forEach((k) => (c[k] = o[k])); const j = JSON.stringify(c); let i = this.styleIdx.get(j); if (i == null) { i = this.styles.push(c) - 1; this.styleIdx.set(j, i); } return i; }
     sheet(n) { if (typeof n === "number") return this.sheets[n]; const l = String(n).toLowerCase(); return this.sheets.find((s) => s.name.toLowerCase() === l); }
-    invalidate() { this.sheets.forEach((s) => { s.cache.clear(); s.sv.clear(); s.so.clear(); s.sp.clear(); }); this.rand.clear(); this.spillDone = false; }
+    invalidate(force) { if (this.manual && !force) return; this.sheets.forEach((s) => { s.cache.clear(); s.sv.clear(); s.so.clear(); s.sp.clear(); }); this.rand.clear(); this.spillDone = false; }
     /* dynamic arrays: a formula whose result is several cells "spills" into the empty cells below / to the right of it */
     isDyn(cell, cr, shn) {
       if (!cell.f) return false; if (cell.ast && cell.ast.ma !== undefined) return cell.ast.ma;

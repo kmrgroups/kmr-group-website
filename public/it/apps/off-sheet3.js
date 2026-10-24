@@ -200,11 +200,11 @@
     const isProt = () => !!cs().ext.protect;
     function protectForm() {
       const sh = cs(); if (sh.ext.protect) { unprotectForm(); return; }
-      form(an(), "Protect this sheet", [{ k: "pw", label: "Password (optional - leave empty for none)", type: "password", value: "" }], "Protect", (v) => { S.tx(() => { S.x.unprotecting = true; try { setExt(sh, "protect", { pw: v.pw ? hash(v.pw) : null }); } finally { S.x.unprotecting = false; } }); S.render(); S.redrawRibbon(); say("Sheet protected. Locked cells can't be changed - cells you unlocked (Review ▸ Unlock cells) still can. This stops accidental edits; it is not strong security.", true); });
+      form(an(), "Protect this sheet", [{ k: "pw", label: "Password (optional - leave empty for none)", type: "password", value: "" }], "Protect", (v) => { S.tx(() => { S.x.unprotecting = true; try { setExt(sh, "protect", { pw: v.pw ? hash(v.pw) : null, xh: v.pw ? window.OffPwHash(v.pw) : null }); } finally { S.x.unprotecting = false; } }); S.render(); S.redrawRibbon(); say("Sheet protected. Locked cells can't be changed - cells you unlocked (Review ▸ Unlock cells) still can. This stops accidental edits; it is not strong security.", true); });
     }
     function unprotectForm() {
       const sh = cs(), p = sh.ext.protect; const done = () => { S.tx(() => { const e = Object.assign({}, sh.ext); delete e.protect; S.setMeta(sh, "ext", e); }); S.render(); S.redrawRibbon(); say("Sheet unprotected."); };
-      if (!p.pw) { done(); return; } form(an(), "Unprotect this sheet", [{ k: "pw", label: "Password", type: "password", value: "" }], "Unprotect", (v) => { if (hash(v.pw || "") !== p.pw) { say("That password is not right."); return; } done(); });
+      if (!p.pw && !p.xh) { done(); return; } form(an(), "Unprotect this sheet", [{ k: "pw", label: "Password", type: "password", value: "" }], "Unprotect", (v) => { if (p.pw ? hash(v.pw || "") !== p.pw : window.OffPwHash(v.pw || "") !== p.xh) { say("That password is not right."); return; } done(); });
     }
     const lockSel = (unl) => { if (isProt()) { say("Unprotect the sheet first, then change which cells are locked."); return; } S.styleSel({ unl: unl ? 1 : null }); say(unl ? "These cells are unlocked: they stay editable after you protect the sheet." : "These cells are locked again."); };
 
