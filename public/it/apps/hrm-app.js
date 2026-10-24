@@ -146,7 +146,7 @@
       if (e.doj && String(e.doj).slice(0, 10) >= from && String(e.doj).slice(0, 10) <= to) o.join++;
       if (e.status === "left" && e.dol && String(e.dol).slice(0, 10) >= from && String(e.dol).slice(0, 10) <= to) o.left++;
       if (!o.has) return;
-      const sm = C.summary(e, S.dc.idx[e.id] || [], per, L.leave_types), att = sm.present + sm.hd * 0.5, exp = Math.max(0, sm.days - sm.outside - sm.wo - sm.h), r = { e, sm, att, exp, otH: sm.ot_min / 60, cost: 0, otCost: 0 };
+      const sm = C.summary(e, S.dc.idx[e.id] || [], per, L.leave_types), att = sm.present + sm.hd * 0.5, exp = to > L.today ? sm.present + sm.hd + sm.absent + sm.missed + (sm.paid_leave || 0) + (sm.unpaid_leave || 0) : Math.max(0, sm.days - sm.outside - sm.wo - sm.h), r = { e, sm, att, exp, otH: sm.ot_min / 60, cost: 0, otCost: 0 };
       o.att += att; o.exp += exp; o.absent += sm.absent + sm.missed; o.late += sm.late_count; o.otH += r.otH;
       if (cost) { const sl = C.payOf(e, sm, per, L.settings), i = sl.info || {}; r.cost = sl.gross + (i.er_eps || 0) + (i.er_epf || 0) + (i.er_admin || 0) + (i.er_edli || 0) + (i.er_esi || 0); r.otCost = (sl.earnings.find((x) => x.code === "OT") || {}).amount || 0; if (!sl.gross && sm.paid_days) o.noPay++; o.cost += r.cost; o.otCost += r.otCost; }
       o.list.push(r);
