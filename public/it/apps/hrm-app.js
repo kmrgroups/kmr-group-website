@@ -53,7 +53,7 @@
   const activeEmps = () => S.load.employees.filter((e) => e.status !== "left");
 
   /* ================= router ================= */
-  const SECTIONS = ["std", "dash", "emp", "att", "hrs", "rev", "dev", "leave", "pay", "setup"];
+  const SECTIONS = ["std", "dash", "emp", "att", "hrs", "rev", "pres", "dev", "leave", "pay", "setup"];
   async function route() {
     let go = hashGo();
     if (window.KMRLock && KMRLock.locked(go)) { KMRLock.dialog(go); go = "std"; history.replaceState(null, "", location.pathname + location.search + "#go=std"); }
@@ -63,7 +63,7 @@
     try {
       await loadAll(); tabsSetup(); await autoHolidays();
       if (go === "pay" && !money()) { say("Payroll is for editors and administrators."); return; }
-      ({ dash: drawDash, emp: drawEmp, att: drawAtt, hrs: drawHrs, rev: drawRev, dev: drawDev, leave: drawLeave, pay: drawPay, setup: drawSetup })[go]();
+      ({ dash: drawDash, emp: drawEmp, att: drawAtt, hrs: drawHrs, rev: drawRev, pres: drawPres, dev: drawDev, leave: drawLeave, pay: drawPay, setup: drawSetup })[go]();
     } catch (e) { say(e.message); }
   }
   document.addEventListener("click", (e) => { const a = e.target.closest('a[href^="#go="]'); if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); history.replaceState(null, "", location.pathname + location.search + a.getAttribute("href")); route(); window.scrollTo(0, 0); });
@@ -362,6 +362,52 @@
       const [id, d] = c.dataset.lv.split("|"), x = em[id], on = c.checked;
       try { await call("kmr_hrms_employee_save", { p: on ? { id, status: "active", dol: "" } : { id, status: "left", dol: d || null } }); x.status = on ? "active" : "left"; x.dol = on ? null : d; say(on ? x.name + " is working again." : x.name + " is marked as left" + (d ? " from " + fmt(d) : "") + ". Counted in attrition.", true); setTimeout(drawRev, 900); } catch (er) { c.checked = !on; say(er.message); }
     }));
+  }
+  /* ================= presentation: management review of HR KPIs from the live records ================= */
+  async function drawPres() {
+    const L = S.load, el = $("#pres"); if (!S.pm) S.pm = L.today.slice(0, 7);
+    if (el._kp) { el._kp.reload(); return; }
+    if (!window.KMRPresent) { el.innerHTML = '<div class="empty">The presentation module did not load. Refresh the page.</div>'; return; }
+    el._kp = KMRPresent.mount(el, { app: "hrms", code: "hrms", stdKey: "hrms", appName: "HRM & Payroll", company: (QP.ctx && QP.ctx.company) || "", slug: QP.slug, call, canEdit: ed(),
+      controls: [{ id: "month", label: "Month", type: "month", value: S.pm }],
+      load: async (v) => {
+        const per = v.month || S.pm; S.pm = per; S.dm = per; await dashLoad(per.slice(0, 4) !== (S.dc && S.dc.year));
+        const y = +per.slice(0, 4), cur = +per.slice(5, 7), all = () => true, cost = money();
+        const yr = Array.from({ length: 12 }, (_, i) => dashStats(y + "-" + String(i + 1).padStart(2, "0"), all)), m = yr[cur - 1], pm = cur > 1 ? yr[cur - 2] : null;
+        const lab = MON.map((x) => x.slice(0, 3)), ser = (f) => yr.map((x) => (x.has ? f(x) : null)), pickp = (x, f) => (x && x.has ? f(x) : null);
+        const missed = (x) => x.list.reduce((s, r) => s + (r.sm.missed || 0), 0), mpPct = (x) => (x.att + missed(x) ? missed(x) / (x.att + missed(x)) * 100 : null);
+        const latePct = (x) => (x.att ? x.late / x.att * 100 : null), absPct = (x) => (x.exp ? x.absent / x.exp * 100 : null), otHead = (x) => (x.head ? x.otH / x.head : null);
+        const ytdLeft = yr.slice(0, cur).reduce((s, x) => s + x.left, 0), avgHead = yr.slice(0, cur).filter((x) => x.head).reduce((s, x, _, a) => s + x.head / a.length, 0), ytdAttr = avgHead ? ytdLeft / avgHead * 100 : null;
+        const kpis = [
+          { id: "att", name: "Attendance %", value: m.pct, unit: "%", target: 95, tol: 3, dir: "high", prev: pickp(pm, (x) => x.pct), trend: ser((x) => x.pct), std: [["ISO", "7.1.2"], ["IATF", "7.1.2"], ["ISO", "9.1.1"], ["ISO", "9.1.3"], ["VDA", "P6"]], why: "Days present (half days count 0.5) divided by the days the person was expected to work (month days less weekly offs, holidays and days before joining / after leaving)." },
+          { id: "abs", name: "Absenteeism %", value: m.has ? absPct(m) : null, unit: "%", target: 3, tol: 50, dir: "low", prev: pickp(pm, absPct), trend: ser(absPct), std: [["ISO", "7.1.2"], ["IATF", "7.1.2"], ["ISO", "9.1.3"]], why: "Absent days (including missed-punch days) divided by expected working days." },
+          { id: "late", name: "Late arrivals %", value: m.has ? latePct(m) : null, unit: "%", target: 5, tol: 40, dir: "low", prev: pickp(pm, latePct), trend: ser(latePct), std: [["ISO", "7.1.2"], ["ISO", "8.1"]], why: "Late arrivals (after shift start plus grace) divided by present days." },
+          { id: "mp", name: "Missed punches %", value: m.has ? mpPct(m) : null, unit: "%", target: 1, amber: 3, dir: "low", prev: pickp(pm, mpPct), trend: ser(mpPct), std: [["ISO", "7.5.2"], ["ISO", "7.5.3"], ["IATF", "7.5.3.2.1"]], why: "Days with one punch only, divided by days present plus missed. Each one needs a correction on the Review screen so the record is complete." },
+          { id: "oth", name: "Overtime hours per employee", value: m.has ? otHead(m) : null, unit: "h", target: 20, tol: 25, dir: "low", prev: pickp(pm, otHead), trend: ser(otHead), std: [["ISO", "8.1"], ["IATF", "7.1.2"]], why: "Overtime hours of the month divided by the headcount. Overtime applies only to people with OT switched on; all hours on holidays and weekly offs count as overtime." },
+          { id: "attr", name: "Attrition % (month)", value: m.attr, unit: "%", target: 2, amber: 3, dir: "low", prev: pickp(pm, (x) => x.attr), trend: ser((x) => x.attr), std: [["ISO", "7.1.2"], ["IATF", "7.1.2"], ["ISO", "9.1.3"]], why: "People who left in the month divided by the average of opening and closing headcount." },
+          { id: "attry", name: "Attrition % (year to date)", value: ytdAttr, unit: "%", target: 1.25 * cur, amber: 1.75 * cur, dir: "low", std: [["ISO", "7.1.2"], ["ISO", "9.1.3"]], why: "Leavers since January divided by the average headcount; target is 15% for the year, spread by month." },
+          { id: "head", name: "Headcount (month end)", value: m.head, unit: "", std: [["ISO", "7.1.2"]], prev: pm ? pm.head : null, trend: yr.map((x) => (x.head || x.start ? x.head : null)), why: "People in service on the last day of the month." },
+          { id: "join", name: "Joiners", value: m.join, unit: "", std: [["ISO", "7.1.2"]], why: "People whose date of joining is in the month." },
+          { id: "left", name: "Leavers", value: m.left, unit: "", std: [["ISO", "7.1.2"]], why: "People whose date of leaving is in the month." }];
+        if (cost) {
+          const otPct = (x) => (x.cost ? x.otCost / x.cost * 100 : null), cph = (x) => (x.head ? x.cost / x.head : null);
+          kpis.push({ id: "cost", name: "Manpower cost", value: m.has ? m.cost : null, unit: "₹", prev: pickp(pm, (x) => x.cost), trend: ser((x) => x.cost), std: [["ISO", "9.1.3"], ["ISO", "8.1"]], why: "Gross pay plus the employer's PF and ESI contributions, for everyone in service." },
+            { id: "otc", name: "Overtime cost", value: m.has ? m.otCost : null, unit: "₹", prev: pickp(pm, (x) => x.otCost), trend: ser((x) => x.otCost), std: [["ISO", "8.1"], ["ISO", "9.1.3"]], why: "The overtime earnings line of the payroll." },
+            { id: "otp", name: "Overtime cost % of manpower cost", value: m.has ? otPct(m) : null, unit: "%", target: 8, tol: 25, dir: "low", prev: pickp(pm, otPct), trend: ser(otPct), std: [["ISO", "8.1"], ["ISO", "9.1.3"]], why: "Overtime cost divided by manpower cost." },
+            { id: "cph", name: "Cost per employee", value: m.has ? cph(m) : null, unit: "₹", prev: pickp(pm, cph), trend: ser(cph), std: [["ISO", "9.1.3"]], why: "Manpower cost divided by headcount." });
+        }
+        const charts = [
+          { title: "Attendance % - month by month", kind: "line", kpi: "att", labels: lab, series: [{ name: "Attendance %", values: ser((x) => x.pct) }], note: "Target 95%. Months without attendance records are left blank." },
+          { title: "Absenteeism % and late arrivals %", kind: "bar", kpi: "abs", labels: lab, series: [{ name: "Absenteeism %", values: ser(absPct) }, { name: "Late arrivals %", values: ser(latePct) }] },
+          { title: "Attrition % - month by month", kind: "bar", kpi: "attr", labels: lab, series: [{ name: "Attrition %", values: ser((x) => x.attr) }], note: "Leavers: " + yr.map((x, i) => lab[i] + " " + x.left).filter((_, i) => i < cur).join(", ") },
+          { title: "Overtime hours per employee", kind: "bar", kpi: "oth", labels: lab, series: [{ name: "OT h / employee", values: ser(otHead) }] }];
+        if (cost) charts.push({ title: "Manpower cost and overtime cost (₹)", kind: "bar", kpi: "cost", labels: lab, series: [{ name: "Manpower cost", values: ser((x) => x.cost) }, { name: "Overtime cost", values: ser((x) => x.otCost) }] });
+        const depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
+        if (depts.length > 1) { const ds = depts.map((d) => dashStats(per, (e) => e.department === d)); charts.push({ title: "Department comparison - " + perName(per), kind: "bar", labels: depts, series: [{ name: "Attendance %", values: ds.map((x) => x.pct) }, { name: "Absenteeism %", values: ds.map(absPct) }] }); }
+        const top = m.list.slice().sort((x, y2) => y2.otH - x.otH).slice(0, 10).filter((r) => r.otH > 0);
+        if (top.length) charts.push({ title: "Top 10 overtime hours - " + perName(per), kind: "bar", kpi: "oth", labels: top.map((r) => r.e.name.split(" ")[0]), series: [{ name: "OT hours", values: top.map((r) => r.otH) }], note: top.map((r) => esc(r.e.name) + " " + r.otH.toFixed(1) + " h").join("<br>") });
+        return { period: perName(per), kpis, charts };
+      } });
   }
   const slim = (r) => ({ employee_id: r.employee_id, work_date: r.work_date, in_at: r.in_at, out_at: r.out_at, worked_min: r.worked_min, late_min: r.late_min, early_min: r.early_min, ot_min: r.ot_min, status: r.status, leave_code: r.leave_code, source: r.source, remarks: r.remarks });
   /* attendance is worked out by itself from the punches: no button needed. Runs when the dashboard or Attendance opens, for this month and last month. */
