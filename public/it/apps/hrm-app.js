@@ -166,7 +166,7 @@
       <div class="kpis">${emp ? "" : k("Headcount (month end)", m.head) + k("Joined", m.join, "#2563eb") + k("Left", m.left, "var(--r)") + k("Attrition", pc(m.attr), "var(--r)")}${k("Attendance", pc(m.pct), "var(--g)")}${k("Absent days", m.has ? Math.round(m.absent * 10) / 10 : "—", "var(--r)")}${k("Late days", m.has ? m.late : "—", "var(--a)")}${k("OT hours", m.has ? m.otH.toFixed(1) : "—", "#7c3aed")}${cost ? k("Manpower cost ₹", m.has ? rs0(m.cost) : "—", "#0d9488") + k("OT cost ₹", m.has ? rs0(m.otCost) : "—", "#7c3aed") : ""}</div>
       ${cost && m.has && m.noPay ? `<div class="note">${m.noPay} employee(s) have no salary set, so their cost shows as 0. <a href="#go=emp">Employees</a></div>` : ""}
       <h3 style="margin:14px 0 6px">${y} · month by month <span class="mut" style="font-weight:400;font-size:12px">(click a bar to open that month)</span></h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px" id="dch">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(440px,1fr));gap:12px" id="dch">
         ${dashChart("Attendance %", ser((x) => x.pct), (v) => v.toFixed(0), "var(--g)", cur)}${dashChart("Attrition % (leavers ÷ average headcount)", yr.map((x) => (x.attr == null || (!x.has && !x.left) ? null : x.attr)), (v) => v.toFixed(1), "var(--r)", cur)}
         ${cost ? dashChart("Manpower cost ₹ (pay + employer PF/ESI)", ser((x) => x.cost), lakh, "var(--b1)", cur) + dashChart("OT cost ₹", ser((x) => x.otCost), lakh, "#7c3aed", cur) : ""}
         ${dashChart("OT hours", ser((x) => x.otH), (v) => v.toFixed(0), "var(--a)", cur)}${emp ? "" : dashChart("Headcount", hcs, (v) => v, "#2563eb", cur)}</div>
