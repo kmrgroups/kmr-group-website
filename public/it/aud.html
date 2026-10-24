@@ -75,13 +75,19 @@ table.tb2{width:100%;border-collapse:collapse;font-size:13.5px}table.tb2 th{text
 .lock{border:1px dashed var(--line);border-radius:12px;padding:12px;text-align:center;color:var(--mut);margin-top:12px}
 .ro input,.ro select,.ro textarea{background:var(--bg)}
 .sticky{position:sticky;bottom:34px;z-index:5;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 10px;display:flex;gap:8px;flex-wrap:wrap;align-items:center;box-shadow:0 4px 18px #0002;margin-top:12px}
+.sugs{margin:0 0 8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center}.sgc{border:1.5px dashed var(--b1);background:var(--card);color:var(--b1);border-radius:10px;padding:5px 10px;font-size:12.5px;cursor:pointer;text-align:left}.sgc:hover{background:var(--b1);color:#fff}
+.okb{margin-top:8px;padding:8px 12px;border-radius:10px;background:#dcfce7;color:#166534;font-size:13.5px}.ncc{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px;background:var(--card)}
+.hint{color:var(--mut);font-size:12.5px}.how{background:var(--bg);border-radius:8px;padding:6px 10px;font-size:12.5px;color:var(--mut)}.auto{border-left:4px solid var(--b1);background:var(--bg);padding:6px 10px;border-radius:8px;font-size:13px}
+.rt button[data-v="Meets"]{--c:var(--g)}.rt button[data-v="Partly"],.rt button[data-v="Observation"]{--c:var(--a)}.rt button[data-v="Does not meet"],.rt button[data-v="Not OK"],.rt button[data-v="NOT_OK"]{--c:var(--r)}.rt button[data-v="6"]{--c:var(--a)}
+.kpi[data-go]{cursor:pointer}ul{margin:4px 0 8px 18px;padding:0}
 @media print{.noprint,.sticky{display:none!important}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Internal Audit</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a><a class="tab" data-t="list" href="#go=list">Audit programme</a><a class="tab" data-t="acts" href="#go=acts">Findings tracker</a><a class="tab" data-t="setup" href="#go=setup">Setup</a></div>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a><a class="tab" data-t="list" href="#go=list">Audit programme</a><a class="tab" data-t="nc" href="#go=nc">Findings and actions</a><a class="tab" data-t="pts" href="#go=pts">Special points</a><a class="tab" data-t="lib" href="#go=lib">Clause library</a><a class="tab" data-t="acts" href="#go=acts">Action tracker</a><a class="tab" data-t="setup" href="#go=setup">Setup</a></div>
 <main><div class="panel"><div id="msg"></div>
-<section id="std"></section><section id="dash" class="hide"></section><section id="list" class="hide"></section><section id="rep" class="hide"></section><section id="acts" class="hide"></section><section id="setup" class="hide"></section></div></main>
+<section id="std"></section><section id="dash" class="hide"></section><section id="list" class="hide"></section><section id="rep" class="hide"></section><section id="prog" class="hide"></section><section id="nc" class="hide"></section><section id="ncd" class="hide"></section><section id="pts" class="hide"></section><section id="lib" class="hide"></section><section id="acts" class="hide"></section><section id="setup" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
 <script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{acts:"aud.findings-tracker"},names:{"aud.findings-tracker":"Findings tracker","aud.vda-6-3-scoring":"VDA 6.3 scoring","aud.audit-programme-and-reports":"Audit programme and reports"}};</script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/apps/aud-lib.js"></script><script src="/it/apps/aud-engine.js"></script>
 <script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/aud-demo.js"><\/script>')}</script>
-<script src="/it/apps/kmr-report.js"></script><script src="/it/apps/aiag-forms.js"></script><script src="/it/apps/aud-docs.js"></script><script src="/it/apps/aud-app.js"></script><script src="/it/apps/back.js"></script></body></html>
+<script src="/it/apps/kmr-report.js"></script><script src="/it/apps/aiag-forms.js"></script><script src="/it/apps/aud-docs.js"></script><script src="/it/apps/aud-app.js"></script><script src="/it/apps/aud-nc.js"></script><script src="/it/apps/back.js"></script></body></html>
