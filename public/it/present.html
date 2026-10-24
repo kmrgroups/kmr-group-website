@@ -12,6 +12,7 @@
   if(key==="hrms"){location.replace("/it/hrm.html"+location.search+"#go=pres");return}
   document.getElementById("ttl").textContent="Presentation · "+P.name; document.title="Presentation · "+P.name+" · KMR Apps";
   await QP.init(P.code); if(!QP.ctx)return;
+  for(const u of (P.deps||[])) await new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>rej(new Error('Could not load '+u));document.head.append(s)});
   const ctl=P.controls?P.controls():[];
   KMRPresent.mount(document.getElementById("pres"),{app:key,code:P.code,stdKey:P.std,appName:P.name,company:QP.ctx.company,slug:QP.slug,call:QP.call,canEdit:QP.canEdit,controls:ctl,load:v=>P.load(QP.call,v)});
 }catch(e){QP.say(e.message||String(e))}})();

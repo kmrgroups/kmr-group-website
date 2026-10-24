@@ -112,4 +112,145 @@
     ch.unshift({ title: "Audits planned and done by type - " + yr, kind: "bar", kpi: "comp", labels: tn, series: [{ name: "Planned", values: tn.map(function (t) { return bt[t].planned; }) }, { name: "Done", values: tn.map(function (t) { return bt[t].done; }) }] });
     return { period: "Audit year " + yr, kpis: k, charts: ch };
   } };
+
+  var days = function (a, b) { return Math.round((Date.parse(b) - Date.parse(a)) / 864e5); };
+  var todayIso = function () { return new Date().toISOString().slice(0, 10); };
+  var monthKey = function (d) { return String(d).slice(0, 7); };
+  var last12 = function () { var o = [], d = new Date(); d.setDate(1); for (var i = 11; i >= 0; i--) { var x = new Date(d.getFullYear(), d.getMonth() - i, 1); o.push(x.getFullYear() + "-" + String(x.getMonth() + 1).padStart(2, "0")); } return o; };
+
+  /* ---------- Minutes of meetings ---------- */
+  KMRPA.mom = { name: "Minutes Of Meetings", code: "mom", std: "mom", load: async function (call) {
+    var L = await call("kmr_mom_load"), A = []; try { A = await call("kmr_mom_actions"); } catch (e) { A = []; }
+    var S = std, M = (L.meetings || []).filter(function (m) { return m.status !== "void"; }), td = L.today || todayIso(), ms = last12();
+    var pts = M.reduce(function (s, m) { return s + (+m.points || 0); }, 0), done = M.reduce(function (s, m) { return s + (+m.done_points || 0); }, 0), openP = M.reduce(function (s, m) { return s + (+m.open_points || 0); }, 0);
+    var closed = M.filter(function (m) { return m.status === "closed" && m.closed_at; }), ontime = closed.filter(function (m) { return days(m.meeting_date, String(m.closed_at).slice(0, 10)) <= 3; }).length;
+    var over = A.filter(function (a) { return a.due_on && String(a.due_on).slice(0, 10) < td; }), nodate = A.filter(function (a) { return !a.due_on; }), nowho = A.filter(function (a) { return !a.who; });
+    var byM = {}; M.forEach(function (m) { var k = monthKey(m.meeting_date); byM[k] = (byM[k] || 0) + 1; });
+    var types = {}; A.forEach(function (a) { types[a.ptype] = (types[a.ptype] || 0) + 1; });
+    var openM = M.filter(function (m) { return m.status === "open" && days(m.meeting_date, td) > 3; }).length;
+    return { period: "Live position · " + today(), kpis: [
+      { id: "mt", name: "Meetings (last 12 months)", value: M.filter(function (m) { return ms.indexOf(monthKey(m.meeting_date)) >= 0; }).length, std: S("ISO 9.3", "IATF 9.3.1.1"), why: "Meetings with minutes recorded in the last twelve months." },
+      { id: "cl", name: "Minutes closed within 3 days", value: closed.length ? pct(ontime, closed.length) : null, unit: "%", target: 90, tol: 15, dir: "high", std: S("ISO 7.5.3", "IATF 7.5.3.2.1", "ISO 9.3"), why: "Closed minutes whose closing date is within 3 days of the meeting." },
+      { id: "old", name: "Meetings still open after 3 days", value: openM, target: 0, amber: 2, dir: "low", std: S("ISO 7.5.3", "ISO 9.3"), why: "Minutes not closed and issued within 3 days." },
+      { id: "op", name: "Open points and actions", value: A.length || openP, std: S("ISO 10.2", "IATF 10.2.3"), why: "Actions, decisions, risks and queries still open or in progress." },
+      { id: "ov", name: "Actions past their date", value: over.length, target: 0, amber: 3, dir: "low", std: S("ISO 10.2", "IATF 10.2.3", "ISO 9.3"), why: "Open points whose target date has passed." },
+      { id: "nd", name: "Open points without a date or owner", value: nodate.length + nowho.length, target: 0, amber: 3, dir: "low", std: S("ISO 5.3", "ISO 7.4", "ISO 10.2"), why: "Open points with no 'when' or no 'who' - they cannot be followed up." },
+      { id: "cr", name: "Point closure rate", value: pts ? pct(done, pts) : null, unit: "%", target: 80, tol: 15, dir: "high", std: S("ISO 10.2", "IATF 9.3.3.1"), why: "Points done ÷ all points recorded." }],
+      charts: [{ title: "Meetings per month", kind: "bar", kpi: "mt", labels: ms, series: [{ name: "Meetings", values: ms.map(function (m) { return byM[m] || 0; }) }] }, barOf("Open points by type", types, "Points", "op")] };
+  } };
+
+  /* ---------- APQP ---------- */
+  KMRPA.apqp = { name: "APQP", code: "apqp", std: "apqp", load: async function (call) {
+    var P = await call("kmr_apqp_list"), S = std, td = todayIso(), act = P.filter(function (p) { return p.status === "active"; });
+    var tot = 0, dn = 0, ov = 0, withOv = 0, risk = 0, ph = {}; 
+    act.forEach(function (p) { tot += +p.total || 0; dn += +p.done || 0; ov += +p.overdue || 0; if (+p.overdue > 0) withOv++; if (p.sop_date && days(td, String(p.sop_date).slice(0, 10)) <= 90 && days(td, String(p.sop_date).slice(0, 10)) >= 0 && pct(p.done, p.total) < 80) risk++; Object.keys(p.phases || {}).forEach(function (k) { var x = ph[k] = ph[k] || { t: 0, d: 0 }; x.t += p.phases[k].total; x.d += p.phases[k].done; }); });
+    var late = act.filter(function (p) { return p.sop_date && String(p.sop_date).slice(0, 10) < td && pct(p.done, p.total) < 100; }).length;
+    var low = act.map(function (p) { return { n: p.part_code, v: pct(p.done, p.total) || 0 }; }).sort(function (a, b) { return a.v - b.v; }).slice(0, 10), st = {}; P.forEach(function (p) { st[p.status] = (st[p.status] || 0) + 1; });
+    return { period: "Live position · " + today(), kpis: [
+      { id: "act", name: "Active APQP projects", value: act.length, std: S("APQP Phases 1-5", "IATF 8.3.2"), why: "Projects not on hold or closed." },
+      { id: "comp", name: "Checklist completion", value: tot ? pct(dn, tot) : null, unit: "%", std: S("APQP Phases 1-5", "ISO 8.3.2", "IATF 8.3.2"), why: "Checklist items done ÷ items that apply, over active projects." },
+      { id: "ov", name: "Overdue checklist items", value: ov, target: 0, amber: 5, dir: "low", std: S("APQP Phases 1-5", "IATF 8.3.4", "ISO 8.3.4"), why: "Open or in-progress items past their due date." },
+      { id: "pov", name: "Projects with overdue items", value: withOv, target: 0, amber: 2, dir: "low", std: S("IATF 8.3.4", "ISO 8.3.4"), why: "Active projects having at least one overdue item." },
+      { id: "risk", name: "SOP within 90 days and below 80% complete", value: risk, target: 0, amber: 1, dir: "low", std: S("APQP Phases 1-5", "IATF 8.3.4", "VDA P2 / P3 / P4"), why: "Launch risk: start of production is near but the plan is not ready." },
+      { id: "sop", name: "Past SOP date and not complete", value: late, target: 0, amber: 1, dir: "low", std: S("IATF 8.3.4", "VDA P2 / P3 / P4"), why: "Active projects whose SOP date has passed with items still open." }],
+      charts: [{ title: "Completion by APQP phase", kind: "bar", kpi: "comp", labels: ["1 Plan", "2 Design", "3 Process", "4 Validation", "5 Feedback"], series: [{ name: "Done %", values: [1, 2, 3, 4, 5].map(function (i) { var x = ph[i]; return x && x.t ? pct(x.d, x.t) : null; }) }] }, { title: "Projects with the lowest completion %", kind: "bar", kpi: "comp", labels: low.map(function (x) { return x.n; }), series: [{ name: "Complete %", values: low.map(function (x) { return x.v; }) }] }, barOf("Projects by status", st, "Projects", "act")] };
+  } };
+
+  /* ---------- PPAP ---------- */
+  KMRPA.ppap = { name: "PPAP", code: "ppap", std: "ppap", load: async function (call) {
+    var P = await call("kmr_ppap_list"), S = std, td = todayIso(), dec = P.filter(function (p) { return /approved|interim|rejected/.test(p.status); }), ap = P.filter(function (p) { return p.status === "approved"; }), rj = P.filter(function (p) { return p.status === "rejected"; });
+    var wait = P.filter(function (p) { return p.status === "submitted" && p.submitted_on && days(String(p.submitted_on).slice(0, 10), td) > 30; }), ready = P.reduce(function (s, p) { return s + (+p.ready || 0); }, 0), dd = dec.filter(function (p) { return p.submitted_on && p.decided_on; });
+    var avg = dd.length ? dd.reduce(function (s, p) { return s + days(String(p.submitted_on).slice(0, 10), String(p.decided_on).slice(0, 10)); }, 0) / dd.length : null, st = {}, lv = {}; P.forEach(function (p) { st[p.status] = (st[p.status] || 0) + 1; lv["Level " + p.level] = (lv["Level " + p.level] || 0) + 1; });
+    var drafts = P.filter(function (p) { return p.status === "draft" && p.updated_at && days(String(p.updated_at).slice(0, 10), td) > 30; }).length;
+    return { period: "Live position · " + today(), kpis: [
+      { id: "tot", name: "PPAP submissions", value: P.length, std: S("PPAP 18 elements", "IATF 8.3.4.4"), why: "All submissions on record." },
+      { id: "ap", name: "First-time approval rate", value: dec.length ? pct(ap.length, dec.length) : null, unit: "%", target: 90, tol: 10, dir: "high", std: S("PPAP Part Submission Warrant (PSW)", "IATF 8.3.4.4", "ISO 8.6"), why: "Approved ÷ decided submissions (approved, interim or rejected)." },
+      { id: "rj", name: "Rejected submissions", value: rj.length, target: 0, amber: 1, dir: "low", std: S("IATF 8.3.4.4", "ISO 8.6", "VDA P4"), why: "Submissions rejected by the customer." },
+      { id: "wt", name: "Submitted over 30 days, no decision", value: wait.length, target: 0, amber: 1, dir: "low", std: S("IATF 8.3.4.4", "VDA P4"), why: "Submissions waiting for a customer decision for more than 30 days." },
+      { id: "dd", name: "Average days to customer decision", value: avg, unit: "days", target: 30, tol: 30, dir: "low", std: S("IATF 8.3.4.4", "APQP Phase 4"), why: "Average days from submission to decision." },
+      { id: "dr", name: "Drafts untouched for 30 days", value: drafts, target: 0, amber: 2, dir: "low", std: S("PPAP 18 elements", "APQP Phase 4"), why: "Submissions still in draft and not updated for a month." },
+      { id: "el", name: "Elements ready", value: P.length ? pct(ready, P.length * 18) : null, unit: "%", std: S("PPAP 18 elements"), why: "Elements ready, done or not applicable ÷ 18 per submission." }],
+      charts: [barOf("Submissions by status", st, "Submissions", "tot"), barOf("Submissions by level", lv, "Submissions", "tot")] };
+  } };
+
+  /* ---------- CAD drafting ---------- */
+  KMRPA.cad = { name: "CAD Drafting", code: "cad", std: "cad", load: async function (call) {
+    var D = await call("kmr_cad_list"), S = std, td = todayIso(), cur = D.filter(function (d) { return d.status !== "superseded" && d.status !== "obsolete"; }), st = {}; D.forEach(function (d) { st[d.status] = (st[d.status] || 0) + 1; });
+    var rel = cur.filter(function (d) { return d.status === "released"; }).length, rev = cur.filter(function (d) { return d.status === "review"; }), oldr = rev.filter(function (d) { return d.updated_at && days(String(d.updated_at).slice(0, 10), td) > 14; }).length, oldd = cur.filter(function (d) { return d.status === "draft" && d.updated_at && days(String(d.updated_at).slice(0, 10), td) > 30; }).length;
+    var nums = {}; D.forEach(function (d) { nums[d.number] = d.revs; }); var mr = Math.max.apply(null, [0].concat(Object.keys(nums).map(function (k) { return nums[k]; })));
+    var ms = last12(), by = {}; D.forEach(function (d) { var k = monthKey(d.created_at); by[k] = (by[k] || 0) + 1; });
+    return { period: "Live position · " + today(), kpis: [
+      { id: "tot", name: "Drawings (current revisions)", value: cur.length, std: S("ISO 7.5.2", "ISO 7.5.3", "IATF 7.5.3.2.1"), why: "Drawings that are not superseded or obsolete." },
+      { id: "rel", name: "Drawings released", value: cur.length ? pct(rel, cur.length) : null, unit: "%", std: S("ISO 7.5.3", "IATF 8.3.5.1", "ISO 8.3.5"), why: "Released ÷ current drawings: only released drawings are issued to the shop floor." },
+      { id: "rv", name: "In review over 14 days", value: oldr, target: 0, amber: 2, dir: "low", std: S("ISO 8.3.5", "IATF 8.3.5.1"), why: "Drawings waiting in review for more than two weeks." },
+      { id: "dr", name: "Drafts untouched over 30 days", value: oldd, target: 0, amber: 3, dir: "low", std: S("ISO 7.5.3", "IATF 7.5.3.2.1"), why: "Drawings left in draft." },
+      { id: "mx", name: "Most revisions on one drawing", value: mr, std: S("ISO 8.3.6", "IATF 8.3.6.1"), why: "A high number can indicate unstable design inputs." }],
+      charts: [barOf("Drawings by status", st, "Drawings", "tot"), { title: "Drawings created per month", kind: "bar", kpi: "tot", labels: ms, series: [{ name: "Drawings", values: ms.map(function (m) { return by[m] || 0; }) }] }] };
+  } };
+
+  /* ---------- Office suite ---------- */
+  KMRPA.off = { name: "Office (Docs, Sheets, Slides)", code: "off", std: "off", load: async function (call) {
+    var r = await call("kmr_off_list", { p: {} }), F = r.files || [], S = std, td = todayIso(), k = { doc: 0, sheet: 0, slide: 0 }; F.forEach(function (f) { k[f.kind] = (k[f.kind] || 0) + 1; });
+    var rev = F.filter(function (f) { return +f.rev > 1; }).length, rec = F.filter(function (f) { return f.updated_at && days(String(f.updated_at).slice(0, 10), td) <= 30; }).length, stale = F.filter(function (f) { return f.updated_at && days(String(f.updated_at).slice(0, 10), td) > 365; }).length, ms = last12(), by = {};
+    F.forEach(function (f) { var m = monthKey(f.updated_at); by[m] = (by[m] || 0) + 1; });
+    return { period: "Live position · " + today(), kpis: [
+      { id: "tot", name: "Controlled files", value: F.length, std: S("ISO 7.5.1", "ISO 7.5.2"), why: "Documents, sheets and presentations held with a unique number." },
+      { id: "rev", name: "Files with revision history", value: F.length ? pct(rev, F.length) : null, unit: "%", std: S("ISO 7.5.3.2", "IATF 7.5.3.2.2"), why: "Files at revision 2 or later - changes are kept as versions." },
+      { id: "rec", name: "Files updated in the last 30 days", value: rec, std: S("ISO 7.5.3.1"), why: "Activity in the last month." },
+      { id: "old", name: "Files not reviewed for a year", value: stale, target: 0, amber: 5, dir: "low", std: S("ISO 7.5.3.2", "IATF 7.5.3.2.1"), why: "Files not changed for more than 365 days; check they are still valid." }],
+      charts: [{ title: "Files by type", kind: "bar", kpi: "tot", labels: ["Documents", "Sheets", "Presentations"], series: [{ name: "Files", values: [k.doc, k.sheet, k.slide] }] }, { title: "Files last updated per month", kind: "bar", kpi: "rec", labels: ms, series: [{ name: "Files", values: ms.map(function (m) { return by[m] || 0; }) }] }] };
+  } };
+
+  /* ---------- Maintenance ---------- */
+  KMRPA.mnt = { name: "Maintenance", code: "mnt", std: "mnt", deps: ["/it/apps/mnt-calc.js"], controls: function () { return [{ id: "days", label: "Period", type: "select", value: 90, options: [[30, "Last 30 days"], [90, "Last 90 days"], [180, "Last 180 days"]] }]; }, load: async function (call, v) {
+    var days_ = +v.days || 90, m = await call("kmr_mnt_load"), x = await call("kmr_mnt_data", { p_days: Math.max(180, days_) }), C = window.MNTCalc, S = std;
+    var st = C.stats(x, m, days_, null), an = C.analysis(x, m, days_), pm = C.pm(x, x.today || todayIso()), openB = x.breakdowns.filter(function (b) { return b.status === "open" || b.status === "attended"; }).length;
+    var top = an.byMachine.slice().sort(function (a, b) { return b.v - a.v; }).slice(0, 10), cat = an.byCat.slice().sort(function (a, b) { return b.v - a.v; }).slice(0, 8);
+    return { period: "Last " + days_ + " days · " + today(), kpis: [
+      { id: "av", name: "Plant availability", value: st.avail != null ? st.avail * 100 : null, unit: "%", target: 95, tol: 4, dir: "high", std: S("IATF 8.5.1.5", "ISO 7.1.3", "VDA P6"), why: "MTBF ÷ (MTBF + MTTR), from the breakdowns of the period." },
+      { id: "mtbf", name: "MTBF", value: st.mtbf, unit: "h", std: S("IATF 8.5.1.5", "IATF 7.1.3.1"), why: "Operating hours ÷ number of breakdowns." },
+      { id: "mttr", name: "MTTR", value: st.mttr, unit: "h", target: 4, tol: 25, dir: "low", std: S("IATF 8.5.1.5", "ISO 7.1.3"), why: "Breakdown downtime ÷ number of breakdowns." },
+      { id: "bd", name: "Breakdowns", value: st.n, std: S("IATF 8.5.1.5", "ISO 10.2"), why: "Breakdowns started in the period." },
+      { id: "dn", name: "Breakdown hours", value: st.down, unit: "h", std: S("IATF 8.5.1.5"), why: "Total machine stop time due to breakdowns." },
+      { id: "rs", name: "Average response time", value: st.resp, unit: "h", target: 1, tol: 50, dir: "low", std: S("IATF 8.5.1.5", "VDA P6"), why: "Time from machine stop to the maintenance person attending." },
+      { id: "pm", name: "PM done on time", value: pm.compliance != null ? pm.compliance * 100 : null, unit: "%", target: 90, tol: 10, dir: "high", std: S("IATF 8.5.1.5", "IATF 7.1.3.1", "ISO 7.1.3"), why: "Preventive maintenance done on or before its due date." },
+      { id: "pmo", name: "PM plans overdue", value: pm.over, target: 0, amber: 2, dir: "low", std: S("IATF 8.5.1.5", "ISO 7.1.3"), why: "Preventive maintenance plans past their due date." },
+      { id: "rep", name: "Repeat failures (same machine and cause 3+ times)", value: an.repeats.length, target: 0, amber: 1, dir: "low", std: S("ISO 10.2", "IATF 8.5.1.5"), why: "Needs root-cause action rather than another repair." },
+      { id: "ob", name: "Breakdowns still open", value: openB, target: 0, amber: 1, dir: "low", std: S("IATF 8.5.1.5"), why: "Machines stopped or being attended now." }],
+      charts: [{ title: "Breakdown hours by machine", kind: "bar", kpi: "dn", labels: top.map(function (a) { return a.l; }), series: [{ name: "Hours", values: top.map(function (a) { return a.v; }) }] },
+        { title: "Breakdown hours by category", kind: "bar", kpi: "dn", labels: cat.map(function (a) { return a.l; }), series: [{ name: "Hours", values: cat.map(function (a) { return a.v; }) }] },
+        { title: "Breakdowns and downtime by month", kind: "bar", kpi: "bd", labels: an.months.map(function (a) { return a.m; }), series: [{ name: "Breakdowns", values: an.months.map(function (a) { return a.n; }) }, { name: "Downtime h", values: an.months.map(function (a) { return a.down; }) }] },
+        { title: "Availability by machine (%)", kind: "bar", kpi: "av", labels: an.rows.slice(0, 12).map(function (r) { return r.code; }), series: [{ name: "Availability %", values: an.rows.slice(0, 12).map(function (r) { return r.avail != null ? r.avail * 100 : null; }) }] }] };
+  } };
+
+  /* ---------- MMD: material movement, OEE, rejection ---------- */
+  KMRPA.mmd = { name: "Material Movement (MMD)", code: "mmd", std: "mmd", deps: ["/it/apps/mmd-dash.js"], controls: function () { return [{ id: "days", label: "Period", type: "select", value: 30, options: [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] }]; }, load: async function (call, v) {
+    var days_ = +v.days || 30, m = await call("kmr_mmd_load"), x = await call("kmr_mmd_data", { p_days: Math.max(days_, 30) }), D = window.MMDDash, P = D.plant(m), S = std, td = m.today || todayIso();
+    var since = Date.parse(td + "T00:00:00") - (days_ - 1) * 864e5, inWin = function (iso) { return Date.parse(String(iso).slice(0, 10) + "T00:00:00") >= since; }, wd = 0;
+    for (var i = 0; i < days_; i++) { var dow = new Date(since + i * 864e5).getDay(), off = P.off === "Sunday" ? dow === 0 : P.off === "Saturday & Sunday" ? dow === 0 || dow === 6 : P.off === "Friday" ? dow === 5 : false; if (!off) wd++; }
+    var lc = {}; (m.loss_codes || []).forEach(function (l) { lc[l.code] = l; });
+    var pe = (x.entries || []).filter(function (e) { return e.status === "ok" && e.kind === "process" && inWin(e.entry_at) && e.machine; }), loss = (x.loss || []).filter(function (l) { return inWin(l.loss_date); }), mach = {};
+    var M = function (c) { return (mach[c] = mach[c] || { c: c, ok: 0, rej: 0, rew: 0, std: 0, std_ok: 0, loss: 0, plan: 0 }); };
+    pe.forEach(function (e) { var r = M(e.machine); r.ok += +e.ok_qty; r.rej += +e.rej_qty; r.rew += +e.rew_qty; var ct = +e.ct_sec || 0; r.std += ct * (+e.ok_qty + +e.rej_qty + +e.rew_qty) / 3600; r.std_ok += ct * +e.ok_qty / 3600; });
+    loss.forEach(function (l) { var r = M(l.machine_code), pl = (lc[l.d_code] || {}).planned === "Yes"; if (pl) r.plan += +l.minutes / 60; else r.loss += +l.minutes / 60; });
+    var R = Object.keys(mach).sort().map(function (k) { var r = mach[k], avail = P.H * wd - r.plan, op = Math.max(0.01, avail - r.loss), A = avail > 0 ? op / avail : 0, tot = r.ok + r.rej + r.rew, Pf = r.std ? Math.min(1, r.std / op) : null, Q = tot ? r.ok / tot : null; r.avail = avail; r.op = op; r.A = A; r.oee = Pf != null && Q != null ? A * Pf * Q : null; return r; });
+    var T = R.reduce(function (a, r) { ["ok", "rej", "rew", "std", "std_ok", "loss", "plan", "avail", "op"].forEach(function (k) { a[k] += r[k]; }); return a; }, { ok: 0, rej: 0, rew: 0, std: 0, std_ok: 0, loss: 0, plan: 0, avail: 0, op: 0 });
+    var tot = T.ok + T.rej + T.rew, TA = T.avail > 0 ? T.op / T.avail : null, TP = T.std ? Math.min(1, T.std / Math.max(0.01, T.op)) : null, TQ = tot ? T.ok / tot : null, TO = TA != null && TP != null && TQ != null ? TA * TP * TQ : null, tg = P.oee || 0.85;
+    var df = (x.defects || []).filter(function (d) { return inWin(d.entry_at) && d.kind === "rej"; }), byR = {}; df.forEach(function (d) { var k = d.reason || "—"; byR[k] = (byR[k] || 0) + +d.qty; });
+    var byL = {}; loss.forEach(function (l) { var k = (l.d_code || "") + " " + (l.d_name || ""); byL[k] = (byL[k] || 0) + +l.minutes / 60; });
+    var day = {}; pe.forEach(function (e) { var d = String(e.entry_at).slice(0, 10), r = (day[d] = day[d] || { ok: 0, rej: 0, rew: 0 }); r.ok += +e.ok_qty; r.rej += +e.rej_qty; r.rew += +e.rew_qty; });
+    var dk = Object.keys(day).sort().slice(-30), stuck = 0; try { stuck = D.stuck(m, x); } catch (e) { stuck = null; }
+    return { period: "Last " + days_ + " days · " + wd + " working days", kpis: [
+      { id: "oee", name: "OEE", value: TO != null ? TO * 100 : null, unit: "%", target: tg * 100, tol: 15, dir: "high", std: S("IATF 9.1.1.1", "IATF 8.5.2.1", "VDA P6"), why: "Availability × Performance × Quality, from the stage entries and loss hours." },
+      { id: "av", name: "Availability", value: TA != null ? TA * 100 : null, unit: "%", target: 90, tol: 8, dir: "high", std: S("IATF 9.1.1.1", "ISO 8.5.2"), why: "(Available hours − unplanned loss hours) ÷ available hours." },
+      { id: "pf", name: "Performance", value: TP != null ? TP * 100 : null, unit: "%", target: 90, tol: 8, dir: "high", std: S("IATF 9.1.1.1", "ISO 8.5.2"), why: "Standard hours of everything made ÷ operating hours." },
+      { id: "q", name: "Quality (first pass OK)", value: TQ != null ? TQ * 100 : null, unit: "%", target: 97, tol: 2, dir: "high", std: S("ISO 8.7", "IATF 8.7.1", "IATF 9.1.1.1"), why: "OK ÷ (OK + rejected + rework)." },
+      { id: "rej", name: "Rejection %", value: tot ? T.rej / tot * 100 : null, unit: "%", target: 2, tol: 50, dir: "low", std: S("ISO 8.7", "IATF 8.7.1", "IATF 9.1.1.1"), why: "Rejected pieces ÷ all pieces produced." },
+      { id: "rew", name: "Rework %", value: tot ? T.rew / tot * 100 : null, unit: "%", target: 2, tol: 50, dir: "low", std: S("ISO 8.7", "IATF 8.7.1"), why: "Pieces sent for rework ÷ all pieces produced." },
+      { id: "loss", name: "Unplanned loss hours", value: T.loss, unit: "h", std: S("IATF 9.1.1.1", "VDA P6"), why: "Machine hours lost to unplanned D codes." },
+      { id: "stuck", name: "Lots not moving", value: stuck, target: 0, amber: 2, dir: "low", std: S("ISO 8.5.2", "IATF 8.5.2.1", "ISO 8.4"), why: "Lots waiting longer than the transfer time plus the run time at the OEE target." }],
+      charts: [{ title: "OEE by machine (%)", kind: "bar", kpi: "oee", labels: R.map(function (r) { return r.c; }), series: [{ name: "OEE %", values: R.map(function (r) { return r.oee != null ? r.oee * 100 : null; }) }] },
+        barOf("Rejection by defect (pcs)", byR, "Pieces", "rej"), barOf("Loss hours by D code", byL, "Hours", "loss"),
+        { title: "Daily rejection and rework rate (%)", kind: "line", kpi: "rej", labels: dk.map(function (d) { return d.slice(5); }), series: [{ name: "Rejection %", values: dk.map(function (d) { var r = day[d], t = r.ok + r.rej + r.rew; return t ? r.rej / t * 100 : null; }) }, { name: "Rework %", values: dk.map(function (d) { var r = day[d], t = r.ok + r.rej + r.rew; return t ? r.rew / t * 100 : null; }) }] }] };
+  } };
 })();
