@@ -83,8 +83,8 @@
   const merge = (A, built) => { const have = {}; A.attendance.forEach((r) => { have[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; }); const out = A.attendance.slice(); built.forEach((r) => { if (!have[r.employee_id + "|" + r.work_date]) out.push(r); }); return out; };
 
   /* ================= dashboard ================= */
-  async function drawDash() {
-    const L = S.load, t = L.today, el = $("#dash"), emps = activeEmps();
+  async function todayBlock(el) {
+    const L = S.load, t = L.today, emps = activeEmps();
     let rows = [], unknown = {}, A = null;
     if (hasF("hrms.attendance")) {
       try { A = await getAtt(C.addDays(t, -1), t); const b = buildFrom(A, C.addDays(t, -1), t); unknown = b.unknown; rows = merge(A, b.rows).filter((r) => r.work_date === t); } catch (e) { say(e.message); }
@@ -111,6 +111,86 @@
       ${emps.length ? (hasF("hrms.attendance") ? `<h3 style="margin:10px 0 6px">Today · ${fmt(t)}</h3><table><thead><tr><th>Employee</th><th>Shift</th><th>In</th><th>Out</th><th>Late (min)</th><th>Status</th></tr></thead><tbody>${emps.map((e) => { const r = by[e.id], s = shiftOf(e); return `<tr><td>${esc(e.name)}<div class="mut">${esc(e.emp_code)} · ${esc(e.department || "")}</div></td><td>${esc(s ? s.name : "—")}</td><td>${tm(r && r.in_at) || "—"}</td><td>${tm(r && r.out_at) || "—"}</td><td class="num">${r && r.late_min ? `<span class="late">${r.late_min}</span>` : ""}</td><td>${r ? (notIn(r) ? '<span class="mut">Not in yet</span>' : stChip(r.status)) : "—"}</td></tr>`; }).join("")}</tbody></table>` : `<div class="lock">Attendance is not part of your plan.</div>`)
         : `<div class="empty">No employees yet.<br>Add them in <a href="#go=emp">Employees</a>, set the shifts in <a href="#go=setup">Setup</a>, and connect the machines in <a href="#go=dev">Machines</a>.</div>`}`;
     if (hasF("hrms.leave") && pend == null) { try { S.leaves = await call("kmr_hrms_leaves", { p_year: +t.slice(0, 4) }); const n = S.leaves.filter((l) => l.status === "Pending").length; if (n) el.insertAdjacentHTML("afterbegin", `<div class="guide">⏳ ${n} leave request(s) are waiting for a decision. <a href="#go=leave">Leave</a></div>`); } catch (e) { /* ignore */ } }
+  }
+
+  /* the dashboard: any month, a year's trend, everyone or one person; today's live view below */
+  const inSvc = (e, d) => (!e.doj || String(e.doj).slice(0, 10) <= d) && (e.status !== "left" ? (!e.dol || String(e.dol).slice(0, 10) >= d) : !!(e.dol && String(e.dol).slice(0, 10) >= d));
+  async function dashLoad(force) {
+    const y = S.dm.slice(0, 4); if (!force && S.dc && S.dc.year === y) return;
+    const rows = [];
+    for (const [a, b] of [["01-01", "03-31"], ["04-01", "06-30"], ["07-01", "09-30"], ["10-01", "12-31"]]) { const A = await call("kmr_hrms_att_get", { p_from: y + "-" + a, p_to: y + "-" + b }); (A.attendance || []).forEach((r) => rows.push(r)); }
+    const idx = {}, months = {}; rows.forEach((r) => { (idx[r.employee_id] = idx[r.employee_id] || []).push(r); months[String(r.work_date).slice(0, 7)] = 1; });
+    S.dc = { year: y, idx, months };
+  }
+  function dashStats(per, pick) {
+    const L = S.load, { from, to } = C.monthRange(per), prev = C.addDays(from, -1), cost = money();
+    const emps = L.employees.filter((e) => pick(e) && (inSvc(e, from) || inSvc(e, to)));
+    const o = { per, has: !!S.dc.months[per], head: emps.filter((e) => inSvc(e, to)).length, start: L.employees.filter((e) => pick(e) && inSvc(e, prev)).length, join: 0, left: 0, att: 0, exp: 0, absent: 0, late: 0, otH: 0, cost: 0, otCost: 0, noPay: 0, list: [] };
+    emps.forEach((e) => {
+      if (e.doj && String(e.doj).slice(0, 10) >= from && String(e.doj).slice(0, 10) <= to) o.join++;
+      if (e.status === "left" && e.dol && String(e.dol).slice(0, 10) >= from && String(e.dol).slice(0, 10) <= to) o.left++;
+      if (!o.has) return;
+      const sm = C.summary(e, S.dc.idx[e.id] || [], per, L.leave_types), att = sm.present + sm.hd * 0.5, exp = Math.max(0, sm.days - sm.outside - sm.wo - sm.h), r = { e, sm, att, exp, otH: sm.ot_min / 60, cost: 0, otCost: 0 };
+      o.att += att; o.exp += exp; o.absent += sm.absent + sm.missed; o.late += sm.late_count; o.otH += r.otH;
+      if (cost) { const sl = C.payOf(e, sm, per, L.settings), i = sl.info || {}; r.cost = sl.gross + (i.er_eps || 0) + (i.er_epf || 0) + (i.er_admin || 0) + (i.er_edli || 0) + (i.er_esi || 0); r.otCost = (sl.earnings.find((x) => x.code === "OT") || {}).amount || 0; if (!sl.gross && sm.paid_days) o.noPay++; o.cost += r.cost; o.otCost += r.otCost; }
+      o.list.push(r);
+    });
+    o.pct = o.has && o.exp ? Math.min(100, (o.att / o.exp) * 100) : null;
+    o.attr = (o.start + o.head) ? (o.left / ((o.start + o.head) / 2)) * 100 : null;
+    return o;
+  }
+  function dashChart(title, vals, f, color, cur) {
+    const W = 420, H = 150, pt = 16, pb = 20, mx = Math.max(0, ...vals.filter((v) => v != null)) || 1, bw = W / 12;
+    return `<div class="card" style="margin:0"><h3>${esc(title)}</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc(title)} by month">${vals.map((v, i) => {
+      const h = v == null ? 0 : (H - pt - pb) * v / mx, x = i * bw + bw * 0.14, y = H - pb - h;
+      return `<g data-m="${i + 1}" style="cursor:pointer"><rect x="${x}" y="${pt - 4}" width="${bw * 0.72}" height="${H - pt - pb + 4}" fill="transparent"/>${v == null ? "" : `<rect x="${x}" y="${y}" width="${bw * 0.72}" height="${Math.max(h, 1)}" rx="3" style="fill:${color};opacity:${i + 1 === cur ? 1 : 0.45}"/><text x="${x + bw * 0.36}" y="${y - 3}" font-size="9" text-anchor="middle" style="fill:var(--ink)">${f(v)}</text>`}<text x="${x + bw * 0.36}" y="${H - 6}" font-size="9" text-anchor="middle" style="fill:var(--mut);font-weight:${i + 1 === cur ? 700 : 400}">${MON[i].slice(0, 3)}</text></g>`;
+    }).join("")}</svg></div>`;
+  }
+  function dashPaint() {
+    const L = S.load, el = $("#dmain"), per = S.dm, y = +per.slice(0, 4), cur = +per.slice(5, 7), cost = money(), dd = S.dd || "", de = S.de || "";
+    const pick = (e) => (!dd || e.department === dd) && (!de || e.id === de), depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
+    const emp = de ? L.employees.find((e) => e.id === de) : null;
+    const yr = Array.from({ length: 12 }, (_, i) => dashStats(y + "-" + String(i + 1).padStart(2, "0"), pick)), m = yr[cur - 1];
+    const pc = (v) => (v == null ? "—" : v.toFixed(1) + "%"), k = (t, v, c) => `<div class="kpi" style="--c:${c || "var(--b1)"}"><b>${v}</b><span>${t}</span></div>`;
+    const lakh = (v) => (v >= 1e7 ? (v / 1e7).toFixed(2) + " Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + " L" : rs0(v));
+    const ser = (f) => yr.map((x) => (x.has ? f(x) : null)), hcs = yr.map((x) => (x.head || x.start ? x.head : null));
+    const yHead = yr.reduce((a, x) => a + x.head, 0) / 12, yLeft = yr.reduce((a, x) => a + x.left, 0), yCost = yr.reduce((a, x) => a + x.cost, 0), yOt = yr.reduce((a, x) => a + x.otCost, 0), yOtH = yr.reduce((a, x) => a + x.otH, 0);
+    const days = C.monthDays(per), from = C.monthRange(per).from;
+    const peopleList = L.employees.filter((e) => (!dd || e.department === dd) && (inSvc(e, C.monthRange(per).to) || inSvc(e, from) || e.id === de)).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    el.innerHTML = `<div class="row" style="align-items:flex-end;gap:8px;flex-wrap:wrap">
+        <div><label class="lbl">Month</label><div class="row" style="gap:4px"><button class="btn o s" id="dmp" title="Previous month">◀</button><input type="month" id="dm" value="${per}" style="width:160px"><button class="btn o s" id="dmn" title="Next month">▶</button></div></div>
+        <div><label class="lbl">Department</label><select id="dd" style="max-width:190px"><option value="">All departments</option>${opts(depts, dd)}</select></div>
+        <div><label class="lbl">Employee</label><select id="de" style="max-width:260px"><option value="">All employees</option>${opts(peopleList.map((e) => [e.id, e.emp_code + " - " + e.name]), de)}</select></div>
+        ${de || dd ? '<button class="btn o s" id="dclr">Show everyone</button>' : ""}</div>
+      <div class="note" style="margin:10px 0 6px"><b>${emp ? esc(emp.name) + " · " + esc(emp.emp_code) : dd ? esc(dd) : "All employees"}</b> — ${perName(per)}${m.has ? "" : ' · <span style="color:var(--r)">no attendance recorded for this month yet (Attendance tab → Work out, or import)</span>'}</div>
+      <div class="kpis">${emp ? "" : k("Headcount (month end)", m.head) + k("Joined", m.join, "#2563eb") + k("Left", m.left, "var(--r)") + k("Attrition", pc(m.attr), "var(--r)")}${k("Attendance", pc(m.pct), "var(--g)")}${k("Absent days", m.has ? Math.round(m.absent * 10) / 10 : "—", "var(--r)")}${k("Late days", m.has ? m.late : "—", "var(--a)")}${k("OT hours", m.has ? m.otH.toFixed(1) : "—", "#7c3aed")}${cost ? k("Manpower cost ₹", m.has ? rs0(m.cost) : "—", "#0d9488") + k("OT cost ₹", m.has ? rs0(m.otCost) : "—", "#7c3aed") : ""}</div>
+      ${cost && m.has && m.noPay ? `<div class="note">${m.noPay} employee(s) have no salary set, so their cost shows as 0. <a href="#go=emp">Employees</a></div>` : ""}
+      <h3 style="margin:14px 0 6px">${y} · month by month <span class="mut" style="font-weight:400;font-size:12px">(click a bar to open that month)</span></h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px" id="dch">
+        ${dashChart("Attendance %", ser((x) => x.pct), (v) => v.toFixed(0), "var(--g)", cur)}${dashChart("Attrition % (leavers ÷ average headcount)", yr.map((x) => (x.attr == null || (!x.has && !x.left) ? null : x.attr)), (v) => v.toFixed(1), "var(--r)", cur)}
+        ${cost ? dashChart("Manpower cost ₹ (pay + employer PF/ESI)", ser((x) => x.cost), lakh, "var(--b1)", cur) + dashChart("OT cost ₹", ser((x) => x.otCost), lakh, "#7c3aed", cur) : ""}
+        ${dashChart("OT hours", ser((x) => x.otH), (v) => v.toFixed(0), "var(--a)", cur)}${emp ? "" : dashChart("Headcount", hcs, (v) => v, "#2563eb", cur)}</div>
+      <div class="note">${y}: ${emp ? "" : `average headcount ${yHead.toFixed(0)} · leavers ${yLeft} · attrition ${yHead ? ((yLeft / yHead) * 100).toFixed(1) : "0.0"}%`}${cost ? ` · manpower cost ₹ ${rs0(yCost)} · OT cost ₹ ${rs0(yOt)}` : ""} · OT ${yOtH.toFixed(0)} h. Cost is estimated from each person's salary master and the recorded attendance; no payroll run is needed.</div>
+      ${emp ? dashDays(emp, per) : m.has && m.list.length ? `<h3 style="margin:14px 0 6px">${perName(per)} · by employee</h3><div class="twrap"><table class="sortable"><thead><tr><th>Employee</th><th class="num">Present</th><th class="num">Half</th><th class="num">Absent</th><th class="num">Late</th><th class="num">Attend %</th><th class="num">OT h</th>${cost ? '<th class="num">Cost ₹</th><th class="num">OT cost ₹</th>' : ""}</tr></thead><tbody>${m.list.sort((a, b) => String(a.e.name).localeCompare(String(b.e.name))).map((r) => `<tr><td><a href="#" data-pe="${r.e.id}">${esc(r.e.name)}</a><div class="mut">${esc(r.e.emp_code)} · ${esc(r.e.department || "")}</div></td><td class="num">${r.sm.present}</td><td class="num">${r.sm.hd || ""}</td><td class="num">${r.sm.absent + r.sm.missed || ""}</td><td class="num">${r.sm.late_count || ""}</td><td class="num">${r.exp ? Math.min(100, (r.att / r.exp) * 100).toFixed(0) + "%" : "—"}</td><td class="num">${r.otH ? r.otH.toFixed(1) : ""}</td>${cost ? `<td class="num">${rs0(r.cost)}</td><td class="num">${r.otCost ? rs0(r.otCost) : ""}</td>` : ""}</tr>`).join("")}</tbody></table></div>` : ""}`;
+    const go = () => { S.dm = V("dm") || S.dm; S.dd = V("dd"); S.de = V("de"); return (S.dc && S.dc.year === S.dm.slice(0, 4) ? Promise.resolve() : dashLoad()).then(dashPaint).catch((e) => say(e.message)); };
+    ["dm", "dd", "de"].forEach((i) => ($("#" + i).onchange = () => { if (i === "dd") $("#de").value = ""; go(); }));
+    $("#dmp").onclick = () => { $("#dm").value = C.addDays(per + "-01", -1).slice(0, 7); go(); };
+    $("#dmn").onclick = () => { $("#dm").value = C.addDays(C.monthRange(per).to, 1).slice(0, 7); go(); };
+    if ($("#dclr")) $("#dclr").onclick = () => { $("#dd").value = ""; $("#de").value = ""; go(); };
+    document.querySelectorAll("#dch [data-m]").forEach((g) => (g.onclick = () => { $("#dm").value = y + "-" + String(g.dataset.m).padStart(2, "0"); go(); }));
+    document.querySelectorAll("[data-pe]").forEach((a) => (a.onclick = (ev) => { ev.preventDefault(); $("#de").value = a.dataset.pe; go(); window.scrollTo(0, 0); }));
+  }
+  function dashDays(emp, per) {
+    const { from, to } = C.monthRange(per), by = {}; (S.dc.idx[emp.id] || []).forEach((r) => { by[String(r.work_date).slice(0, 10)] = r; });
+    const cells = []; for (let d = from; d <= to; d = C.addDays(d, 1)) { const r = by[d]; cells.push(`<td class="c ${r ? "s-" + r.status : ""}" title="${r ? esc(ST[r.status] + (r.in_at ? " · " + tm(r.in_at) + "–" + tm(r.out_at) : "") + (r.ot_min ? " · OT " + (r.ot_min / 60).toFixed(1) + " h" : "")) : ""}">${r ? ABBR[r.status] : ""}</td>`); }
+    return `<h3 style="margin:14px 0 6px">${esc(emp.name)} · ${perName(per)} · day by day</h3><div class="twrap"><table class="sheetg" style="min-width:0"><thead><tr>${cells.map((_, i) => `<th>${i + 1}</th>`).join("")}</tr></thead><tbody><tr>${cells.join("")}</tr></tbody></table></div>`;
+  }
+  async function drawDash() {
+    const el = $("#dash"); if (!S.dm) S.dm = S.load.today.slice(0, 7);
+    el.innerHTML = `<div id="dmain">${hasF("hrms.attendance") ? '<div class="note">Loading…</div>' : ""}</div><details class="card" id="dtod" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Today · ${fmt(S.load.today)} — live attendance and alerts</summary><div id="dtb" style="margin-top:10px"></div></details>`;
+    if (hasF("hrms.attendance")) { try { await dashLoad(true); dashPaint(); } catch (e) { say(e.message); } }
+    else $("#dtod").open = true;
+    await todayBlock($("#dtb"));
   }
 
   /* ================= employees ================= */
