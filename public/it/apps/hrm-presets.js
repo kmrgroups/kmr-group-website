@@ -275,7 +275,13 @@ def connect():
         import pyodbc
         return pyodbc.connect("DRIVER={ODBC Driver 17 for SQL Server};SERVER=%s,%s;DATABASE=%s;UID=%s;PWD=%s" % (DB_HOST, DB_PORT or 1433, DB_NAME, DB_USER, DB_PASS))
     import pymysql
-    return pymysql.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS, database=DB_NAME, connect_timeout=15)
+    last = None
+    for port in (DB_PORT, 3307, 3306):             # the database may have been installed on 3306 or 3307
+        try:
+            return pymysql.connect(host=DB_HOST, port=port, user=DB_USER, password=DB_PASS, database=DB_NAME, connect_timeout=15)
+        except Exception as e:
+            last = e
+    raise last
 
 def last_sent():
     try:
