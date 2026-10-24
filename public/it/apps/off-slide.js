@@ -87,10 +87,10 @@
 
   /* ---------- editor ---------- */
   const SLIDE = {
-    kind: "slide", label: "Presentation", plural: "Presentations", blurb: "Slides for meetings, reviews and training", ext: "pptx", color: "#ea580c", icon: "pres", accept: ".pptx", templates: TPL,
+    kind: "slide", label: "Presentation", plural: "Presentations", blurb: "Slides for meetings, reviews and training", ext: "pptx", color: "#ea580c", icon: "pres", accept: ".pptx,.ppt", templates: TPL,
     blank(tid) { return build(tid); },
     async importFile(file) {
-      const n = file.name, base = n.replace(/\.[^.]+$/, ""), ext = ((/\.([^.]+)$/.exec(n) || [])[1] || "").toLowerCase(); if (ext === "ppt") throw new Error("Old .ppt files are not supported. Please save the file as .pptx in your presentation program and import that."); if (ext !== "pptx") throw new Error("Presentations can be opened from .pptx files.");
+      const n = file.name, base = n.replace(/\.[^.]+$/, ""), ext = ((/\.([^.]+)$/.exec(n) || [])[1] || "").toLowerCase(); if (ext === "ppt") { const sl = window.OffLegacy.ppt(new Uint8Array(await Z.readBuf(file))); const esc2 = (t) => String(t).replace(/[&<>]/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m])); const slides = sl.map((x) => { const sd = newSlide("content", 960, 540); sd.objs[0].tx = "<p>" + esc2(x.title) + "</p>"; sd.objs[1].tx = x.body.map((l) => "<p>" + esc2(l) + "</p>").join(""); return sd; }); return { name: base, body: { size: { w: 960, h: 540 }, theme: Object.assign({}, THEMES[0]), slides, media: {}, zoom: 0, warn: "Old .ppt files bring across the slide text only. Pictures, shapes and animations are not carried over. For a full copy, save it as .pptx in PowerPoint first." } }; } if (ext !== "pptx") throw new Error("Presentations can be opened from .pptx files.");
       const body = await P.read(await Z.readBuf(file)); if (!body.slides.length) body.slides.push(newSlide("title", 960, 540)); body.zoom = 0; return { name: base, body };
     },
     exports: [{ label: "PowerPoint file (.pptx)", ext: "pptx", run: (c) => c.exportPptx() }, { label: "Outline text (.txt)", ext: "txt", run: (c) => c.exportTxt() }],

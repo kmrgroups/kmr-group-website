@@ -64,14 +64,13 @@
 
   /* ----- sample sheets used by the templates (kept here so blank() works without mounting) ----- */
   const SHEET = {
-    kind: "sheet", label: "Spreadsheet", plural: "Spreadsheets", blurb: "Tables, calculations, charts and reports", ext: "xlsx", color: "#16a34a", icon: "sheet", accept: ".xlsx,.csv,.tsv,.txt",
+    kind: "sheet", label: "Spreadsheet", plural: "Spreadsheets", blurb: "Tables, calculations, charts and reports", ext: "xlsx", color: "#16a34a", icon: "sheet", accept: ".xlsx,.xls,.csv,.tsv,.txt",
     get templates() { return (window.OffSheetT ? OffSheetT.list : [{ id: "blank", name: "Blank spreadsheet", desc: "" }]).map((t) => ({ id: t.id, name: t.name, desc: t.desc })); },
     blank(tid, set) { const wb = window.OffSheetT ? OffSheetT.make(tid, set || {}) : new C.Workbook({}); const j = wb.toJSON(); j.zoom = 100; return j; },
     async importFile(file) {
       const n = file.name, base = n.replace(/\.[^.]+$/, ""), ext = ((/\.([^.]+)$/.exec(n) || [])[1] || "").toLowerCase();
-      if (ext === "xls") throw new Error("Old .xls files are not supported. Please save the file as .xlsx in your spreadsheet program and import that.");
       let wb;
-      if (ext === "xlsx") wb = await X.read(await Z.readBuf(file)); else { const t = await Z.readText(file); wb = X.fromCsv(ext === "tsv" ? t.replace(/\r?\n/g, "\n") : t, "Sheet1"); if (ext === "tsv") wb = (function () { const rows = X.parseCsv(t, "\t"); const w = new C.Workbook({ sheets: [{ name: "Sheet1" }] }); rows.forEach((r, i) => r.forEach((x, j) => { if (x === "") return; const p = C.parseInput(x); const cell = { v: p.f ? x : p.v }; if (p.nf) cell.s = w.styleId({ nf: p.nf }); if (cell.v != null) w.sheets[0].set(i + 1, j + 1, cell); })); return w; })(); }
+      if (ext === "xls") { const lr = window.OffLegacy.xls(new Uint8Array(await Z.readBuf(file))); wb = lr.wb; } else if (ext === "xlsx") wb = await X.read(await Z.readBuf(file)); else { const t = await Z.readText(file); wb = X.fromCsv(ext === "tsv" ? t.replace(/\r?\n/g, "\n") : t, "Sheet1"); if (ext === "tsv") wb = (function () { const rows = X.parseCsv(t, "\t"); const w = new C.Workbook({ sheets: [{ name: "Sheet1" }] }); rows.forEach((r, i) => r.forEach((x, j) => { if (x === "") return; const p = C.parseInput(x); const cell = { v: p.f ? x : p.v }; if (p.nf) cell.s = w.styleId({ nf: p.nf }); if (cell.v != null) w.sheets[0].set(i + 1, j + 1, cell); })); return w; })(); }
       const j = wb.toJSON(); j.zoom = 100; return { name: base, body: j };
     },
     exports: [

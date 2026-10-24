@@ -65,14 +65,14 @@
   ];
 
   const DOC = {
-    kind: "doc", label: "Document", plural: "Documents", blurb: "Letters, procedures, minutes, reports", ext: "docx", color: "#2563eb", icon: "doc", accept: ".docx,.html,.htm,.txt,.md,.csv", templates: TEMPLATES.map((t) => ({ id: t.id, name: t.name, desc: t.desc })),
+    kind: "doc", label: "Document", plural: "Documents", blurb: "Letters, procedures, minutes, reports", ext: "docx", color: "#2563eb", icon: "doc", accept: ".docx,.doc,.html,.htm,.txt,.md,.csv", templates: TEMPLATES.map((t) => ({ id: t.id, name: t.name, desc: t.desc })),
     blank(tid, set) {
       const t = TEMPLATES.find((x) => x.id === tid) || TEMPLATES[0], s = set || {};
       return { html: t.html, page: { size: s.page_size || "A4", orient: "portrait", margins: Object.assign({}, MARGINS.Normal), cols: 1 }, header: s.header || "", footer: s.footer || "", comments: [] };
     },
     async importFile(file) {
       const n = file.name, base = n.replace(/\.[^.]+$/, ""), ext = (/\.([^.]+)$/.exec(n) || [])[1] || "";
-      if (/^docx?$/i.test(ext)) { if (/^doc$/i.test(ext)) throw new Error("Old .doc files are not supported. Please save the file as .docx first and import that."); const r = await OffDocx.read(await Z.readBuf(file)); return { name: r.title || base, body: { html: clean(r.html), page: r.page, header: clean(r.header || ""), footer: clean(r.footer || ""), comments: r.comments || [] } }; }
+      if (/^docx?$/i.test(ext)) { if (/^doc$/i.test(ext)) { const lr = window.OffLegacy.doc(new Uint8Array(await Z.readBuf(file))); return { name: base, body: { html: clean(lr.html), page: { size: "A4", orient: "portrait", margins: Object.assign({}, MARGINS.Normal), cols: 1 }, header: "", footer: "", comments: [] } }; } const r = await OffDocx.read(await Z.readBuf(file)); return { name: r.title || base, body: { html: clean(r.html), page: r.page, header: clean(r.header || ""), footer: clean(r.footer || ""), comments: r.comments || [] } }; }
       if (/^html?$/i.test(ext)) return { name: base, body: Object.assign(DOC.blank(), { html: clean(await Z.readText(file)) || "<p><br></p>" }) };
       const tx = await Z.readText(file); const h = tx.split(/\r?\n/).map((l) => `<p>${esc(l) || "<br>"}</p>`).join("");
       return { name: base, body: Object.assign(DOC.blank(), { html: h }) };
