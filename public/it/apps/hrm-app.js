@@ -190,6 +190,7 @@
   }
   async function drawDash() {
     const el = $("#dash"); if (!S.dm) S.dm = S.load.today.slice(0, 7);
+    await autoWork();
     el.innerHTML = `<div id="dmain">${hasF("hrms.attendance") ? '<div class="note">Loading…</div>' : ""}</div><details class="card" id="dtod" style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">Today · ${fmt(S.load.today)} — live attendance and alerts</summary><div id="dtb" style="margin-top:10px"></div></details>`;
     if (hasF("hrms.attendance")) { try { await dashLoad(true); dashPaint(); } catch (e) { say(e.message); } }
     else $("#dtod").open = true;
@@ -258,6 +259,7 @@
   async function drawAtt() {
     const L = S.load; if (!S.month) S.month = L.today.slice(0, 7);
     const { from, to } = C.monthRange(S.month), nd = C.monthDays(S.month), el = $("#att");
+    await autoWork();
     const A = await getAtt(from, to), lockedM = A.locked.includes(S.month);
     const by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
     const dep = V("ad") || "", depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
@@ -291,6 +293,23 @@
     document.querySelectorAll("[data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
   }
   const slim = (r) => ({ employee_id: r.employee_id, work_date: r.work_date, in_at: r.in_at, out_at: r.out_at, worked_min: r.worked_min, late_min: r.late_min, early_min: r.early_min, ot_min: r.ot_min, status: r.status, leave_code: r.leave_code, source: r.source, remarks: r.remarks });
+  /* attendance is worked out by itself from the punches: no button needed. Runs when the dashboard or Attendance opens, for this month and last month. */
+  async function autoWork() {
+    if (!ed() || !hasF("hrms.attendance") || (S.autoAt && Date.now() - S.autoAt < 90000)) return 0;
+    S.autoAt = Date.now(); let n = 0;
+    try {
+      const t = S.load.today, cur = t.slice(0, 7), prev = C.addDays(cur + "-01", -1).slice(0, 7);
+      for (const per of [prev, cur]) {
+        const { from, to } = C.monthRange(per), last = to > t ? t : to; if (last < from) continue;
+        const A = await getAtt(from, to); if ((A.locked || []).includes(per)) continue;
+        const have = {}; A.attendance.forEach((r) => { have[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
+        const tsEq = (a, b) => (a ? Date.parse(a) : 0) === (b ? Date.parse(b) : 0), num = (v) => +v || 0;
+        const rows = buildFrom(A, from, last).rows.filter((r) => { const o = have[r.employee_id + "|" + r.work_date]; return !o || (o.source !== "manual" && (o.status !== r.status || !tsEq(o.in_at, r.in_at) || !tsEq(o.out_at, r.out_at) || num(o.ot_min) !== num(r.ot_min) || num(o.late_min) !== num(r.late_min))); });
+        if (rows.length) { const r = await saveRows(rows, "auto"); n += r.saved; }
+      }
+    } catch (e) { /* quiet: the person can still press the button on the Attendance tab */ }
+    return n;
+  }
   async function saveRows(rows, mode) {
     const tot = { saved: 0, locked: 0, kept_manual: 0 };
     for (let i = 0; i < rows.length; i += 3000) { const r = await call("kmr_hrms_att_save", { p: { mode, rows: rows.slice(i, i + 3000).map(slim) } }); tot.saved += r.saved; tot.locked += r.locked; tot.kept_manual += r.kept_manual; }
