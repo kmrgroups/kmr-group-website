@@ -254,7 +254,7 @@ import sys, time, json, os, datetime, threading, subprocess, socket, zlib
 
 DB_KIND = "${o.db || "mysql"}"                  # "mysql" or "sqlserver"
 DB_HOST, DB_PORT = "${o.host || "localhost"}", ${o.dbport || 3306}
-DB_NAME, DB_USER, DB_PASS = "${o.dbname || "attendance"}", "${o.dbuser || "kmr_reader"}", "PASTE-THE-DATABASE-PASSWORD"
+DB_NAME, DB_USER, DB_PASS = "${o.dbname || "attendance"}", "${o.dbuser || "kmr_reader"}", "KmrRead2026"
 TABLE = "AttendanceLogs"                          # same table name as on the Realtime screen
 URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-HRM-MACHINE-SCREEN"}"
 EVERY_MIN = ${o.every || 2}
