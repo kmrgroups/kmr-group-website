@@ -238,27 +238,31 @@
 
     /* ======================= master ======================= */
     D.master = D.master || null; let masterSlide = null;
-    X.bg = (s, T) => { if (s.master) return tc(T, s.bg, "#fff"); return tc(T, s.bg === "@bg" && D.master && D.master.bg ? D.master.bg : s.bg, "#fff"); };
+    const layOf = (s) => (s && s.lay && (D.layouts || []).find((l) => l.id === s.lay)) || null;
+    X.layOf = layOf;
+    X.bg = (s, T) => { if (s.master) return tc(T, s.bg, "#fff"); const L = layOf(s); return tc(T, s.bg === "@bg" && L && L.bg ? L.bg : s.bg === "@bg" && D.master && D.master.bg ? D.master.bg : s.bg, "#fff"); };
     X.master = (host, s, T) => {
-      if (s.master || s.nomaster || !D.master || !(D.master.objs || []).length) return; const i = D.slides.indexOf(s) - (masterSlide ? 1 : 0), num = i + 1, today = new Date().toLocaleDateString();
-      D.master.objs.forEach((o) => { const c = cl(o); if (c.tx) c.tx = c.tx.replace(/\{#\}/g, String(num)).replace(/\{date\}/g, today); const e = P.objEl(c, T, false); e.style.pointerEvents = "none"; e.classList.add("pmo"); host.append(e); });
+      const LL = layOf(s); if (s.master || s.nomaster || ((!D.master || !(D.master.objs || []).length) && !(LL && (LL.objs || []).length))) return; const i = D.slides.indexOf(s) - (masterSlide ? 1 : 0), num = i + 1, today = new Date().toLocaleDateString();
+      ((D.master && D.master.objs) || []).concat(LL ? LL.objs || [] : []).forEach((o) => { const c = cl(o); if (c.tx) c.tx = c.tx.replace(/\{#\}/g, String(num)).replace(/\{date\}/g, today); const e = P.objEl(c, T, false); e.style.pointerEvents = "none"; e.classList.add("pmo"); host.append(e); });
     };
-    function enterMaster() {
-      if (masterSlide) return; D.master = D.master || { bg: null, objs: [] }; masterSlide = { id: "master", master: true, layout: "blank", bg: D.master.bg || "@bg", notes: "", trans: "none", objs: D.master.objs }; D.slides.unshift(masterSlide); P.wk.querySelector(".psw").classList.add("mastermode"); P.drawAll(); P.go(0); say("Slide master: anything you add here (logo, footer, slide number, background) appears on every slide. Press “Close master view” when done.", true); rbRedraw();
+    let editLay = null;
+    function enterMaster(layId) {
+      if (masterSlide) return; D.master = D.master || { bg: null, objs: [] }; editLay = layId ? (D.layouts || []).find((l) => l.id === layId) || null : null; const tgt = editLay || D.master; if (editLay && !editLay.objs) editLay.objs = []; masterSlide = { id: "master", master: true, layout: "blank", bg: tgt.bg || "@bg", notes: "", trans: "none", objs: tgt.objs, lay: editLay ? editLay.id : null }; D.slides.unshift(masterSlide); P.wk.querySelector(".psw").classList.add("mastermode"); P.drawAll(); P.go(0); say("Slide master: anything you add here (logo, footer, slide number, background) appears on every slide. Press “Close master view” when done.", true); rbRedraw();
     }
-    function exitMaster() { if (!masterSlide) return; D.master.objs = masterSlide.objs; D.master.bg = masterSlide.bg === "@bg" ? null : masterSlide.bg; const i = D.slides.indexOf(masterSlide); if (i >= 0) D.slides.splice(i, 1); masterSlide = null; P.wk.querySelector(".psw").classList.remove("mastermode"); P.drawAll(); P.go(Math.min(1, D.slides.length - 1) >= 0 ? 0 : 0); rbRedraw(); }
+    function exitMaster() { if (!masterSlide) return; if (editLay) { editLay.objs = masterSlide.objs; editLay.bg = masterSlide.bg === "@bg" ? null : masterSlide.bg; editLay = null; } else { D.master.objs = masterSlide.objs; D.master.bg = masterSlide.bg === "@bg" ? null : masterSlide.bg; } const i = D.slides.indexOf(masterSlide); if (i >= 0) D.slides.splice(i, 1); masterSlide = null; P.wk.querySelector(".psw").classList.remove("mastermode"); P.drawAll(); P.go(Math.min(1, D.slides.length - 1) >= 0 ? 0 : 0); rbRedraw(); }
     const rbRedraw = () => P.redraw();
-    X.body = (j) => { if (masterSlide) { j.slides = j.slides.filter((s) => !s.master); j.master = { bg: masterSlide.bg === "@bg" ? null : masterSlide.bg, objs: masterSlide.objs }; } return j; };
+    X.body = (j) => { if (masterSlide) { j.slides = j.slides.filter((s) => !s.master); if (editLay) j.layouts = (j.layouts || []).map((l) => (l.id === editLay.id ? Object.assign({}, l, { bg: masterSlide.bg === "@bg" ? null : masterSlide.bg, objs: masterSlide.objs }) : l)); else j.master = { bg: masterSlide.bg === "@bg" ? null : masterSlide.bg, objs: masterSlide.objs }; } return j; };
+    X.masterEditing = () => (masterSlide ? (editLay ? "layout" : "master") : null); X.enterMaster = enterMaster; X.exitMaster = exitMaster;
     const mAdd = (tx, w, h, x, y, al) => P.addObj({ id: uid(), t: "text", x, y, w, h, rot: 0, tx: "<p>" + tx + "</p>", st: { sz: 16, c: "@fg", al: al || "left", va: "middle" }, name: "Master text" });
 
     /* ======================= flat export ======================= */
     X.flat = async (src) => {
-      const j = cl(src); j.media = src.media; if (masterSlide) j.master = { bg: masterSlide.bg === "@bg" ? null : masterSlide.bg, objs: masterSlide.objs }; const mo = (j.master && j.master.objs) || [];
+      const j = cl(src); j.media = src.media; if (masterSlide && !editLay) j.master = { bg: masterSlide.bg === "@bg" ? null : masterSlide.bg, objs: masterSlide.objs }; if (masterSlide && editLay) j.layouts = (j.layouts || []).map((l) => (l.id === editLay.id ? Object.assign({}, l, { bg: masterSlide.bg === "@bg" ? null : masterSlide.bg, objs: masterSlide.objs }) : l)); const mo = (j.master && j.master.objs) || []; const lays = j.layouts || [];
       for (let i = 0; i < j.slides.length; i++) {
-        const s = j.slides[i]; if (s.master) continue; const pre = !s.nomaster && mo.length ? mo.map((o) => { const c = cl(o); if (c.tx) c.tx = c.tx.replace(/\{#\}/g, String(i + 1)).replace(/\{date\}/g, new Date().toLocaleDateString()); c.id = uid(); return c; }) : []; if (!s.nomaster && j.master && j.master.bg && s.bg === "@bg") s.bg = j.master.bg;
-        const out = []; for (const o of pre.concat(s.objs)) { if (o.hide) continue; if (o.t === "group") groupFlat(o).forEach((k) => out.push(k)); else if (o.t === "chart") { const png = await svgPng(chartSvg(o.ch, Math.round(o.w * 2), Math.round(o.h * 2), j.theme), o.w * 2, o.h * 2); if (png) { const key = "c" + uid(); j.media[key] = png; out.push({ id: o.id, t: "img", m: key, x: o.x, y: o.y, w: o.w, h: o.h, rot: o.rot || 0, alt: o.ch.title || "Chart" }); } } else if (o.t === "media") continue; else out.push(o); }
+        const s = j.slides[i]; if (s.master) continue; const LL = lays.find((l) => l.id === s.lay); if (LL) s.layN = lays.indexOf(LL) + 2; const pre = !s.nomaster && (mo.length || (LL && (LL.objs || []).length)) ? mo.concat(LL ? LL.objs || [] : []).map((o) => { const c = cl(o); if (c.tx) c.tx = c.tx.replace(/\{#\}/g, String(i + 1)).replace(/\{date\}/g, new Date().toLocaleDateString()); c.id = uid(); return c; }) : []; if (!s.nomaster && s.bg === "@bg") { if (LL && LL.bg) s.bg = LL.bg; else if (j.master && j.master.bg) s.bg = j.master.bg; }
+        const out = []; for (const o of pre.concat(s.objs)) { if (o.hide) continue; if (o.t === "group") groupFlat(o).forEach((k) => out.push(k)); else if (o.t === "chart") { const png = await svgPng(chartSvg(o.ch, Math.round(o.w * 2), Math.round(o.h * 2), j.theme), o.w * 2, o.h * 2); if (png) { const key = "c" + uid(); j.media[key] = png; out.push(Object.assign({}, o, { fb: key, alt: o.ch.title || "Chart" })); } else out.push(o); } else out.push(o); }
         s.objs = out;
-      } j.slides = j.slides.filter((s) => !s.master); return j;
+      } j.slides = j.slides.filter((s) => !s.master); j.layouts = lays.map((l) => ({ name: l.name || "Layout" })); j.shows = (j.shows || []).map((c) => ({ name: c.name, idx: (c.ids || []).map((id) => j.slides.findIndex((q) => q.id === id)).filter((k) => k >= 0) })).filter((c) => c.idx.length); return j;
     };
     const svgPng = (svg, w, h) => new Promise((res) => { const im = new Image(); im.onload = () => { const c = document.createElement("canvas"); c.width = w; c.height = h; const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, w, h); g.drawImage(im, 0, 0, w, h); res(c.toDataURL("image/png")); }; im.onerror = () => res(null); im.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svg); });
 
