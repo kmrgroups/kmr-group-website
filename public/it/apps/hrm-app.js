@@ -53,7 +53,7 @@
   const activeEmps = () => S.load.employees.filter((e) => e.status !== "left");
 
   /* ================= router ================= */
-  const SECTIONS = ["std", "dash", "emp", "att", "hrs", "dev", "leave", "pay", "setup"];
+  const SECTIONS = ["std", "dash", "emp", "att", "hrs", "rev", "dev", "leave", "pay", "setup"];
   async function route() {
     let go = hashGo();
     if (window.KMRLock && KMRLock.locked(go)) { KMRLock.dialog(go); go = "std"; history.replaceState(null, "", location.pathname + location.search + "#go=std"); }
@@ -63,7 +63,7 @@
     try {
       await loadAll(); tabsSetup(); await autoHolidays();
       if (go === "pay" && !money()) { say("Payroll is for editors and administrators."); return; }
-      ({ dash: drawDash, emp: drawEmp, att: drawAtt, hrs: drawHrs, dev: drawDev, leave: drawLeave, pay: drawPay, setup: drawSetup })[go]();
+      ({ dash: drawDash, emp: drawEmp, att: drawAtt, hrs: drawHrs, rev: drawRev, dev: drawDev, leave: drawLeave, pay: drawPay, setup: drawSetup })[go]();
     } catch (e) { say(e.message); }
   }
   document.addEventListener("click", (e) => { const a = e.target.closest('a[href^="#go="]'); if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); history.replaceState(null, "", location.pathname + location.search + a.getAttribute("href")); route(); window.scrollTo(0, 0); });
@@ -82,8 +82,8 @@
     const off = (e, d) => hol[d] ? "H" : (((shiftOf(e) || {}).weekly_off || [0]).includes(C.dow(d)) ? "WO" : "");
     const have = {};
     (A.attendance || []).forEach((r) => {
-      const d = String(r.work_date).slice(0, 10), e = em[r.employee_id]; have[r.employee_id + "|" + d] = 1; if (!e) return; const o = off(e, d); if (!o) return;
-      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = r.worked_min; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " (all hours are overtime)"; }
+      const d = String(r.work_date).slice(0, 10), e = em[r.employee_id]; have[r.employee_id + "|" + d] = 1; if (!e) return; const o = off(e, d); if (!o) { if (!e.ot_eligible) r.ot_min = 0; return; }
+      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = e.ot_eligible ? r.worked_min : 0; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " " + (e.ot_eligible ? " (all hours are overtime)" : ""); }
       else if (r.status === "A" || r.status === "MP" && !(+r.worked_min > 0) && !r.in_at) { r.status = o; r.ot_min = 0; r.late_min = 0; r.remarks = o === "H" ? "Holiday: " + hol[d] : null; }
     });
     if (from && to) {                                                                                       // every person has the holiday / weekly off marked, even where nothing was recorded
@@ -220,10 +220,11 @@
     $("#emp").innerHTML = `<div class="row"><input id="eq" placeholder="Search name, code, designation, Biometric ID" style="max-width:300px" value="${esc(V("eq"))}"><select id="ed" style="max-width:180px"><option value="">All departments</option>${opts(depts, dp)}</select><select id="es" style="max-width:150px">${opts([["active", "Active"], ["left", "Left"], ["all", "All"]], st)}</select><span class="grow"></span>
       ${ed() ? `<button class="btn" id="eadd">+ Add employee</button><details class="mm"><summary class="btn o">More ▾</summary><div><button class="btn o s" id="eimp">Import from CSV</button><button class="btn o s" id="etpl">CSV template</button><button class="btn o s" id="ecsv">Export CSV</button>${money() ? '<button class="btn o s" id="epfon">PF on for everyone shown</button><button class="btn o s" id="epfoff">PF off for everyone shown</button>' : ""}</div></details>` : `<button class="btn o s" id="ecsv">Export CSV</button>`}</div>
       <div class="note">${rows.length} of ${L.employees.length} employees. The <b>Biometric ID</b> is the number the person is enrolled with on the fingerprint / face machine; punches are matched to the employee by it.</div>
-      ${rows.length ? `<div class="twrap"><table><thead><tr><th>Code</th><th>Name</th><th>Department · Designation</th><th>Shift</th><th>Bio ID</th>${money() ? "<th class='num'>Monthly gross</th><th title='Switch on only for the people who pay PF'>PF</th>" : ""}<th>Status</th><th></th></tr></thead><tbody>${rows.map((e) => `<tr><td>${esc(e.emp_code)}</td><td><a href="#" data-e="${e.id}">${esc(e.name)}</a>${e.sample ? ' <span class="chip x">sample</span>' : ""}</td><td>${esc(e.department || "")}<div class="mut">${esc(e.designation || "")}</div></td><td>${esc((shiftOf(e) || {}).name || "—")}</td><td>${esc(e.bio_id || "—")}</td>${money() ? `<td class="num">${e.pay_type === "daily" ? rs0(e.basic) + " /day" : rs0(+e.basic + +e.hra + +e.special + +e.other_allow)}</td><td><label class="sw"><input type="checkbox" data-pf="${e.id}"${e.pf ? " checked" : ""}${ed() ? "" : " disabled"}><i></i></label></td>` : ""}<td>${e.status === "left" ? '<span class="chip x">Left</span>' : '<span class="chip g">Active</span>'}</td><td>${ed() ? `<button class="btn o s" data-e="${e.id}">Edit</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No employees match.</div>`}`;
+      ${rows.length ? `<div class="twrap"><table><thead><tr><th>Code</th><th>Name</th><th>Department · Designation</th><th>Shift</th><th title="Switch on for people who get overtime: hours above the working hours then count as overtime">OT</th><th>Bio ID</th>${money() ? "<th class='num'>Monthly gross</th><th title='Switch on only for the people who pay PF'>PF</th>" : ""}<th>Status</th><th></th></tr></thead><tbody>${rows.map((e) => `<tr><td>${esc(e.emp_code)}</td><td><a href="#" data-e="${e.id}">${esc(e.name)}</a>${e.sample ? ' <span class="chip x">sample</span>' : ""}</td><td>${esc(e.department || "")}<div class="mut">${esc(e.designation || "")}</div></td><td>${esc((shiftOf(e) || {}).name || "—")}</td><td><label class="sw"><input type="checkbox" data-ot="${e.id}"${e.ot_eligible ? " checked" : ""}${ed() ? "" : " disabled"}><i></i></label></td><td>${esc(e.bio_id || "—")}</td>${money() ? `<td class="num">${e.pay_type === "daily" ? rs0(e.basic) + " /day" : rs0(+e.basic + +e.hra + +e.special + +e.other_allow)}</td><td><label class="sw"><input type="checkbox" data-pf="${e.id}"${e.pf ? " checked" : ""}${ed() ? "" : " disabled"}><i></i></label></td>` : ""}<td>${e.status === "left" ? '<span class="chip x">Left</span>' : '<span class="chip g">Active</span>'}</td><td>${ed() ? `<button class="btn o s" data-e="${e.id}">Edit</button>` : ""}</td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">No employees match.</div>`}`;
     ["eq", "ed", "es"].forEach((i) => { $("#" + i).oninput = () => { const pos = $("#eq").selectionStart; drawEmp(); if (i === "eq") { $("#eq").focus(); $("#eq").setSelectionRange(pos, pos); } }; });
     document.querySelectorAll("[data-e]").forEach((b) => (b.onclick = (ev) => { ev.preventDefault(); empForm(L.employees.find((x) => x.id === b.dataset.e)); }));
     if ($("#eadd")) { $("#eadd").onclick = () => empForm(null); $("#eimp").onclick = empImport; $("#etpl").onclick = empTemplate; }
+    document.querySelectorAll("[data-ot]").forEach((c) => (c.onchange = async () => { try { await call("kmr_hrms_employee_save", { p: { id: c.dataset.ot, ot_eligible: c.checked } }); const x = L.employees.find((y) => y.id === c.dataset.ot); if (x) x.ot_eligible = c.checked; say("Overtime " + (c.checked ? "switched on" : "switched off") + " for " + (x ? x.name : "the employee") + ".", true); } catch (er) { c.checked = !c.checked; say(er.message); } }));
     document.querySelectorAll("[data-pf]").forEach((c) => (c.onchange = async () => { try { await call("kmr_hrms_employee_save", { p: { id: c.dataset.pf, pf: c.checked } }); const x = L.employees.find((y) => y.id === c.dataset.pf); if (x) x.pf = c.checked; say("PF " + (c.checked ? "switched on" : "switched off") + " for " + (x ? x.name : "the employee") + ".", true); } catch (er) { c.checked = !c.checked; say(er.message); } }));
     const bulkPf = (v) => async () => { if (!confirm(`Switch PF ${v ? "on" : "off"} for the ${rows.length} employee(s) shown?`)) return; try { for (const x of rows) if (!!x.pf !== v) await call("kmr_hrms_employee_save", { p: { id: x.id, pf: v } }); say("Done.", true); await loadAll(); drawEmp(); } catch (er) { say(er.message); } };
     if ($("#epfon")) { $("#epfon").onclick = bulkPf(true); $("#epfoff").onclick = bulkPf(false); }
@@ -272,6 +273,8 @@
 
   /* ================= attendance ================= */
   const ABBR = { P: "P", HD: "½", A: "A", L: "L", U: "U", WO: "W", H: "H", MP: "?" };
+  /* a person who has left is listed only for the month he worked in or left in */
+  const shown = (e, A, from) => e.status !== "left" || (e.dol && String(e.dol).slice(0, 10) >= from) || A.attendance.some((r) => r.employee_id === e.id && ["P", "HD", "MP", "L", "U"].includes(r.status));
   async function drawAtt() {
     const L = S.load; if (!S.month) S.month = L.today.slice(0, 7);
     const { from, to } = C.monthRange(S.month), nd = C.monthDays(S.month), el = $("#att");
@@ -279,7 +282,7 @@
     const A = holFix(await getAtt(from, to), from, to), lockedM = A.locked.includes(S.month);
     const by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
     const dep = V("ad") || "", depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
-    const emps = L.employees.filter((e) => (e.status !== "left" || A.attendance.some((r) => r.employee_id === e.id)) && (!dep || e.department === dep));
+    const emps = L.employees.filter((e) => shown(e, A, from) && (!dep || e.department === dep));
     const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
     const noRows = !A.attendance.length;
     el.innerHTML = `<div class="row"><input type="month" id="am" value="${S.month}" style="max-width:170px"><select id="ad" style="max-width:190px"><option value="">All departments</option>${opts(depts, dep)}</select><span class="grow"></span>
@@ -316,7 +319,7 @@
     await autoWork();
     const A = holFix(await getAtt(from, to), from, to), by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
     const dep = V("hd") || "", q = (V("hq") || "").toLowerCase(), depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
-    const emps = L.employees.filter((e) => (e.status !== "left" || A.attendance.some((r) => r.employee_id === e.id)) && (!dep || e.department === dep) && (!q || (e.name + " " + e.emp_code).toLowerCase().includes(q)));
+    const emps = L.employees.filter((e) => shown(e, A, from) && (!dep || e.department === dep) && (!q || (e.name + " " + e.emp_code).toLowerCase().includes(q)));
     const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
     const hh = (m) => (m / 60).toFixed(1).replace(/\.0$/, ""), split = (r) => { const w = +r.worked_min || 0, o = Math.min(+r.ot_min || 0, w); return { reg: w - o, ot: o, w }; };
     let TR = 0, TO = 0;
@@ -327,6 +330,38 @@
     $("#hm").onchange = () => { S.hm = V("hm") || S.hm; drawHrs(); }; $("#hd").onchange = () => drawHrs(); $("#hq").onchange = () => drawHrs();
     $("#hcsv").onclick = () => dl(`hours-${S.hm}.csv`, toCsv([["Code", "Name", "Department", "Type", ...days.map((d) => +d.slice(8)), "Total"], ...lines.flatMap((x) => [[x.e.emp_code, x.e.name, x.e.department || "", "Regular h", ...x.cells.map((c) => (c.s && c.s.w > 0 ? hh(c.s.reg) : (c.r ? c.r.status : ""))), hh(x.reg)], [x.e.emp_code, x.e.name, x.e.department || "", "OT h", ...x.cells.map((c) => (c.s && c.s.ot ? hh(c.s.ot) : "")), hh(x.ot)]])]), "text/csv");
     document.querySelectorAll("#hrs [data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
+  }
+  /* ================= review: missed punches and long absence ================= */
+  async function drawRev() {
+    const L = S.load, el = $("#rev"); if (!S.rm) S.rm = L.today.slice(0, 7); if (!S.rdays) S.rdays = 7;
+    if (!hasF("hrms.attendance")) { el.innerHTML = '<div class="empty">Attendance is not part of this plan.</div>'; return; }
+    await autoWork();
+    const { from, to } = C.monthRange(S.rm), em = {}; L.employees.forEach((e) => { em[e.id] = e; });
+    const Am = holFix(await getAtt(from, to)), mp = Am.attendance.filter((r) => r.status === "MP" && em[r.employee_id] && em[r.employee_id].status !== "left").sort((x, y) => (em[x.employee_id].name + x.work_date).localeCompare(em[y.employee_id].name + y.work_date));
+    const t = L.today, end = C.addDays(t, -1), beg = C.addDays(end, -90), A3 = holFix(await getAtt(beg, end)), rows = {};
+    A3.attendance.forEach((r) => { (rows[r.employee_id] = rows[r.employee_id] || []).push(r); });
+    const N = Math.max(2, +S.rdays || 7), list = [];
+    L.employees.filter((e) => e.status !== "left").forEach((e) => {
+      const rs = (rows[e.id] || []).sort((x, y) => String(y.work_date).localeCompare(String(x.work_date))); if (!rs.length) return;
+      let ab = 0, last = null; for (const r of rs) { if (r.status === "A") ab++; else if (r.status === "WO" || r.status === "H") continue; else { last = String(r.work_date).slice(0, 10); break; } }
+      if (ab >= N) list.push({ e, ab, last, since: last ? C.addDays(last, 1) : String(rs[rs.length - 1].work_date).slice(0, 10) });
+    });
+    list.sort((x, y) => y.ab - x.ab);
+    const left = L.employees.filter((e) => e.status === "left" && e.dol).sort((x, y) => String(y.dol).localeCompare(String(x.dol))).slice(0, 15);
+    el.innerHTML = `<div class="note">Two lists to review. Fix what is wrong, or mark people who no longer come as <b>left</b>: they disappear from every list and are counted in attrition from their last working day.</div>
+      <h3 style="margin:14px 0 6px">Missed punches</h3>
+      <div class="row"><input type="month" id="rm" value="${S.rm}" style="max-width:170px"><span class="mut">${mp.length} day(s) with one punch only. Click Fix to enter the missing punch.</span></div>
+      ${mp.length ? `<div class="twrap" style="max-height:340px"><table style="min-width:0"><thead><tr><th>Employee</th><th>Code</th><th>Department</th><th>Date</th><th>Punch</th><th></th></tr></thead><tbody>${mp.map((r) => { const e = em[r.employee_id]; return `<tr><td>${esc(e.name)}</td><td>${esc(e.emp_code)}</td><td>${esc(e.department || "")}</td><td>${fmt(r.work_date)}</td><td>${r.in_at ? tm(r.in_at) : ""}</td><td>${ed() ? `<button class="btn o s" data-fx="${e.id}|${String(r.work_date).slice(0, 10)}">Fix</button>` : ""}</td></tr>`; }).join("")}</tbody></table></div>` : `<div class="empty">No missed punches in ${perName(S.rm)}.</div>`}
+      <h3 style="margin:22px 0 6px">Long absent</h3>
+      <div class="row"><label class="lbl" style="margin:0">Absent for at least</label><input type="number" id="rd" min="2" value="${N}" style="max-width:80px"><span class="mut">days in a row, up to yesterday (weekly offs and holidays do not break the run). Switch the person off when he has left.</span></div>
+      ${list.length ? `<div class="twrap" style="max-height:420px"><table style="min-width:0"><thead><tr><th>Employee</th><th>Code</th><th>Department</th><th>Last present</th><th>Absent days</th><th>Still working</th></tr></thead><tbody>${list.map((x) => `<tr><td>${esc(x.e.name)}</td><td>${esc(x.e.emp_code)}</td><td>${esc(x.e.department || "")}</td><td>${x.last ? fmt(x.last) : "not in the last 3 months"}</td><td><b>${x.ab}</b></td><td><label class="sw"><input type="checkbox" data-lv="${x.e.id}|${x.last || x.since}" checked${ed() ? "" : " disabled"}><i></i></label></td></tr>`).join("")}</tbody></table></div>` : `<div class="empty">Nobody has been absent for ${N} days or more.</div>`}
+      ${left.length ? `<h3 style="margin:22px 0 6px">Recently left</h3><div class="twrap" style="max-height:300px"><table style="min-width:0"><thead><tr><th>Employee</th><th>Code</th><th>Last working day</th><th>Left</th></tr></thead><tbody>${left.map((e) => `<tr><td>${esc(e.name)}</td><td>${esc(e.emp_code)}</td><td>${fmt(e.dol)}</td><td><label class="sw"><input type="checkbox" data-lv="${e.id}|" ${ed() ? "" : "disabled"}><i></i></label></td></tr>`).join("")}</tbody></table></div><div class="note">Switch back on to bring a person back as working.</div>` : ""}`;
+    $("#rm").onchange = () => { S.rm = V("rm") || S.rm; drawRev(); }; $("#rd").onchange = () => { S.rdays = +V("rd") || 7; drawRev(); };
+    el.querySelectorAll("[data-fx]").forEach((b) => (b.onclick = () => { const [id, d] = b.dataset.fx.split("|"); dayForm(id, d); }));
+    el.querySelectorAll("[data-lv]").forEach((c) => (c.onchange = async () => {
+      const [id, d] = c.dataset.lv.split("|"), x = em[id], on = c.checked;
+      try { await call("kmr_hrms_employee_save", { p: on ? { id, status: "active", dol: "" } : { id, status: "left", dol: d || null } }); x.status = on ? "active" : "left"; x.dol = on ? null : d; say(on ? x.name + " is working again." : x.name + " is marked as left" + (d ? " from " + fmt(d) : "") + ". Counted in attrition.", true); setTimeout(drawRev, 900); } catch (er) { c.checked = !on; say(er.message); }
+    }));
   }
   const slim = (r) => ({ employee_id: r.employee_id, work_date: r.work_date, in_at: r.in_at, out_at: r.out_at, worked_min: r.worked_min, late_min: r.late_min, early_min: r.early_min, ot_min: r.ot_min, status: r.status, leave_code: r.leave_code, source: r.source, remarks: r.remarks });
   /* attendance is worked out by itself from the punches: no button needed. Runs when the dashboard or Attendance opens, for this month and last month. */
