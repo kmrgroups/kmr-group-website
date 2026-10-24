@@ -253,4 +253,42 @@
         barOf("Rejection by defect (pcs)", byR, "Pieces", "rej"), barOf("Loss hours by D code", byL, "Hours", "loss"),
         { title: "Daily rejection and rework rate (%)", kind: "line", kpi: "rej", labels: dk.map(function (d) { return d.slice(5); }), series: [{ name: "Rejection %", values: dk.map(function (d) { var r = day[d], t = r.ok + r.rej + r.rew; return t ? r.rej / t * 100 : null; }) }, { name: "Rework %", values: dk.map(function (d) { var r = day[d], t = r.ok + r.rej + r.rew; return t ? r.rew / t * 100 : null; }) }] }] };
   } };
+
+  /* ---------- Calibration ---------- */
+  KMRPA.calibration = { name: "Calibration Hub", code: "calibration", std: "calibration", load: async function (call) {
+    var D = await call("kmr_cal_load"), S = std, td = todayIso(), DUE = 30, ms = function (d) { return Date.parse(d + "T00:00:00"); };
+    var I = D.instruments || [], use = I.filter(function (i) { return i.status === "In use"; }), dd = function (i) { return i.next_due ? Math.round((ms(i.next_due) - ms(td)) / 864e5) : null; };
+    var od = use.filter(function (i) { return i.next_due && dd(i) < 0; }), soon = use.filter(function (i) { var d = dd(i); return d != null && d >= 0 && d <= DUE; }), nocal = use.filter(function (i) { return !i.next_due; });
+    var oot = (D.oot || []).filter(function (o) { return o.status !== "Closed"; }), rec = D.records || [], cert = rec.filter(function (r) { return r.cert_no; }).length, msa = D.msa || [];
+    var grr = msa.map(function (m) { return +((m.results || {}).pctGRR); }).filter(function (x) { return isFinite(x); }), bad = grr.filter(function (g) { return g > 30; }).length;
+    var by = {}; I.forEach(function (i) { var k = i.department || "—"; by[k] = by[k] || { t: 0, o: 0 }; by[k].t++; if (od.indexOf(i) >= 0) by[k].o++; });
+    var mo = {}; for (var k = 0; k < 6; k++) { var d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + k); mo[d.toISOString().slice(0, 7)] = 0; }
+    use.forEach(function (i) { if (i.next_due && mo[i.next_due.slice(0, 7)] != null) mo[i.next_due.slice(0, 7)]++; });
+    var dk = Object.keys(by);
+    return { period: "As on " + today(), kpis: [
+      { id: "ok", name: "Calibrated on time", value: use.length ? (use.length - od.length) / use.length * 100 : null, unit: "%", target: 100, tol: 5, dir: "high", std: S("IATF 7.1.5.2.1", "ISO 7.1.5.2", "VDA 6.3 P6"), why: "Instruments in use that are not past their due date." },
+      { id: "od", name: "Overdue instruments", value: od.length, target: 0, amber: 3, dir: "low", std: S("IATF 7.1.5.2.1", "ISO 7.1.5.2"), why: "Past due date — must not be used for acceptance." },
+      { id: "soon", name: "Due in " + DUE + " days", value: soon.length, std: S("IATF 7.1.5.2.1"), why: "Plan these now so none goes overdue." },
+      { id: "nc", name: "In use with no calibration date", value: nocal.length, target: 0, amber: 2, dir: "low", std: S("IATF 7.1.5.2.1", "ISO 7.1.5.2"), why: "No traceable calibration status." },
+      { id: "oot", name: "Open out-of-tolerance cases", value: oot.length, target: 0, amber: 1, dir: "low", std: S("IATF 7.1.5.2.1", "ISO 7.1.5.2", "ISO 8.7"), why: "Parts measured since the last good calibration must be assessed." },
+      { id: "cert", name: "Records with certificate", value: rec.length ? cert / rec.length * 100 : null, unit: "%", target: 100, tol: 10, dir: "high", std: S("IATF 7.1.5.3.2", "ISO 7.1.5.2"), why: "Traceability to national standards needs a certificate number." },
+      { id: "grr", name: "MSA studies with %GRR above 30", value: bad, target: 0, amber: 1, dir: "low", std: S("IATF 7.1.5.1.1", "AIAG MSA"), why: msa.length + " studies on record; above 30% the gauge is not acceptable." }],
+      charts: [{ title: "Instruments due by month", kind: "bar", kpi: "soon", labels: Object.keys(mo), series: [{ name: "Due", values: Object.keys(mo).map(function (m) { return mo[m]; }) }] },
+        { title: "Overdue by department", kind: "bar", kpi: "od", labels: dk, series: [{ name: "Overdue", values: dk.map(function (x) { return by[x].o; }) }, { name: "Total", values: dk.map(function (x) { return by[x].t; }) }] }] };
+  } };
+
+  /* ---------- Raw Material Planning ---------- */
+  KMRPA.rmp = { name: "Raw Material Planning", code: "rmp", std: "rmp", deps: ["/it/apps/rmp-calc.js"], controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 4; k++) { var m = d.toISOString().slice(0, 7); o.push([m, m]); d.setMonth(d.getMonth() + 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
+    var data = await call("kmr_rmp_load", { p_month: v.month }), P = window.RMPCalc.plan(data, v.month), S = std, L = P.lines || [];
+    var ord = L.filter(function (l) { return l.order > 0; }), late = L.filter(function (l) { return l.late; }), sh = L.filter(function (l) { return l.short > 0; });
+    var val = ord.reduce(function (a, l) { return a + (l.value || 0); }, 0), top = ord.slice().sort(function (a, b) { return b.value - a.value; }).slice(0, 10);
+    var sup = {}; ord.forEach(function (l) { var k = l.supplier || "—"; sup[k] = (sup[k] || 0) + (l.value || 0); });
+    return { period: "Plan for " + v.month, kpis: [
+      { id: "late", name: "Orders already late", value: late.length, target: 0, amber: 2, dir: "low", std: S("IATF 8.4.2.1", "ISO 8.4.1", "VDA 6.3 P5"), why: "Order-by date has passed — material will reach production late." },
+      { id: "sh", name: "Materials short of requirement", value: sh.length, target: 0, amber: 3, dir: "low", std: S("ISO 8.1", "IATF 8.4.2.1", "VDA 6.3 P5"), why: "Stock plus safety stock does not cover the plan." },
+      { id: "pr", name: "Data problems in the plan", value: (P.problems || []).length, target: 0, amber: 3, dir: "low", std: S("ISO 7.5.3", "ISO 8.1"), why: "Missing weights, drawings or BOM lines that make the plan uncertain." },
+      { id: "no", name: "Materials to order", value: ord.length, std: S("ISO 8.4.1"), why: "Lines with a net order quantity." },
+      { id: "va", name: "Order value", value: val, unit: "₹", std: S("ISO 8.4.1"), why: "Total value of the orders to place." }],
+      charts: [barOf("Order value by material (₹)", Object.fromEntries(top.map(function (l) { return [l.code, l.value]; })), "₹", "va"), barOf("Order value by supplier (₹)", sup, "₹", "va")] };
+  } };
 })();
