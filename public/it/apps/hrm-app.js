@@ -182,7 +182,7 @@
     const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
     const noRows = !A.attendance.length;
     el.innerHTML = `<div class="row"><input type="month" id="am" value="${S.month}" style="max-width:170px"><select id="ad" style="max-width:190px"><option value="">All departments</option>${opts(depts, dep)}</select><span class="grow"></span>
-      ${ed() ? `<button class="btn" id="awork"${lockedM ? " disabled" : ""}>Work out attendance from punches</button><button class="btn o" id="apun">+ Add a punch</button><button class="btn o" id="aros">Import shift roster</button>` : ""}<button class="btn o" id="acsv">Export sheet (CSV)</button></div>
+      ${ed() ? `<button class="btn" id="awork"${lockedM ? " disabled" : ""}>Work out attendance from punches</button><button class="btn o" id="apun">+ Add a punch</button><button class="btn o" id="aros">Import shift roster</button><button class="btn o" id="aimp">Import attendance sheet</button>` : ""}<button class="btn o" id="acsv">Export sheet (CSV)</button></div>
       ${lockedM ? `<div class="guide">🔒 The payroll of ${perName(S.month)} is finalised. Attendance of this month cannot be changed unless the payroll is re-opened.</div>` : ""}
       ${noRows && ed() && !lockedM ? `<div class="guide">No attendance has been worked out for ${perName(S.month)} yet. Press <b>Work out attendance from punches</b>: it reads the punches of the machines (and the ones you added), applies each person's shift, holidays and approved leave, and fills in Present / Absent / Late / Overtime for every day. Days you correct by hand are never overwritten.</div>` : ""}
       <div class="note"><span class="s-P" style="padding:1px 7px;border-radius:6px">P</span> present · <span class="s-HD" style="padding:1px 7px;border-radius:6px">½</span> half day · <span class="s-A" style="padding:1px 7px;border-radius:6px">A</span> absent · <span class="s-L" style="padding:1px 7px;border-radius:6px">L</span> paid leave · <span class="s-U" style="padding:1px 7px;border-radius:6px">U</span> unpaid leave · <span class="s-WO" style="padding:1px 7px;border-radius:6px">W</span> weekly off · <span class="s-H" style="padding:1px 7px;border-radius:6px">H</span> holiday · <span class="s-MP" style="padding:1px 7px;border-radius:6px">?</span> missed punch. Click a day to see the punches or to correct it.</div>
@@ -191,7 +191,7 @@
         return `<tr><td class="nm">${esc(e.name)}<div class="mut">${esc(e.emp_code)}</div></td>${days.map((d) => { const r = by[e.id + "|" + d]; return `<td class="c ${r ? "s-" + r.status : ""} ${C.dow(d) === 0 && !r ? "wk" : ""}" data-c="${e.id}|${d}" title="${r ? esc(ST[r.status] + (r.in_at ? " · " + tm(r.in_at) + "–" + tm(r.out_at) : "") + (r.remarks ? " · " + r.remarks : "") + (r.source === "manual" ? " · entered by hand" : "")) : ""}">${r ? ABBR[r.status] + (r.source === "manual" ? "*" : "") : ""}</td>`; }).join("")}<td><b>${sm.paid_days}</b></td><td>${sm.absent + sm.missed || ""}</td><td>${sm.late_count || ""}</td><td>${sm.ot_min ? (sm.ot_min / 60).toFixed(1) : ""}</td></tr>`;
       }).join("")}</tbody></table></div><div class="note">* entered by hand</div>` : `<div class="empty">No employees yet.</div>`}`;
     $("#am").onchange = () => { S.month = V("am") || S.month; drawAtt(); }; $("#ad").onchange = () => drawAtt();
-    if ($("#awork")) $("#awork").onclick = workOut; if ($("#apun")) $("#apun").onclick = () => punchForm(); if ($("#aros")) $("#aros").onclick = rosterImport;
+    if ($("#awork")) $("#awork").onclick = workOut; if ($("#apun")) $("#apun").onclick = () => punchForm(); if ($("#aros")) $("#aros").onclick = rosterImport; if ($("#aimp")) $("#aimp").onclick = attendanceImport;
     $("#acsv").onclick = () => dl(`attendance-${S.month}.csv`, toCsv([["Code", "Name", "Department", ...days.map((d) => +d.slice(8)), "Paid days", "Absent", "Late days", "OT hours"], ...emps.map((e) => { const rows = A.attendance.filter((r) => r.employee_id === e.id), sm = C.summary(e, rows, S.month, L.leave_types); return [e.emp_code, e.name, e.department || "", ...days.map((d) => (by[e.id + "|" + d] || {}).status || ""), sm.paid_days, sm.absent + sm.missed, sm.late_count, (sm.ot_min / 60).toFixed(1)]; })]), "text/csv");
     document.querySelectorAll("[data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
   }
@@ -230,6 +230,34 @@
         if (cfg().status_rule !== "shift" && confirm("Judge each day by its shift (late arrival or early leaving = half day, like your attendance machine software)? Press Cancel to keep judging by hours worked.")) { await call("kmr_hrms_settings_save", { p: Object.assign({}, S.load.settings, { status_rule: "shift" }) }); await loadAll(); }
         drawAtt();
       } catch (e) { say(/roster/i.test(e.message) && /function|schema|exist/i.test(e.message) ? "The shift roster is not switched on in the database yet. Run the file 0087_hrm_shift_roster.sql once in the Supabase SQL editor, then try again." : e.message); }
+    });
+  }
+  /* attendance sheet from another system (for example the machine software's timecard report), day by day: Employee Code, Date, Status, In, Out, OT Minutes, Remarks.
+     The days are saved exactly as given and are kept when attendance is worked out from punches again. */
+  function attendanceImport() {
+    pickFile(".csv,.txt,.tsv", async (text) => {
+      try {
+        const t = parseCsv(text); if (t.length < 2) return say("The file has no rows.");
+        const head = t[0].map((h) => h.toLowerCase().replace(/[^a-z_]+/g, "_").replace(/^_|_$/g, "")), ix = (...n) => head.findIndex((h) => n.includes(h));
+        const ic = ix("emp_code", "employee_code", "code"), idt = ix("date", "work_date"), ist = ix("status"), iin = ix("in", "in_time"), iout = ix("out", "out_time"), iot = ix("ot_minutes", "ot_min"), irm = ix("remarks", "remark");
+        if (ic < 0 || idt < 0 || ist < 0) return say("The file needs the columns Employee Code, Date and Status (P, HD, A, L, U, WO, H, MP).");
+        const byCode = {}; S.load.employees.forEach((e) => { byCode[String(e.emp_code).toLowerCase()] = e; });
+        const OK = ["P", "HD", "A", "L", "U", "WO", "H", "MP"], rows = [], miss = new Set(); let bad = 0;
+        t.slice(1).forEach((r) => {
+          const code = (r[ic] || "").trim(), date = (r[idt] || "").trim().slice(0, 10), st = (r[ist] || "").trim().toUpperCase(); if (!code && !date) return;
+          const e = byCode[code.toLowerCase()]; if (!e) { miss.add(code); return; } if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !OK.includes(st)) { bad++; return; }
+          const ti = iin >= 0 ? (r[iin] || "").trim() : "", to = iout >= 0 ? (r[iout] || "").trim() : "", inI = ti ? atLocal(date, ti) : null; let outI = to ? atLocal(date, to) : null;
+          if (inI && outI && outI <= inI) outI = new Date(Date.parse(outI) + 864e5).toISOString();
+          rows.push({ employee_id: e.id, work_date: date, status: st, in_at: inI, out_at: outI, worked_min: inI && outI ? Math.round((Date.parse(outI) - Date.parse(inI)) / 6e4) : 0, ot_min: iot >= 0 ? Math.max(0, Math.round(+r[iot] || 0)) : 0, source: "manual", remarks: irm >= 0 ? (r[irm] || "").trim() || null : null });
+        });
+        if (!rows.length) return say("No row could be used. Check that the employee codes exist in the HRM (Employees tab) and the dates look like 2026-09-01.");
+        const ds = rows.map((x) => x.work_date).sort();
+        if (!confirm(`Save ${rows.length} attendance day(s) for ${new Set(rows.map((x) => x.employee_id)).size} people, ${ds[0]} to ${ds[ds.length - 1]}? They are saved exactly as in the file and are not changed when you work out attendance from punches. Days already saved for the same person and date are replaced.` + (miss.size ? ` ${miss.size} employee code(s) are not in the HRM and will be skipped.` : "") + (bad ? ` ${bad} row(s) have a wrong date or status and will be skipped.` : ""))) return;
+        const tot = { saved: 0, locked: 0 };
+        for (let i = 0; i < rows.length; i += 3000) { const r = await call("kmr_hrms_att_save", { p: { mode: "manual", rows: rows.slice(i, i + 3000) } }); tot.saved += r.saved; tot.locked += r.locked; }
+        say(`${tot.saved} attendance day(s) saved` + (tot.locked ? `, ${tot.locked} day(s) in a finalised month were not changed` : "") + (miss.size ? `. Not in the HRM: ${[...miss].slice(0, 5).join(", ")}${miss.size > 5 ? "…" : ""}` : "") + ".", true);
+        drawAtt();
+      } catch (e) { say(e.message); }
     });
   }
   async function workOut() {
