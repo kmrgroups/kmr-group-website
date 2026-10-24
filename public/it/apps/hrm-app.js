@@ -53,7 +53,7 @@
   const activeEmps = () => S.load.employees.filter((e) => e.status !== "left");
 
   /* ================= router ================= */
-  const SECTIONS = ["std", "dash", "emp", "att", "dev", "leave", "pay", "setup"];
+  const SECTIONS = ["std", "dash", "emp", "att", "hrs", "dev", "leave", "pay", "setup"];
   async function route() {
     let go = hashGo();
     if (window.KMRLock && KMRLock.locked(go)) { KMRLock.dialog(go); go = "std"; history.replaceState(null, "", location.pathname + location.search + "#go=std"); }
@@ -63,7 +63,7 @@
     try {
       await loadAll(); tabsSetup(); await autoHolidays();
       if (go === "pay" && !money()) { say("Payroll is for editors and administrators."); return; }
-      ({ dash: drawDash, emp: drawEmp, att: drawAtt, dev: drawDev, leave: drawLeave, pay: drawPay, setup: drawSetup })[go]();
+      ({ dash: drawDash, emp: drawEmp, att: drawAtt, hrs: drawHrs, dev: drawDev, leave: drawLeave, pay: drawPay, setup: drawSetup })[go]();
     } catch (e) { say(e.message); }
   }
   document.addEventListener("click", (e) => { const a = e.target.closest('a[href^="#go="]'); if (!a || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); history.replaceState(null, "", location.pathname + location.search + a.getAttribute("href")); route(); window.scrollTo(0, 0); });
@@ -74,7 +74,13 @@
   async function getAtt(from, to) {
     const A = await call("kmr_hrms_att_get", { p_from: from, p_to: to });
     try { A.roster = await call("kmr_hrms_roster_get", { p_from: from, p_to: to }); } catch (e) { A.roster = []; }             // the shift roster (rotating shifts); none yet = everyone on their own shift
-    S.att = A; return A;
+    holFix(A); S.att = A; return A;
+  }
+  /* holidays from Setup are applied to every month by themselves: a day marked absent on a holiday (for example by the machine report, which does not know the company holidays) counts as a holiday */
+  function holFix(A) {
+    const hol = {}; ((S.load || {}).holidays || []).forEach((h) => { hol[String(h.hdate).slice(0, 10)] = h.name; });
+    (A.attendance || []).forEach((r) => { const d = String(r.work_date).slice(0, 10); if (r.status === "A" && hol[d]) { r.status = "H"; r.ot_min = 0; r.late_min = 0; r.remarks = "Holiday: " + hol[d]; } });
+    return A;
   }
   function buildFrom(A, from, to) {
     const L = S.load, leaves = (A.leaves || []);
@@ -118,7 +124,7 @@
   async function dashLoad(force) {
     const y = S.dm.slice(0, 4); if (!force && S.dc && S.dc.year === y) return;
     const rows = [];
-    for (const [a, b] of [["01-01", "03-31"], ["04-01", "06-30"], ["07-01", "09-30"], ["10-01", "12-31"]]) { const A = await call("kmr_hrms_att_get", { p_from: y + "-" + a, p_to: y + "-" + b }); (A.attendance || []).forEach((r) => rows.push(r)); }
+    for (const [a, b] of [["01-01", "03-31"], ["04-01", "06-30"], ["07-01", "09-30"], ["10-01", "12-31"]]) { const A = holFix(await call("kmr_hrms_att_get", { p_from: y + "-" + a, p_to: y + "-" + b })); (A.attendance || []).forEach((r) => rows.push(r)); }
     const idx = {}, months = {}; rows.forEach((r) => { (idx[r.employee_id] = idx[r.employee_id] || []).push(r); months[String(r.work_date).slice(0, 7)] = 1; });
     S.dc = { year: y, idx, months };
   }
@@ -291,6 +297,26 @@
     };
     $("#acsv").onclick = () => dl(`attendance-${S.month}.csv`, toCsv([["Code", "Name", "Department", ...days.map((d) => +d.slice(8)), "Paid days", "Absent", "Late days", "OT hours"], ...emps.map((e) => { const rows = A.attendance.filter((r) => r.employee_id === e.id), sm = C.summary(e, rows, S.month, L.leave_types); return [e.emp_code, e.name, e.department || "", ...days.map((d) => (by[e.id + "|" + d] || {}).status || ""), sm.paid_days, sm.absent + sm.missed, sm.late_count, (sm.ot_min / 60).toFixed(1)]; })]), "text/csv");
     document.querySelectorAll("[data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
+  }
+  /* ================= hours sheet: every day of every person, regular hours (top left) and overtime hours (bottom right) in one cell ================= */
+  async function drawHrs() {
+    const L = S.load; if (!S.hm) S.hm = L.today.slice(0, 7);
+    const { from, to } = C.monthRange(S.hm), nd = C.monthDays(S.hm), el = $("#hrs");
+    if (!hasF("hrms.attendance")) { el.innerHTML = '<div class="empty">Attendance is not part of this plan.</div>'; return; }
+    await autoWork();
+    const A = await getAtt(from, to), by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
+    const dep = V("hd") || "", q = (V("hq") || "").toLowerCase(), depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
+    const emps = L.employees.filter((e) => (e.status !== "left" || A.attendance.some((r) => r.employee_id === e.id)) && (!dep || e.department === dep) && (!q || (e.name + " " + e.emp_code).toLowerCase().includes(q)));
+    const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
+    const hh = (m) => (m / 60).toFixed(1).replace(/\.0$/, ""), split = (r) => { const w = +r.worked_min || 0, o = Math.min(+r.ot_min || 0, w); return { reg: w - o, ot: o, w }; };
+    let TR = 0, TO = 0;
+    const lines = emps.map((e) => { let reg = 0, ot = 0, wd = 0; const cells = days.map((d) => { const r = by[e.id + "|" + d]; if (!r) return { d, r: null }; const s = split(r); if (s.w > 0) { reg += s.reg; ot += s.ot; wd++; } return { d, r, s }; }); TR += reg; TO += ot; return { e, cells, reg, ot, wd }; });
+    el.innerHTML = `<div class="row"><input type="month" id="hm" value="${S.hm}" style="max-width:170px"><select id="hd" style="max-width:190px"><option value="">All departments</option>${opts(depts, dep)}</select><input type="search" id="hq" placeholder="Search name or code" value="${esc(q)}" style="max-width:200px"><span class="grow"></span><button class="btn o" id="hcsv">Export sheet (CSV)</button></div>
+      <div class="note">Each cell: <b>regular hours</b> (top left) and <span style="color:var(--r,#c0392b);font-weight:700">overtime hours</span> (bottom right), divided by the diagonal. Days without work show the status letter (A absent, W weekly off, H holiday, L / U leave). Regular hours = hours between first in and last out, less the overtime. Click a day to see the punches or correct it.</div>
+      ${emps.length ? `<div class="twrap"><table class="sheetg"><thead><tr><th class="nm">Employee</th>${days.map((d) => `<th class="${C.dow(d) === 0 ? "wk" : ""}">${+d.slice(8)}</th>`).join("")}<th>Days worked</th><th>Regular h</th><th>OT h</th><th>Total h</th></tr></thead><tbody>${lines.map((x) => `<tr><td class="nm">${esc(x.e.name)}<div class="mut">${esc(x.e.emp_code)}</div></td>${x.cells.map((c) => !c.r ? `<td class="st ${C.dow(c.d) === 0 ? "wk" : ""}"></td>` : c.s.w > 0 ? `<td class="c hcell ${C.dow(c.d) === 0 ? "wk" : ""}" data-c="${x.e.id}|${c.d}" title="${esc(ST[c.r.status] + " · " + tm(c.r.in_at) + "–" + tm(c.r.out_at) + " · regular " + hh(c.s.reg) + " h, overtime " + hh(c.s.ot) + " h")}"><span class="r">${c.s.reg ? hh(c.s.reg) : "0"}</span><span class="o">${c.s.ot ? hh(c.s.ot) : ""}</span></td>` : `<td class="c hcell st s-${c.r.status}" data-c="${x.e.id}|${c.d}" title="${esc(ST[c.r.status] + (c.r.remarks ? " · " + c.r.remarks : ""))}">${ABBR[c.r.status]}</td>`).join("")}<td>${x.wd || ""}</td><td><b>${x.reg ? hh(x.reg) : ""}</b></td><td><b style="color:var(--r,#c0392b)">${x.ot ? hh(x.ot) : ""}</b></td><td><b>${x.reg + x.ot ? hh(x.reg + x.ot) : ""}</b></td></tr>`).join("")}<tr><td class="nm"><b>Total</b></td>${days.map((d) => { let r = 0, o = 0; lines.forEach((x) => { const c = x.cells[+d.slice(8) - 1]; if (c && c.s && c.s.w > 0) { r += c.s.reg; o += c.s.ot; } }); return `<td class="hcell st" style="background-image:none"><b>${r ? hh(r) : ""}</b>${o ? `<div style="color:var(--r,#c0392b);font-weight:700">${hh(o)}</div>` : ""}</td>`; }).join("")}<td></td><td><b>${hh(TR)}</b></td><td><b style="color:var(--r,#c0392b)">${hh(TO)}</b></td><td><b>${hh(TR + TO)}</b></td></tr></tbody></table></div>` : `<div class="empty">No employees match.</div>`}`;
+    $("#hm").onchange = () => { S.hm = V("hm") || S.hm; drawHrs(); }; $("#hd").onchange = () => drawHrs(); $("#hq").onchange = () => drawHrs();
+    $("#hcsv").onclick = () => dl(`hours-${S.hm}.csv`, toCsv([["Code", "Name", "Department", "Type", ...days.map((d) => +d.slice(8)), "Total"], ...lines.flatMap((x) => [[x.e.emp_code, x.e.name, x.e.department || "", "Regular h", ...x.cells.map((c) => (c.s && c.s.w > 0 ? hh(c.s.reg) : (c.r ? c.r.status : ""))), hh(x.reg)], [x.e.emp_code, x.e.name, x.e.department || "", "OT h", ...x.cells.map((c) => (c.s && c.s.ot ? hh(c.s.ot) : "")), hh(x.ot)]])]), "text/csv");
+    document.querySelectorAll("#hrs [data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
   }
   const slim = (r) => ({ employee_id: r.employee_id, work_date: r.work_date, in_at: r.in_at, out_at: r.out_at, worked_min: r.worked_min, late_min: r.late_min, early_min: r.early_min, ot_min: r.ot_min, status: r.status, leave_code: r.leave_code, source: r.source, remarks: r.remarks });
   /* attendance is worked out by itself from the punches: no button needed. Runs when the dashboard or Attendance opens, for this month and last month. */
