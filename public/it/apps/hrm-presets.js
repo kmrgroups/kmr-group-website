@@ -43,28 +43,63 @@
 """KMR HRM bridge - reads the attendance punches from a biometric machine by its IP address and sends them to KMR HRM & Payroll.
 Machine: ${o.name || "(machine)"} (${o.ip})
 Works with machines that speak the ZKTeco protocol (ZKTeco, eSSL, Realtime and most look-alikes) on their network port (usually 4370).
-Setup (once):   pip install pyzk requests
-Run:            python kmr_bridge.py            (leave it running; it checks every ${o.every || 5} minutes)
-                python kmr_bridge.py --once     (read once and stop; good for a scheduled task)
-Nothing is lost when the PC or the internet is off: every run sends the punches again from the last one confirmed, and punches that were already received are ignored."""
-import sys, time, json, os, datetime
-import requests
-from zk import ZK
+Double-click this file (kmr_bridge.pyw) on a PC that is on the same network as the machine and stays switched on.
+No window opens: a small KMR icon appears near the clock (system tray). Green = punches are being sent, red = a problem (hover to read it).
+Right-click the icon: Send now, Start with Windows, Open log, Quit. The first run installs what it needs and sets itself to start with Windows.
+It checks every ${o.every || 5} minutes. Nothing is lost when the PC or the internet is off: every run sends the punches again from the last one confirmed, and punches already received are ignored.
+Other ways:  python kmr_bridge.pyw --once   (read once and stop)      python kmr_bridge.pyw --console   (run in a window, no tray icon)"""
+import sys, time, json, os, datetime, threading, subprocess, socket, zlib
 
 IP, PORT, COMM_KEY = "${o.ip || "192.168.1.201"}", ${o.port || 4370}, ${o.commkey || 0}
 URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-MACHINE-SCREEN"}"
 EVERY_MIN = ${o.every || 5}
-STATE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "kmr_bridge_state.json")
+NAME = "KMR bridge ${String(o.name || o.ip || "").replace(/[^A-Za-z0-9 ._-]/g, "")}".strip()
+HERE = os.path.dirname(os.path.abspath(__file__))
+STATE = os.path.join(HERE, "kmr_bridge_state.json")
+LOGF = os.path.join(HERE, "kmr_bridge.log")
 VERIFY = {0: "password", 1: "finger", 2: "card", 3: "password", 4: "card", 15: "face", 25: "palm"}
 DIRECTION = {0: "in", 1: "out", 4: "in", 5: "out"}
+NL = chr(10)
+STATUS = {"text": "Starting...", "ok": True}
+WAKE = threading.Event()
+
+def log(msg):
+    line = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ") + str(msg)
+    try:
+        if os.path.exists(LOGF) and os.path.getsize(LOGF) > 400000:
+            keep = open(LOGF, encoding="utf-8", errors="ignore").read().split(NL)[-500:]
+            open(LOGF, "w", encoding="utf-8").write(NL.join(keep) + NL)
+        with open(LOGF, "a", encoding="utf-8") as f:
+            f.write(line + NL)
+    except Exception:
+        pass
+    if sys.stdout:
+        print(line)
+
+def need(mod, pkg):
+    try:
+        __import__(mod)
+    except ImportError:
+        log("Installing " + pkg + " (first run only)...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", pkg], creationflags=0x08000000 if os.name == "nt" else 0)
+
+def load_state():
+    try:
+        return json.load(open(STATE))
+    except Exception:
+        return {}
+
+def save_state(**kw):
+    st = load_state()
+    st.update(kw)
+    json.dump(st, open(STATE, "w"))
 
 def last_sent():
-    try:
-        return json.load(open(STATE))["last"]
-    except Exception:
-        return "1970-01-01 00:00:00"
+    return load_state().get("last", "1970-01-01 00:00:00")
 
 def run_once():
+    import requests
+    from zk import ZK
     since = last_sent()
     conn = ZK(IP, port=PORT, timeout=15, password=COMM_KEY, force_udp=False, ommit_ping=True).connect()
     try:
@@ -76,18 +111,128 @@ def run_once():
         r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
         r.raise_for_status()
     if punches:
-        json.dump({"last": max(p["time"] for p in punches)}, open(STATE, "w"))
-    print(datetime.datetime.now().strftime("%H:%M:%S"), len(punches), "punch(es) sent")
+        save_state(last=max(p["time"] for p in punches))
+    return len(punches)
+
+def cycle():
+    try:
+        n = run_once()
+        STATUS.update(ok=True, text="OK " + datetime.datetime.now().strftime("%d %b %H:%M") + " - " + str(n) + " punch(es) sent")
+        log(str(n) + " punch(es) sent")
+    except Exception as e:
+        STATUS.update(ok=False, text="Problem: " + str(e)[:120] + " - will try again")
+        log("Could not read/send: " + str(e) + " - will try again")
+
+def worker(icon=None):
+    while True:
+        cycle()
+        if icon:
+            icon_update(icon)
+        if "--once" in sys.argv:
+            return
+        WAKE.wait(EVERY_MIN * 60)
+        WAKE.clear()
+
+def autostart_cmd():
+    exe = sys.executable
+    if exe.lower().endswith("python.exe"):
+        exe = exe[:-10] + "pythonw.exe"
+    return '"%s" "%s"' % (exe, os.path.abspath(__file__))
+
+def autostart_get():
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run") as k:
+            return winreg.QueryValueEx(k, NAME)[0] == autostart_cmd()
+    except Exception:
+        return False
+
+def autostart_set(on):
+    if os.name != "nt":
+        return
+    import winreg
+    with winreg.OpenKey(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE) as k:
+        if on:
+            winreg.SetValueEx(k, NAME, 0, winreg.REG_SZ, autostart_cmd())
+        else:
+            try:
+                winreg.DeleteValue(k, NAME)
+            except FileNotFoundError:
+                pass
+    save_state(autostart=bool(on))
+
+def make_image(ok):
+    from PIL import Image, ImageDraw
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse((3, 3, 61, 61), fill=(22, 163, 74, 255) if ok else (220, 38, 38, 255))
+    for a, b in (((22, 17), (22, 47)), ((23, 33), (42, 17)), ((26, 31), (43, 47))):
+        d.line([a, b], fill="white", width=6)
+    return img
+
+def icon_update(icon):
+    try:
+        icon.icon = make_image(STATUS["ok"])
+        icon.title = (NAME + ": " + STATUS["text"])[:120]
+        icon.update_menu()
+    except Exception:
+        pass
+
+def run_tray():
+    import pystray
+    def send_now(icon, item):
+        WAKE.set()
+    def toggle(icon, item):
+        autostart_set(not autostart_get())
+    def open_log(icon, item):
+        try:
+            os.startfile(LOGF)
+        except Exception:
+            pass
+    def quit_it(icon, item):
+        ok = True
+        if os.name == "nt":
+            import ctypes
+            ok = ctypes.windll.user32.MessageBoxW(0, "Stop the KMR bridge? Punches will not reach the HRM until it is started again.", NAME, 0x24 | 0x40000) == 6
+        if ok:
+            icon.stop()
+    menu = pystray.Menu(
+        pystray.MenuItem(lambda item: STATUS["text"], None, enabled=False),
+        pystray.MenuItem("Send now", send_now, default=True),
+        pystray.MenuItem("Start with Windows", toggle, checked=lambda item: autostart_get()),
+        pystray.MenuItem("Open log", open_log),
+        pystray.MenuItem("Quit", quit_it))
+    icon = pystray.Icon(NAME, make_image(True), NAME + ": starting", menu)
+    threading.Thread(target=worker, args=(icon,), daemon=True).start()
+    icon.run()
 
 if __name__ == "__main__":
-    while True:
+    lock = socket.socket()
+    try:
+        lock.bind(("127.0.0.1", 47000 + zlib.crc32((IP + str(PORT)).encode()) % 1000))
+    except OSError:
+        sys.exit(0)                                   # already running: do nothing
+    try:
+        need("requests", "requests"); need("zk", "pyzk")
+        if "--once" not in sys.argv and "--console" not in sys.argv:
+            need("PIL", "pillow"); need("pystray", "pystray")
+    except Exception as e:
+        log("Could not install what is needed: " + str(e))
+    if "--once" in sys.argv or "--console" in sys.argv:
+        worker()
+    else:
+        if load_state().get("autostart", True) and not autostart_get():
+            try:
+                autostart_set(True)
+            except Exception as e:
+                log("Could not set start with Windows: " + str(e))
         try:
-            run_once()
+            run_tray()
         except Exception as e:
-            print("Could not read/send:", e, "- will try again")
-        if "--once" in sys.argv:
-            break
-        time.sleep(EVERY_MIN * 60)
+            log("No tray icon (" + str(e) + "); running without it")
+            worker()
 `;
   }
 
