@@ -22,7 +22,7 @@
     meta = meta || {};
     const rels = [], media = []; let rid = 10, numId = 10; const nums = [];
     const addRel = (type, target, ext) => { const id = "rId" + rid++; rels.push(`<Relationship Id="${id}" Type="${R}/${type}" Target="${esc(target)}"${ext ? ' TargetMode="External"' : ""}/>`); return id; };
-    const imgs = []; let imgN = 1, drawId = 1;
+    const imgs = []; let imgN = 1, drawId = 1; let tcId = 900; const cList = meta.comments || [], cIdx = {}; cList.forEach((c, i) => (cIdx[c.id] = i));
     /* ---- runs ---- */
     function rpr(f) {
       let x = "";
@@ -72,6 +72,8 @@
           const h = c.getAttribute("href"); let inner = await inline(c, fmtOf(c, f));
           if (/^#/.test(h)) x += `<w:hyperlink w:anchor="${esc(h.slice(1))}">${inner}</w:hyperlink>`; else x += `<w:hyperlink r:id="${addRel("hyperlink", h, true)}">${inner}</w:hyperlink>`; continue;
         }
+        if ((t === "ins" || t === "del") && c.hasAttribute("data-by")) { const a = `w:id="${tcId++}" w:author="${esc(c.getAttribute("data-by") || "")}" w:date="${esc((c.getAttribute("data-at") || new Date().toISOString()).replace(/\.\d+Z$/, "Z"))}"`; let inner = await inline(c, f); if (t === "del") inner = inner.replace(/<w:t( xml:space="preserve")?>/g, '<w:delText xml:space="preserve">').replace(/<\/w:t>/g, "</w:delText>"); x += `<w:${t} ${a}>${inner}</w:${t}>`; continue; }
+        if (t === "span" && c.classList && c.classList.contains("cmt") && cIdx[c.getAttribute("data-c")] != null) { const n = cIdx[c.getAttribute("data-c")]; x += `<w:commentRangeStart w:id="${n}"/>${await inline(c, fmtOf(c, f))}<w:commentRangeEnd w:id="${n}"/><w:r><w:rPr><w:rStyle w:val="CommentReference"/></w:rPr><w:commentReference w:id="${n}"/></w:r>`; continue; }
         if (c.classList && c.classList.contains("pb")) { x += '<w:r><w:br w:type="page"/></w:r>'; continue; }
         x += await inline(c, fmtOf(c, f));
       }
@@ -178,16 +180,17 @@
     const ct = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="png" ContentType="image/png"/><Default Extension="jpeg" ContentType="image/jpeg"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.numbering+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/word/footer1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.footer+xml"/>${hdr ? '<Override PartName="/word/header1.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.header+xml"/>' : ""}<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/></Types>`;
     const now = new Date().toISOString().replace(/\.\d+Z$/, "Z");
     const entries = [
-      { name: "[Content_Types].xml", data: ct },
+      { name: "[Content_Types].xml", data: cList.length ? ct.replace("</Types>", '<Override PartName="/word/comments.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.comments+xml"/></Types>') : ct },
       { name: "_rels/.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/><Relationship Id="rId3" Type="${R}/extended-properties" Target="docProps/app.xml"/></Relationships>` },
       { name: "word/document.xml", data: docXml },
-      { name: "word/_rels/document.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/styles" Target="styles.xml"/><Relationship Id="rId2" Type="${R}/numbering" Target="numbering.xml"/><Relationship Id="rId3" Type="${R}/settings" Target="settings.xml"/>${rels.join("")}</Relationships>` },
+      { name: "word/_rels/document.xml.rels", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/styles" Target="styles.xml"/><Relationship Id="rId2" Type="${R}/numbering" Target="numbering.xml"/><Relationship Id="rId3" Type="${R}/settings" Target="settings.xml"/>${cList.length ? `<Relationship Id="rId4" Type="${R}/comments" Target="comments.xml"/>` : ""}${rels.join("")}</Relationships>` },
       { name: "word/styles.xml", data: styles() }, { name: "word/numbering.xml", data: numXml },
       { name: "word/settings.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="${W}"><w:defaultTabStop w:val="720"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>` },
       { name: "word/footer1.xml", data: footXml },
       { name: "docProps/core.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(meta.title || "")}</dc:title><dc:creator>${esc(meta.author || "KMR Office Suite")}</dc:creator>${meta.subject ? `<dc:subject>${esc(meta.subject)}</dc:subject>` : ""}${meta.keywords ? `<cp:keywords>${esc(meta.keywords)}</cp:keywords>` : ""}<dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>` },
       { name: "docProps/app.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>KMR Office Suite</Application></Properties>` }
     ];
+    if (cList.length) entries.push({ name: "word/comments.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:comments xmlns:w="${W}">${cList.map((c, i) => `<w:comment w:id="${i}" w:author="${esc(c.by || "")}" w:date="${esc((c.at || now).replace(/\.\d+Z$/, "Z"))}" w:initials="${esc((c.by || "?").split(/\s+/).map((x) => x[0] || "").join("").slice(0, 3))}"><w:p><w:r><w:t xml:space="preserve">${esc(c.text || "")}</w:t></w:r></w:p></w:comment>`).join("")}</w:comments>` });
     if (hdr) entries.push({ name: "word/header1.xml", data: await hf("hdr", hdr) });
     imgs.forEach((i) => entries.push({ name: "word/media/" + i.name, data: i.bytes }));
     return Z.build(entries);
@@ -225,6 +228,8 @@
       const sd = Z.parse(stXml); const dd = Z.deep(sd.documentElement, "rPrDefault")[0]; if (dd) { const s = at(kid(kid(dd, "rPr"), "sz"), "w:val") || at(kid(kid(dd, "rPr"), "sz"), "val"); if (s) defaultSz = +s; }
       Z.deep(sd.documentElement, "style").forEach((s) => (styleDef[s.getAttributeNS(W, "styleId") || s.getAttribute("w:styleId")] = { el: s, based: at(kid(s, "basedOn"), "w:val") || (kid(s, "basedOn") && kid(s, "basedOn").getAttributeNS(W, "val")), name: kid(s, "name") ? (kid(s, "name").getAttributeNS(W, "val") || kid(s, "name").getAttribute("w:val")) : "" }));
     }
+    const cmtXml = await zip.text("word/comments.xml"), cmtMap = {}, cmtUsed = [];
+    if (cmtXml) Z.deep(Z.parse(cmtXml).documentElement, "comment").forEach((c) => { const id = c.getAttributeNS(W, "id") || c.getAttribute("w:id"); cmtMap[id] = { by: c.getAttributeNS(W, "author") || c.getAttribute("w:author") || "", at: c.getAttributeNS(W, "date") || c.getAttribute("w:date") || "", text: Z.deep(c, "p").map((p) => Z.deep(p, "t").map((t) => t.textContent).join("")).join("\n") }; });
     const wv = (el) => (el ? el.getAttributeNS(W, "val") ?? el.getAttribute("w:val") : null), wa = (el, n) => (el ? el.getAttributeNS(W, n) ?? el.getAttribute("w:" + n) : null);
     const numXml = await zip.text("word/numbering.xml"), numFmt = {}; // numId -> [fmt per lvl]
     if (numXml) {
@@ -281,7 +286,7 @@
             let inner = "";
             for (const x of Array.from(c.children)) {
               const xn = x.localName;
-              if (xn === "t") inner += esc(x.textContent).replace(/ {2}/g, " &nbsp;"); else if (xn === "tab") inner += "&emsp;"; else if (xn === "br") { inner += wa(x, "type") === "page" ? '</span><div class="pb" contenteditable="false"></div><span>' : "<br>"; } else if (xn === "cr") inner += "<br>"; else if (xn === "noBreakHyphen") inner += "-"; else if (xn === "sym") { const ch = wa(x, "char"); if (ch) inner += String.fromCodePoint(parseInt(ch, 16) & 0xffff); }
+              if (xn === "t" || xn === "delText") inner += esc(x.textContent).replace(/ {2}/g, " &nbsp;"); else if (xn === "tab") inner += "&emsp;"; else if (xn === "br") { inner += wa(x, "type") === "page" ? '</span><div class="pb" contenteditable="false"></div><span>' : "<br>"; } else if (xn === "cr") inner += "<br>"; else if (xn === "noBreakHyphen") inner += "-"; else if (xn === "sym") { const ch = wa(x, "char"); if (ch) inner += String.fromCodePoint(parseInt(ch, 16) & 0xffff); }
               else if (xn === "drawing" || xn === "pict") {
                 for (const b of Z.deep(x, "blip")) { const src = await pic(b); if (src) { let w = 0, hh = 0; const ext = Z.deep(x, "extent")[0]; if (ext) { w = +ext.getAttribute("cx") / 9525; hh = +ext.getAttribute("cy") / 9525; } inner += `<img src="${src}"${w ? ` width="${Math.round(w)}" height="${Math.round(hh)}"` : ""} alt="${esc((Z.deep(x, "docPr")[0] || { getAttribute: () => "" }).getAttribute("descr") || "")}">`; } }
               }
@@ -291,11 +296,12 @@
           } else if (n === "hyperlink") {
             const rid = c.getAttributeNS(R, "id") || c.getAttribute("r:id"), anc = wa(c, "anchor"); const before = h; h = ""; await walk(c); const inner = h; h = before;
             const href = rid && rel[rid] ? rel[rid].t : anc ? "#" + anc : ""; h += href ? `<a href="${esc(href)}">${inner}</a>` : inner;
-          } else if (/^(ins|smartTag|sdt|sdtContent|fldSimple|customXml|bdo)$/.test(n)) await walk(c);
-          else if (n === "del") { /* deleted text is not shown */ }
+          } else if (n === "ins" || n === "del") { const before = h; h = ""; await walk(c); const inner = h; h = before; h += inner ? `<${n} data-by="${esc(wa(c, "author") || "")}" data-at="${esc(wa(c, "date") || "")}">${inner}</${n}>` : ""; }
+          else if (n === "commentRangeStart") h += "\u0001S" + wa(c, "id") + "\u0001"; else if (n === "commentRangeEnd") h += "\u0001E" + wa(c, "id") + "\u0001";
+          else if (/^(smartTag|sdt|sdtContent|fldSimple|customXml|bdo)$/.test(n)) await walk(c);
         }
       };
-      await walk(p); return h;
+      await walk(p); h = h.replace(/\u0001S(\d+)\u0001([\s\S]*?)\u0001E\1\u0001/g, (m, id, inner) => { const c = cmtMap[id]; if (!c || cmtUsed.some((u) => u.id === "c" + id)) return inner; cmtUsed.push({ id: "c" + id, text: c.text, by: c.by, at: c.at, quote: inner.replace(/<[^>]+>/g, "").slice(0, 200), done: false }); return `<span class="cmt" data-c="c${id}">${inner}</span>`; }); return h.replace(/\u0001[SE]\d+\u0001/g, "");
     }
     const headingOf = (st, pr) => { const nm = ((styleDef[st] && styleDef[st].name) || st || "").toLowerCase(); let m = /^heading ?([1-6])$/.exec(nm); if (m) return "h" + m[1]; if (nm === "title") return "title"; if (nm === "subtitle") return "sub"; if (/quote/.test(nm)) return "quote"; if (pr && pr.outline != null && pr.outline < 6) return "h" + (pr.outline + 1); return null; };
     let used = 0;
@@ -376,7 +382,7 @@
     const part = async (kind) => { const sp2 = sp && Z.kids(sp, kind + "Reference")[0]; if (!sp2) return ""; const rid = sp2.getAttributeNS(R, "id") || sp2.getAttribute("r:id"); const r = rel[rid]; if (!r) return ""; const x = await zip.text("word/" + r.t); if (!x) return ""; const dd = Z.parse(x); const hh = await blocksOf(dd.documentElement); return hh.replace(/<p><br><\/p>/g, "").replace(/<\/?p[^>]*>/g, " ").replace(/<[^>]+>/g, (m) => (/^<(b|i|u|strong|em|br|span)/.test(m) || /^<\/(b|i|u|strong|em|span)>/.test(m) ? m : "")).trim(); };
     let header = "", footer = ""; try { header = await part("header"); footer = await part("footer"); } catch (e) { /* ignore */ }
     const cp = await zip.text("docProps/core.xml"); let title = ""; if (cp) { const m = /<dc:title>([^<]*)<\/dc:title>/.exec(cp); if (m) title = m[1]; }
-    return { html: html || "<p><br></p>", page, header, footer, title };
+    return { html: html || "<p><br></p>", page, header, footer, title, comments: cmtUsed };
   }
   window.OffDocx = { write, read };
 })();
