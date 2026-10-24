@@ -1,0 +1,18 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/company-config.js"></script>
+<title>Presentation · KMR Apps</title>
+<meta name="theme-color" content="#1e3a8a">
+</head><body>
+<header><span class="clogo" id="clogo" hidden></span><div><h1 id="ttl">Presentation</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<main><div class="panel"><div id="msg"></div><section id="pres"></section></div></main>
+<script src="/it/apps/qp-core.js"></script><script src="/it/apps/kmr-present.js"></script><script src="/it/apps/kmr-present-apps.js"></script>
+<script>
+(async()=>{try{
+  const key=(new URLSearchParams(location.search).get("app")||"").toLowerCase(), P=(window.KMRPA||{})[key];
+  if(!P){QP.say("This app has no presentation. Open it from the app's Presentation tab.");return}
+  if(key==="hrms"){location.replace("/it/hrm.html"+location.search+"#go=pres");return}
+  document.getElementById("ttl").textContent="Presentation · "+P.name; document.title="Presentation · "+P.name+" · KMR Apps";
+  await QP.init(P.code); if(!QP.ctx)return;
+  const ctl=P.controls?P.controls():[];
+  KMRPresent.mount(document.getElementById("pres"),{app:key,code:P.code,stdKey:P.std,appName:P.name,company:QP.ctx.company,slug:QP.slug,call:QP.call,canEdit:QP.canEdit,controls:ctl,load:v=>P.load(QP.call,v)});
+}catch(e){QP.say(e.message||String(e))}})();
+</script><script src="/it/apps/back.js"></script></body></html>
