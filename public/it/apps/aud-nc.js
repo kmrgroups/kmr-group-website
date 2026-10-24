@@ -91,7 +91,7 @@
       <div class="stepper">${ST_ORDER.map((k, i) => `<div class="sp ${st === "closed" || i < ix ? "done" : i === ix ? "cur" : ""}" data-go="${k}"><b>${i + 1}</b><small>${esc((STGN[k] || "").replace(/^\d /, ""))}</small></div>`).join("")}</div>
       <div class="card"><h3>The finding</h3><div class="mut" style="margin-bottom:6px"><b>${esc((n.standard || "") + " " + (n.clause || ""))}</b> · ${esc(n.audit_title)} · ${esc(n.audit_type)}</div><div class="guide" style="margin-bottom:8px"><b>Requirement:</b> ${esc(n.requirement || "—")}</div>
         <div class="sg"><div class="w"><label>Problem: what was found, where and when</label>${ta("n_pr", n.problem, "", 3)}</div><div class="w"><label>Evidence</label>${inp("n_ev", n.evidence, "Photo, record number, sample")}</div>
-        <div><label>Area or process</label>${inp("n_ar", n.area)}</div><div><label>Owner of the response</label>${inp("n_ow", n.owner, "", 'list="own"')}</div><div><label>Root cause and permanent action due by</label><input id="n_rd" type="date" value="${esc(n.resp_due || "")}" ${ro1(ro)}></div></div>${sevBox}</div>
+        <div class="w"><label>Attachments (photos, records, reports)</label><div id="n_att">${A.attHtml("nc:" + n.id, n.can_edit, n.audit_id)}</div></div><div><label>Area or process</label>${inp("n_ar", n.area)}</div><div><label>Owner of the response</label>${inp("n_ow", n.owner, "", 'list="own"')}</div><div><label>Root cause and permanent action due by</label><input id="n_rd" type="date" value="${esc(n.resp_due || "")}" ${ro1(ro)}></div></div>${sevBox}</div>
       ${filled ? '<div class="guide">Recommended text has been filled into the empty fields. Edit it to fit what really happened, then press <b>Save</b>.</div>' : ""}
       ${stepBox("contain", 1, "1 Contain", "Stop it reaching the customer. Due " + fmt(n.contain_due), n.contain_done_on ? "done" : st === "contain" ? "cur" : "", step1, st === "contain")}
       ${stepBox("rca", 2, "2 Root cause", "Why-why down to the system", rcaOk && n.contain_done_on ? "done" : st === "rca" ? "cur" : "", step2, st === "rca")}
@@ -116,6 +116,7 @@
   }
   function wireNc() {
     const n = N, el = $("#ncd");
+    const attBox = $("#n_att"), attAgain = () => { attBox.innerHTML = A.attHtml("nc:" + n.id, n.can_edit, n.audit_id); A.wireAtt(attBox, n.audit_id, attAgain); }; A.wireAtt(attBox, n.audit_id, attAgain);
     $("#n_back").onclick = () => go("go=nc"); $("#n_audit").onclick = () => go("go=list&id=" + n.audit_id); $("#n_print").onclick = () => A.showDoc(AudDocs.nc(N));
     el.querySelectorAll(".sp").forEach((s) => (s.onclick = () => { const d = $("#stp_" + s.dataset.go); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } }));
     if (n.can_edit) {
@@ -138,7 +139,7 @@
     const cn = $("#n_cancel"); if (cn) cn.onclick = () => { const m = $("#n_msg"); m.hidden = false; m.className = "wh"; m.style.background = "var(--bg)"; m.style.color = "var(--ink)"; m.innerHTML = '<b>Why is the finding cancelled?</b> <input id="cx_r" placeholder="For example: raised by mistake; the auditee showed the requirement is met" style="margin:6px 0"><button class="btn s r" id="cx_go">Cancel the finding</button>'; $("#cx_go").onclick = () => guard(async () => { try { await call("kmr_aud_nc_cancel", { p_id: n.id, p_reason: V("cx_r") }); await openNc(n.id); } catch (e) { m.textContent = e.message; m.style.background = "#fee2e2"; m.style.color = "#991b1b"; } }); };
   }
   async function openNc(id) {
-    N = await call("kmr_aud_nc_get", { p_id: id }); const el = $("#ncd"); el.innerHTML = ncPage(N); NDIRTY = false; wireNc();
+    N = await call("kmr_aud_nc_get", { p_id: id }); await A.loadFiles(N.audit_id); const el = $("#ncd"); el.innerHTML = ncPage(N); NDIRTY = false; wireNc();
     if (!el.querySelector("details[open]")) { const d = el.querySelector("details.cur") || el.querySelector("details"); if (d) d.open = true; }
   }
   async function screenNcd(hp) { await openNc(hp.id); }

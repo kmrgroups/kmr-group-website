@@ -16,21 +16,21 @@
 
   function plan(a) {
     set("plan", a.no);
-    const rows = (a.checklist || []).map((x, i) => `<tr>${cell(i + 1, "c")}${cell(nl(x.q))}${cell(esc(x.ref))}${cell("&nbsp;", "c")}${cell("&nbsp;")}</tr>`).join("");
+    const rows = (a.checklist || []).map((x, i) => `<tr>${cell(i + 1, "c")}${cell(nl(x.q) + (x.ev ? '<br><small>Look at: ' + esc(x.ev) + "</small>" : ""))}${cell(esc(x.ref) + (x.m ? "<br><small>" + esc(x.m) + "</small>" : ""))}${cell("&nbsp;", "c")}${cell("&nbsp;")}${cell("&nbsp;")}</tr>`).join("");
     return A.wrap("port", A.title("INTERNAL AUDIT PLAN", esc(a.title || "")) + hd(a) + A.sec("Checklist for the auditor") +
-      `<table><colgroup>${[5, 50, 17, 10, 18].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th class="c">#</th><th>Question</th><th>Reference</th><th class="c">Rating</th><th>Evidence seen</th></tr></thead><tbody>${rows || '<tr><td colspan="5">No questions.</td></tr>'}</tbody></table>` +
+      `<table><colgroup>${[4, 38, 15, 8, 25, 10].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th class="c">#</th><th>Question</th><th>Clause / 6M</th><th class="c">Rating</th><th>Actual: what was seen</th><th>Evidence ref.</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No questions.</td></tr>'}</tbody></table>` +
       `<div class="note" style="color:#000;font-size:11.5px">${a.type === "Process" ? "Rating: 10 fully met · 8 small gap · 4 large gap · 0 not met · NA not applicable." : "Rating: OK · Minor · Major · Observation · NA (not applicable)."} The auditor must not audit their own work.</div>` + A.signoff());
   }
   function report(a, ncs) {
     ncs = ncs || [];
     set("report", a.no);
     const cl = a.checklist || [], acts = a.actions || [], hs = a.has_scoring && a.type === "Process" && a.score != null;
-    const rows = cl.map((x, i) => `<tr>${cell(i + 1, "c")}${cell(nl(x.q))}${cell(esc(x.ref))}${cell("<b>" + esc(x.rating || "—") + "</b>", "c")}${cell(nl(x.note))}</tr>`).join("");
+    const rows = cl.map((x, i) => { const fl = (a.files || []).filter((f) => f.ref === x.id).map((f) => esc(f.name)).join(", "); return `<tr>${cell(i + 1, "c")}${cell(nl(x.q))}${cell(esc(x.ref) + (x.m ? "<br><small>" + esc(x.m) + "</small>" : ""))}${cell("<b>" + esc(x.rating || "—") + "</b>", "c")}${cell(nl(x.note))}${cell(esc(x.evr) + (fl ? "<br><small>Attached: " + fl + "</small>" : ""))}</tr>`; }).join("");
     const fa = acts.map((y, i) => { const q = cl.findIndex((x) => x.id === y.q_id); return `<tr>${cell(i + 1, "c")}${cell(q >= 0 ? "Q" + (q + 1) : "General", "c")}${cell(nl(y.text))}${cell(esc(y.owner))}${cell(dmy(y.due_on), "c")}${cell(y.status === "done" ? dmy(y.done_on) : "Open", "c")}${cell(nl(y.evidence) + (y.verified ? "<br><b>Effective, checked " + dmy(y.verified_on) + "</b>" : ""))}</tr>`; }).join("");
     return A.wrap("port", A.title("INTERNAL AUDIT REPORT", esc(a.title || "")) + hd(a) +
       (hs ? `<div class="note" style="color:#000;font-size:13px"><b>Result: ${esc(a.score)}% · Grade ${esc(a.grade)}</b> &nbsp; (A 90% and above · B 80% to 89% · C below 80%; a question rated 0 holds the grade at B or lower)</div>` : "") +
       A.sec("Summary and conclusion") + `<table><tbody><tr>${cell(nl(a.summary))}</tr></tbody></table>` + A.sec("Checklist and ratings") +
-      `<table><colgroup>${[5, 40, 17, 9, 29].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th class="c">#</th><th>Question</th><th>Reference</th><th class="c">Rating</th><th>What was seen</th></tr></thead><tbody>${rows}</tbody></table>` +
+      `<table><colgroup>${[4, 33, 14, 8, 26, 15].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th class="c">#</th><th>Question</th><th>Clause / 6M</th><th class="c">Rating</th><th>Actual: what was seen</th><th>Evidence ref. / files</th></tr></thead><tbody>${rows}</tbody></table>` +
       (ncs.length ? A.sec("Nonconformities and corrective actions") + `<table><colgroup>${[12, 8, 16, 34, 14, 16].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th>Finding</th><th class="c">Grade</th><th>Standard / clause</th><th>Problem</th><th>Owner</th><th class="c">Step</th></tr></thead><tbody>${ncs.map((n) => `<tr>${cell("<b>" + esc(n.no) + "</b>")}${cell("<b>" + esc(n.severity) + "</b>", "c")}${cell(esc((n.standard || "") + " " + (n.clause || "")))}${cell(nl(n.problem))}${cell(esc(n.owner))}${cell(esc(STN[n.status] || n.status), "c")}</tr>`).join("")}</tbody></table>` : "") + A.sec("Findings, actions and follow-up") + (fa ? `<table><colgroup>${[4, 7, 31, 14, 10, 10, 24].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th class="c">#</th><th class="c">Q</th><th>Action</th><th>Owner</th><th class="c">Due</th><th class="c">Done</th><th>Evidence / effectiveness</th></tr></thead><tbody>${fa}</tbody></table>` : '<table><tbody><tr><td>No findings needing action.</td></tr></tbody></table>') + A.signoff());
   }
   function register(list, filt) {
@@ -68,5 +68,20 @@
     return A.wrap("land", A.title("SPECIAL AUDIT POINTS", "Points to be checked until closed") + A.head([[["Filter", esc(filt || "All")], ["Points", String(list.length)]]]) +
       `<table><colgroup>${[9, 31, 10, 14, 9, 10, 9, 8].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th>No.</th><th>Point</th><th>Source</th><th>Standard / clause</th><th>Frequency</th><th>Owner</th><th class="c">Last check</th><th class="c">Status</th></tr></thead><tbody>${rows || '<tr><td colspan="8">No points.</td></tr>'}</tbody></table>` + A.signoff());
   }
-  window.AudDocs = { plan, report, register, actions, nc, ncList, points };
+  function schedule(d) {
+    set("schedule", d.fy); const ST = { P: "background:#dbeafe", L: "background:#fecaca", R: "background:#cffafe", C: "background:#bbf7d0" };
+    const rows = d.rows.map((r) => `<tr>${cell("<b>" + esc(r.name) + "</b>" + (r.gap ? "<br><b>No audit planned</b>" : ""))}${r.cells.map((c) => `<td class="c">${c.map((x) => `<span style="${ST[x.s]};padding:0 3px">${esc(x.t)}${x.d ? " " + esc(x.d) : ""}</span>`).join("<br>") || "&nbsp;"}</td>`).join("")}</tr>`).join("");
+    return A.wrap("land", A.title("INTERNAL QUALITY AUDIT (IQA) SCHEDULE", "Financial year " + esc(d.fy)) + A.head([[["Financial year", esc(d.fy)], ["Audits", String(d.rows.reduce((s, r) => s + r.cells.reduce((t, c) => t + c.length, 0), 0))], ["Processes without an audit", String(d.rows.filter((r) => r.gap).length)]]]) +
+      `<table><colgroup><col style="width:20%">${d.months.map(() => '<col style="width:6.6%">').join("")}</colgroup><thead><tr><th>Process</th>${d.months.map((m) => `<th class="c">${m}</th>`).join("")}</tr></thead><tbody>${rows}</tbody></table>` +
+      `<div class="note" style="color:#000;font-size:11.5px">Type: ${d.legend.map(esc).join(" · ")}. Number = day of the month. Blue planned · red late · cyan report issued · green closed.</div>` + A.signoff());
+  }
+  function summary(d) {
+    set("ncsummary", d.fy);
+    const head = `<tr><th>Process</th>${d.cols.map((c) => `<th class="c">${esc(c)}</th>`).join("")}<th class="c">Total</th></tr>`;
+    const body = d.rows.map((r) => `<tr>${cell("<b>" + esc(r.name) + "</b>")}${r.cells.map((c) => `<td class="c" style="${c.n ? (c.major ? "background:#fecaca" : "background:#fde68a") : ""}">${c.n || "&nbsp;"}</td>`).join("")}${cell("<b>" + r.total + "</b>", "c")}</tr>`).join("") + `<tr>${cell("<b>Total</b>")}${d.totals.map((n) => cell("<b>" + n + "</b>", "c")).join("")}${cell("<b>" + d.total + "</b>", "c")}</tr>`;
+    return A.wrap("land", A.title("NONCONFORMITY SUMMARY: PROCESS AGAINST CLAUSE", "Financial year " + esc(d.fy)) + A.head([[["Financial year", esc(d.fy)], ["Nonconformities", String(d.total)], ["6M", d.m.map((x) => esc(x[0]) + " " + x[1]).join(" · ") || "—"]]]) +
+      A.sec("Summary") + `<table><tbody>${d.brief.map((b) => `<tr>${cell(esc(b))}</tr>`).join("")}</tbody></table>` + A.sec("Process against clause (red: at least one Major)") +
+      `<table><thead>${head}</thead><tbody>${body}</tbody></table>` + A.signoff());
+  }
+  window.AudDocs = { plan, report, register, actions, nc, ncList, points, schedule, summary };
 })();

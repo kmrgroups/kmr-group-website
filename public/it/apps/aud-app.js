@@ -41,7 +41,7 @@
   function closeDoc() { const d = $("#doc"); if (d) d.remove(); document.body.classList.remove("pv"); }
 
   /* ================= router ================= */
-  const SECS = ["std", "dash", "list", "rep", "prog", "nc", "ncd", "pts", "lib", "acts", "setup"], TABS = ["std", "dash", "list", "nc", "pts", "lib", "acts", "setup"];
+  const SECS = ["std", "dash", "list", "rep", "prog", "sch", "nc", "ncd", "sum", "pts", "lib", "acts", "setup"], TABS = ["std", "dash", "list", "sch", "nc", "sum", "pts", "lib", "acts", "setup"];
   async function route() {
     closeM(); closeDoc(); const hp = hashParts(); const g0 = TABS.includes(hp.go) ? hp.go : "std";
     const sec = g0 === "list" && (hp.id || hp.new) ? "rep" : g0 === "list" && hp.prog ? "prog" : g0 === "nc" && hp.id ? "ncd" : g0;
@@ -135,7 +135,7 @@
     const old = {}; (a.checklist || []).forEach((x) => (old[x.id] = x));
     a.checklist = [...$("#rep").querySelectorAll(".cr")].map((r) => {
       const o = old[r.dataset.q] || {}, g = (k) => { const e = r.querySelector('[data-f="' + k + '"]'); return e ? e.value : ""; };
-      const x = Object.assign({}, o, { id: r.dataset.q, q: g("q"), ref: g("ref"), note: g("note") });
+      const x = Object.assign({}, o, { id: r.dataset.q, q: g("q"), ref: g("ref"), note: g("note"), evr: g("evr") });
       if (r.dataset.legacy) return x; /* an older audit: keep the rating it already has */
       x.ans = r.dataset.ans || ""; if (r.querySelector('[data-f="n"]')) { x.n = g("n"); x.f = g("f"); x.imp = g("imp"); x.absent = !!r.querySelector('[data-f="absent"]').checked; } else if (!["part", "no", "8", "6", "4", "0"].includes(x.ans)) { x.n = ""; x.f = ""; x.imp = ""; x.absent = false; }
       return grade(x, a);
@@ -166,7 +166,7 @@
     try { S.hist = await call("kmr_aud_nc_history", { p: {} }); } catch (e) { S.hist = []; }
     try { S.points = await call("kmr_aud_point_list", { p: { status: "open" } }); } catch (e) { S.points = []; }
   }
-  async function reload() { S.a = await call("kmr_aud_audit_get", { p_id: S.a.id }); S.a.has_scoring = S.a.has_scoring && S.L.has_scoring; S.a.meta = S.a.meta || {}; S.ncs = await call("kmr_aud_nc_list", { p: { audit_id: S.a.id, status: "all" } }); paint(); }
+  async function reload() { S.a = await call("kmr_aud_audit_get", { p_id: S.a.id }); S.a.has_scoring = S.a.has_scoring && S.L.has_scoring; S.a.meta = S.a.meta || {}; S.ncs = await call("kmr_aud_nc_list", { p: { audit_id: S.a.id, status: "all" } }); await loadFiles(S.a.id); paint(); }
   const IMP = [["", "Choose…"], ["none", "No effect seen"], ["internal", "Internal only, did not leave the plant"], ["customer", "Reached, or could reach, the customer"], ["safety", "Safety, legal or regulatory"]];
   const cr = (x, i, a) => {
     const ro = !a.can_edit, legacy = !x.ans && !!x.rating, ans = x.ans || EN().ansOf(x), bad = ["part", "no", "8", "6", "4", "0"].includes(ans) && !legacy;
@@ -176,10 +176,10 @@
     const how = bad ? `<div class="how" style="grid-column:1/-1"><div><label class="lbl">Samples checked</label><input data-f="n" type="number" min="0" value="${esc(x.n == null ? "" : x.n)}" ${ro ? "disabled" : ""}></div><div><label class="lbl">Samples that failed</label><input data-f="f" type="number" min="0" value="${esc(x.f == null ? "" : x.f)}" ${ro ? "disabled" : ""}></div>
       <div class="w2"><label class="lbl">Effect of the failure</label><select data-f="imp" ${ro ? "disabled" : ""}>${opts(IMP, x.imp || "")}</select></div><label class="cl w2"><input type="checkbox" data-f="absent" ${x.absent ? "checked" : ""} ${ro ? "disabled" : ""}> <span>Nothing exists for this requirement (no procedure, process or record system)</span></label></div>` : "";
     const auto = res && !legacy ? `<div class="auto ${res === "Major" ? "mj" : "mn"}"><span class="chip ${res === "Major" ? "r" : "a"}">${res} · decided by the rules</span> <span class="mut">${esc(x.rule || "")}</span></div>` : ans === "obs" ? '<div class="auto"><span class="chip x">Observation</span> <span class="mut">Met, but a risk or chance to improve was seen. No corrective action is needed.</span></div>' : legacy && res ? `<div class="auto"><span class="chip ${res === "Major" ? "r" : "a"}">${res}</span> <span class="mut">Rated in an earlier version of the app.</span></div>` : "";
-    return `<div class="cr ${cls}" data-q="${esc(x.id)}" data-ans="${esc(ans)}"${legacy ? ' data-legacy="1"' : ""}><div class="qn"><textarea data-f="q" rows="2" ${ro ? "disabled" : ""}>${esc(x.q)}</textarea><input data-f="ref" placeholder="Clause / reference" value="${esc(x.ref || "")}" ${ro ? "disabled" : ""}></div>
-      ${x.w ? `<div style="grid-column:1/-1">${chip(x.w === 2 ? "Critical requirement" : "Important requirement", x.w === 2 ? "r" : "a")}${x.pt ? " " + chip("Special audit point", "v") : ""}${x.ev ? ` <span class="mut" style="font-size:12.5px">Look at: ${esc(x.ev)}</span>` : ""}</div>` : x.ev ? `<div class="mut" style="grid-column:1/-1;font-size:12.5px">Look at: ${esc(x.ev)}</div>` : ""}
+    return `<div class="cr ${cls}" data-q="${esc(x.id)}" data-m="${esc(x.m || "")}" data-ans="${esc(ans)}"${legacy ? ' data-legacy="1"' : ""}><div class="qn"><textarea data-f="q" rows="2" ${ro ? "disabled" : ""}>${esc(x.q)}</textarea><input data-f="ref" placeholder="Clause / reference" value="${esc(x.ref || "")}" ${ro ? "disabled" : ""}></div>
+      ${x.w ? `<div style="grid-column:1/-1">${chip(x.w === 2 ? "Critical requirement" : "Important requirement", x.w === 2 ? "r" : "a")}${x.pt ? " " + chip("Special audit point", "v") : ""}${x.m ? " " + chip(x.m, "b") : ""}${x.ev ? ` <span class="mut" style="font-size:12.5px">Look at: ${esc(x.ev)}</span>` : ""}</div>` : x.ev ? `<div class="mut" style="grid-column:1/-1;font-size:12.5px">Look at: ${esc(x.ev)}</div>` : ""}
       <div class="rt" style="grid-column:1/-1">${btns}</div>${how}
-      <input data-f="note" placeholder="What was seen: evidence, record number, sample… (needed for every finding)" value="${esc(x.note || "")}" style="grid-column:1/-1" ${ro ? "disabled" : ""}>${auto ? `<div style="grid-column:1/-1">${auto}</div>` : ""}${ro ? "" : '<button class="btn o s" data-del title="Remove this question" style="grid-column:1/-1;justify-self:end">Remove question</button>'}</div>`;
+      <div style="grid-column:1/-1;display:grid;grid-template-columns:2fr 1fr;gap:6px" class="actev"><div><label class="lbl">Actual: what was seen</label><textarea data-f="note" rows="2" placeholder="For example: 3 of 3 operators asked; instruction WI-12 rev 04 at the station." ${ro ? "disabled" : ""}>${esc(x.note || "")}</textarea></div><div><label class="lbl">Evidence reference no.</label><input data-f="evr" placeholder="Record, report or photo no." value="${esc(x.evr || "")}" ${ro ? "disabled" : ""}></div></div><div style="grid-column:1/-1" data-att="${esc(x.id)}">${attHtml(x.id, !ro)}</div>${auto ? `<div style="grid-column:1/-1">${auto}</div>` : ""}${ro ? "" : '<button class="btn o s" data-del title="Remove this question" style="grid-column:1/-1;justify-self:end">Remove question</button>'}</div>`;
   };
   const STG = ["contain", "rca", "action", "monitor", "closed"], STGN = { contain: "1 Contain", rca: "2 Root cause", action: "3 Permanent action", monitor: "4 Check effect", closed: "Closed", cancelled: "Cancelled" };
   const dotsOf = (st) => { const k = STG.indexOf(st); return `<span class="dots" title="${esc(STGN[st] || st)}">${STG.slice(0, 4).map((s, i) => `<i class="${i < k || st === "closed" ? "d" : i === k ? "c" : ""}"></i>`).join("")}</span>`; };
@@ -198,8 +198,27 @@
     return (a.id ? "" : '<div class="mut">Save the audit first; then each finding gets its own record here.</div>') + (blocks || (a.id ? '<div class="empty">No finding. A question answered Partly, Does not meet or rated below 10 becomes a finding.</div>' : "")) +
       (other.length ? `<div class="fb" style="border-left-color:var(--mut)"><h5>Other actions (not tied to one question)</h5>${other.map((y) => actRow(y, !a.can_act)).join("")}</div>` : "");
   }
+  const mfBar = (a) => { const ms = LB().M6.filter((m) => (a.checklist || []).some((x) => x.m === m)); return ms.length ? `<div class="seg noprint" style="margin:6px 0"><button data-mf="" class="${S.mf ? "" : "on"}">All</button>${ms.map((m) => `<button data-mf="${m}" class="${S.mf === m ? "on" : ""}">${m} <small>${(a.checklist || []).filter((x) => x.m === m).length}</small></button>`).join("")}</div>` : ""; };
+  const applyMF = () => { document.querySelectorAll("#r_cl .cr").forEach((r) => (r.style.display = !S.mf || r.dataset.m === S.mf ? "" : "none")); document.querySelectorAll("#r_mf [data-mf]").forEach((b) => b.classList.toggle("on", (b.dataset.mf || "") === (S.mf || ""))); };
   const scoreHtml = (a) => { const sc = a.type === "Process" && a.has_scoring ? (a.status === "planned" ? score(a.checklist) : a.score != null ? { score: a.score, grade: a.grade } : null) : null;
     return sc ? `<div class="score"><span class="big">${sc.score}%</span><div>${chip("Grade " + sc.grade, GC[sc.grade])}<div class="mut" style="font-size:13px;margin-top:3px">A: 90% and above · B: 80% to 89% · C: below 80% (VDA 6.3 grades). A question rated 0 holds the grade at B or lower. Your customer may set its own downgrade rule.</div></div></div>` : a.type === "Process" && !a.has_scoring ? '<div class="lock">🔒 VDA 6.3 scoring is not part of your plan. <button class="btn o s" id="sc_lk">Find out more</button></div>' : ""; };
+  /* ---- attachments: photos, PDFs and records kept with a question or a finding ---- */
+  const fmtSize = (n) => (n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
+  const filesOf = (ref) => (S.files || []).filter((f) => f.ref === ref);
+  function attHtml(ref, edit, aid) {
+    const fs = filesOf(ref);
+    return `<div class="atts">${fs.map((f) => `<span class="att"><a href="#" data-dl="${f.id}" title="Open ${esc(f.name)}">📎 ${esc(f.name)} <small>${fmtSize(f.size)}</small></a>${edit ? ` <button type="button" class="x" data-rmf="${f.id}" title="Remove file">✕</button>` : ""}</span>`).join("")}${edit ? (aid || (S.a && S.a.id) ? `<label class="btn o s attb">Attach a file<input type="file" hidden data-up="${esc(ref)}" accept="image/*,.pdf,.txt,.csv,.doc,.docx,.xls,.xlsx"></label>` : '<small class="mut">Save the audit first to attach files.</small>') : ""}</div>`;
+  }
+  async function loadFiles(auditId) { try { S.files = auditId ? await call("kmr_aud_file_list", { p_audit_id: auditId }) : []; } catch (e) { S.files = []; } S.filesFor = auditId; }
+  function wireAtt(root, auditId, refresh) {
+    root.querySelectorAll("[data-dl]").forEach((e) => (e.onclick = (ev) => { ev.preventDefault(); guard(async () => { const f = await call("kmr_aud_file_get", { p_id: e.dataset.dl }), bin = atob(f.data), u = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); const url = URL.createObjectURL(new Blob([u], { type: f.mime })), l = document.createElement("a"); l.href = url; l.download = f.name; l.target = "_blank"; document.body.append(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); }); }));
+    root.querySelectorAll("[data-rmf]").forEach((b) => (b.onclick = () => guard(async () => { await call("kmr_aud_file_delete", { p_id: b.dataset.rmf }); S.files = S.files.filter((f) => f.id !== b.dataset.rmf); refresh(); })));
+    root.querySelectorAll("[data-up]").forEach((i) => (i.onchange = () => guard(async () => {
+      const f = i.files[0]; if (!f) return; if (f.size > 1500000) { say("The file is too large. The limit is about 1.5 MB; reduce the photo or PDF size."); i.value = ""; return; }
+      const data = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(",")[1] || ""); r.onerror = () => no(new Error("The file could not be read.")); r.readAsDataURL(f); });
+      const m = await call("kmr_aud_file_save", { p: { audit_id: auditId, ref: i.dataset.up, name: f.name, mime: f.type || "application/octet-stream", data } }); S.files.push(m); say("File attached.", true); refresh();
+    })));
+  }
   const checklistHtml = (a) => { const ro = !a.can_edit; return (a.checklist || []).map((x, i) => cr(x, i, a)).join("") || `<div class="empty">No questions yet.${ro ? "" : "<br>Choose the type and the process above, then press <b>Create the clause checklist</b>."}</div>`; };
   function paint() {
     const a = S.a, el = $("#rep"), ro = !a.can_edit, s = STAT[a.status] || ["", "x"], ty = LB().TYPES[a.type] || {}, m = a.meta || {};
@@ -214,7 +233,7 @@
       <div class="w"><label>Shifts covered</label><div class="sh">${SHIFTS.map((x) => `<label><input type="checkbox" id="sh_${x}"${(a.shifts || []).includes(x) ? " checked" : ""} ${ro ? "disabled" : ""}> ${x === "General" ? "General" : "Shift " + x}</label>`).join("")}</div></div></div></div>
       <div class="guide" style="margin-top:12px"><b>${esc(ty.name || a.type)}.</b> ${esc(ty.desc || "")} <br><b>Standards:</b> ${esc(ty.std || "")}. <b>How often:</b> ${esc(ty.freq || "")}</div>
       <h3 style="margin:16px 0 4px">Checklist <small class="mut" id="r_cnt"></small></h3><div class="guide" style="margin-bottom:8px">${a.type === "Process" ? "Rate each question 10 (fully met), 8 (largely met), 6 (partly met), 4 (inadequately met) or 0 (not met). NA if it does not apply. The score follows." : a.type === "LPA" ? "Answer OK or Not OK. If Not OK, say how many samples failed and the effect. The rules decide Major or Minor." : "Answer each question: Meets, Partly, Does not meet, Observation or NA. For Partly and Does not meet, say how many samples failed and the effect: the rules decide Minor or Major, not the auditor."}</div>
-      <div id="r_cl" class="${ro ? "ro" : ""}">${checklistHtml(a)}</div>
+      <div id="r_mf">${mfBar(a)}</div><div id="r_cl" class="${ro ? "ro" : ""}">${checklistHtml(a)}</div>
       ${ro ? "" : '<div class="row"><button class="btn" id="r_make">Create the clause checklist</button><button class="btn o s" id="r_addq">+ Add a question</button></div>'}
       <div id="r_score">${scoreHtml(a)}</div>
       <h3 style="margin:16px 0 4px">Findings and corrective actions</h3><div class="guide" style="margin-bottom:8px">Every Minor or Major finding gets its own record with the problem, containment, root cause (why-why), permanent action and a check that it worked. The audit can be closed only when all of them are closed.</div>
@@ -235,6 +254,8 @@
   }
   const showErr = (m) => { const e = $("#r_msg"); if (!e) return say(m); e.textContent = m; e.hidden = false; e.scrollIntoView({ block: "center", behavior: "smooth" }); };
   const updateCount = () => { const a = S.a, r = (a.checklist || []).filter((x) => x.rating).length, f = (a.checklist || []).filter(isF), mj = f.filter((x) => x.sev === "Major" || ["4", "0", "Major"].includes(String(x.rating))).length, e = $("#r_cnt"); if (e) e.textContent = r + " of " + (a.checklist || []).length + " answered" + (f.length ? " · " + f.length + " finding" + (f.length > 1 ? "s" : "") + " (" + mj + " Major, " + (f.length - mj) + " Minor)" : ""); };
+  function wireMF() { document.querySelectorAll("#r_mf [data-mf]").forEach((b) => (b.onclick = () => { S.mf = b.dataset.mf; applyMF(); })); }
+  function wireAttAll() { const a = S.a; if (!a.id) return; document.querySelectorAll("#r_cl [data-att]").forEach((d) => { const again = () => { d.innerHTML = attHtml(d.dataset.att, a.can_edit); wireAtt(d, a.id, again); }; wireAtt(d, a.id, again); }); }
   function wireRows(root) {
     const a = S.a; if (!a.can_edit) return;
     root.querySelectorAll(".cr").forEach((r) => {
@@ -246,9 +267,9 @@
   function wire() {
     const el = $("#rep"), a = S.a;
     $("#r_back").onclick = () => go("go=list"); $("#r_plan").onclick = () => { collect(); showDoc(AudDocs.plan(S.a)); };
-    const rp = $("#r_rep"); if (rp) rp.onclick = () => showDoc(AudDocs.report(S.a, S.ncs || []));
+    const rp = $("#r_rep"); if (rp) rp.onclick = () => showDoc(AudDocs.report(Object.assign({}, S.a, { files: S.files || [] }), S.ncs || []));
     const lk = $("#sc_lk"); if (lk) lk.onclick = () => window.KMRLock && KMRLock.need("aud.vda-6-3-scoring");
-    updateCount(); wireFind();
+    updateCount(); wireFind(); wireMF(); wireAttAll(); applyMF();
     if (a.can_edit) {
       el.querySelectorAll("input,textarea,select").forEach((e) => { if (!e.closest("[data-act],[data-qa],.cr")) e.addEventListener("input", dirty); });
       const rebuild = () => { collect(); if ((a.checklist || []).some((x) => x.ans || x.rating)) { dirty(); return; } a.checklist = build(a); dirty(); repaintChecklistKeep(); };
@@ -265,6 +286,8 @@
       if (a.can_edit) await saveAudit();
       const miss = (a.checklist || []).map((x, i) => [x, i + 1]).filter((p) => FIND(p[0].rating) && !String(p[0].note || "").trim());
       if (miss.length) throw new Error("Write what was seen for every finding. Missing for question " + miss.map((p) => p[1]).join(", ") + ".");
+      const noev = (a.checklist || []).map((x, i) => [x, i + 1]).filter((p) => p[0].cl && p[0].rating && p[0].rating !== "NA" && (!String(p[0].note || "").trim() || !String(p[0].evr || "").trim()));
+      if (noev.length) throw new Error("Each answered question needs the actual (what was seen) and an evidence reference number. Missing for question " + noev.slice(0, 12).map((p) => p[1]).join(", ") + (noev.length > 12 ? " and " + (noev.length - 12) + " more" : "") + ".");
       await call("kmr_aud_issue", { p_id: a.id });
       for (const x of a.checklist || []) if (x.pt && x.ans && x.ans !== "na") { try { const ok = ["ok", "obs", "10"].includes(x.ans); await call("kmr_aud_point_check", { p_id: x.pt, p: { result: ok ? "ok" : "not_ok", note: x.note || "", audit: a.no } }); } catch (e) { /* the point may be closed */ } }
       say("The audit report is issued.", true); await reload();
@@ -282,7 +305,7 @@
   /* repaint only the checklist, score and findings so typed text in the other fields is kept */
   function repaintChecklistKeep() {
     const a = S.a; $("#r_cl").innerHTML = checklistHtml(a); $("#r_find").innerHTML = findingsHtml(); $("#r_score").innerHTML = scoreHtml(a);
-    wireRows($("#rep")); wireActs($("#r_find")); wireFind(); const lk = $("#sc_lk"); if (lk) lk.onclick = () => window.KMRLock && KMRLock.need("aud.vda-6-3-scoring"); updateCount(); const n = $("#sv_note"); if (n) n.textContent = "Not saved yet";
+    $("#r_mf").innerHTML = mfBar(a); wireMF(); wireRows($("#rep")); wireActs($("#r_find")); wireFind(); wireAttAll(); applyMF(); const lk = $("#sc_lk"); if (lk) lk.onclick = () => window.KMRLock && KMRLock.need("aud.vda-6-3-scoring"); updateCount(); const n = $("#sv_note"); if (n) n.textContent = "Not saved yet";
   }
   function wireActs(root) {
     const a = S.a;
@@ -306,8 +329,8 @@
   }
   async function drawAudit(hp) {
     await loadRefs();
-    if (hp.new) { if (!canEdit()) { go("go=list"); return; } S.a = blank(); S.ncs = []; S.dirty = false; paint(); return; }
-    S.a = await call("kmr_aud_audit_get", { p_id: hp.id }); S.a.has_scoring = S.a.has_scoring && S.L.has_scoring; S.a.meta = S.a.meta || {}; S.ncs = await call("kmr_aud_nc_list", { p: { audit_id: hp.id, status: "all" } }); S.dirty = false;
+    if (hp.new) { if (!canEdit()) { go("go=list"); return; } S.a = blank(); S.ncs = []; S.files = []; S.mf = ""; S.dirty = false; paint(); return; }
+    S.a = await call("kmr_aud_audit_get", { p_id: hp.id }); S.a.has_scoring = S.a.has_scoring && S.L.has_scoring; S.a.meta = S.a.meta || {}; S.ncs = await call("kmr_aud_nc_list", { p: { audit_id: hp.id, status: "all" } }); await loadFiles(hp.id); S.mf = ""; S.dirty = false;
     if (S.a.can_edit && !(S.a.checklist || []).length && S.a.meta.auto) { S.a.checklist = build(S.a); S.dirty = true; }
     paint(); if (S.dirty) { const n = $("#sv_note"); if (n) n.textContent = "Checklist created from the standard: save to keep it"; }
   }
@@ -335,7 +358,7 @@
   }
 
   /* ================= start ================= */
-  window.AUD = { S, route, go, showDoc, chip, due, opts, guard, canEdit, isAdmin, dl, V, hasF, rid, setGo, hashParts, GC, STAT, STGN, dotsOf, today, TYPES, screens: {} };
+  window.AUD = { attHtml, wireAtt, loadFiles, filesOf, fmtSize, S, route, go, showDoc, chip, due, opts, guard, canEdit, isAdmin, dl, V, hasF, rid, setGo, hashParts, GC, STAT, STGN, dotsOf, today, TYPES, screens: {} };
   async function start() {
     try {
       await QP.init("aud"); if (!QP.ctx) return;

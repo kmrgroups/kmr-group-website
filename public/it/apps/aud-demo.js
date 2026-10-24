@@ -5,7 +5,7 @@
   let uid = 0; const id = () => "a" + (++uid).toString(36).padStart(3, "0") + Math.random().toString(36).slice(2, 6);
   const day = (n) => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
   const td = () => day(0), ME = "you@demo.example", orNull = (v) => (T(v) === "" ? null : T(v));
-  const S = { settings: { prefix: "AUD", fy_numbering: true, due_days: 30 }, aud: [], acts: [], log: [], n: {}, ncs: [], pts: [] };
+  const S = { files: [], settings: { prefix: "AUD", fy_numbering: true, due_days: 30 }, aud: [], acts: [], log: [], n: {}, ncs: [], pts: [] };
   function number() {
     const s = S.settings, pre = (T(s.prefix).toUpperCase().replace(/[^A-Z0-9-]/g, "") || "AUD"), d = new Date(), y = d.getMonth() < 3 ? d.getFullYear() - 1 : d.getFullYear();
     if (s.fy_numbering !== false) { const fy = String(y % 100).padStart(2, "0") + "-" + String((y + 1) % 100).padStart(2, "0"); S.n[fy] = (S.n[fy] || 0) + 1; return pre + "/" + fy + "/" + String(S.n[fy]).padStart(4, "0"); }
@@ -65,7 +65,7 @@
       if (!Array.isArray(sh) || sh.some((s) => !["A", "B", "C", "General"].includes(s))) err("Shift must be A, B, C or General.");
       let out = null; if (p.checklist != null) {
         if (!Array.isArray(p.checklist)) err("The checklist is not valid."); if (p.checklist.length > 200) err("A checklist can have up to 200 questions.");
-        out = p.checklist.map((x, i) => { if (!x || !orNull(x.q)) err("Question " + (i + 1) + " is empty."); const rt = orNull(x.rating); if (rt && !ratingsOf(ty).includes(rt)) err("Question " + (i + 1) + ": the rating must be one of " + ratingsOf(ty).join(", ") + "."); const o = { id: orNull(x.id) || id(), q: T(x.q), ref: orNull(x.ref), rating: rt, note: orNull(x.note) }; ["cl", "std", "ev", "cat", "ans", "imp", "rule", "pt"].forEach((k) => (o[k] = orNull(x[k]))); o.w = /^[0-2]$/.test(String(x.w)) ? Number(x.w) : null; o.n = x.n == null || x.n === "" ? null : Number(x.n); o.f = x.f == null || x.f === "" ? null : Number(x.f); if (x.absent === true) o.absent = true; return o; });
+        out = p.checklist.map((x, i) => { if (!x || !orNull(x.q)) err("Question " + (i + 1) + " is empty."); const rt = orNull(x.rating); if (rt && !ratingsOf(ty).includes(rt)) err("Question " + (i + 1) + ": the rating must be one of " + ratingsOf(ty).join(", ") + "."); const o = { id: orNull(x.id) || id(), q: T(x.q), ref: orNull(x.ref), rating: rt, note: orNull(x.note) }; ["cl", "std", "ev", "cat", "ans", "imp", "rule", "pt", "evr", "m"].forEach((k) => (o[k] = orNull(x[k]))); o.w = /^[0-2]$/.test(String(x.w)) ? Number(x.w) : null; o.n = x.n == null || x.n === "" ? null : Number(x.n); o.f = x.f == null || x.f === "" ? null : Number(x.f); if (x.absent === true) o.absent = true; return o; });
       }
       const f = { title: ttl, type: ty, area: orNull(p.area), scope: orNull(p.scope), planned_on: orNull(p.planned_on), done_on: orNull(p.done_on), auditor: orNull(p.auditor), auditee: orNull(p.auditee), shifts: J(sh), summary: orNull(p.summary) }; if (p.meta && typeof p.meta === "object") f.meta = J(p.meta);
       if (!p.id) { const r = mk(Object.assign(f, { checklist: out || [] })); return { id: r.id, no: r.no }; }
@@ -80,6 +80,7 @@
       if (!r.checklist.length) err("Add at least one question to the checklist.");
       const nr = r.checklist.filter((x) => !T(x.rating)).length; if (nr) err("Rate every question: " + nr + " are not rated yet.");
       const na = r.checklist.filter((x) => isF(x.rating) && !S.acts.some((y) => y.audit_id === r.id && y.q_id === x.id && T(y.owner) && y.due_on) && !S.ncs.some((c) => c.audit_id === r.id && c.q_id === x.id && c.status !== "cancelled" && T(c.problem) && T(c.owner) && c.resp_due && c.contain_due)).length; if (na) err(na + " finding(s) still need a problem description, an owner and due dates (open the finding and fill the containment and response dates).");
+      { const ne = r.checklist.filter((x) => T(x.cl) && T(x.rating) && x.rating !== "NA" && (!T(x.note) || !T(x.evr))).length; if (ne) err(ne + " question(s) need the actual finding (what was seen) and an evidence reference number."); }
       if (r.type === "Process" && has("aud.vda-6-3-scoring")) { const s = score(r.checklist); r.score = s[0]; r.grade = s[1]; }
       r.status = "reported"; r.reported_on = t; lg(r, "Audit report issued" + (r.grade ? ": score " + r.score + "%, grade " + r.grade : "") + "."); return rowOut(r);
     },
@@ -210,10 +211,26 @@
         points_open: pt.length, points_overdue: pt.filter((x) => x.due_on && x.due_on < t).length, points_notok: pt.filter((x) => x.last_result === "not_ok").length, audited_areas: new Set(au12.map((r) => String(r.area || "").toLowerCase()).filter(Boolean)).size, audited_types: [...new Set(au12.map((r) => r.type))] };
     }
   });
+  (function seedMeta() { S.aud.forEach((r) => { const ar = String(r.area || ""); r.meta = { proc: /Final|Product|Quality/i.test(ar) ? "qa" : /Machin|Grind|Production/i.test(ar) ? "prod" : "all", auto: false }; }); })();
   (function seedNc() {
     const b = S.aud.find((r) => r.type === "Process" && r.status === "reported"); if (!b) return;
     mkNc(b, { q_id: "p4", severity: "Major", clause: "P6.5", standard: "VDA 6.3", requirement: "Nonconforming product is identified, segregated and handled so it cannot be used.", cat: "nc", problem: "Red bin not emptied; two rejects mixed with good parts at Machining T04.", area: "Machining T04", owner: "K. Arun", created_at: day(-20), resp_due: day(-6), contain_due: day(-19), contain_action: "Sorted the full lot 100%, removed 2 rejects, emptied and locked the red bin.", contain_owner: "K. Arun", contain_qty: "480 checked, 2 scrapped", contain_done_on: day(-19), rule_text: "Answer 'Does not meet' on a critical question: Major." });
     mkNc(b, { q_id: "p2", severity: "Minor", clause: "P6.2", standard: "VDA 6.3", requirement: "First-piece approval is recorded for every setup.", cat: "rec", problem: "First-piece record missing on 2 of 10 setups checked.", area: "Machining T04", owner: "K. Arun", created_at: day(-20), resp_due: day(10), contain_due: day(-17), rule_text: "Answer 'Partly' on an important question, first time: Minor." });
+    const c0 = S.aud.find((r) => r.type === "System" && r.status === "closed"); if (c0) mkNc(c0, { q_id: "s2", severity: "Minor", clause: "7.5.3", standard: "ISO 9001:2015", requirement: "Current versions of procedures are available where the work is done.", cat: "doc", problem: "Two old copies of the inspection procedure on the notice board.", area: "Final Inspection", owner: "S. Priya", created_at: day(-70), resp_due: day(-40), contain_due: day(-67), contain_done_on: day(-69), contain_action: "Removed old copies.", contain_owner: "S. Priya", status: "closed", closed_on: day(-55), closed_by: "S. Priya", mon_result: "effective", rule_text: "Partly met on an important question, first time: Minor." }).status = "closed";
     S.pts.push({ id: id(), no: ncNo("SP"), title: "Confirm the bore-diameter mistake-proofing is tested at every shift start", source: "Customer", standard: "Customer CSR", clause: "CSR 4.2", frequency: "Every audit", applies: "Machining T04", owner: "R. Venkatesh", due_on: day(30), status: "open", check_how: "Test record and master piece at the machine", description: "Raised in the customer audit.", checks: [], last_checked: null, last_result: null, closed_on: null, closure_note: null, evidence: null });
   })();
+
+  /* ---------- attachments (migration 0086) ---------- */
+  Object.assign(window.QP_DEMO, {
+    kmr_aud_file_save(a) {
+      const p = a.p || {}, r = au(p.audit_id); if (!["planned", "reported"].includes(r.status)) err("This audit is " + r.status + ". An administrator can reopen it."); if (!T(p.ref)) err("Say which question or finding the file belongs to."); if (!T(p.name)) err("The file has no name.");
+      const mt = T(p.mime).toLowerCase(); if (!(mt.startsWith("image/") || ["application/pdf", "text/plain", "text/csv", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/vnd.ms-excel", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"].includes(mt))) err("This kind of file cannot be attached. Use a photo, PDF, text, CSV, Word or Excel file.");
+      if (!T(p.data) || !/^[A-Za-z0-9+/=]+$/.test(p.data)) err("The file could not be read."); if (p.data.length > 2100000) err("The file is too large. The limit is about 1.5 MB; reduce the photo or PDF size.");
+      if (S.files.filter((f) => f.audit_id === r.id && f.ref === p.ref).length >= 12) err("At most 12 files can be attached to one question or finding.");
+      const f = { id: id(), audit_id: r.id, ref: T(p.ref), name: T(p.name).slice(0, 200), mime: mt, size: Math.round((p.data.length * 3) / 4), data: p.data, by: ME, at: new Date().toISOString() }; S.files.push(f); lg(r, "File attached: " + f.name); return { id: f.id, ref: f.ref, name: f.name, mime: f.mime, size: f.size, by: f.by, at: f.at };
+    },
+    kmr_aud_file_list(a) { return S.files.filter((f) => f.audit_id === a.p_audit_id).map((f) => ({ id: f.id, ref: f.ref, name: f.name, mime: f.mime, size: f.size, by: f.by, at: f.at })); },
+    kmr_aud_file_get(a) { const f = S.files.find((x) => x.id === a.p_id) || err("File not found."); return { id: f.id, ref: f.ref, name: f.name, mime: f.mime, size: f.size, data: f.data }; },
+    kmr_aud_file_delete(a) { const f = S.files.find((x) => x.id === a.p_id) || err("File not found."); S.files = S.files.filter((x) => x !== f); lg(au(f.audit_id), "File removed: " + f.name); return null; }
+  });
 })();
