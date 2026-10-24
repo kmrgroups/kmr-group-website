@@ -72,11 +72,13 @@
 
   /* attendance worked out live from punches (for today's view, month previews and payroll) */
   async function getAtt(from, to) {
-    const A = await call("kmr_hrms_att_get", { p_from: from, p_to: to }); S.att = A; return A;
+    const A = await call("kmr_hrms_att_get", { p_from: from, p_to: to });
+    try { A.roster = await call("kmr_hrms_roster_get", { p_from: from, p_to: to }); } catch (e) { A.roster = []; }             // the shift roster (rotating shifts); none yet = everyone on their own shift
+    S.att = A; return A;
   }
   function buildFrom(A, from, to) {
     const L = S.load, leaves = (A.leaves || []);
-    return C.buildAttendance({ employees: L.employees, shifts: L.shifts, holidays: L.holidays, leaves, permissions: A.permissions || [], punches: A.punches, existing: A.attendance }, from, to, L.settings, L.today);
+    return C.buildAttendance({ employees: L.employees, shifts: L.shifts, holidays: L.holidays, leaves, permissions: A.permissions || [], punches: A.punches, existing: A.attendance, roster: A.roster || [] }, from, to, L.settings, L.today);
   }
   const merge = (A, built) => { const have = {}; A.attendance.forEach((r) => { have[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; }); const out = A.attendance.slice(); built.forEach((r) => { if (!have[r.employee_id + "|" + r.work_date]) out.push(r); }); return out; };
 
@@ -180,7 +182,7 @@
     const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
     const noRows = !A.attendance.length;
     el.innerHTML = `<div class="row"><input type="month" id="am" value="${S.month}" style="max-width:170px"><select id="ad" style="max-width:190px"><option value="">All departments</option>${opts(depts, dep)}</select><span class="grow"></span>
-      ${ed() ? `<button class="btn" id="awork"${lockedM ? " disabled" : ""}>Work out attendance from punches</button><button class="btn o" id="apun">+ Add a punch</button>` : ""}<button class="btn o" id="acsv">Export sheet (CSV)</button></div>
+      ${ed() ? `<button class="btn" id="awork"${lockedM ? " disabled" : ""}>Work out attendance from punches</button><button class="btn o" id="apun">+ Add a punch</button><button class="btn o" id="aros">Import shift roster</button>` : ""}<button class="btn o" id="acsv">Export sheet (CSV)</button></div>
       ${lockedM ? `<div class="guide">🔒 The payroll of ${perName(S.month)} is finalised. Attendance of this month cannot be changed unless the payroll is re-opened.</div>` : ""}
       ${noRows && ed() && !lockedM ? `<div class="guide">No attendance has been worked out for ${perName(S.month)} yet. Press <b>Work out attendance from punches</b>: it reads the punches of the machines (and the ones you added), applies each person's shift, holidays and approved leave, and fills in Present / Absent / Late / Overtime for every day. Days you correct by hand are never overwritten.</div>` : ""}
       <div class="note"><span class="s-P" style="padding:1px 7px;border-radius:6px">P</span> present · <span class="s-HD" style="padding:1px 7px;border-radius:6px">½</span> half day · <span class="s-A" style="padding:1px 7px;border-radius:6px">A</span> absent · <span class="s-L" style="padding:1px 7px;border-radius:6px">L</span> paid leave · <span class="s-U" style="padding:1px 7px;border-radius:6px">U</span> unpaid leave · <span class="s-WO" style="padding:1px 7px;border-radius:6px">W</span> weekly off · <span class="s-H" style="padding:1px 7px;border-radius:6px">H</span> holiday · <span class="s-MP" style="padding:1px 7px;border-radius:6px">?</span> missed punch. Click a day to see the punches or to correct it.</div>
@@ -189,7 +191,7 @@
         return `<tr><td class="nm">${esc(e.name)}<div class="mut">${esc(e.emp_code)}</div></td>${days.map((d) => { const r = by[e.id + "|" + d]; return `<td class="c ${r ? "s-" + r.status : ""} ${C.dow(d) === 0 && !r ? "wk" : ""}" data-c="${e.id}|${d}" title="${r ? esc(ST[r.status] + (r.in_at ? " · " + tm(r.in_at) + "–" + tm(r.out_at) : "") + (r.remarks ? " · " + r.remarks : "") + (r.source === "manual" ? " · entered by hand" : "")) : ""}">${r ? ABBR[r.status] + (r.source === "manual" ? "*" : "") : ""}</td>`; }).join("")}<td><b>${sm.paid_days}</b></td><td>${sm.absent + sm.missed || ""}</td><td>${sm.late_count || ""}</td><td>${sm.ot_min ? (sm.ot_min / 60).toFixed(1) : ""}</td></tr>`;
       }).join("")}</tbody></table></div><div class="note">* entered by hand</div>` : `<div class="empty">No employees yet.</div>`}`;
     $("#am").onchange = () => { S.month = V("am") || S.month; drawAtt(); }; $("#ad").onchange = () => drawAtt();
-    if ($("#awork")) $("#awork").onclick = workOut; if ($("#apun")) $("#apun").onclick = () => punchForm();
+    if ($("#awork")) $("#awork").onclick = workOut; if ($("#apun")) $("#apun").onclick = () => punchForm(); if ($("#aros")) $("#aros").onclick = rosterImport;
     $("#acsv").onclick = () => dl(`attendance-${S.month}.csv`, toCsv([["Code", "Name", "Department", ...days.map((d) => +d.slice(8)), "Paid days", "Absent", "Late days", "OT hours"], ...emps.map((e) => { const rows = A.attendance.filter((r) => r.employee_id === e.id), sm = C.summary(e, rows, S.month, L.leave_types); return [e.emp_code, e.name, e.department || "", ...days.map((d) => (by[e.id + "|" + d] || {}).status || ""), sm.paid_days, sm.absent + sm.missed, sm.late_count, (sm.ot_min / 60).toFixed(1)]; })]), "text/csv");
     document.querySelectorAll("[data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
   }
@@ -198,6 +200,37 @@
     const tot = { saved: 0, locked: 0, kept_manual: 0 };
     for (let i = 0; i < rows.length; i += 3000) { const r = await call("kmr_hrms_att_save", { p: { mode, rows: rows.slice(i, i + 3000).map(slim) } }); tot.saved += r.saved; tot.locked += r.locked; tot.kept_manual += r.kept_manual; }
     return tot;
+  }
+  /* shift roster: who works which shift on which day (rotating shifts). File columns: Employee Code, Date, Shift; optional Start, End, Grace create shifts that do not exist yet. */
+  function rosterImport() {
+    pickFile(".csv,.txt,.tsv", async (text) => {
+      try {
+        const t = parseCsv(text); if (t.length < 2) return say("The file has no rows.");
+        const head = t[0].map((h) => h.toLowerCase().replace(/[^a-z_]+/g, "_").replace(/^_|_$/g, "")), ix = (...n) => head.findIndex((h) => n.includes(h));
+        const ic = ix("emp_code", "employee_code", "code"), idt = ix("date", "work_date"), is = ix("shift", "shift_name"), ist = ix("start", "start_time"), ien = ix("end", "end_time"), ig = ix("grace", "grace_min");
+        if (ic < 0 || idt < 0 || is < 0) return say("The file needs the columns Employee Code, Date and Shift.");
+        const L = S.load, byCode = {}; L.employees.forEach((e) => { byCode[String(e.emp_code).toLowerCase()] = e; });
+        const hm = (v) => { const m = /^(\d{1,2}):(\d{2})/.exec(String(v || "").trim()); return m ? m[1].padStart(2, "0") + ":" + m[2] : ""; };
+        const rows = [], miss = new Set(), want = {};
+        t.slice(1).forEach((r) => {
+          const code = (r[ic] || "").trim(), date = (r[idt] || "").trim().slice(0, 10), sn = (r[is] || "").trim(); if (!code || !date || !sn) return;
+          const e = byCode[code.toLowerCase()]; if (!e) { miss.add(code); return; }
+          rows.push([e.id, date, sn]); if (!want[sn.toLowerCase()]) want[sn.toLowerCase()] = { name: sn, start: hm(ist >= 0 ? r[ist] : ""), end: hm(ien >= 0 ? r[ien] : ""), grace: ig >= 0 ? +r[ig] || 0 : 0 };
+        });
+        if (!rows.length) return say("No row matches an employee. Add the employees first (Employees tab), using the same codes as in the file.");
+        const have = {}; L.shifts.forEach((x) => { have[x.name.toLowerCase()] = x; });
+        const make = Object.values(want).filter((w) => !have[w.name.toLowerCase()]), bad = make.filter((w) => !w.start || !w.end);
+        if (bad.length) return say("These shifts do not exist yet and the file gives no Start and End time for them: " + bad.map((w) => w.name).join(", ") + ". Add them in Setup, or add Start and End columns to the file.");
+        if (!confirm(`Set the shift of ${rows.length} day(s) for ${new Set(rows.map((r) => r[0])).size} people.` + (make.length ? ` These new shifts will be created: ${make.map((w) => w.name + " " + w.start + "-" + w.end).join(", ")}.` : "") + (miss.size ? ` ${miss.size} employee code(s) in the file are not in the HRM and will be skipped.` : "") + " Continue?")) return;
+        for (const w of make) await call("kmr_hrms_shift_save", { p: { name: w.name, start_time: w.start, end_time: w.end, grace_min: w.grace, break_min: 0, half_day_min: 240, full_day_min: 450, night: w.end <= w.start, weekly_off: [0], active: true } });
+        if (make.length) await loadAll();
+        const sid = {}; S.load.shifts.forEach((x) => { sid[x.name.toLowerCase()] = x.id; }); const tot = { saved: 0, locked: 0 };
+        for (let i = 0; i < rows.length; i += 5000) { const r = await call("kmr_hrms_roster_save", { p: { rows: rows.slice(i, i + 5000).map((x) => ({ employee_id: x[0], work_date: x[1], shift_id: sid[x[2].toLowerCase()] })) } }); tot.saved += r.saved; tot.locked += r.locked; }
+        say(`Shift roster saved for ${tot.saved} day(s)` + (tot.locked ? `, ${tot.locked} day(s) in a finalised month were not changed` : "") + (miss.size ? `. Not in the HRM: ${[...miss].slice(0, 5).join(", ")}${miss.size > 5 ? "…" : ""}` : "") + ". Now press Work out attendance from punches.", true);
+        if (cfg().status_rule !== "shift" && confirm("Judge each day by its shift (late arrival or early leaving = half day, like your attendance machine software)? Press Cancel to keep judging by hours worked.")) { await call("kmr_hrms_settings_save", { p: Object.assign({}, S.load.settings, { status_rule: "shift" }) }); await loadAll(); }
+        drawAtt();
+      } catch (e) { say(/roster/i.test(e.message) && /function|schema|exist/i.test(e.message) ? "The shift roster is not switched on in the database yet. Run the file 0087_hrm_shift_roster.sql once in the Supabase SQL editor, then try again." : e.message); }
+    });
   }
   async function workOut() {
     const { from, to } = C.monthRange(S.month), last = to > S.load.today ? S.load.today : to;
@@ -484,7 +517,9 @@
     el.innerHTML = `<div class="row"><b class="grow" style="font-size:15px">Company rules</b>${ed() ? '<button class="btn" id="ssv">Save rules</button>' : ""}</div>
       <datalist id="dl_tz">${["Asia/Kolkata", "Asia/Dubai", "Asia/Kathmandu", "Asia/Colombo", "Asia/Dhaka", "Asia/Karachi", "Asia/Singapore", "Asia/Riyadh", "Europe/London", "UTC"].map((z) => `<option>${z}</option>`).join("")}</datalist>
       <div class="frm"><div><label class="lbl">Time zone of the machines</label><input id="s_tz" list="dl_tz" value="${esc(c.tz)}"></div><div><label class="lbl">Employee code prefix</label><input id="s_pre" value="${esc(c.emp_prefix)}"></div>
-        <div><label class="lbl">Days in a month for pay</label><select id="s_md">${opts([["calendar", "Actual days of the month"], ["26", "Fixed 26 days"], ["30", "Fixed 30 days"]], String(c.month_days_mode))}</select></div>${n("s_gap", "Ignore a second punch within (minutes)", c.min_gap_min)}</div>
+        <div><label class="lbl">Days in a month for pay</label><select id="s_md">${opts([["calendar", "Actual days of the month"], ["26", "Fixed 26 days"], ["30", "Fixed 30 days"]], String(c.month_days_mode))}</select></div>${n("s_gap", "Ignore a second punch within (minutes)", c.min_gap_min)}
+        <div><label class="lbl">How a day is judged</label><select id="s_rule">${opts([["hours", "By hours worked (full day / half day by hours)"], ["shift", "By the shift: late arrival or early leaving = half day"]], c.status_rule || "hours")}</select></div>${n("s_egr", "Early leaving allowed up to (minutes)", c.early_grace_min)}</div>
+      <div class="note">“By the shift” follows the attendance-machine software: arriving after the shift start plus its grace, or leaving before the shift end, makes the day a half day. Each shift’s grace is set in the Shifts table below.</div>
       <h4 style="margin:14px 0 4px">What is deducted from pay</h4><div class="note">One switch for the whole company. When a switch is off, nobody pays it, whatever is set on the employee. When it is on, it applies to the employees who have it ticked (Employees tab: the PF column).</div>
       <div class="row">${sw("s_pfe", "Provident fund (PF)", c.pf_enabled !== false)}${sw("s_esie2", "ESI", c.esi_enabled !== false)}${sw("s_pte", "Professional tax", c.pt_enabled !== false)}${sw("s_rnd", "Pay whole rupees (round the net pay)", !!c.round_net)}</div>
       <h4 style="margin:14px 0 4px">Overtime</h4><div class="frm">${n("s_otm", "Pay rate (× normal hourly)", c.ot_multiplier)}${n("s_ota", "Counts only after (minutes beyond shift end)", c.ot_min_after)}<div><label class="lbl">Days to divide the salary by (monthly staff)</label><select id="s_otd">${opts([["calendar", "Actual days of the month"], ["26", "26 days"], ["30", "30 days"]], String(c.ot_day_divisor))}</select></div><div><label class="lbl">Hourly rate is worked out from</label><select id="s_otb">${opts([["basic", "Basic salary"], ["gross", "Full salary (basic + allowances)"]], c.ot_basis)}</select></div>${n("s_oth", "Hours in a day (when the employee has none set)", c.ot_hours_per_day)}</div>
@@ -542,7 +577,7 @@
     try {
       const slabs = V("s_pt").split(/\n/).map((l) => l.trim()).filter(Boolean).map((l) => { const [a, b] = l.split(/[,\s]+/); if (!Number.isFinite(+a) || !Number.isFinite(+b)) throw new Error("Professional tax slab lines must look like: 15000,200"); return { from: +a, amount: +b }; });
       if (!slabs.some((x) => x.from === 0)) slabs.unshift({ from: 0, amount: 0 });
-      const p = Object.assign({}, S.load.settings, { tz: V("s_tz").trim() || "Asia/Kolkata", emp_prefix: V("s_pre").trim() || "E", month_days_mode: V("s_md") === "calendar" ? "calendar" : +V("s_md"), min_gap_min: +V("s_gap"), ot_multiplier: +V("s_otm"), ot_min_after: +V("s_ota"), ot_day_divisor: V("s_otd") === "calendar" ? "calendar" : +V("s_otd"), ot_basis: V("s_otb"), ot_hours_per_day: +V("s_oth"), pf_enabled: V("s_pfe"), esi_enabled: V("s_esie2"), pt_enabled: V("s_pte"), round_net: V("s_rnd"), bonus_amount: +V("s_bon"), bonus_max_short: +V("s_bons"), ess_enabled: V("s_ess"),
+      const p = Object.assign({}, S.load.settings, { tz: V("s_tz").trim() || "Asia/Kolkata", emp_prefix: V("s_pre").trim() || "E", month_days_mode: V("s_md") === "calendar" ? "calendar" : +V("s_md"), min_gap_min: +V("s_gap"), status_rule: V("s_rule") === "shift" ? "shift" : "hours", early_grace_min: +V("s_egr") || 0, ot_multiplier: +V("s_otm"), ot_min_after: +V("s_ota"), ot_day_divisor: V("s_otd") === "calendar" ? "calendar" : +V("s_otd"), ot_basis: V("s_otb"), ot_hours_per_day: +V("s_oth"), pf_enabled: V("s_pfe"), esi_enabled: V("s_esie2"), pt_enabled: V("s_pte"), round_net: V("s_rnd"), bonus_amount: +V("s_bon"), bonus_max_short: +V("s_bons"), ess_enabled: V("s_ess"),
         pf_rate: +V("s_pfr"), pf_wage_cap: +V("s_pfc"), eps_rate: +V("s_eps"), pf_admin_rate: +V("s_pfa"), edli_rate: +V("s_edli"), esi_emp_rate: +V("s_esie"), esi_er_rate: +V("s_esir"), esi_limit: +V("s_esil"), pt_slabs: slabs });
       try { new Intl.DateTimeFormat("en", { timeZone: p.tz }); } catch (e) { throw new Error("The time zone “" + p.tz + "” is not known. Example: Asia/Kolkata"); }
       await call("kmr_hrms_settings_save", { p }); await loadAll(); say("Rules saved.", true);

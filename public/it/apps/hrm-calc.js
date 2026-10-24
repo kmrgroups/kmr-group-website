@@ -16,6 +16,8 @@
     bonus_amount: 0, bonus_max_short: 1,      // attendance bonus for employees marked eligible: paid when at most this many days are short
     round_net: false,                         // pay whole rupees
     min_gap_min: 5,                           // two punches closer than this are one punch (double touch)
+    status_rule: "hours",                     // hours = present / half day by hours worked; shift = judged by the shift: late arrival or early leaving = half day
+    early_grace_min: 2,                       // with the shift rule: leaving this many minutes before shift end is still full day
   };
   const cfg = (s) => Object.assign({}, DEFAULTS, s || {});
   const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
@@ -79,6 +81,12 @@
         const extra = outM - en;
         row.ot_min = emp.ot_eligible && extra >= s.ot_min_after ? extra : 0;
       }
+      if (s.status_rule === "shift" && st != null && en0 != null) {                                     // judged by the shift: late arrival or early leaving = half day
+        const en = en0 <= st ? en0 + 1440 : en0, late = rel(first, date, tz) > st + num(sh.grace_min), early = rel(last, date, tz) < en - num(s.early_grace_min);
+        row.status = late || early ? "HD" : "P";
+        if (late || early) row.remarks = (late ? "Late arrival" : "") + (late && early ? " and " : "") + (early ? "Left early" : "") + " (" + (sh.name || "shift") + ")";
+        return;
+      }
       row.status = row.worked_min >= sh.full_day_min ? "P" : row.worked_min >= sh.half_day_min ? "HD" : "A";
       if (row.status === "A") row.remarks = "Worked less than a half day";
     };
@@ -113,22 +121,33 @@
     const manual = {}; (data.existing || []).forEach((r) => { if (r.source === "manual") manual[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = 1; });
     const perm = {}; (data.permissions || []).forEach((x) => { const k = x.employee_id + "|" + String(x.date).slice(0, 10); perm[k] = { minutes: (perm[k] ? perm[k].minutes : 0) + num(x.minutes), from_time: x.from_time, to_time: x.to_time }; });
     const ctx = { settings: s, holidays: hol, leaves: data.leaves || [], today: today || local(Date.now(), tz).date };
+    // shift roster: the shift a person works on a given day (rotating shifts); days without one use the person's own shift
+    const roster = {}, hasRoster = {}; (data.roster || []).forEach((r) => { const sh = shifts[r.s]; if (sh) { roster[r.e + "|" + String(r.d).slice(0, 10)] = sh; hasRoster[r.e] = 1; } });
+    const shiftOn = (e, d) => roster[e.id + "|" + d] || shifts[e.shift_id] || firstShift;
+    function dateFor(e, ts) {                                                                           // the work date a punch belongs to
+      if (!hasRoster[e.id]) return workDateOf(ts, shifts[e.shift_id] || firstShift, tz);
+      const l = local(ts, tz), prev = addDays(l.date, -1), sp = roster[e.id + "|" + prev], st = roster[e.id + "|" + l.date];
+      if (sp && sp.night) {                                                                             // morning punches after a night shift belong to the night shift's day
+        const endM = hhmm(sp.end_time), nextStart = st && !st.night ? hhmm(st.start_time) : null;
+        if (endM != null && l.min <= endM + 240 && !(nextStart != null && nextStart - l.min < 90)) return prev;
+      }
+      return l.date;
+    }
     // sort punches into employee -> work date
     const bucket = {}, unknown = {};
     (data.punches || []).forEach((p) => {
       const e = (p.employee_id && (data.employees || []).find((x) => x.id === p.employee_id)) || byBio[String(p.bio_id)];
       if (!e) { unknown[p.bio_id] = (unknown[p.bio_id] || 0) + 1; return; }
-      const sh = shifts[e.shift_id] || firstShift, d = workDateOf(p.at, sh, tz);
+      const d = dateFor(e, p.at);
       if (d < from || d > to) return;
       const k = e.id + "|" + d; (bucket[k] || (bucket[k] = [])).push(p.at);
     });
     const rows = [];
     (data.employees || []).forEach((e) => {
       if (e.status === "left" && !e.dol) return;
-      const sh = shifts[e.shift_id] || firstShift;
       for (let d = from; d <= to; d = addDays(d, 1)) {
         if (manual[e.id + "|" + d]) continue;                                                           // hand-entered days stay as they are
-        const r = dayRow(e, sh, d, bucket[e.id + "|" + d] || [], ctx);
+        const sh = shiftOn(e, d), r = dayRow(e, sh, d, bucket[e.id + "|" + d] || [], ctx);
         if (r) {
           const pm = perm[e.id + "|" + d];                                                              // an approved permission excuses that many minutes of late / early going
           if (pm && (num(r.late_min) > 0 || num(r.early_min) > 0)) {

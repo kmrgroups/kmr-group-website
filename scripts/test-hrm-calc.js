@@ -96,4 +96,15 @@ eep = C.payOf(emk({ basic: 2500, pay_type: "fixed", ot_eligible: false, bonus_el
 eep = C.payOf(emk({ basic: 15500, hours_per_day: 12, bonus_eligible: false }), esm(31, 120), "2026-08", ES); eq(eep.earnings.find((x) => x.code === "OT").amount, r2e(15500 / 31 / 12 * 2), "OT hours at daily/hours");
 function r2e(n) { return Math.round(n * 100) / 100; }
 eep = C.payOf(emk({ basic: 20000 }), esm(31, 0), "2026-08", Object.assign({}, ES, { pf_enabled: true })); eq(eep.deductions.map((x) => x.code), ["PF", "ESI", "PT"].filter((x) => x === "PF"), "PF switch on: PF taken");
+// shift roster + "judged by the shift" rule (rotating shifts, late = half day, night shift morning punches)
+{
+  const shs = [{ id: "ms", name: "MS", start_time: "06:30", end_time: "14:30", grace_min: 0, break_min: 0, half_day_min: 240, full_day_min: 450, night: false, weekly_off: [0], active: true },
+    { id: "ns", name: "NS", start_time: "22:00", end_time: "06:00", grace_min: 30, break_min: 0, half_day_min: 240, full_day_min: 450, night: true, weekly_off: [0], active: true }];
+  const rs = { employees: [{ id: "r1", bio_id: "R1", status: "active", shift_id: "ms" }], shifts: shs, holidays: [], leaves: [],
+    roster: [{ e: "r1", d: "2026-09-07", s: "ms" }, { e: "r1", d: "2026-09-08", s: "ns" }, { e: "r1", d: "2026-09-10", s: "ms" }, { e: "r1", d: "2026-09-11", s: "ns" }],
+    punches: [["2026-09-07", "06:20"], ["2026-09-07", "14:35"], ["2026-09-08", "18:00"], ["2026-09-09", "06:05"], ["2026-09-10", "06:40"], ["2026-09-10", "14:31"], ["2026-09-11", "18:05"], ["2026-09-12", "05:50"]].map(([d, t]) => ({ bio_id: "R1", at: IST(d, t) })) };
+  const rr = C.buildAttendance(rs, "2026-09-07", "2026-09-12", { status_rule: "shift" }, "2026-10-24").rows, st = (d) => (rr.find((x) => x.work_date === d) || {}).status;
+  eq([st("2026-09-07"), st("2026-09-08"), st("2026-09-09"), st("2026-09-10"), st("2026-09-11")], ["P", "P", "A", "HD", "HD"], "shift rule: on time, night shift (out next morning), late arrival, early leaving");
+  eq(C.buildAttendance(Object.assign({}, rs, { roster: [] }), "2026-09-07", "2026-09-07", {}, "2026-10-24").rows[0].status, "P", "no roster, hours rule: unchanged behaviour");
+}
 console.log(bad ? bad + " FAILED" : "all passed"); process.exit(bad ? 1 : 0);
