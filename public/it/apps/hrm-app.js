@@ -140,10 +140,10 @@
     return o;
   }
   function dashChart(title, vals, f, color, cur) {
-    const W = 420, H = 150, pt = 16, pb = 20, mx = Math.max(0, ...vals.filter((v) => v != null)) || 1, bw = W / 12;
+    const W = 360, H = 200, pt = 22, pb = 26, mx = Math.max(0, ...vals.filter((v) => v != null)) || 1, bw = W / 12;
     return `<div class="card" style="margin:0"><h3>${esc(title)}</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc(title)} by month">${vals.map((v, i) => {
       const h = v == null ? 0 : (H - pt - pb) * v / mx, x = i * bw + bw * 0.14, y = H - pb - h;
-      return `<g data-m="${i + 1}" style="cursor:pointer"><rect x="${x}" y="${pt - 4}" width="${bw * 0.72}" height="${H - pt - pb + 4}" fill="transparent"/>${v == null ? "" : `<rect x="${x}" y="${y}" width="${bw * 0.72}" height="${Math.max(h, 1)}" rx="3" style="fill:${color};opacity:${i + 1 === cur ? 1 : 0.45}"/><text x="${x + bw * 0.36}" y="${y - 3}" font-size="9" text-anchor="middle" style="fill:var(--ink)">${f(v)}</text>`}<text x="${x + bw * 0.36}" y="${H - 6}" font-size="9" text-anchor="middle" style="fill:var(--mut);font-weight:${i + 1 === cur ? 700 : 400}">${MON[i].slice(0, 3)}</text></g>`;
+      return `<g data-m="${i + 1}" style="cursor:pointer"><rect x="${x}" y="${pt - 4}" width="${bw * 0.72}" height="${H - pt - pb + 4}" fill="transparent"/>${v == null ? "" : `<rect x="${x}" y="${y}" width="${bw * 0.72}" height="${Math.max(h, 1)}" rx="3" style="fill:${color};opacity:${i + 1 === cur ? 1 : 0.45}"/><text x="${x + bw * 0.36}" y="${y - 3}" font-size="12" font-weight="600" text-anchor="middle" style="fill:var(--ink)">${f(v)}</text>`}<text x="${x + bw * 0.36}" y="${H - 8}" font-size="12" text-anchor="middle" style="fill:var(--mut);font-weight:${i + 1 === cur ? 700 : 400}">${MON[i].slice(0, 3)}</text></g>`;
     }).join("")}</svg></div>`;
   }
   function dashPaint() {
@@ -152,7 +152,7 @@
     const emp = de ? L.employees.find((e) => e.id === de) : null;
     const yr = Array.from({ length: 12 }, (_, i) => dashStats(y + "-" + String(i + 1).padStart(2, "0"), pick)), m = yr[cur - 1];
     const pc = (v) => (v == null ? "—" : v.toFixed(1) + "%"), k = (t, v, c) => `<div class="kpi" style="--c:${c || "var(--b1)"}"><b>${v}</b><span>${t}</span></div>`;
-    const lakh = (v) => (v >= 1e7 ? (v / 1e7).toFixed(2) + " Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + " L" : rs0(v));
+    const lakh = (v) => (v >= 1e7 ? (v / 1e7).toFixed(1) + "Cr" : v >= 1e5 ? (v / 1e5).toFixed(1) + "L" : v >= 1e3 ? (v / 1e3).toFixed(0) + "k" : rs0(v));
     const ser = (f) => yr.map((x) => (x.has ? f(x) : null)), hcs = yr.map((x) => (x.head || x.start ? x.head : null));
     const yHead = yr.reduce((a, x) => a + x.head, 0) / 12, yLeft = yr.reduce((a, x) => a + x.left, 0), yCost = yr.reduce((a, x) => a + x.cost, 0), yOt = yr.reduce((a, x) => a + x.otCost, 0), yOtH = yr.reduce((a, x) => a + x.otH, 0);
     const days = C.monthDays(per), from = C.monthRange(per).from;
@@ -166,7 +166,7 @@
       <div class="kpis">${emp ? "" : k("Headcount (month end)", m.head) + k("Joined", m.join, "#2563eb") + k("Left", m.left, "var(--r)") + k("Attrition", pc(m.attr), "var(--r)")}${k("Attendance", pc(m.pct), "var(--g)")}${k("Absent days", m.has ? Math.round(m.absent * 10) / 10 : "—", "var(--r)")}${k("Late days", m.has ? m.late : "—", "var(--a)")}${k("OT hours", m.has ? m.otH.toFixed(1) : "—", "#7c3aed")}${cost ? k("Manpower cost ₹", m.has ? rs0(m.cost) : "—", "#0d9488") + k("OT cost ₹", m.has ? rs0(m.otCost) : "—", "#7c3aed") : ""}</div>
       ${cost && m.has && m.noPay ? `<div class="note">${m.noPay} employee(s) have no salary set, so their cost shows as 0. <a href="#go=emp">Employees</a></div>` : ""}
       <h3 style="margin:14px 0 6px">${y} · month by month <span class="mut" style="font-weight:400;font-size:12px">(click a bar to open that month)</span></h3>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:10px" id="dch">
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px" id="dch">
         ${dashChart("Attendance %", ser((x) => x.pct), (v) => v.toFixed(0), "var(--g)", cur)}${dashChart("Attrition % (leavers ÷ average headcount)", yr.map((x) => (x.attr == null || (!x.has && !x.left) ? null : x.attr)), (v) => v.toFixed(1), "var(--r)", cur)}
         ${cost ? dashChart("Manpower cost ₹ (pay + employer PF/ESI)", ser((x) => x.cost), lakh, "var(--b1)", cur) + dashChart("OT cost ₹", ser((x) => x.otCost), lakh, "#7c3aed", cur) : ""}
         ${dashChart("OT hours", ser((x) => x.otH), (v) => v.toFixed(0), "var(--a)", cur)}${emp ? "" : dashChart("Headcount", hcs, (v) => v, "#2563eb", cur)}</div>
