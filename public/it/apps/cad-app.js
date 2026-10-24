@@ -36,8 +36,8 @@
     const E = { root, opts, doc: K.newDoc(), sel: [], CANCEL, lastPt: [0, 0], lastCmd: "", dirty: false };
     let prefs = {}; try { prefs = JSON.parse(localStorage.getItem("kcad-prefs") || "{}"); } catch (e) { prefs = {}; }
     if (!prefs.lwtMig) { prefs.lwt = true; prefs.lwtMig = 1; }
-    if (!prefs.crossMig) { prefs.cross = 12; prefs.crossMig = 1; }   // short crosshair so it never hides the drawing   // thickness shows by default
-    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: true, light: false, cross: 12, pick: 5 }, prefs);
+    if (prefs.crossMig !== 2) { prefs.cross = 4; prefs.pick = 8; prefs.crossMig = 2; }   // short crosshair so it never hides the drawing   // thickness shows by default
+    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: true, light: false, cross: 4, pick: 8 }, prefs);
     const savePrefs = () => { try { localStorage.setItem("kcad-prefs", JSON.stringify(E.set)); } catch (e) { /* private mode */ } };
     E.cur = { layer: "0", color: null, lt: null, lw: null };
     E.view = { cx: 0, cy: 0, s: 3, W: 800, H: 600 };
