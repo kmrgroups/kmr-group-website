@@ -75,7 +75,7 @@
     $("#d_y").onchange = (e) => { S.year = +e.target.value; guard(drawDash); };
     el.querySelectorAll("[data-go]").forEach((e) => (e.onclick = () => { S.f.status = "open"; go(e.dataset.go); }));
     el.querySelectorAll("[data-a]").forEach((e) => (e.onclick = () => go("go=list&id=" + e.dataset.a)));
-    if (AUD.screens.dash2) { const d2 = document.createElement("div"); d2.id = "dash2"; el.append(d2); await AUD.screens.dash2(d2, d); }
+    if (AUD.screens.dash2) { const d2 = document.createElement("div"); d2.id = "dash2"; el.append(d2); try { await AUD.screens.dash2(d2, d); } catch (e) { d2.innerHTML = '<div class="guide">The findings dashboard needs the latest database update (migration 0085). Ask your administrator to run it once; everything else keeps working.</div>'; } }
   }
 
   /* ================= Audit programme ================= */
