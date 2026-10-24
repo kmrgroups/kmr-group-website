@@ -160,7 +160,7 @@
       }
       await flush(); return x;
     }
-    const tocXml = async (c) => { let x = ""; for (const a of c.querySelectorAll("a")) x += `<w:p><w:pPr><w:ind w:left="${(+a.dataset.lvl || 1) * 360 - 360}"/></w:pPr><w:hyperlink w:anchor="${esc((a.getAttribute("href") || "").slice(1))}"><w:r><w:rPr><w:color w:val="0563C1"/></w:rPr><w:t xml:space="preserve">${esc(a.textContent)}</w:t></w:r></w:hyperlink></w:p>`; return `<w:p><w:pPr><w:pStyle w:val="TOCHeading"/></w:pPr><w:r><w:t>Contents</w:t></w:r></w:p>` + x; };
+    const tocXml = async (c) => { let x = ""; for (const a of c.querySelectorAll("a")) { const tt = a.querySelector(".tt"), tn = a.querySelector(".tn"); x += `<w:p><w:pPr><w:tabs><w:tab w:val="right" w:leader="dot" w:pos="9000"/></w:tabs><w:ind w:left="${(+a.dataset.lvl || 1) * 360 - 360}"/></w:pPr><w:hyperlink w:anchor="${esc((a.getAttribute("href") || "").slice(1))}"><w:r><w:rPr><w:color w:val="0563C1"/></w:rPr><w:t xml:space="preserve">${esc(tt ? tt.textContent : a.textContent)}</w:t></w:r>${tn ? `<w:r><w:tab/></w:r><w:r><w:t>${esc(tn.textContent)}</w:t></w:r>` : ""}</w:hyperlink></w:p>`; } return `<w:p><w:pPr><w:pStyle w:val="TOCHeading"/></w:pPr><w:r><w:t>Contents</w:t></w:r></w:p>` + x; };
 
     // bookmarks for headings so contents links work
     let body = await blocks(root, {});
@@ -185,7 +185,7 @@
       { name: "word/styles.xml", data: styles() }, { name: "word/numbering.xml", data: numXml },
       { name: "word/settings.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings xmlns:w="${W}"><w:defaultTabStop w:val="720"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>` },
       { name: "word/footer1.xml", data: footXml },
-      { name: "docProps/core.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(meta.title || "")}</dc:title><dc:creator>${esc(meta.author || "KMR Office Suite")}</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>` },
+      { name: "docProps/core.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>${esc(meta.title || "")}</dc:title><dc:creator>${esc(meta.author || "KMR Office Suite")}</dc:creator>${meta.subject ? `<dc:subject>${esc(meta.subject)}</dc:subject>` : ""}${meta.keywords ? `<cp:keywords>${esc(meta.keywords)}</cp:keywords>` : ""}<dcterms:created xsi:type="dcterms:W3CDTF">${now}</dcterms:created><dcterms:modified xsi:type="dcterms:W3CDTF">${now}</dcterms:modified></cp:coreProperties>` },
       { name: "docProps/app.xml", data: `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>KMR Office Suite</Application></Properties>` }
     ];
     if (hdr) entries.push({ name: "word/header1.xml", data: await hf("hdr", hdr) });

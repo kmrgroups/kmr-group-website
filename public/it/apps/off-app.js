@@ -89,7 +89,8 @@
     let dirty = false, saving = false, again = false, timer = 0, ctrl = null; const sv = $("#o_sv");
     const setSv = (t, bad) => { sv.textContent = t; sv.classList.toggle("err", !!bad); };
     const api = {
-      file: f, rib: $("#orib"), wk: $("#owk"), st: $("#ost"), root: w, ro, me: (S.L && S.L.me) || "", say,
+      file: f, rib: $("#orib"), wk: $("#owk"), st: $("#ost"), root: w, ro, me: (S.L && S.L.me) || "", say, call, settings: (S.L && S.L.settings) || {},
+      files: async (kind) => ((await call("kmr_off_list", { p: { kind } })).files || []), getFile: (id) => call("kmr_off_get", { p_id: id }),
       changed() { if (ro) return; dirty = true; setSv("Unsaved changes…"); clearTimeout(timer); timer = setTimeout(() => doSave(), 3500); },
       save: () => doSave(true)
     };

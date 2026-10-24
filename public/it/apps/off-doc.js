@@ -41,8 +41,8 @@
         else if ((n === "href") && /^\s*(javascript|data|vbscript):/i.test(v)) e.removeAttribute(a.name);
         else if (n === "src" && !(/^data:image\/(png|jpe?g|gif|webp|bmp|svg\+xml);/i.test(v) || (o.http && /^https?:/i.test(v)))) e.removeAttribute(a.name);
         else if (n === "style") { const s = v.replace(/mso-[^;]+;?/gi, "").replace(/expression\([^)]*\)|url\([^)]*\)|@import|behavior:|javascript:/gi, "").trim(); if (s) e.setAttribute("style", s); else e.removeAttribute("style"); }
-        else if (n === "class") { const keep = v.split(/\s+/).filter((c) => /^(pb|toc|nb|t-title|t-sub|cmt|dt|hr)$/.test(c)); if (keep.length) e.setAttribute("class", keep.join(" ")); else e.removeAttribute("class"); }
-        else if (!/^(href|src|alt|colspan|rowspan|width|height|align|valign|title|target|id|data-c|data-lvl|data-bc|contenteditable|face|size|color|start|type)$/.test(n)) e.removeAttribute(a.name);
+        else if (n === "class") { const keep = v.split(/\s+/).filter((c) => /^(pb|cb|toc|nb|t-title|t-sub|cmt|dt|hr|fld|fnr|fns|fn|bm|xref|cap|capn|eq|fr|tbx|mf|dc|tt|tn|ml|tgt|ct0|ct1|ct2|ct3|ct4|ct5|sig|cover|note|rad|ix|idx|bib|cit|tl)$/.test(c)); if (keep.length) e.setAttribute("class", keep.join(" ")); else e.removeAttribute("class"); }
+        else if (!/^(href|src|alt|colspan|rowspan|width|height|align|valign|title|target|id|data-c|data-lvl|data-bc|contenteditable|face|size|color|start|type|dir|lang|data-[a-z]+)$/.test(n)) e.removeAttribute(a.name);
       });
       if (t === "a" && e.getAttribute("href") && !/^#/.test(e.getAttribute("href"))) { e.setAttribute("target", "_blank"); e.setAttribute("rel", "noopener noreferrer"); }
     });
@@ -220,7 +220,7 @@
       ed.addEventListener("paste", async (e) => {
         const cd = e.clipboardData; if (!cd) return; const files = [...(cd.files || [])].filter((f) => /^image\//.test(f.type));
         if (files.length) { e.preventDefault(); for (const f of files) await addImage(f); return; }
-        const h = cd.getData("text/html"); if (h) { e.preventDefault(); const tmp = clean(h.replace(/<!--[\s\S]*?-->/g, "").replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, "")); document.execCommand("insertHTML", false, tmp); changed(); }
+        const h = cd.getData("text/html"); if (h) { e.preventDefault(); const tmp = clean(h.replace(/<!--[\s\S]*?-->/g, "").replace(/^[\s\S]*<body[^>]*>|<\/body>[\s\S]*$/gi, "")); document.execCommand("insertHTML", false, (X.pasteWrap || ((q) => q))(tmp)); changed(); }
       });
       ed.addEventListener("drop", async (e) => { const f = [...(e.dataTransfer.files || [])].filter((x) => /^image\//.test(x.type)); if (f.length) { e.preventDefault(); for (const x of f) await addImage(x); } });
       ed.addEventListener("input", () => { if (pendingSize) { fixFonts(pendingSize); pendingSize = null; } changed(); });
@@ -240,7 +240,7 @@
         hd.style.left = m.l * MM + "px"; hd.style.right = m.r * MM + "px"; ft.style.left = m.l * MM + "px"; ft.style.right = m.r * MM + "px";
         const ch = h - (m.t + m.b) * MM, total = pg.scrollHeight - (m.t + m.b) * MM, n = Math.max(1, Math.ceil((ed.scrollHeight - 2) / ch)); gd.style.height = pg.scrollHeight + "px"; gd.innerHTML = "";
         for (let i = 1; i < n; i++) { const l = document.createElement("i"); l.style.top = m.t * MM + i * ch + "px"; l.dataset.p = "Page " + (i + 1); gd.append(l); }
-        const need = n * ch + (m.t + m.b) * MM; if (need > h) pg.style.minHeight = need + "px"; pages = n; upStatus(); placeHandle();
+        const need = n * ch + (m.t + m.b) * MM; if (need > h) pg.style.minHeight = need + "px"; pages = n; upStatus(); placeHandle(); X.onLayout.forEach((f) => f());
         zm.style.zoom = zoom / 100;
       };
       let pages = 1;
@@ -316,6 +316,8 @@
       // fix up menu items that need dynamic wiring
       const ins = tabs[1].groups; ins[1].items[0] = { i: "table", label: "Table", big: true, on: () => gridMenu(rbBtn("Table")) };
       ins[4].items[2] = { k: "menu", i: "symbol", t: "Symbols", items: () => SYMS.map((s) => ({ label: s, run: () => exec("insertText", s) })) };
+      const X = { api, body, ed, hd, ft, pg, sc, zm, pane, tabs, exec, restore, sel, caretEl, elOf, state, insHTML, changed, rbBtn, blocksIn, setBlockStyle, openTables, cellOf, focusCell, clean, layout, setZoom, fit, showPane, addImage, setSize, upStatus, curCss, selectImg, xform: [], xformAsync: [], onLayout: [], onBody: [], get zoom() { return zoom; }, get saved() { return saved; }, get pages() { return pages; }, get rb() { return rb; }, drawComments, PAGES, MM, MARGINS };
+      (window.OffDocX || []).forEach((f) => f(X));
       rb = make(api.rib, tabs, { first: "home" });
       let rafP = 0; ed.addEventListener("mouseup", () => rb.redraw()); ed.addEventListener("keyup", () => { rb.refresh(); });
       const redrawCtx = () => { const t = rb.tab(); const need = (!!openTables() || !!selImg); rb.refresh(); };
@@ -324,16 +326,18 @@
       layout(); setTimeout(layout, 300); if (zoom !== 100) setZoom(zoom);
       const printCss = () => { let s = document.getElementById("off-page-style"); if (!s) { s = document.createElement("style"); s.id = "off-page-style"; s.media = "print"; document.head.append(s); } const m = body.page.margins; s.textContent = `@page{size:${body.page.size === "Letter" ? "letter" : body.page.size === "Legal" ? "legal" : body.page.size} ${body.page.orient === "landscape" ? "landscape" : "portrait"}}body.opv .dpage{padding-left:${Math.max(0, m.l - 10)}mm!important;padding-right:${Math.max(0, m.r - 10)}mm!important}`; };
       const out = () => { const c = ed.cloneNode(true); c.querySelectorAll(".isel").forEach((i) => i.classList.remove("isel")); c.querySelectorAll("img").forEach((i) => { if (!i.getAttribute("class")) i.removeAttribute("class"); }); return c; };
+      const outX = () => { const c = out(); X.xform.forEach((f) => f(c)); return c; };
       const ctrl = {
-        body() { body.html = out().innerHTML; body.header = hd.innerHTML.replace(/^<br>$/, ""); body.footer = ft.innerHTML.replace(/^<br>$/, ""); body.zoom = zoom; return body; },
+        body() { body.html = out().innerHTML; body.header = hd.innerHTML.replace(/^<br>$/, ""); body.footer = ft.innerHTML.replace(/^<br>$/, ""); body.zoom = zoom; X.onBody.forEach((f) => f(body)); return body; },
         print() { printCss(); if (window.KMRReport) KMRReport.set({ title: file.name || "Document", doc: file.no || "", key: "document", land: body.page.orient === "landscape" }); selectImg(null); document.body.classList.add("opv"); const t0 = document.title; document.title = file.name || "Document"; setTimeout(() => { window.print(); document.title = t0; document.body.classList.remove("opv"); }, 60); },
-        async exportDocx() { const c = out(); c.style.cssText = "position:absolute;left:-9999px;top:0;width:" + pg.clientWidth + "px"; document.body.append(c); c.classList.add("ded"); try { const wrap = document.createElement("div"); wrap.className = "dpage"; wrap.style.cssText = "position:absolute;left:-9999px;top:0;width:" + pg.style.width + ";padding:0"; wrap.append(c); c.style.cssText = ""; document.body.append(wrap); const blob = await OffDocx.write(c, { page: body.page, header: hd.innerHTML.replace(/^<br>$/, ""), footer: ft.innerHTML.replace(/^<br>$/, ""), title: file.name }); wrap.remove(); Z.download(blob, Z.safeName(file.name) + ".docx"); } finally { document.querySelectorAll("body > .ded, body > .dpage").forEach((x) => x.remove()); } },
-        exportHtml() { const h = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(file.name)}</title><style>body{font:11pt Calibri,Arial,sans-serif;max-width:800px;margin:30px auto;padding:0 16px;line-height:1.4}table{border-collapse:collapse}td,th{border:1px solid #808080;padding:4px 7px}img{max-width:100%}.pb{page-break-after:always}</style></head><body>${out().innerHTML}</body></html>`; Z.download(new Blob([h], { type: "text/html" }), Z.safeName(file.name) + ".html"); },
-        exportTxt() { Z.download(new Blob([out().innerText], { type: "text/plain" }), Z.safeName(file.name) + ".txt"); },
+        async exportDocx() { const c = outX(); for (const f of X.xformAsync) await f(c); c.style.cssText = "position:absolute;left:-9999px;top:0;width:" + pg.clientWidth + "px"; document.body.append(c); c.classList.add("ded"); try { const wrap = document.createElement("div"); wrap.className = "dpage"; wrap.style.cssText = "position:absolute;left:-9999px;top:0;width:" + pg.style.width + ";padding:0"; wrap.append(c); c.style.cssText = ""; document.body.append(wrap); const blob = await OffDocx.write(c, { page: body.page, header: (X.hfOut || ((h) => h))(hd.innerHTML.replace(/^<br>$/, "")), footer: (X.hfOut || ((h) => h))(ft.innerHTML.replace(/^<br>$/, "")), title: file.name, author: (body.props && body.props.author) || api.me || "", subject: body.props && body.props.subject, keywords: body.props && body.props.keywords }); wrap.remove(); Z.download(blob, Z.safeName(file.name) + ".docx"); } finally { document.querySelectorAll("body > .ded, body > .dpage").forEach((x) => x.remove()); } },
+        exportHtml() { const h = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(file.name)}</title><style>body{font:11pt Calibri,Arial,sans-serif;max-width:800px;margin:30px auto;padding:0 16px;line-height:1.4}table{border-collapse:collapse}td,th{border:1px solid #808080;padding:4px 7px}img{max-width:100%}.pb{page-break-after:always}</style></head><body>${outX().innerHTML}</body></html>`; Z.download(new Blob([h], { type: "text/html" }), Z.safeName(file.name) + ".html"); },
+        exportTxt() { Z.download(new Blob([outX().innerText], { type: "text/plain" }), Z.safeName(file.name) + ".txt"); },
         focus() { ed.focus(); }, destroy() { document.removeEventListener("selectionchange", onSel); window.removeEventListener("resize", layout); if (hl) hl.clear(); }
       };
+      X.ctrl = ctrl; (window.OffDocPost || []).forEach((f) => f(X));
       return ctrl;
     }
   };
-  window.Office = window.Office || { editors: {} }; Office.editors.doc = DOC; window.OffDoc = { clean };
+  window.Office = window.Office || { editors: {} }; Office.editors.doc = DOC; window.OffDoc = { clean, MARGINS, PAGES };
 })();
