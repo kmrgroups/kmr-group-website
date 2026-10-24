@@ -77,9 +77,19 @@
     holFix(A); S.att = A; return A;
   }
   /* holidays from Setup are applied to every month by themselves: a day marked absent on a holiday (for example by the machine report, which does not know the company holidays) counts as a holiday */
-  function holFix(A) {
-    const hol = {}; ((S.load || {}).holidays || []).forEach((h) => { hol[String(h.hdate).slice(0, 10)] = h.name; });
-    (A.attendance || []).forEach((r) => { const d = String(r.work_date).slice(0, 10); if (r.status === "A" && hol[d]) { r.status = "H"; r.ot_min = 0; r.late_min = 0; r.remarks = "Holiday: " + hol[d]; } });
+  function holFix(A, from, to) {
+    const L = S.load || {}, hol = {}, em = {}; (L.holidays || []).forEach((h) => { hol[String(h.hdate).slice(0, 10)] = h.name; }); (L.employees || []).forEach((e) => { em[e.id] = e; });
+    const off = (e, d) => hol[d] ? "H" : (((shiftOf(e) || {}).weekly_off || [0]).includes(C.dow(d)) ? "WO" : "");
+    const have = {};
+    (A.attendance || []).forEach((r) => {
+      const d = String(r.work_date).slice(0, 10), e = em[r.employee_id]; have[r.employee_id + "|" + d] = 1; if (!e) return; const o = off(e, d); if (!o) return;
+      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = r.worked_min; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " (all hours are overtime)"; }
+      else if (r.status === "A" || r.status === "MP" && !(+r.worked_min > 0) && !r.in_at) { r.status = o; r.ot_min = 0; r.late_min = 0; r.remarks = o === "H" ? "Holiday: " + hol[d] : null; }
+    });
+    if (from && to) {                                                                                       // every person has the holiday / weekly off marked, even where nothing was recorded
+      const t = L.today, last = to > t ? t : to;
+      (L.employees || []).forEach((e) => { for (let d = from; d <= last; d = C.addDays(d, 1)) { const o = off(e, d); if (!o || have[e.id + "|" + d]) continue; if (e.doj && d < String(e.doj).slice(0, 10)) continue; if (e.dol && d > String(e.dol).slice(0, 10)) continue; if (e.status === "left" && !e.dol) continue; (A.attendance = A.attendance || []).push({ employee_id: e.id, work_date: d, status: o, in_at: null, out_at: null, worked_min: 0, ot_min: 0, late_min: 0, early_min: 0, source: "rule", remarks: o === "H" ? "Holiday: " + hol[d] : null, _syn: true }); } });
+    }
     return A;
   }
   function buildFrom(A, from, to) {
@@ -266,7 +276,7 @@
     const L = S.load; if (!S.month) S.month = L.today.slice(0, 7);
     const { from, to } = C.monthRange(S.month), nd = C.monthDays(S.month), el = $("#att");
     await autoWork();
-    const A = await getAtt(from, to), lockedM = A.locked.includes(S.month);
+    const A = holFix(await getAtt(from, to), from, to), lockedM = A.locked.includes(S.month);
     const by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
     const dep = V("ad") || "", depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
     const emps = L.employees.filter((e) => (e.status !== "left" || A.attendance.some((r) => r.employee_id === e.id)) && (!dep || e.department === dep));
@@ -304,7 +314,7 @@
     const { from, to } = C.monthRange(S.hm), nd = C.monthDays(S.hm), el = $("#hrs");
     if (!hasF("hrms.attendance")) { el.innerHTML = '<div class="empty">Attendance is not part of this plan.</div>'; return; }
     await autoWork();
-    const A = await getAtt(from, to), by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
+    const A = holFix(await getAtt(from, to), from, to), by = {}; A.attendance.forEach((r) => { by[r.employee_id + "|" + String(r.work_date).slice(0, 10)] = r; });
     const dep = V("hd") || "", q = (V("hq") || "").toLowerCase(), depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
     const emps = L.employees.filter((e) => (e.status !== "left" || A.attendance.some((r) => r.employee_id === e.id)) && (!dep || e.department === dep) && (!q || (e.name + " " + e.emp_code).toLowerCase().includes(q)));
     const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
