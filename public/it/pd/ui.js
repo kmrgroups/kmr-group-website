@@ -328,6 +328,30 @@ V.plan = (M)=>{
   draw();
 };
 /* ---------- CNC programs ---------- */
+
+/* ---------- presentation: KPIs of this project's documents against the standards ---------- */
+V.present = (M)=>{
+  const S=A().S; M.innerHTML='<div id="preshost" style="padding:4px 4px 18px"></div>';
+  if(!window.KMRPresent){ $("preshost").textContent="Presentation engine not loaded."; return; }
+  const code="pd-"+(S.prj.id||"x");
+  KMRPresent.mount($("preshost"),{app:"pd",code:code,stdKey:"pd",appName:"Process Documents · "+(S.prj.part_no||""),company:(S.org&&S.org.name)||"",slug:code,call:async()=>{throw new Error("local");},canEdit:S.canEdit,controls:[],
+  load:async()=>{
+    const F=window.PDFmea, lim=F.limitOf(S.settings), pf=S.docs&&S.docs.pfmea, rows=((pf&&pf.rows)||[]).filter(r=>r.s||r.o||r.d), std=(pf&&pf.std)||"vda";
+    const need=rows.filter(r=>F.needsAction(std,r,lim)), open=need.filter(r=>!(r.taken||r.actPrev||r.actDet)), noOwner=need.filter(r=>!(r.resp)), hs=rows.filter(r=>+r.s>=9), after=need.filter(r=>r.rpn2!==""&&r.rpn2!=null);
+    const docs=window.PDDocs?PDDocs.DOCS:[], ed=(S.prj.doc&&S.prj.doc.edited)||{}, nEd=docs.filter(d=>ed[d.id]).length, cp=S.docs&&S.docs.cp, cpN=((cp&&cp.rows)||[]).length;
+    const by={}; rows.forEach(r=>{const k=+r.s||0; by[k]=(by[k]||0)+1;});
+    const ks=Object.keys(by).sort((x,y)=>x-y);
+    return {period:"Part "+(S.prj.part_no||"")+" rev "+(S.prj.rev||"")+" · "+(std==="aiag4"?"FMEA 4th edition":"AIAG-VDA 2019"),kpis:[
+      {id:"need",name:"Failure modes needing action",value:need.length,std:[["AIAG-VDA","FMEA 2019"],["IATF","8.3.5.2"],["ISO","6.1"]],why:"Action priority High, or rating at/above the team limit — "+rows.length+" failure modes analysed."},
+      {id:"open",name:"Needing action, none planned",value:open.length,target:0,amber:2,dir:"low",std:[["AIAG-VDA","FMEA 2019"],["IATF","8.3.5.2"],["VDA","6.3 P4"]],why:"Each needs a prevention or detection action."},
+      {id:"own",name:"Actions without a responsible person",value:noOwner.length,target:0,amber:2,dir:"low",std:[["AIAG-VDA","FMEA 2019"],["ISO","5.3"]],why:"Every action needs an owner and a target date."},
+      {id:"hs",name:"Severity 9–10 failure modes",value:hs.length,std:[["IATF","8.3.3.3"],["AIAG","Control Plan"]],why:"Special characteristics — must be on the Control Plan."},
+      {id:"re",name:"Actions re-rated after implementation",value:need.length?after.length/need.length*100:null,unit:"%",target:100,tol:30,dir:"high",std:[["AIAG-VDA","FMEA 2019"],["IATF","8.3.5.2"]],why:"Effectiveness check — new S/O/D after the action."},
+      {id:"cp",name:"Control Plan lines",value:cpN,std:[["AIAG","Control Plan"],["IATF","8.5.1.1"]],why:"Control Plan derived from the PFMEA."},
+      {id:"dc",name:"Documents reviewed on screen",value:docs.length?nEd/docs.length*100:null,unit:"%",std:[["ISO","7.5.3"],["IATF","8.3.4.4"]],why:nEd+" of "+docs.length+" generated documents edited or reviewed."}],
+      charts:[{title:"Failure modes by severity",kind:"bar",kpi:"hs",labels:ks.map(k=>"S"+k),series:[{name:"Failure modes",values:ks.map(k=>by[k])}]}]};
+  }});
+};
 V.cnc = (M)=>{
   const S=A().S, plan=S.plan, C=window.PDCNC, ops=plan.ops.filter(C.isCNC);
   if(!ops.length){ M.innerHTML=`<div class="toolbar"><h2>CNC programs</h2></div><div class="paper"><p class="hintline">This project has no CNC turning, VMC or drilling operation. Add one on the Process plan screen.</p></div>`; return; }

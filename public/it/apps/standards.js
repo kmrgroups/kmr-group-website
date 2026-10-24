@@ -283,6 +283,7 @@ capacity:[
 ['ISO','8.5.1','Control of production provision','Work is shared between the machines of a process by speed (auto load balancing); the Loading Plan checks the customer date with finite machine loading and shows the throughput time.'],
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Overloaded processes list the ways out (extra machine, cycle time, hours, OEE, days) with the numbers.']],
 pd:[
+['ISO','9.3.2','Management review inputs','The Presentation screen shows the PFMEA action status, severity 9–10 items and Control Plan coverage with action plans.'],
 ['CP','Control Plan (prototype, pre-launch, production)','Control Plan content','Control Plan is generated from the process flow and FMEA.'],
 ['VF','7 steps; Action Priority (AP)','Process FMEA','PFMEA with severity, occurrence, detection and Action Priority.'],
 ['F4','RPN method','Process FMEA','PFMEA with RPN is available where the customer still asks for the 4th edition.'],
