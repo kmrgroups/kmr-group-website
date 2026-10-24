@@ -9,6 +9,7 @@
     var slug = (window.QP && QP.slug) || new URLSearchParams(location.search).get("co"); if (!slug) return false;
     var href = "/it/present.html?app=" + key + "&kmr=1&co=" + encodeURIComponent(slug), tabs = document.querySelector(".tabs"), a = document.createElement("a");
     a.id = "kp-link"; a.href = href;
+    a.addEventListener("click", function (e) { e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation(); location.href = href; }, true);
     if (tabs) { a.className = "tab"; a.textContent = "Presentation"; tabs.appendChild(a); }
     else { a.textContent = "Presentation"; a.style.cssText = "position:fixed;right:14px;bottom:40px;z-index:8990;background:#1e3a8a;color:#fff;padding:7px 14px;border-radius:999px;font:600 13px 'Segoe UI',Arial;text-decoration:none;box-shadow:0 2px 10px #0004"; document.body.appendChild(a); }
     return true;
