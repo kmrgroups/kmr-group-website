@@ -2,7 +2,9 @@
    Attendance and pay are worked out by hrm-calc.js in the browser and stored by the database. */
 (function () {
   "use strict";
-  const { $, esc, iso, today, fmt, say, call } = QP, C = window.HRMCalc;
+  const { $, esc, iso, today, fmt, say } = QP, C = window.HRMCalc;
+  /* every database call goes through here: a write clears the short-lived caches so the screens never show stale numbers */
+  const call = (name, args) => { if (!/(_get|_load|_leaves)$/.test(name)) { S.attC = null; S.loadAt = 0; } return QP.call(name, args); };
   const S = { load: null, att: null, month: "", payPeriod: "", devFrom: "", devTo: "", leaveYear: "", leaves: null, pay: null };
   const ed = () => QP.canEdit, money = () => !!(S.load && S.load.money), hasF = (k) => !window.KMRLock || KMRLock.has(k), isAdmin = () => QP.ctx && QP.ctx.role === "admin";
   const cfg = () => C.cfg(S.load && S.load.settings), tz = () => cfg().tz;
@@ -50,7 +52,7 @@
     if (cr) parts.push(three(cr) + " crore"); if (lk) parts.push(two(lk) + " lakh"); if (th) parts.push(two(th) + " thousand"); if (rest) parts.push(three(rest)); return parts.join(" ");
   };
 
-  async function loadAll() { S.load = await call("kmr_hrms_load"); }
+  async function loadAll() { if (S.load && S.loadAt && Date.now() - S.loadAt < 20000) return; S.load = await call("kmr_hrms_load"); S.loadAt = Date.now(); }
   const tabsSetup = () => { const t = document.querySelector('.tab[data-t="pay"]'); if (t) t.style.display = money() ? "" : "none"; };
   const activeEmps = () => S.load.employees.filter((e) => e.status !== "left");
 
@@ -74,9 +76,11 @@
 
   /* attendance worked out live from punches (for today's view, month previews and payroll) */
   async function getAtt(from, to) {
-    const A = await call("kmr_hrms_att_get", { p_from: from, p_to: to });
-    try { A.roster = await call("kmr_hrms_roster_get", { p_from: from, p_to: to }); } catch (e) { A.roster = []; }             // the shift roster (rotating shifts); none yet = everyone on their own shift
-    holFix(A); S.att = A; return A;
+    const key = from + "|" + to;
+    if (S.attC && S.attC.k === key && Date.now() - S.attC.t < 45000) { S.att = S.attC.A; return S.attC.A; }                  // same month again within 45 s: no new download
+    const [A, ro] = await Promise.all([call("kmr_hrms_att_get", { p_from: from, p_to: to }), call("kmr_hrms_roster_get", { p_from: from, p_to: to }).catch(() => [])]);   // both downloads at the same time
+    A.roster = ro || [];                                                                                                     // the shift roster (rotating shifts); none yet = everyone on their own shift
+    holFix(A); S.att = A; S.attC = { k: key, t: Date.now(), A }; return A;
   }
   /* holidays from Setup are applied to every month by themselves: a day marked absent on a holiday (for example by the machine report, which does not know the company holidays) counts as a holiday */
   function holFix(A, from, to) {
@@ -287,16 +291,16 @@
     const dep = V("ad") || "", depts = [...new Set(L.employees.map((e) => e.department).filter(Boolean))].sort();
     const emps = L.employees.filter((e) => shown(e, A, from) && (!dep || e.department === dep));
     const days = Array.from({ length: nd }, (_, i) => from.slice(0, 8) + String(i + 1).padStart(2, "0"));
-    const noRows = !A.attendance.length;
+    const noRows = !A.attendance.length, byEmp = {}; A.attendance.forEach((r) => { (byEmp[r.employee_id] || (byEmp[r.employee_id] = [])).push(r); });
     el.innerHTML = `<div class="row"><input type="month" id="am" value="${S.month}" style="max-width:170px"><select id="ad" style="max-width:190px"><option value="">All departments</option>${opts(depts, dep)}</select><span class="grow"></span>
       ${ed() ? `<button class="btn" id="awork"${lockedM ? " disabled" : ""}>Work out attendance from punches</button><button class="btn o" id="apun">+ Add a punch</button><button class="btn o" id="aros">Import shift roster</button><button class="btn o" id="aimp">Import attendance sheet</button><button class="btn o" id="atidy"${lockedM ? " disabled" : ""}>Tidy people from this month</button><button class="btn o" id="aclr"${lockedM ? " disabled" : ""}>Clear imported / hand-entered days</button>` : ""}<button class="btn o" id="acsv">Export sheet (CSV)</button></div>
       ${lockedM ? `<div class="guide">🔒 The payroll of ${perName(S.month)} is finalised. Attendance of this month cannot be changed unless the payroll is re-opened.</div>` : ""}
       ${noRows && ed() && !lockedM ? `<div class="guide">No attendance has been worked out for ${perName(S.month)} yet. Press <b>Work out attendance from punches</b>: it reads the punches of the machines (and the ones you added), applies each person's shift, holidays and approved leave, and fills in Present / Absent / Late / Overtime for every day. Days you correct by hand are never overwritten.</div>` : ""}
       <div class="note"><span class="s-P" style="padding:1px 7px;border-radius:6px">P</span> present · <span class="s-HD" style="padding:1px 7px;border-radius:6px">½</span> half day · <span class="s-A" style="padding:1px 7px;border-radius:6px">A</span> absent · <span class="s-L" style="padding:1px 7px;border-radius:6px">L</span> paid leave · <span class="s-U" style="padding:1px 7px;border-radius:6px">U</span> unpaid leave · <span class="s-WO" style="padding:1px 7px;border-radius:6px">W</span> weekly off · <span class="s-H" style="padding:1px 7px;border-radius:6px">H</span> holiday · <span class="s-MP" style="padding:1px 7px;border-radius:6px">?</span> missed punch. Click a day to see the punches or to correct it.</div>
-      ${emps.length ? `<div class="twrap"><table class="sheetg"><thead><tr><th class="nm">Employee</th>${days.map((d) => `<th class="${C.dow(d) === 0 ? "wk" : ""}">${+d.slice(8)}<small class="dw">${DOW[C.dow(d)]}</small></th>`).join("")}<th>Paid days</th><th>Absent</th><th>Late</th><th>OT h</th></tr></thead><tbody>${emps.map((e) => {
-        const rows = A.attendance.filter((r) => r.employee_id === e.id), sm = C.summary(e, rows, S.month, L.leave_types);
-        return `<tr><td class="nm">${esc(e.name)}<div class="mut">${esc(e.emp_code)}</div></td>${days.map((d) => { const r = by[e.id + "|" + d]; return `<td class="c ${r ? "s-" + r.status : ""} ${C.dow(d) === 0 && !r ? "wk" : ""}" data-c="${e.id}|${d}" title="${r ? esc(ST[r.status] + (r.in_at ? " · " + tm(r.in_at) + "–" + tm(r.out_at) : "") + (r.remarks ? " · " + r.remarks : "") + (r.source === "manual" ? " · entered by hand" : "")) : ""}">${r ? ABBR[r.status] + (r.source === "manual" ? "*" : "") : ""}</td>`; }).join("")}<td><b>${sm.paid_days}</b></td><td>${sm.absent + sm.missed || ""}</td><td>${sm.late_count || ""}</td><td>${sm.ot_min ? (sm.ot_min / 60).toFixed(1) : ""}</td></tr>`;
-      }).join("")}</tbody></table></div><div class="note">* entered by hand</div>` : `<div class="empty">No employees yet.</div>`}`;
+      ${emps.length ? `<div class="twrap"><table class="sheetg att"><thead><tr><th class="nm">Employee</th>${days.map((d) => `<th class="${C.dow(d) === 0 ? "wk" : ""}">${+d.slice(8)}<small class="dw">${DOW[C.dow(d)]}</small></th>`).join("")}<th>Paid days</th><th>Absent</th><th>Late days</th><th>OT h (Overtime hours)</th></tr></thead><tbody>${emps.map((e) => {
+        const rows = byEmp[e.id] || [], sm = C.summary(e, rows, S.month, L.leave_types);
+        return `<tr><td class="nm">${esc(e.name)}<div class="mut">${esc(e.emp_code)}</div></td>${days.map((d) => { const r = by[e.id + "|" + d]; return `<td class="c ${r ? "s-" + r.status : ""}${r && r.source === "manual" ? " mn" : ""} ${C.dow(d) === 0 && !r ? "wk" : ""}" data-c="${e.id}|${d}">${r ? ABBR[r.status] : ""}</td>`; }).join("")}<td><b>${sm.paid_days}</b></td><td>${sm.absent + sm.missed || ""}</td><td>${sm.late_count || ""}</td><td>${sm.ot_min ? (sm.ot_min / 60).toFixed(1) : ""}</td></tr>`;
+      }).join("")}</tbody></table></div><div class="note"><span class="mnkey"></span> small corner mark = entered or corrected by hand</div>` : `<div class="empty">No employees yet.</div>`}`;
     $("#am").onchange = () => { S.month = V("am") || S.month; drawAtt(); }; $("#ad").onchange = () => drawAtt();
     if ($("#awork")) $("#awork").onclick = workOut; if ($("#apun")) $("#apun").onclick = () => punchForm(); if ($("#aros")) $("#aros").onclick = rosterImport; if ($("#aimp")) $("#aimp").onclick = attendanceImport; if ($("#atidy")) $("#atidy").onclick = async () => {
       const { from, to } = C.monthRange(S.month), A2 = await getAtt(from, to), act = S.load.employees.filter((e) => e.status !== "left");
@@ -312,7 +316,13 @@
       try { let n = 0; for (const e of S.load.employees) n += +(await call("kmr_hrms_att_reset", { p_employee: e.id, p_from: from, p_to: to })) || 0; say(`${n} day(s) removed.`, true); drawAtt(); } catch (er) { say(er.message); }
     };
     $("#acsv").onclick = () => dl(`attendance-${S.month}.csv`, toCsv([["Code", "Name", "Department", ...days.map((d) => +d.slice(8)), "Paid days", "Absent", "Late days", "OT hours"], ...emps.map((e) => { const rows = A.attendance.filter((r) => r.employee_id === e.id), sm = C.summary(e, rows, S.month, L.leave_types); return [e.emp_code, e.name, e.department || "", ...days.map((d) => (by[e.id + "|" + d] || {}).status || ""), sm.paid_days, sm.absent + sm.missed, sm.late_count, (sm.ot_min / 60).toFixed(1)]; })]), "text/csv");
-    document.querySelectorAll("[data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
+    sheetEvents("#att", by, (r) => ST[r.status] + (r.in_at ? " · " + tm(r.in_at) + "–" + tm(r.out_at) : "") + (r.remarks ? " · " + r.remarks : "") + (r.source === "manual" ? " · entered by hand" : ""));
+  }
+  /* one click handler and one hover handler for a whole sheet (instead of one per day cell): quicker to draw and to answer */
+  function sheetEvents(root, by, tip) {
+    const t = document.querySelector(root + " table.sheetg"); if (!t) return;
+    t.addEventListener("click", (e) => { const td = e.target.closest("td[data-c]"); if (!td) return; const [id, d] = td.dataset.c.split("|"); dayForm(id, d); });
+    t.addEventListener("mouseover", (e) => { const td = e.target.closest("td[data-c]"); if (!td || td.title) return; const r = by[td.dataset.c]; if (r) td.title = tip(r); });
   }
   /* ================= hours sheet: every day of every person, regular hours (top left) and overtime hours (bottom right) in one cell ================= */
   async function drawHrs() {
@@ -328,11 +338,11 @@
     let TR = 0, TO = 0;
     const lines = emps.map((e) => { let reg = 0, ot = 0, wd = 0; const cells = days.map((d) => { const r = by[e.id + "|" + d]; if (!r) return { d, r: null }; const s = split(r); if (s.w > 0) { reg += s.reg; ot += s.ot; wd++; } return { d, r, s }; }); TR += reg; TO += ot; return { e, cells, reg, ot, wd }; });
     el.innerHTML = `<div class="row"><input type="month" id="hm" value="${S.hm}" style="max-width:170px"><select id="hd" style="max-width:190px"><option value="">All departments</option>${opts(depts, dep)}</select><input type="search" id="hq" placeholder="Search name or code" value="${esc(q)}" style="max-width:200px"><span class="grow"></span><button class="btn o" id="hcsv">Export sheet (CSV)</button></div>
-      <div class="note">Each cell: <b>regular hours</b> (top left) and <span style="color:var(--r,#c0392b);font-weight:700">overtime hours</span> (bottom right), divided by the diagonal. Days without work show the status letter (A = Absent, W = Weekly off, H = Holiday, L = Paid leave, U = Unpaid leave, ? = Missed punch, ½ = Half day, P = Present). OT = Overtime. Regular hours = hours between first in and last out, less the overtime. Click a day to see the punches or correct it.</div>
-      ${emps.length ? `<div class="twrap"><table class="sheetg"><thead><tr><th class="nm">Employee</th>${days.map((d) => `<th class="${C.dow(d) === 0 ? "wk" : ""}">${+d.slice(8)}<small class="dw">${DOW[C.dow(d)]}</small></th>`).join("")}<th>Days worked</th><th>Regular h</th><th>OT h</th><th>Total h</th></tr></thead><tbody>${lines.map((x) => `<tr><td class="nm">${esc(x.e.name)}<div class="mut">${esc(x.e.emp_code)}</div></td>${x.cells.map((c) => !c.r ? `<td class="st ${C.dow(c.d) === 0 ? "wk" : ""}"></td>` : c.s.w > 0 ? `<td class="c hcell ${C.dow(c.d) === 0 ? "wk" : ""}" data-v="${hh(c.s.reg + c.s.ot)}" data-c="${x.e.id}|${c.d}" title="${esc(ST[c.r.status] + " · " + tm(c.r.in_at) + "–" + tm(c.r.out_at) + " · regular " + hh(c.s.reg) + " h, overtime " + hh(c.s.ot) + " h")}"><span class="r">${c.s.reg ? hh(c.s.reg) : "0"}</span><span class="o">${c.s.ot ? hh(c.s.ot) : ""}</span></td>` : `<td class="c hcell st s-${c.r.status}" data-v="${ABBR[c.r.status]}" data-c="${x.e.id}|${c.d}" title="${esc(ST[c.r.status] + (c.r.remarks ? " · " + c.r.remarks : ""))}">${ABBR[c.r.status]}</td>`).join("")}<td>${x.wd || ""}</td><td><b>${x.reg ? hh(x.reg) : ""}</b></td><td><b style="color:var(--r,#c0392b)">${x.ot ? hh(x.ot) : ""}</b></td><td><b>${x.reg + x.ot ? hh(x.reg + x.ot) : ""}</b></td></tr>`).join("")}<tr><td class="nm"><b>Total</b></td>${days.map((d) => { let r = 0, o = 0; lines.forEach((x) => { const c = x.cells[+d.slice(8) - 1]; if (c && c.s && c.s.w > 0) { r += c.s.reg; o += c.s.ot; } }); return `<td class="hcell st" style="background-image:none"><b>${r ? hh(r) : ""}</b>${o ? `<div style="color:var(--r,#c0392b);font-weight:700">${hh(o)}</div>` : ""}</td>`; }).join("")}<td></td><td><b>${hh(TR)}</b></td><td><b style="color:var(--r,#c0392b)">${hh(TO)}</b></td><td><b>${hh(TR + TO)}</b></td></tr></tbody></table></div>` : `<div class="empty">No employees match.</div>`}`;
+      <div class="note">Each cell: <b>regular hours</b> on top and <span style="color:var(--r,#c0392b);font-weight:700">+overtime hours</span> in red below it. Days without work show the status letter (A = Absent, W = Weekly off, H = Holiday, L = Paid leave, U = Unpaid leave, ? = Missed punch, ½ = Half day, P = Present). OT = Overtime. Regular hours = hours between first in and last out, less the overtime. Click a day to see the punches or correct it.</div>
+      ${emps.length ? `<div class="twrap"><table class="sheetg"><thead><tr><th class="nm">Employee</th>${days.map((d) => `<th class="${C.dow(d) === 0 ? "wk" : ""}">${+d.slice(8)}<small class="dw">${DOW[C.dow(d)]}</small></th>`).join("")}<th>Days worked</th><th>Regular h</th><th>OT h</th><th>Total h</th></tr></thead><tbody>${lines.map((x) => `<tr><td class="nm">${esc(x.e.name)}<div class="mut">${esc(x.e.emp_code)}</div></td>${x.cells.map((c) => !c.r ? `<td class="st ${C.dow(c.d) === 0 ? "wk" : ""}"></td>` : c.s.w > 0 ? `<td class="c hcell ${C.dow(c.d) === 0 ? "wk" : ""}" data-v="${hh(c.s.reg + c.s.ot)}" data-c="${x.e.id}|${c.d}" title="${esc(ST[c.r.status] + " · " + tm(c.r.in_at) + "–" + tm(c.r.out_at) + " · regular " + hh(c.s.reg) + " h, overtime " + hh(c.s.ot) + " h")}"><b>${c.s.reg ? hh(c.s.reg) : "–"}</b>${c.s.ot ? `<i>+${hh(c.s.ot)}</i>` : ""}</td>` : `<td class="c hcell st s-${c.r.status}" data-v="${ABBR[c.r.status]}" data-c="${x.e.id}|${c.d}">${ABBR[c.r.status]}</td>`).join("")}<td>${x.wd || ""}</td><td><b>${x.reg ? hh(x.reg) : ""}</b></td><td><b style="color:var(--r,#c0392b)">${x.ot ? hh(x.ot) : ""}</b></td><td><b>${x.reg + x.ot ? hh(x.reg + x.ot) : ""}</b></td></tr>`).join("")}<tr><td class="nm"><b>Total</b></td>${days.map((d) => { let r = 0, o = 0; lines.forEach((x) => { const c = x.cells[+d.slice(8) - 1]; if (c && c.s && c.s.w > 0) { r += c.s.reg; o += c.s.ot; } }); return `<td class="hcell st" style="background-image:none"><b>${r ? hh(r) : ""}</b>${o ? `<div style="color:var(--r,#c0392b);font-weight:700">${hh(o)}</div>` : ""}</td>`; }).join("")}<td></td><td><b>${hh(TR)}</b></td><td><b style="color:var(--r,#c0392b)">${hh(TO)}</b></td><td><b>${hh(TR + TO)}</b></td></tr></tbody></table></div>` : `<div class="empty">No employees match.</div>`}`;
     $("#hm").onchange = () => { S.hm = V("hm") || S.hm; drawHrs(); }; $("#hd").onchange = () => drawHrs(); $("#hq").onchange = () => drawHrs();
     $("#hcsv").onclick = () => dl(`hours-${S.hm}.csv`, toCsv([["Code", "Name", "Department", "Type", ...days.map((d) => +d.slice(8)), "Total"], ...lines.flatMap((x) => [[x.e.emp_code, x.e.name, x.e.department || "", "Regular h", ...x.cells.map((c) => (c.s && c.s.w > 0 ? hh(c.s.reg) : (c.r ? c.r.status : ""))), hh(x.reg)], [x.e.emp_code, x.e.name, x.e.department || "", "OT h", ...x.cells.map((c) => (c.s && c.s.ot ? hh(c.s.ot) : "")), hh(x.ot)]])]), "text/csv");
-    document.querySelectorAll("#hrs [data-c]").forEach((td) => (td.onclick = () => { const [id, d] = td.dataset.c.split("|"); dayForm(id, d); }));
+    sheetEvents("#hrs", by, (r) => { const q = split(r); return ST[r.status] + " · " + tm(r.in_at) + "–" + tm(r.out_at) + " · regular " + hh(q.reg) + " h (hours), overtime " + hh(q.ot) + " h (hours)"; });
   }
   /* ================= review: missed punches and long absence ================= */
   async function drawRev() {
@@ -525,7 +535,14 @@
         const st = V("d_st"), inI = V("d_in") ? atLocal(date, V("d_in")) : null; let outI = V("d_out") ? atLocal(date, V("d_out")) : null; if (inI && outI && outI <= inI) outI = new Date(Date.parse(outI) + 864e5).toISOString();
         const row = { employee_id: empId, work_date: date, status: st, in_at: inI, out_at: outI, worked_min: 0, late_min: 0, early_min: 0, ot_min: 0, leave_code: ["L", "U"].includes(st) ? V("d_lv") || null : null, remarks: V("d_rm") || "Entered by hand" };
         if (inI && outI && ["P", "HD", "A"].includes(st)) { const m = C.dayRow(e, sh, date, [inI, outI], { settings: L.settings, holidays: {}, leaves: [], today: "9999-12-31" }); if (m) Object.assign(row, { worked_min: m.worked_min, late_min: m.late_min, early_min: m.early_min, ot_min: m.ot_min }); }
-        await call("kmr_hrms_att_save", { p: { mode: "manual", rows: [row] } }); closeM(); say("Saved.", true); drawAtt();
+        const prev = S.att, per = date.slice(0, 7), rg = C.monthRange(per);
+        await call("kmr_hrms_att_save", { p: { mode: "manual", rows: [row] } }); closeM(); say("Saved.", true);
+        if (prev && prev.attendance) {                                                                                       // update the one day on screen: no full download again
+          const rr = Object.assign({}, row, { source: "manual" }), i = prev.attendance.findIndex((x) => x.employee_id === empId && String(x.work_date).slice(0, 10) === date);
+          if (i >= 0) prev.attendance[i] = Object.assign({}, prev.attendance[i], rr); else prev.attendance.push(rr);
+          holFix(prev); S.att = prev; S.attC = { k: rg.from + "|" + rg.to, t: Date.now(), A: prev };
+        }
+        hashGo() === "hrs" ? drawHrs() : drawAtt();
       } catch (er) { $("#dmsg").textContent = er.message; $("#dmsg").style.color = "var(--r)"; }
     };
   }
