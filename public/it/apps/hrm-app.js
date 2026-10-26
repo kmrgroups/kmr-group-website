@@ -84,20 +84,8 @@
   }
   /* holidays from Setup are applied to every month by themselves: a day marked absent on a holiday (for example by the machine report, which does not know the company holidays) counts as a holiday */
   function holFix(A, from, to) {
-    const L = S.load || {}, hol = {}, em = {}; (L.holidays || []).forEach((h) => { hol[String(h.hdate).slice(0, 10)] = h.name; }); (L.employees || []).forEach((e) => { em[e.id] = e; });
-    const rs = {}; ((S.att || A || {}).roster || A.roster || []).forEach((x) => { rs[x.e + "|" + String(x.d).slice(0, 10)] = x.s; });
-    const off = (e, d) => { if (hol[d]) return "H"; const sid = rs[e.id + "|" + d], sh = (sid && ((L.shifts || []).find((z) => z.id === sid))) || shiftOf(e) || {}; return (sh.weekly_off || [0]).includes(C.dow(d)) ? "WO" : ""; };
-    const have = {};
-    (A.attendance || []).forEach((r) => {
-      const d = String(r.work_date).slice(0, 10), e = em[r.employee_id]; have[r.employee_id + "|" + d] = 1; if (!e) return; const o = off(e, d); if (!o) { if (!e.ot_eligible) r.ot_min = 0; return; }
-      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = r.worked_min; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " (all hours are overtime)"; }
-      else if (r.status === "A" || r.status === "MP" && !(+r.worked_min > 0) && !r.in_at) { r.status = o; r.ot_min = 0; r.late_min = 0; r.remarks = o === "H" ? "Holiday: " + hol[d] : null; }
-    });
-    if (from && to) {                                                                                       // every person has the holiday / weekly off marked, even where nothing was recorded
-      const t = L.today, last = to > t ? t : to;
-      (L.employees || []).forEach((e) => { for (let d = from; d <= last; d = C.addDays(d, 1)) { const o = off(e, d); if (!o || have[e.id + "|" + d]) continue; if (e.doj && d < String(e.doj).slice(0, 10)) continue; if (e.dol && d > String(e.dol).slice(0, 10)) continue; if (e.status === "left" && !e.dol) continue; (A.attendance = A.attendance || []).push({ employee_id: e.id, work_date: d, status: o, in_at: null, out_at: null, worked_min: 0, ot_min: 0, late_min: 0, early_min: 0, source: "rule", remarks: o === "H" ? "Holiday: " + hol[d] : null, _syn: true }); } });
-    }
-    return A;
+    const L = S.load || {};
+    return C.holFix(A, { employees: L.employees, shifts: L.shifts, holidays: L.holidays, roster: (S.att || A || {}).roster || A.roster || [], today: L.today, shiftOf }, from, to);
   }
   function buildFrom(A, from, to) {
     const L = S.load, leaves = (A.leaves || []);

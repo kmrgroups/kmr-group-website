@@ -6,7 +6,9 @@
 *{box-sizing:border-box}html{-webkit-text-size-adjust:100%}body{margin:0;font:15px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh;display:flex;flex-direction:column}
 .wrap{width:100%;max-width:520px;margin:0 auto;padding:0 16px}
 header{background:#0c1a3a;color:#fff;padding:12px 0}header .wrap{display:flex;align-items:center;gap:10px}header h1{font-size:16px;margin:0}header small{display:block;opacity:.75;font-size:12px}header .sp{flex:1}
-.who{font-size:12px;opacity:.85;text-align:right;max-width:46%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ht{min-width:0}header h1{line-height:1.2}.who{font-size:12px;text-align:right;max-width:44%;line-height:1.3}.who b{display:block;font-size:13px;overflow-wrap:anywhere}.who span{display:block;opacity:.85}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}.clogo[hidden]{display:none}.clogo.big{width:64px;height:64px;margin:0 auto;border:1px solid var(--line);font-size:20px}.clogo.big img{max-width:56px;max-height:56px}
+.rec{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--line)}.rec:last-child{border-bottom:0}.rec span{color:var(--mut);font-size:13px}.rec b{text-align:right;overflow-wrap:anywhere;font-size:14px}
 main{flex:1;padding:14px 0 90px}
 .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:12px}
 h2{font-size:16px;margin:0 0 8px}h3{font-size:14px;margin:12px 0 6px}
@@ -28,15 +30,15 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:10px 16px 76px}
 .hide{display:none!important}
 @media print{header,nav,footer,.noprint{display:none!important}body{background:#fff}.card{border:0;padding:0}}
 </style></head><body>
-<header><div class="wrap"><div><h1 id="co">My attendance and payslip</h1><small>Employee self service</small></div><div class="sp"></div><div class="who" id="who"></div></div></header>
+<header><div class="wrap"><span class="clogo" id="clogo" hidden></span><div class="ht"><h1 id="co">My attendance and payslip</h1><small>Employee self service</small></div><div class="sp"></div><div class="who" id="who"></div></div></header>
 <main><div class="wrap"><div id="msg"></div>
 <section id="login" class="card hide"><h2>Sign in</h2><div class="mut">Enter your employee ID and your date of birth. You will see only your own attendance and salary.</div>
 <form id="lf" autocomplete="off"><label for="lc">Employee ID</label><input id="lc" autocapitalize="characters" autocomplete="username" placeholder="for example E-0001" required>
 <label for="ld">Date of birth</label><input id="ld" type="date" autocomplete="bday" required>
 <div style="margin-top:14px"><button class="btn w" id="lgo" type="submit">Sign in</button></div></form></section>
-<section id="v-home" class="hide"></section><section id="v-att" class="hide"></section><section id="v-pay" class="hide"></section><section id="v-apply" class="hide"></section>
+<section id="v-home" class="hide"></section><section id="v-att" class="hide"></section><section id="v-pay" class="hide"></section><section id="v-apply" class="hide"></section><section id="v-me" class="hide"></section>
 </div></main>
-<nav id="nav" class="hide"><div class="wrap"><button data-v="home" class="on"><b>🏠</b>Home</button><button data-v="att"><b>🗓</b>Attendance</button><button data-v="pay"><b>💰</b>Payslips</button><button data-v="apply"><b>✍️</b>Leave</button></div></nav>
+<nav id="nav" class="hide"><div class="wrap"><button data-v="home" class="on"><b>🏠</b>Home</button><button data-v="att"><b>🗓</b>Attendance</button><button data-v="pay"><b>💰</b>Payslips</button><button data-v="apply"><b>✍️</b>Leave</button><button data-v="me"><b>👤</b>Profile</button></div></nav>
 <footer>Powered By : KMR Group of Companies</footer>
 <script src="/it/apps/hrm-calc.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/hrm-demo.js"><\/script>')}</script>
 <script src="/it/apps/kmr-report.js"></script><script src="/it/apps/hrm-me.js"></script></body></html>

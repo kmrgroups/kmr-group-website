@@ -161,6 +161,26 @@
     return { rows, unknown };
   }
 
+
+  /* ---------- holidays and weekly offs applied to attendance rows (used by the HR screens AND the employee mobile page, so both show the same numbers) ----------
+     ctx = { employees, shifts, holidays, roster, today, shiftOf(emp) }. Hours worked on a holiday or weekly off are all overtime; a day marked absent on one counts as that holiday / weekly off. */
+  function holFix(A, ctx, from, to) {
+    const hol = {}, em = {}; (ctx.holidays || []).forEach((h) => { hol[String(h.hdate).slice(0, 10)] = h.name; }); (ctx.employees || []).forEach((e) => { em[e.id] = e; });
+    const rs = {}; (ctx.roster || []).forEach((x) => { rs[x.e + "|" + String(x.d).slice(0, 10)] = x.s; });
+    const off = (e, d) => { if (hol[d]) return "H"; const sid = rs[e.id + "|" + d], sh = (sid && ((ctx.shifts || []).find((z) => z.id === sid))) || (ctx.shiftOf ? ctx.shiftOf(e) : null) || {}; return (sh.weekly_off || [0]).includes(dow(d)) ? "WO" : ""; };
+    const have = {};
+    (A.attendance || []).forEach((r) => {
+      const d = String(r.work_date).slice(0, 10), e = em[r.employee_id]; have[r.employee_id + "|" + d] = 1; if (!e) return; const o = off(e, d); if (!o) { if (!e.ot_eligible) r.ot_min = 0; return; }
+      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = r.worked_min; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " (all hours are overtime)"; }
+      else if (r.status === "A" || r.status === "MP" && !(+r.worked_min > 0) && !r.in_at) { r.status = o; r.ot_min = 0; r.late_min = 0; r.remarks = o === "H" ? "Holiday: " + hol[d] : null; }
+    });
+    if (from && to) {                                                                                       // every person has the holiday / weekly off marked, even where nothing was recorded
+      const t = ctx.today, last = to > t ? t : to;
+      (ctx.employees || []).forEach((e) => { for (let d = from; d <= last; d = addDays(d, 1)) { const o = off(e, d); if (!o || have[e.id + "|" + d]) continue; if (e.doj && d < String(e.doj).slice(0, 10)) continue; if (e.dol && d > String(e.dol).slice(0, 10)) continue; if (e.status === "left" && !e.dol) continue; (A.attendance = A.attendance || []).push({ employee_id: e.id, work_date: d, status: o, in_at: null, out_at: null, worked_min: 0, ot_min: 0, late_min: 0, early_min: 0, source: "rule", remarks: o === "H" ? "Holiday: " + hol[d] : null, _syn: true }); } });
+    }
+    return A;
+  }
+
   /* ---------- month summary of one employee from attendance rows ---------- */
   function summary(emp, rows, period, leaveTypes) {
     const days = monthDays(period), { from, to } = monthRange(period);
@@ -287,6 +307,6 @@
   function dirOf(v) { v = String(v == null ? "" : v).trim().toLowerCase(); if (v === "0" || v === "i" || /^(in|check ?in|c\/in|entry|enter)/.test(v)) return "in"; if (v === "1" || v === "o" || /^(out|check ?out|c\/out|exit)/.test(v)) return "out"; return null; }
   function verOf(v) { v = String(v == null ? "" : v).trim().toLowerCase(); if (v === "1" || /finger|fp/.test(v)) return "finger"; if (/^(15|16|17|18)$/.test(v) || /face/.test(v)) return "face"; if (/^(2|3|4)$/.test(v) || /card|rf/.test(v)) return "card"; if (v === "0" || /pass|pw|pin/.test(v)) return "password"; if (v === "25" || /palm/.test(v)) return "palm"; return "other"; }
 
-  const api = { DEFAULTS, cfg, r2, local, dnum, dstr, addDays, dow, monthDays, monthRange, rel, clock, hhmm, workDateOf, dayRow, buildAttendance, summary, payOf, totals, reslip, parsePunchFile, parseDate, parseTime, DEFAULT_SHIFT };
+  const api = { DEFAULTS, cfg, r2, local, dnum, dstr, addDays, dow, monthDays, monthRange, rel, clock, hhmm, workDateOf, dayRow, buildAttendance, holFix, summary, payOf, totals, reslip, parsePunchFile, parseDate, parseTime, DEFAULT_SHIFT };
   if (typeof module !== "undefined" && module.exports) module.exports = api; else root.HRMCalc = api;
 })(typeof window !== "undefined" ? window : globalThis);
