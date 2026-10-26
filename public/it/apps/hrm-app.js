@@ -90,7 +90,7 @@
     const have = {};
     (A.attendance || []).forEach((r) => {
       const d = String(r.work_date).slice(0, 10), e = em[r.employee_id]; have[r.employee_id + "|" + d] = 1; if (!e) return; const o = off(e, d); if (!o) { if (!e.ot_eligible) r.ot_min = 0; return; }
-      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = e.ot_eligible ? r.worked_min : 0; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " " + (e.ot_eligible ? " (all hours are overtime)" : ""); }
+      if (+r.worked_min > 0 && r.status !== "A") { r.ot_min = r.worked_min; if (r.status === "HD") r.status = "P"; r.remarks = (o === "H" ? "Worked on holiday: " + hol[d] : "Worked on weekly off") + " (all hours are overtime)"; }
       else if (r.status === "A" || r.status === "MP" && !(+r.worked_min > 0) && !r.in_at) { r.status = o; r.ot_min = 0; r.late_min = 0; r.remarks = o === "H" ? "Holiday: " + hol[d] : null; }
     });
     if (from && to) {                                                                                       // every person has the holiday / weekly off marked, even where nothing was recorded

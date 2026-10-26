@@ -91,12 +91,12 @@
       if (row.status === "A") row.remarks = "Worked less than a half day";
     };
     if (hol) {
-      if (ps.length) { worked(); if (row.status !== "MP") row.status = "P"; row.remarks = "Worked on holiday: " + hol; }
+      if (ps.length) { worked(); if (row.status !== "MP") { row.status = "P"; row.ot_min = row.worked_min; } row.remarks = "Worked on holiday: " + hol + " (all hours are overtime)"; }
       else { row.status = "H"; row.source = "rule"; row.remarks = hol; }
       return row;
     }
     if (wo) {
-      if (ps.length) { worked(); if (row.status !== "MP") row.status = "P"; row.remarks = "Worked on weekly off"; }
+      if (ps.length) { worked(); if (row.status !== "MP") { row.status = "P"; row.ot_min = row.worked_min; } row.remarks = "Worked on weekly off (all hours are overtime)"; }
       else { row.status = "WO"; row.source = "rule"; }
       return row;
     }
