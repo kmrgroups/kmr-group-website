@@ -112,9 +112,9 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
       th.append(lab);
       const ctl = document.createElement("span"); ctl.className = "kmr-ctl";
       const ar = document.createElement("span"); ar.className = "kmr-ar"; ctl.append(ar);
-      if (!serial.has(i)) { const b = document.createElement("button"); b.type = "button"; b.className = "kmr-fb f"; b.title = "Filter / sort this column"; b.innerHTML = SVG_F; b.onclick = (e) => { e.stopPropagation(); openPop(t, i, b); }; ctl.append(b); }
+      if (!serial.has(i)) { const b = document.createElement("button"); b.type = "button"; b.className = "kmr-fb f"; b.title = "Filter / sort this column"; b.innerHTML = SVG_F; b.onclick = (e) => { e.stopPropagation(); openPop(t, [...hr.cells].indexOf(th), b); }; ctl.append(b); }
       th.append(ctl);
-      if (!edit && !serial.has(i)) lab.onclick = (e) => { e.stopPropagation(); setSort(t, i, st.sort && st.sort.c === i ? (st.sort.dir === "asc" ? "desc" : st.sort.dir === "desc" ? null : "asc") : "asc"); };
+      if (!edit && !serial.has(i)) lab.onclick = (e) => { e.stopPropagation(); const ci = [...hr.cells].indexOf(th); setSort(t, ci, st.sort && st.sort.c === ci ? (st.sort.dir === "asc" ? "desc" : st.sort.dir === "desc" ? null : "asc") : "asc"); };
       else lab.style.cursor = "default";
     });
     // toolbar
@@ -157,7 +157,7 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
           const rs = [...b.rows].filter((r) => r !== hr && !([...r.cells].some((x) => x.colSpan > 1 && x.colSpan >= hr.cells.length)));
           const idx = new Map(rs.map((r, i) => [r, i]));
           const vals = new Map(rs.map((r) => [r, cellVal(r.cells[c])]));
-          const sorted = rs.slice().sort((a, b2) => m * cmp(vals.get(a), vals.get(b2)) || idx.get(a) - idx.get(b2));
+          const sorted = rs.slice().sort((a, b2) => { const va = vals.get(a), vb = vals.get(b2); if (va === "" && vb !== "") return 1; if (vb === "" && va !== "") return -1; return m * cmp(va, vb) || idx.get(a) - idx.get(b2); });          // empty cells always last
           if (sorted.some((r, i) => r !== rs[i])) sorted.forEach((r) => b.append(r));
         });
       }
@@ -227,7 +227,7 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
   let tm = null;
   function scan() {
     document.querySelectorAll("table").forEach((t) => {
-      if (t._kmr) { if (!t.isConnected) { live.delete(t); } else if (!t.previousElementSibling || !t.previousElementSibling.classList.contains("kmr-tt") || !t._kmr.hr.isConnected || [...t._kmr.hr.cells].some((th) => !th.classList.contains("kmr-th"))) { /* toolbar lost: re-enhance */ t._kmr.mo && t._kmr.mo.disconnect(); delete t._kmr; t.querySelectorAll(".kmr-th").forEach((th) => th.classList.remove("kmr-th")); const pv = t.previousElementSibling; if (pv && pv.classList.contains("kmr-tt")) pv.remove(); } else return; }
+      if (t._kmr) { if (!t.isConnected) { live.delete(t); } else if (!t.previousElementSibling || !t.previousElementSibling.classList.contains("kmr-tt") || !t._kmr.hr.isConnected || [...t._kmr.hr.cells].some((th) => !th.classList.contains("kmr-th"))) { /* toolbar lost: re-enhance */ t._kmr.mo && t._kmr.mo.disconnect(); delete t._kmr; t.querySelectorAll(".kmr-th").forEach((th) => { th.querySelectorAll(":scope > .kmr-ctl").forEach((x) => x.remove()); th.querySelectorAll(":scope > .kmr-lab").forEach((l) => { while (l.firstChild) th.insertBefore(l.firstChild, l); l.remove(); }); th.classList.remove("kmr-th", "kmr-on"); }); const pv = t.previousElementSibling; if (pv && pv.classList.contains("kmr-tt")) pv.remove(); } else return; }
       const hr = eligible(t); if (hr) enhance(t, hr);
     });
   }
