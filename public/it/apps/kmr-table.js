@@ -29,7 +29,7 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
 .kmr-pop .acts{display:flex;justify-content:space-between;margin:8px 2px 4px;font-size:12px}.kmr-pop .acts a{color:#7C3AED;font-weight:700;cursor:pointer;text-decoration:none}
 .kmr-pop .lst{max-height:240px;overflow:auto;border:1px solid #EEF1F6;border-radius:8px;padding:2px}
 .kmr-pop label{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:6px;cursor:pointer;line-height:1.25}.kmr-pop label:hover{background:#F5F0FF}
-.kmr-pop label input{accent-color:#7C3AED;flex:none;margin:0}.kmr-pop label span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.kmr-pop label em{font-style:normal;color:#8A96A8;font-size:11.5px}
+.kmr-pop label input{accent-color:#7C3AED;flex:none;margin:0}.kmr-pop label span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#16233A!important;font-size:13px!important;position:static!important;display:block!important}.kmr-pop label em{font-style:normal;color:#8A96A8!important;font-size:11.5px!important;position:static!important;display:block!important}
 .kmr-pop .none{padding:10px;color:#8A96A8;text-align:center}
 @media print{.kmr-tt,th.kmr-th .kmr-ctl{display:none!important}}`;
   document.head.append(css);
@@ -58,6 +58,7 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
     if (a === b) return 0; if (a === "") return 1; if (b === "") return -1;
     const da = dateOf(a), db = dateOf(b); if (da != null && db != null) return da - db;
     const na = num(a), nb = num(b); if (na != null && nb != null) return na - nb;
+    if (na != null) return -1; if (nb != null) return 1;                                              // numbers first (smallest to largest), then words
     return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
   };
 
@@ -189,7 +190,7 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
     const sel = new Set(st.f[c] ? st.f[c] : vals);
     pop = document.createElement("div"); pop.className = "kmr-pop";
     const dir = st.sort && st.sort.c === c ? st.sort.dir : "";
-    pop.innerHTML = (k.edit ? "" : `<div class="sr"><button type="button" data-s="asc" class="${dir === "asc" ? "on" : ""}">▲ Sort A→Z</button><button type="button" data-s="desc" class="${dir === "desc" ? "on" : ""}">▼ Z→A</button></div>`) +
+    pop.innerHTML = (k.edit ? "" : `<div class="sr"><button type="button" data-s="asc" class="${dir === "asc" ? "on" : ""}">▲ Sort A→Z (smallest first)</button><button type="button" data-s="desc" class="${dir === "desc" ? "on" : ""}">▼ Z→A (largest first)</button></div>`) +
       '<input class="q" type="search" placeholder="Search values…"><div class="acts"><a data-a="all">Select all</a><a data-a="none">Clear</a><a data-a="reset">Reset</a></div><div class="lst"></div>';
     const lst = pop.querySelector(".lst"), q = pop.querySelector(".q");
     const commit = () => { const all = vals.every((v) => sel.has(v)); if (all) delete st.f[c]; else st.f[c] = new Set(sel); apply(t); };
