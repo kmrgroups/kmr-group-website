@@ -41,12 +41,13 @@
     mmd: { color: "#2563EB", desc: "Issue raw material with QR tags, follow every part machine by machine to finished goods, run supplier DC and GRN, and see rejection, rework and loss hours.", demo: "/it/mmd.html?demo=1" },
     rmp: { color: "#0D9488", desc: "Turn the capacity plan into kilograms of raw material, compare with stock, and plan MOQ-rounded supplier orders with lead times.", demo: "/it/rmp.html?demo=1" },
     calib: { color: "#6366F1", desc: "Instrument register, calibration due control, gauge history, MSA and out-of-tolerance cases.", demo: "/it/calibration.html?demo=1" },
+    layout: { color: "#7C3AED", desc: "1:1 metric scale factory machine shop and office layout generator — converts line concepts into lean cellular layouts with DXF export.", demo: "/it/layout.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["proc", "Procurement"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
-  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1, qms: 1, aud: 1, off: 1 };
+  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1, qms: 1, aud: 1, off: 1, layout: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
