@@ -82,6 +82,7 @@
         : nSample ? `<p class="sub" style="margin-top:-12px">Includes ${nSample} sample records, marked <span class="pill">Sample</span>.</p>` : "";
       ctx.main.innerHTML = `<h1>Operations Master</h1><p class="sub">One set of master data for your company, used by every KMR app. ${ctx.role === "viewer" ? "You can view it." : "You can add, change and import."}</p>
         ${error ? `<p class="msg">${esc(error.message)}</p>` : ""}
+        ${dups.length ? `<div class="card" id="opsDup" style="border-color:#D97706;background:#FFF7E6;margin-bottom:12px"><b>⚠ ${dups.length} possible duplicate ${dups.length > 1 ? "groups" : "group"} found (${dupIds.size} machines)</b><div style="margin:4px 0 8px">These machines look like the same machine entered more than once. For each group, press <b>Keep</b> on the one that is right (the others in the group are deleted), <b>Delete</b> on a single wrong one, or <b>Both are different</b> to hide the warning. Before deleting, check that no cycle time or process plan uses the code you remove.</div>${dups.map((g, gi) => `<div style="background:#fff;border:1px solid #F0C36D;border-radius:10px;margin-bottom:8px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left"><th style="padding:6px 10px">Machine code</th><th>Name</th><th>Type</th><th>Make / model</th><th>Asset no.</th><th>Serial no.</th><th>Why flagged</th><th></th></tr></thead><tbody>${g.rows.map((r) => `<tr style="border-top:1px solid #F5E2B8"><td style="padding:6px 10px"><b>${esc(r.code)}</b></td><td>${esc(r.name)}</td><td>${esc((r.data || {}).type || "")}</td><td>${esc([(r.data || {}).make, (r.data || {}).model].filter(Boolean).join(" "))}</td><td>${esc((r.data || {}).asset_no || "")}</td><td>${esc((r.data || {}).serial_no || "")}</td><td>${esc(dupWhy(r))}</td><td style="text-align:right;white-space:nowrap;padding-right:8px">${edit ? `<button class="btn ghost" data-dk="${gi}:${r.id}" style="height:30px">Keep</button> <button class="btn ghost" data-dd="${r.id}" style="height:30px;color:#B00E28">Delete</button>` : ""}</td></tr>`).join("")}</tbody></table>${edit ? `<div style="padding:4px 10px 8px"><button class="btn ghost" data-dn="${gi}" style="height:30px">Both are different — hide this warning</button></div>` : ""}</div>`).join("")}</div>` : ""}
         ${note ? `<div class="card" style="border-color:#1E7B4A;background:#E7F8EF;margin-bottom:12px">${note}</div>` : ""}
         <details open style="margin-bottom:16px"><summary style="cursor:pointer;font-weight:700;font-size:15px;margin-bottom:6px">Standards alignment</summary><div id="opsStd"></div></details>
         ${sampleBar}
@@ -284,6 +285,17 @@
       } catch (e) { alert(e.message || e); }
       if (input) input.value = "";
     },
+    /** machines that look like the same machine entered twice: same code ignoring spaces/dashes/case, same name, same asset no. or same serial no. */
+    dupGroups(rows) {
+      const norm = (s) => String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]+/g, "");
+      const live = rows.filter((r) => r.active !== false), par = new Map(), why = new Map();
+      const find = (x) => { while (par.get(x) !== x) { par.set(x, par.get(par.get(x))); x = par.get(x); } return x; };
+      live.forEach((r) => par.set(r.id, r.id));
+      const link = (key, label) => { const m = new Map(); live.forEach((r) => { const k = key(r); if (!k) return; (m.get(k) || m.set(k, []).get(k)).push(r); }); m.forEach((g) => { if (g.length < 2) return; g.forEach((r) => { par.set(find(r.id), find(g[0].id)); const w = why.get(r.id) || new Set(); w.add(label); why.set(r.id, w); }); }); };
+      link((r) => norm(r.code), "same code"); link((r) => norm(r.name), "same name"); link((r) => norm((r.data || {}).asset_no), "same asset no."); link((r) => norm((r.data || {}).serial_no), "same serial no.");
+      const groups = new Map(); live.forEach((r) => { if (!why.has(r.id)) return; const k = find(r.id); (groups.get(k) || groups.set(k, []).get(k)).push(r); });
+      return [...groups.values()].filter((g) => g.length > 1).map((g) => ({ rows: g, why: why }));
+    },
     async list(ctx, kind, note) {
       const K = KINDS.find((x) => x.kind === kind); const edit = ctx.role === "admin" || ctx.role === "editor";
       if (ctx.setView) ctx.setView("ops/" + kind);
@@ -292,6 +304,8 @@
       const { data, error } = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: kind });
       if (error) { ctx.main.querySelector(".msg").textContent = error.message; return; }
       const rows = data || [];
+      const okIds = (() => { try { return new Set(JSON.parse(localStorage.getItem("kmr-dup-ok-" + ctx.slug) || "[]")); } catch (e) { return new Set(); } })(), dups = kind === "machines" ? this.dupGroups(rows).filter((g) => !g.rows.every((r) => okIds.has(r.id))) : [], dupIds = new Set(); dups.forEach((g) => g.rows.forEach((r) => dupIds.add(r.id)));
+      const dupWhy = (r) => { const s = new Set(); dups.forEach((g) => { if (g.rows.includes(r)) (g.why.get(r.id) || []).forEach((w) => s.add(w)); }); return [...s].join(", "); };
       const shown = [["code", K.code], ["name", K.name], ...K.fields.slice(0, K.kind === "machines" ? 5 : 4).map((f) => [f.k, f.l])];
       ctx.main.innerHTML = `<p><button class="btn ghost" id="opsBack" style="height:36px">← Operations Master</button></p>
         <h1>${K.icon} ${esc(K.label)}</h1><p class="sub">${rows.length} records</p>
@@ -314,13 +328,21 @@
       const val = (r, k) => (k === "code" ? r.code : k === "name" ? r.name : k === "customer" ? (cname[(r.data || {}).customer] || (r.data || {}).customer) : (r.data || {})[k]);
       const draw = (q) => {
         const f = rows.filter((r) => !q || JSON.stringify([r.code, r.name, r.data, val(r, "customer")]).toLowerCase().includes(q.toLowerCase()));
-        body.innerHTML = f.map((r) => `<tr style="border-top:1px solid var(--line)${r.active === false ? ";opacity:.5" : ""}">${shown.map((c) => `<td style="padding:9px 12px">${c[0] === "code" ? `<b>${esc(val(r, c[0]))}</b>${r.sample ? ' <span class="pill">Sample</span>' : ""}` : esc(val(r, c[0]) ?? "")}</td>`).join("")}
+        body.innerHTML = f.map((r) => `<tr style="border-top:1px solid var(--line)${r.active === false ? ";opacity:.5" : ""}${dupIds.has(r.id) ? ";background:#FFF1CC" : ""}">${shown.map((c) => `<td style="padding:9px 12px">${c[0] === "code" ? `<b>${esc(val(r, c[0]))}</b>${r.sample ? ' <span class="pill">Sample</span>' : ""}${dupIds.has(r.id) ? ' <span class="pill" style="background:#D97706;color:#fff">Duplicate?</span>' : ""}` : esc(val(r, c[0]) ?? "")}</td>`).join("")}
           ${K.file ? `<td style="padding:9px 12px">${r.data && r.data.file_path ? `<button class="btn ghost" data-file="${esc(r.data.file_path)}" style="height:32px">Open</button>` : '<small style="color:var(--muted)">—</small>'}</td>` : ""}
           <td style="padding:9px 12px;text-align:right"><button class="btn ghost" data-id="${r.id}" style="height:32px">${edit ? "Edit" : "View"}</button></td></tr>`).join("") || `<tr><td colspan="9" style="padding:18px;color:var(--muted)">${rows.length ? "No match." : "No records yet."}</td></tr>`;
         body.querySelectorAll("[data-id]").forEach((b) => (b.onclick = () => this.edit(ctx, K, rows.find((r) => r.id === b.dataset.id))));
         body.querySelectorAll("[data-file]").forEach((b) => (b.onclick = async () => { const s = await ctx.sb.storage.from("kmr-docs").createSignedUrl(b.dataset.file, 300); if (s.data) window.open(s.data.signedUrl, "_blank"); }));
       };
       draw("");
+      const armed = { k: null }, dupPanel = ctx.main.querySelector("#opsDup");
+      if (dupPanel) {
+        const del = async (id) => { const res = await ctx.sb.rpc("kmr_ops_delete", { p_slug: ctx.slug, p_kind: "machines", p_id: id }); if (res.error) throw new Error(res.error.message); };
+        const arm = (b, label, fn) => { if (armed.k === b) return fn(); armed.k = b; const o = b.textContent; b.textContent = "Press again to " + label; b.style.background = "#B00E28"; b.style.color = "#fff"; setTimeout(() => { if (armed.k === b) { armed.k = null; b.textContent = o; b.style.background = ""; b.style.color = ""; } }, 4000); };
+        dupPanel.querySelectorAll("[data-dk]").forEach((b) => (b.onclick = () => arm(b, "keep this one", async () => { try { const [gi, id] = b.dataset.dk.split(":"); const g = dups[+gi]; let n = 0; for (const r of g.rows) if (r.id !== id) { await del(r.id); n++; } this.list(ctx, "machines", `<b>Duplicate reviewed:</b> kept ${esc(g.rows.find((r) => r.id === id).code)}, deleted ${n} other${n > 1 ? "s" : ""}.`); } catch (e) { alert(e.message || e); } })));
+        dupPanel.querySelectorAll("[data-dd]").forEach((b) => (b.onclick = () => arm(b, "delete", async () => { try { await del(b.dataset.dd); this.list(ctx, "machines", "<b>Machine deleted.</b>"); } catch (e) { alert(e.message || e); } })));
+        dupPanel.querySelectorAll("[data-dn]").forEach((b) => (b.onclick = () => { try { const g = dups[+b.dataset.dn], s = JSON.parse(localStorage.getItem("kmr-dup-ok-" + ctx.slug) || "[]"); g.rows.forEach((r) => s.push(r.id)); localStorage.setItem("kmr-dup-ok-" + ctx.slug, JSON.stringify(s)); } catch (e) { /* storage blocked */ } this.list(ctx, "machines", "<b>Warning hidden</b> for that group on this device."); }));
+      }
       ctx.main.querySelector("#opsQ").oninput = (e) => draw(e.target.value);
       ctx.main.querySelector("#opsBack").onclick = () => this.overview(ctx);
       const kLoad = ctx.main.querySelector("#opsKLoad"), kFlush = ctx.main.querySelector("#opsKFlush");
@@ -392,7 +414,7 @@
         $("#of_last_calibrated").onchange = auto; $("#of_cal_freq_months").oninput = $("#of_cal_freq_months").onchange = auto;
       }
       $("#ofSave").onclick = async () => {
-        const m = $("#ofM"); m.className = "msg"; m.textContent = "Saving…";
+        const m = $("#ofM"); m.className = "msg"; m.style.color = ""; m.textContent = "Saving…";
         const data = Object.assign({}, r.data || {}); K.fields.forEach((f) => { let v = $("#of_" + f.k).value.trim(); if (f.showIf && !same($("#of_" + f.showIf.k).value, f.showIf.v)) v = ""; if (v) data[f.k] = v; else delete data[f.k]; });
         const code = $("#of_code").value.trim(); if (!code) { m.textContent = `${K.code} is required.`; return; }
         const file = K.file && $("#of_file") && $("#of_file").files[0];
@@ -402,6 +424,11 @@
           const up = await ctx.sb.storage.from("kmr-docs").upload(path, file, { contentType: file.type || "application/octet-stream" });
           if (up.error) { m.textContent = "Upload failed: " + up.error.message; return; }
           data.file_path = path; data.file_name = file.name;
+        }
+        if (K.kind === "machines" && $("#of_name") && m._dupOk !== code + "|" + $("#of_name").value) {
+          const nz = (s) => String(s == null ? "" : s).toLowerCase().replace(/[^a-z0-9]+/g, ""), lr = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: "machines" });
+          const hit = (lr.data || []).filter((o) => o.active !== false && (isNew || o.id !== r.id)).map((o) => { const w = []; if (nz(o.code) === nz(code)) w.push("code"); if (nz($("#of_name").value) && nz(o.name) === nz($("#of_name").value)) w.push("name"); if (nz(data.asset_no) && nz((o.data || {}).asset_no) === nz(data.asset_no)) w.push("asset no."); if (nz(data.serial_no) && nz((o.data || {}).serial_no) === nz(data.serial_no)) w.push("serial no."); return w.length ? `${o.code} (${o.name || "no name"}: same ${w.join(", ")})` : null; }).filter(Boolean);
+          if (hit.length) { m._dupOk = code + "|" + $("#of_name").value; m.style.color = "#B45309"; m.innerHTML = `⚠ <b>This looks like a duplicate of:</b> ${hit.map(esc).join("; ")}. If it is really a different machine, press Save again. Otherwise cancel and edit the existing one.`; return; }
         }
         const res = await ctx.sb.rpc("kmr_ops_save", { p_slug: ctx.slug, p_kind: K.kind, p_rows: [Object.assign(isNew ? {} : { id: r.id }, { code, name: $("#of_name").value.trim(), data, active: $("#of_active").checked })] });
         if (res.error) { m.textContent = /duplicate|unique/.test(res.error.message) ? `${K.code} "${code}" already exists.` : res.error.message; return; }
