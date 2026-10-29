@@ -15,6 +15,23 @@ var CAT={
  SPC:['AIAG SPC (2nd ed.)','Statistical process control']
 };
 var A={
+layout:[
+['ISO','7.1.3','Infrastructure - buildings, workspace and process equipment','The existing floor plan is read into the app with the building and every machine at its real size, so the infrastructure is on record and new layouts are designed on it at 1:1 scale without changing any size.'],
+['ISO','7.1.4','Environment for the operation of processes','Operator, maintenance and aisle clearances are checked against targets for every design; the quality and measurement room is placed away from the machine hall.'],
+['ISO','8.5.1','Control of production and service provision','Machines are grouped into cells or lines by process stage, so the flow from inbound door to dispatch door is planned and its route length is measured.'],
+['ISO','7.5.2','Creating and updating documented information','Each layout has a unique number; each issued report has its own reference number and the layout drawing can be exported as PDF and DXF.'],
+['ISO','6.3','Planning of changes','The current layout is compared with each new design (route saving, floor use, gaps) before a change is approved.'],
+['IATF','7.1.3.1','Plant, facility and equipment planning','The layout is evaluated for material flow, floor use and clearances, and the compared options are kept as a record. Current layout against new designs shows the improvement.','route'],
+['IATF','7.1.4.1','Environment for the operation of processes','Clearance and quality room checks are listed for every option with a pass or fail.','chk'],
+['IATF','8.5.1.5','Total productive maintenance','The maintenance corridor around each machine is checked against the target.','chk'],
+['IATF','8.5.4','Preservation - handling of material','The shorter material route per part reduces handling and damage risk.','route'],
+['APQP','Phase 3','Process design and development - floor plan layout','The floor plan layout is a Phase 3 output and is issued as a numbered, revision-controlled report.','rpt'],
+['PPAP','Element 5','Process flow diagram','The route leg by leg (from-to distances) supports the process flow diagram.','route'],
+['VF','Step 2','Structure analysis (AIAG-VDA FMEA)','The machines, stages and their positions define the process elements the Process FMEA starts from.'],
+['F4','Process FMEA','Process steps and work environment','Layout and clearance gaps are listed as process risks to be treated with an action plan.'],
+['CP','Measurement location','Control Plan - where the measurement is done','The measurement tables and quality room position are shown in the layout.','msa'],
+['MSA','Environment','Measurement system - environment','The quality and measurement room is kept apart from the machine hall.','msa'],
+['VDA','P4 / P6','Process development and process analysis','Layout design is documented and the existing layout is analysed for flow and risks.','cur']],
 sales:[
 ['ISO','10.2','Nonconformity and corrective action - follow-up in ActionTrack','Where the company also has ActionTrack, an action plan can be turned into a task for its responsible person with the target date; the task links back to the action plan and the person is alerted on phone or computer. The action plan and its status stay in Sales Flow.'],
 ['ISO','8.2.1 / 8.2.3','Customer communication and review of requirements','Each customer and plant keeps its parts, price and monthly demand, so what was agreed is on record.'],

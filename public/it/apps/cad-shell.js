@@ -28,6 +28,13 @@
     document.body.style.paddingBottom = (g === "ed" || g === "stage") && !isFs() ? "32px" : "";
     try {
       if (g === "std") return KMRStd.draw($("#std"), "cad", { evidence: evidence() });
+      if (g === "layout") {
+        history.replaceState(null, "", location.pathname + location.search + "#go=ed"); fit(); await openEditor("");
+        let h = null; try { h = JSON.parse(localStorage.getItem("kmr-layout-dxf") || "null"); localStorage.removeItem("kmr-layout-dxf"); } catch (e) { h = null; }
+        const E = S.E;
+        if (h && h.text && E) { const r = K.readDXF(h.text); E.load(r.doc, { title: h.name || "Layout from Factory & Office Layout" }); E._scratch = true; S.cur = null; setBar(); say("Layout drawing opened from Factory & Office Layout. Use Save to keep it in the register."); }
+        return;
+      }
       if (g === "ed") { fit(); await openEditor(hashId()); return; }
       // from Process Documents: make the stage drawings of this project (#go=stage&pd=<project>)
       if (g === "stage") { const pd = (location.hash.match(/[&?]pd=([0-9a-zA-Z-]+)/) || [])[1] || ""; history.replaceState(null, "", location.pathname + location.search + "#go=ed"); fit(); await openEditor(""); const E = S.E; if (!ed()) { E.err("You have view-only access, so you cannot make stage drawings."); return; } setTimeout(() => E.run("STAGEDWG", pd ? { pd } : undefined), 120); return; }
