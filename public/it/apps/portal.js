@@ -41,6 +41,7 @@
     mmd: { color: "#2563EB", desc: "Issue raw material with QR tags, follow every part machine by machine to finished goods, run supplier DC and GRN, and see rejection, rework and loss hours.", demo: "/it/mmd.html?demo=1" },
     rmp: { color: "#0D9488", desc: "Turn the capacity plan into kilograms of raw material, compare with stock, and plan MOQ-rounded supplier orders with lead times.", demo: "/it/rmp.html?demo=1" },
     calib: { color: "#6366F1", desc: "Instrument register, calibration due control, gauge history, MSA and out-of-tolerance cases.", demo: "/it/calibration.html?demo=1" },
+    dwm: { color: "#174B80", desc: "The Plant Head\u2019s monthly Daily Work Management sheet: every review planned by day, marked Completed, Missed or Concession, with adherence against the 98% target, review standards and Executive Director reporting.", demo: "/it/dwm.html?demo=1" },
     layout: { color: "#7C3AED", desc: "1:1 metric scale factory machine shop and office layout generator — converts line concepts into lean cellular layouts with DXF export.", demo: "/it/layout.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["proc", "Procurement"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
@@ -124,7 +125,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "tsk", "off"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "mnt"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "tsk", "off", "dwm"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};
