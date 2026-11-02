@@ -583,11 +583,26 @@ async function sendToPD(){
   const {data:ws,error}=await sb.rpc("pd_my_workspaces",{p_bi_org:C.org.id});
   if(error){ BI.toast(/pd_my_workspaces|PGRST202|schema cache/i.test(error.message)?"Process Documents isn't installed in this Supabase project yet – run supabase/pd-schema.sql from the Process Documents package.":error.message,9000); return; }
   if(!ws||!ws.length){ BI.toast("You aren't an admin or editor in any Process Documents workspace. Ask your admin to add your e-mail there.",9000); return; }
+  /* the process documents depend on how the material arrives: ask first (bar route, or blanks route → forging / casting) */
+  const askRoute=()=>new Promise(res=>{
+    const css="display:block;width:100%;text-align:left;padding:12px 14px;margin:8px 0";
+    const step1=()=>{ veil(`<h2>Raw material route</h2><p class="sub">How does the raw material reach the machines for this part? The process route, incoming inspection, PFMEA, Control Plan and work instructions are designed to match.</p>
+      <button class="btn primary" id="rtBar" style="${css}"><b>Bar route</b><br><small>Bar / rod is cut to length, then machined</small></button>
+      <button class="btn" id="rtBlank" style="${css}"><b>Blanks route</b><br><small>A forging or casting blank arrives; no cutting</small></button>
+      <div class="cl-row"><button class="btn" id="rtX">Cancel</button></div>`);
+      $("rtBar").onclick=()=>{ closeVeil(); res("bar"); }; $("rtBlank").onclick=step2; $("rtX").onclick=()=>{ closeVeil(); res(null); }; };
+    const step2=()=>{ veil(`<h2>Blank type</h2><p class="sub">Which blank do you receive? Forgings get a forging inspection (laps, cracks, mismatch, allowance, hardness); castings also get a fettling step (gate, riser, parting line) before machining.</p>
+      <button class="btn primary" id="rtForg" style="${css}"><b>Forging blank</b></button>
+      <button class="btn primary" id="rtCast" style="${css}"><b>Casting blank</b></button>
+      <div class="cl-row"><button class="btn" id="rtBack">Back</button><button class="btn" id="rtX2">Cancel</button></div>`);
+      $("rtForg").onclick=()=>{ closeVeil(); res("forging"); }; $("rtCast").onclick=()=>{ closeVeil(); res("casting"); }; $("rtBack").onclick=step1; $("rtX2").onclick=()=>{ closeVeil(); res(null); }; };
+    step1(); });
   const go=async(orgId)=>{
+    const stock=await askRoute(); if(!stock) return;
     const win=window.open("about:blank","_blank");
     BI.busy("Sending to Process Documents");
     try{
-      const snap=BI.getSnapshot();
+      const snap=BI.getSnapshot(); snap.header=Object.assign({},snap.header,{stock});
       const {data:pid,error:e2}=await sb.rpc("pd_receive_balloon",{p_org:orgId,p_payload:snap,p_bi_report:C.reportId});
       if(e2) throw e2;
       const url=new URL(pdUrl,location.href); url.searchParams.set("project",pid);

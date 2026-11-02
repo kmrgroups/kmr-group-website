@@ -338,9 +338,22 @@ function applyHeaderDefaults(h, overwrite){ const st=S.settings||{}; let n=0;
   return n; }
 function ensureDocs(){ D.DOCS.forEach(d=>{ if(!S.docs[d.id]) S.docs[d.id]=D.genOne(d.id,S.plan,genSettings()); }); }
 function uuid(){ return (crypto.randomUUID?crypto.randomUUID():"xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{ const r=Math.random()*16|0; return (c==="x"?r:(r&3|8)).toString(16); })); }
+/* bar route, or blanks route (then forging / casting) — the whole document set follows this */
+function askRoute(){ return new Promise(res=>{
+  const css="display:block;width:100%;text-align:left;padding:12px 14px;margin:8px 0";
+  const step1=()=>{ dialog("Raw material route",`<p class="hintline" style="margin-top:0">How does the raw material reach the machines for this part? The process route, incoming inspection, PFMEA, Control Plan and work instructions are designed to match.</p>
+    <button class="btn primary" id="rtBar" style="${css}"><b>Bar route</b><br><small>Bar / rod is cut to length, then machined</small></button>
+    <button class="btn" id="rtBlank" style="${css}"><b>Blanks route</b><br><small>A forging or casting blank arrives; no cutting</small></button>`,`<button class="btn" id="rtX">Cancel</button>`);
+    $("rtBar").onclick=()=>{ closeDialog(); res("bar"); }; $("rtBlank").onclick=step2; $("rtX").onclick=()=>{ closeDialog(); res(null); }; };
+  const step2=()=>{ dialog("Blank type",`<p class="hintline" style="margin-top:0">Which blank do you receive? Forgings get a forging inspection (laps, cracks, mismatch, allowance, hardness); castings also get a fettling step (gate, riser, parting line) before machining.</p>
+    <button class="btn primary" id="rtForg" style="${css}"><b>Forging blank</b></button>
+    <button class="btn primary" id="rtCast" style="${css}"><b>Casting blank</b></button>`,`<button class="btn" id="rtBack">Back</button><button class="btn" id="rtX2">Cancel</button>`);
+    $("rtForg").onclick=()=>{ closeDialog(); res("forging"); }; $("rtCast").onclick=()=>{ closeDialog(); res("casting"); }; $("rtBack").onclick=step1; $("rtX2").onclick=()=>{ closeDialog(); res(null); }; };
+  step1(); }); }
 async function newFromSource(src, biReportId){
   if(!S.canEdit){ toast("Viewers can't create projects."); return; }
   if(S.dirty) await flushSave();
+  if(src&&!src.manual&&!(src.header&&src.header.stock)){ const st=await askRoute(); if(!st) return; src.header=Object.assign({},src.header,{stock:st}); }
   if(src&&src.header) src.header=partFromOps(src.header);
   const h=(src&&src.header)||{};
   const P={id:null,org_id:S.org&&S.org.id,part_no:h.partNo||"",part_name:h.partName||"",rev:h.rev||"",drawing_no:h.drawingNo||"",customer:h.customer||"",status:"received",source:src,bi_report_id:biReportId||null,doc:{}};
