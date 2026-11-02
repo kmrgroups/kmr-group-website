@@ -43,7 +43,7 @@ const MASTER_COLS = {
   customers:[{k:"name",label:"Customer name",w:14},{k:"code",label:"Supplier code (given by customer)",w:9},{k:"address",label:"Address",w:18,type:"long"},{k:"contact",label:"Contact person / e-mail",w:12},{k:"ccSym",label:"CC symbol",w:5},{k:"scSym",label:"SC symbol",w:5},{k:"approval",label:"Customer engineering approval",w:10}],
   consumables:[{k:"key",label:"Process",w:8,type:"sel"},{k:"items",label:"Consumables (one per line)",w:30,type:"long"}]
 };
-const KEY_NAMES = {RMI:"Raw material inspection",CUT:"Cutting / sawing",TURN1:"CNC turning OP1",TURN2:"CNC turning OP2",TURN:"CNC turning",VMC:"VMC / HMC",DRILL:"Drilling / tapping",HOB:"Hobbing",BROACH:"Broaching / slotting",CGRIND:"Cylindrical grinding",IGRIND:"Internal grinding",SGRIND:"Surface grinding",HONE:"Honing",DEBURR:"Deburring",WASH:"Washing",MARK:"Marking",FINAL:"Final inspection",PDI:"PDI",PACK:"Packing",HT:"Heat treatment",SURF:"Surface treatment",CRACK:"Crack detection",LEAK:"Leak test"};
+const KEY_NAMES = {RMI:"Raw material inspection",CUT:"Cutting / sawing",FETTLE:"Fettling",TURN1:"CNC turning OP1",TURN2:"CNC turning OP2",TURN:"CNC turning",VMC:"VMC / HMC",DRILL:"Drilling / tapping",HOB:"Hobbing",BROACH:"Broaching / slotting",CGRIND:"Cylindrical grinding",IGRIND:"Internal grinding",SGRIND:"Surface grinding",HONE:"Honing",DEBURR:"Deburring",WASH:"Washing",MARK:"Marking",FINAL:"Final inspection",PDI:"PDI",PACK:"Packing",HT:"Heat treatment",SURF:"Surface treatment",CRACK:"Crack detection",LEAK:"Leak test"};
 function specFor(id, doc){ return (id==="pfmea" && doc && doc.std==="aiag4" && window.PDFmea) ? window.PDFmea.aiag4Spec(CLS) : COLS[id]; }
 window.PDSchema = {specFor, COLS, MASTER_COLS, FLOW, STATUS, CLS, KEY_NAMES};
 })();

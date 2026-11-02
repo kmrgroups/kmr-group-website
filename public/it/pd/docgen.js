@@ -161,11 +161,14 @@ const OPDESC = {
 };
 
 const GEN = {};
+/* what each operation does — the raw-material operations follow what arrives (bar / forging blank / casting blank) */
+const stockOf = (plan) => window.PDStock.def((plan.header&&plan.header.stock)||(plan.notes&&plan.notes.stock)||"bar");
+function opDesc(o, plan){ const st=stockOf(plan); return o.key==="RMI"?st.rmiDesc:(o.key==="FETTLE"&&st.fettle)?st.fettle.desc:(OPDESC[o.key]||""); }
 /* ---------- PFD ---------- */
 GEN.pfd = (plan, x) => ({ rows: plan.ops.map(o=>{
   const ch = o.chars.map(n=>x.byNo[n]).filter(Boolean);
-  const src = o.key==="RMI"?"Material variation, supplier":o.key.startsWith("TURN")||o.key==="VMC"?"Tool wear, offsets, clamping, coolant, thermal":o.key.includes("GRIND")||o.key==="HONE"?"Wheel wear, dressing, coolant, temperature":o.key==="HT"?"Furnace temperature, quench, load pattern":o.key==="SURF"?"Bath chemistry, time, current":o.key==="PACK"?"Handling, RP oil, packing material":"—";
-  return { opNo:o.opNo, sym:o.sym, name:o.name, desc:(OPDESC[o.key]||"")+(o.note?". "+o.note:""), machine:o.machine||"",
+  const src = o.key==="RMI"?(stockOf(plan).key==="casting"?"Casting process defects at supplier (porosity, shrinkage, sand), pattern wear":stockOf(plan).key==="forging"?"Forging defects at supplier (laps, cracks, mismatch), die wear, heat treatment":"Material variation, supplier"):o.key==="FETTLE"?"Fettling method, wheel condition, template":o.key.startsWith("TURN")||o.key==="VMC"?"Tool wear, offsets, clamping, coolant, thermal":o.key.includes("GRIND")||o.key==="HONE"?"Wheel wear, dressing, coolant, temperature":o.key==="HT"?"Furnace temperature, quench, load pattern":o.key==="SURF"?"Bath chemistry, time, current":o.key==="PACK"?"Handling, RP oil, packing material":"—";
+  return { opNo:o.opNo, sym:o.sym, name:o.name, desc:opDesc(o,plan)+(o.note?". "+o.note:""), machine:o.machine||"",
     product: ch.map(c=>`#${c.no} ${c.label}: ${c.spec}`).concat((o.params||[]).filter(p=>(p.kind||E.paramKind(p.name))==="product").map(p=>`${p.name}: ${p.spec}`)).join("\n") || (o.verify?`All characteristics (${o.verify.length}) verified`:"—"),
     process: (o.params||[]).filter(p=>(p.kind||E.paramKind(p.name))!=="product").map(p=>`${p.name}: ${p.spec}`).join("\n") || "—",
     cls: uniq(ch.map(c=>c.cls).concat((o.params||[]).map(p=>p.cls)).filter(Boolean)).join(", "), src, remarks: o.inHouse?"In-house":"Sub-contract" }; }) });
@@ -190,10 +193,13 @@ GEN.pfmea = (plan, x) => {
     const machineTxt = o.machine||"Machine";
     if(o.key==="RMI"){
       const mat = ch.find(c=>c.type==="Material") || {type:"Material",label:"Material grade",spec:plan.header.material||"As per drawing",cls:"",text:""};
-      CAUSES.rm.forEach(k=>push(o,`${k.we}: raw material`,`Accept only material to ${plan.header.material||"drawing specification"}`,"Supplier delivers material with valid MTC",effectFor(mat),8,"Wrong material grade / material not as per specification",k.fc,k.pc,k.o,"MTC verification per heat; spectro check per lot",5,mat.cls));
+      const st=stockOf(plan);
+      (st.rmCauses||CAUSES.rm).forEach(k=>push(o,`${k.we}: raw material`,`Accept only material to ${plan.header.material||"drawing specification"}`,"Supplier delivers material with valid MTC",effectFor(mat),8,"Wrong material grade / material not as per specification",k.fc,k.pc,k.o,"MTC verification per heat; spectro check per lot",5,mat.cls));
+      (st.rmiRows||[]).forEach(r=>push(o,r.we,r.fs,r.fwe,r.fe,r.s,r.fm,r.fc,r.pc,r.o,r.dc,r.d,""));   // failure modes of the blank (forging / casting)
       ch.filter(c=>c.type!=="Material").forEach(c=>{ const s=sevFor(c), dt=detFor(c,plan,x.gNameC(c)); push(o,"Man: inspector",`Verify ${c.label} ${c.spec}`,"Inspector verifies against specification",effectFor(c),s,fmFor(c),CAUSES.insp[0].fc,CAUSES.insp[0].pc,3,dt.dc,dt.d,c.cls); });
       return;
     }
+    if(o.key==="FETTLE"){ ((stockOf(plan).fettle||{}).rows||[]).forEach(r=>push(o,r.we,r.fs,r.fwe,r.fe,r.s,r.fm,r.fc,r.pc,r.o,r.dc,r.d,"")); return; }
     if(o.key==="CUT"){ push(o,`Machine: ${machineTxt}`,"Cut blank to length","Saw holds cut length","Your plant: part cannot clean up at facing – scrap.",4,"Cut length short / long","Length stop not set / shifted",`First-piece check; length stop locked`,3,"First piece & every 50 pcs with steel rule / vernier",6,""); return; }
     if(E.MFG_KEYS.includes(o.key)){
       const grind = /GRIND|HONE/.test(o.key);
@@ -277,19 +283,19 @@ const STEPS = {
   STORE:[["Keep material / parts in identified location",""],["Follow FIFO","FIFO card"]],
   DISPATCH:[["Check label vs invoice (barcode scan)",""],["Load & secure boxes",""],["Send invoice, PDI report & certificates",""]]
 };
-function stepsFor(k){ return STEPS[k] || STEPS[k.replace(/\d$/,"")] || (/GRIND/.test(k)?STEPS.GRIND:/STORE/.test(k)?STEPS.STORE:[["Perform operation as per this SOP",""]]); }
-function ppeFor(k){ const b=["Safety shoes","Safety goggles"];
+function stepsFor(k, plan){ const st=plan?stockOf(plan):null; if(st&&k==="RMI"&&st.rmiSteps) return st.rmiSteps; if(st&&k==="FETTLE"&&st.fettle) return st.fettle.steps; return STEPS[k] || STEPS[k.replace(/\d$/,"")] || (/GRIND/.test(k)?STEPS.GRIND:/STORE/.test(k)?STEPS.STORE:[["Perform operation as per this SOP",""]]); }
+function ppeFor(k, plan){ const b=["Safety shoes","Safety goggles"]; if(k==="FETTLE"&&plan&&stockOf(plan).fettle) return stockOf(plan).fettle.ppe.slice();
   if(E.MFG_KEYS.includes(k)) return b.concat(["Ear plugs","Tight-fitting uniform; no loose clothing","NO gloves near rotating chuck / spindle"]);
   if(k==="DEBURR") return b.concat(["Cut-resistant gloves"]); if(k==="WASH") return b.concat(["Chemical-resistant gloves","Apron"]); if(k==="PACK"||k==="PDI"||k==="FINAL") return b.concat(["Cotton gloves"]); return b; }
 GEN.sop = (plan, x) => ({ sections: plan.ops.filter(o=>!["RMSTORE","FGSTORE"].includes(o.key)).map(o=>{
   const ch=(o.chars.length?o.chars:(o.verify||[])).map(n=>x.byNo[n]).filter(Boolean);
   return { opNo:o.opNo, opName:o.name, key:o.key, machine:o.machine, docNo:"",
     tools:o.tools.map(t=>`${t.id} ${t.desc} – ${t.spec}`).join("\n"), gauges:o.gauges.map(id=>`${id} ${x.gName(id)}`).join("\n"), consumables:(o.consumables||[]).join("\n"),
-    ppe:ppeFor(o.key).join("\n"),
-    steps: stepsFor(o.key).map((s,i)=>({no:i+1, step:s[0], key:s[1]||""})),
+    ppe:ppeFor(o.key, plan).join("\n"),
+    steps: stepsFor(o.key, plan).map((s,i)=>({no:i+1, step:s[0], key:s[1]||""})),
     checks: ch.slice(0,60).map(c=>({charNo:c.no, char:c.label, spec:c.spec, gauge:(c.pgauge?x.gName(c.pgauge):x.gNameC(c)), freq:c.cls==="CC"?"100%":c.cls?"5 pcs / 2 hrs":"1 pc / 2 hrs", cls:c.cls})),
     params: (o.params||[]).map(p=>({name:p.name, spec:p.spec, freq:p.freq})),
-    safety: (E.MFG_KEYS.includes(o.key)?"Do not open door during cycle. Keep hands away from chuck/spindle. Use hook for chip removal – never bare hands. Emergency stop location known.":o.key==="WASH"?"Handle chemicals with gloves; MSDS displayed.":"Handle parts carefully; keep work area clean.") ,
+    safety: (E.MFG_KEYS.includes(o.key)?"Do not open door during cycle. Keep hands away from chuck/spindle. Use hook for chip removal – never bare hands. Emergency stop location known.":o.key==="WASH"?"Handle chemicals with gloves; MSDS displayed.":(o.key==="FETTLE"&&stockOf(plan).fettle)?stockOf(plan).fettle.safety:"Handle parts carefully; keep work area clean.") ,
     reaction: "If any characteristic is NG: stop, inform supervisor, segregate parts since last OK check, correct and re-approve setup." };
 }) });
 
@@ -334,7 +340,7 @@ GEN.machines = (plan, x) => { const map={}; plan.ops.forEach(o=>{ if(!o.machine)
   return { rows:Object.values(map).map((r,i)=>Object.assign(r,{sl:i+1, ops:r.ops.join(", ")})) }; };
 GEN.pokayoke = (plan, x) => { const rows=[]; const add=(o,desc,type,method,fm,ver)=>rows.push({sl:rows.length+1, id:"PY-"+pad(rows.length+1), opNo:o.opNo, op:o.name, desc, type, method, fm, ver:ver||"Master / red-rabbit sample at start of shift", freq:"Once per shift", react:"If poka-yoke fails: stop, inform supervisor, 100% manual check until restored", status:"To implement"});
   const op = k => plan.ops.find(o=>o.key===k);
-  if(op("RMI")) add(op("RMI"),"Material grade colour-coding on bar ends / castings; cutting accepts only matching colour","Prevention","Fixed-value (colour)","Wrong material grade","Visual verification at start of shift");
+  if(op("RMI")) add(op("RMI"),stockOf(plan).pokayoke,"Prevention","Fixed-value (colour / tag)","Wrong material grade / mixed lot","Visual verification at start of shift");
   plan.ops.forEach(o=>{ const ch=o.chars.map(n=>x.byNo[n]).filter(Boolean);
     if(o.key.startsWith("TURN")&&o.key!=="TURN1") add(o,"Part-seating air-gap sensor – cycle start inhibited if part not seated against stop","Prevention","Contact (sensor)","Length / face runout out due to improper seating");
     if(o.key==="VMC"){ if(plan.header.family!=="rotational") add(o,"Asymmetric locating pin on fixture – part can be loaded in one orientation only","Prevention","Contact","Features machined in wrong orientation");

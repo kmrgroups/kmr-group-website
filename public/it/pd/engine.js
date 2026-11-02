@@ -42,6 +42,7 @@ const DEFAULT_MACHINES = [
 ];
 const DEFAULT_CONSUMABLES = {
   CUT:   ["Bandsaw blade (bi-metal)","Water-soluble coolant 5–8 %"],
+  FETTLE:["Grinding wheels / flap discs","Carbide burrs","Cotton waste / wipers"],
   TURN1: ["Water-soluble cutting coolant 5–8 %","Slideway oil (ISO VG 68)","Hydraulic oil (ISO VG 46)","Cotton waste / wipers"],
   TURN2: ["Water-soluble cutting coolant 5–8 %","Slideway oil (ISO VG 68)","Hydraulic oil (ISO VG 46)","Cotton waste / wipers"],
   VMC:   ["Water-soluble cutting coolant 5–8 %","Tapping compound","Slideway oil (ISO VG 68)","Spindle oil","Cotton waste / wipers"],
@@ -250,6 +251,7 @@ const OPS = {
   RMI:   {rank:0,  name:"Raw material receiving & inspection", sym:"insp",  inHouse:true},
   RMSTORE:{rank:1, name:"Raw material storage (identified & tagged)", sym:"store", inHouse:true},
   CUT:   {rank:2,  name:"Bar cutting / sawing",                   sym:"op",   inHouse:true},
+  FETTLE:{rank:2.2,name:"Fettling – gate, riser & parting-line removal", sym:"op", inHouse:true},
   TURN1: {rank:3,  name:"CNC turning – OP 1 (first side)",       sym:"opi",  inHouse:true},
   TURN2: {rank:4,  name:"CNC turning – OP 2 (second side)",      sym:"opi",  inHouse:true},
   TURN:  {rank:3,  name:"CNC turning",                            sym:"opi",  inHouse:true},
@@ -369,6 +371,7 @@ function toolsFor(op, chars, ctx){
   const thr = chars.filter(c=>c.type==="Thread"), all=chars.map(c=>up(c.text)).join(" ");
   const k=op.key;
   if(k==="CUT"){ add("Bandsaw blade","Bi-metal M42, 27×0.9 mm, 4/6 TPI","—","As per blade life (cuts)"); }
+  if(k==="FETTLE"){ ((window.PDStock.def("casting").fettle||{}).tools||[]).forEach(t=>add(t[0],t[1],t[2],t[3])); }
   if(k.startsWith("TURN")){
     add("OD / face rough turning tool","Insert CNMG 120408","PCLNR 2525 M12",life+" pcs/edge");
     if(ext.some(c=>tolBand(c)!=null&&tolBand(c)<=0.05) || chars.some(c=>c.type==="Surface finish"&&c.upper<=1.6) || ext.length) add("OD finish turning / profiling tool","Insert VNMG 160404","PVJNR 2525 M16",Math.round(life*1.3)+" pcs/edge");
@@ -442,7 +445,8 @@ function paramsFor(op, ctx){
   if(k==="MARK"){ add("Marking content",ctx.notes.markText||"As per drawing","Visual / scanner","Each part"); add("Marking depth / legibility","Legible, depth as per drawing","Visual","First piece & every 2 hrs"); }
   if(k==="PACK"){ add("Rust preventive oil","Applied on all surfaces, no dry patches","Visual","Each box"); add("Quantity per box","As per packing standard","Weighing scale / counting","Each box"); add("Label","Part no., rev., qty, lot / heat no., date","Visual","Each box"); }
   if(k==="CUT"){ add("Blade speed","40–80 m/min (as per material)","Machine setting","Set-up"); }
-  if(k==="RMI"){ add("Material certificate (MTC)","Chemical & mechanical properties as per "+(ctx.header.material||"drawing material"),"MTC verification","Each heat / lot","QA"); add("Raw material size","As per RM specification","Vernier caliper","5 pcs / lot","QA"); }
+  if(k==="RMI"){ window.PDStock.def(ctx.stock).rmiParams(ctx).forEach(r=>add(r[0],r[1],r[2],r[3],r[4])); }   // bar / forging blank / casting blank: what is checked on arrival
+  if(k==="FETTLE"){ ((window.PDStock.def("casting").fettle||{}).params||[]).forEach(r=>add(r[0],r[1],r[2],r[3],r[4])); }
   if(k==="LEAK") add("Test pressure & duration","As per drawing note","Leak tester","Each part");
   if(k==="CRACK") add("Magnetising current / ink concentration","As per MPI procedure","Ammeter / settling test","Start of shift");
   return P;
@@ -482,7 +486,9 @@ function buildPlan(source, masters, settings){
   const intTight = chars.filter(c=>c.type==="Diameter"&&isInternal(c)&&tolBand(c)!=null&&tolBand(c)<=0.013);
   const ctx = {chars, header, notes, family, matCls, maxOD: extDia.length?Math.max(...extDia):(lens.length?Math.max(...lens):50), length: lens.length?Math.max(...lens):null,
     byNo:{}, hasTightInt:intTight.length>0, tightIntOnly:intTight.length>0&&!chars.some(c=>c.type==="Diameter"&&!isInternal(c)&&tolBand(c)!=null&&tolBand(c)<=0.016),
-    cast: notes.casting && !/BAR|ROD|EN\s?\d|C45|SAE/.test(up(header.material)), bar: family==="rotational"};
+    cast: false, bar: family==="rotational"};
+  ctx.stock = window.PDStock.resolve(header.stock, notes, header, family);   // what arrives: bar, forging blank or casting blank (chosen on the part, or detected from the drawing notes)
+  ctx.cast = ctx.stock==="casting"; const stockDef = window.PDStock.def(ctx.stock);
   chars.forEach(c=>ctx.byNo[c.no]=c);
 
   // 1) assign each characteristic (two passes so surface finish can follow its neighbour)
@@ -501,8 +507,8 @@ function buildPlan(source, masters, settings){
   // grinding needs HT order: grind after HT; if HT but no grinding, fine.
   const keys = new Set(chars.map(c=>c._op));
   keys.add("RMI"); keys.add("RMSTORE");
-  if(!ctx.cast && !notes.forging) keys.add("CUT");
-  if(family==="prismatic" && !ctx.cast) keys.add("CUT");
+  if(ctx.stock==="bar") keys.add("CUT");            // bar is cut to length; a forging or casting blank is not
+  if(ctx.stock==="casting") keys.add("FETTLE");     // a casting is fettled (gate, riser, parting line) before machining
   if(notes.ht) { keys.add("HT"); keys.add("HTINSP"); }
   if(notes.surf) keys.add("SURF");
   if(notes.mark) keys.add("MARK");
@@ -517,7 +523,7 @@ function buildPlan(source, masters, settings){
   const order = [...keys].filter(k=>OPS[k]).sort((a,b)=>OPS[a].rank-OPS[b].rank);
   let n = 0;
   const ops = order.map(k=>{ n+=10; const d=OPS[k];
-    return {key:k, opNo:n, name:(k==="CUT"&&family==="prismatic")?(ctx.cast?"Casting receipt":"Blank cutting (plate / flat)"):(k==="RMI"&&ctx.cast?"Casting receiving & inspection":(k==="RMI"&&notes.forging?"Forging receiving & inspection":d.name)),
+    return {key:k, opNo:n, name:k==="RMI"?stockDef.rmiName:(k==="CUT"&&family==="prismatic")?"Blank cutting (plate / flat)":k==="FETTLE"?stockDef.fettle.name:d.name,
       sym:d.sym, inHouse:d.inHouse, chars: chars.filter(c=>c._op===k).map(c=>c.no), machineId:"", machine:"", tools:[], consumables:[], gauges:[], params:[] }; });
   const opByKey = {}; ops.forEach(o=>opByKey[o.key]=o);
   // final & PDI verify every dimensional characteristic
@@ -531,6 +537,7 @@ function buildPlan(source, masters, settings){
     const oc = op.chars.map(no=>ctx.byNo[no]);
     const m = pickMachine(op, machines, ctx);
     if(m){ op.machineId=m.id; op.machine=m.name; op.control=m.control||""; }
+    else if(op.key==="FETTLE"){ op.machine=stockDef.fettle.machine; }
     else if(!op.inHouse){ op.machine="Approved sub-contractor"; }
     else if(["RMSTORE","FGSTORE"].includes(op.key)) op.machine="Racks / bins (identified area)";
     else if(op.key==="DISPATCH") op.machine="Truck / tempo";
@@ -567,6 +574,7 @@ function buildPlan(source, masters, settings){
   let gi = 0, ni = 0; gaugeReg.forEach(e=>{ if(!e.id){ if(e.purchase){ ni++; e.id = "NEW-"+pad(ni,3); } else { do{ gi++; } while(gmaster.some(x=>x.id==="G-"+pad(gi,3))); e.id = "G-"+pad(gi,3); } } });
   ops.forEach(op=>{ op.gauges = gaugeReg.filter(g=>g.ops.includes(op.opNo)).map(g=>g.id); });
   if(opByKey.RMI && !opByKey.RMI.gauges.length){ const e=regGauge({name:"Digital vernier caliper",range:caliperRange(ctx.maxOD||100),lc:"0.01 mm",type:"Variable"},null,opByKey.RMI.opNo); if(!e.id){ if(e.purchase){ ni++; e.id="NEW-"+pad(ni,3); } else { gi++; e.id="G-"+pad(gi,3); } } opByKey.RMI.gauges.push(e.id); }
+  if(opByKey.RMI){ (stockDef.rmiGauges||[]).forEach(g=>{ const e=regGauge(g,null,opByKey.RMI.opNo); if(!e.id){ if(e.purchase){ ni++; e.id="NEW-"+pad(ni,3); } else { do{ gi++; } while(gmaster.some(x=>x.id==="G-"+pad(gi,3))); e.id="G-"+pad(gi,3); } } if(!opByKey.RMI.gauges.includes(e.id)) opByKey.RMI.gauges.push(e.id); }); }
 
   // 5) tool IDs
   let ti=0; ops.forEach(op=>op.tools.forEach(t=>{ ti++; t.id="T-"+pad(ti,3); }));
@@ -580,12 +588,12 @@ function buildPlan(source, masters, settings){
     version:1, generatedAt:new Date().toISOString(),
     header: Object.assign({
       partNo:header.partNo, partName:header.partName, drawingNo:header.drawingNo, drawingRev:header.rev, customer:header.customer, customerCode:"", customerPartNo:header.partNo,
-      material:header.material, family, materialClass:MATCLS_TXT[matCls], phase:"Production", model:"", annualVolume:"",
+      material:header.material, stock:ctx.stock, stockLabel:stockDef.label, family, materialClass:MATCLS_TXT[matCls], phase:"Production", model:"", annualVolume:"",
       supplier:settings.companyName||"", supplierCode:settings.supplierCode||"", plant:settings.plant||"", keyContact:settings.keyContact||"", coreTeam:settings.coreTeam||"",
       preparedBy:settings.preparedBy||"", reviewedBy:settings.reviewedBy||"", approvedBy:settings.approvedBy||"", origDate:today(), revDate:today(), docRev:"00",
       generalTol: src.gen && src.gen!=="none" ? "ISO 2768-"+src.gen : "As per drawing"
     }, {}),
-    notes: {ht:notes.ht, htType:notes.htType, hardness:notes.hardness, caseDepth:notes.caseDepth, surf:notes.surf, surfType:notes.surfType, coat:notes.coat, saltSpray:notes.saltSpray, mark:notes.mark, cast:ctx.cast},
+    notes: {ht:notes.ht, htType:notes.htType, hardness:notes.hardness, caseDepth:notes.caseDepth, surf:notes.surf, surfType:notes.surfType, coat:notes.coat, saltSpray:notes.saltSpray, mark:notes.mark, cast:ctx.cast, stock:ctx.stock},
     chars: charsOut, ops, gauges: gaugeReg.map(({fromBalloon,...g})=>Object.assign(g,{fromBalloon})), ctxInfo:{maxOD:ctx.maxOD, length:ctx.length, matCls}
   };
 }

@@ -13,13 +13,13 @@ const fmtN=(v,d=4)=>v==null||v===""||!isFinite(+v)?"—":String(Math.round(+v*10
 /* ---------------- labels ---------------- */
 const HL = {partNo:"Part number",partName:"Part name",drawingNo:"Drawing number",drawingRev:"Drawing revision",customer:"Customer",customerCode:"Supplier code (customer)",customerPartNo:"Customer part no.",
   material:"Material",phase:"Control plan type",supplier:"Supplier / plant",supplierCode:"Supplier code",plant:"Plant / location",keyContact:"Key contact / phone",coreTeam:"Core team",model:"Model / vehicle",
-  origDate:"Date (original)",revDate:"Date (revision)",docRev:"Document revision",annualVolume:"Annual volume",generalTol:"General tolerance",family:"Part family"};
+  origDate:"Date (original)",revDate:"Date (revision)",docRev:"Document revision",annualVolume:"Annual volume",generalTol:"General tolerance",family:"Part family",stockLabel:"Raw material form"};
 const INFO = {
   _:["partNo","partName","drawingNo","drawingRev","customer","material","supplier","origDate"],
-  pfd:["partNo","partName","drawingNo","drawingRev","customer","material","supplier","model","coreTeam","origDate","revDate","docRev"],
+  pfd:["partNo","partName","drawingNo","drawingRev","customer","material","stockLabel","supplier","model","coreTeam","origDate","revDate","docRev"],
   pfmea:["partNo","partName","drawingNo","drawingRev","customer","supplier","plant","model","keyContact","coreTeam","origDate","revDate"],
-  cp:["phase","partNo","partName","drawingNo","drawingRev","customer","customerCode","supplier","supplierCode","keyContact","coreTeam","origDate","revDate","customerPartNo","material","docRev"],
-  sop:["partNo","partName","drawingNo","drawingRev","customer","material","supplier","docRev"],
+  cp:["phase","partNo","partName","drawingNo","drawingRev","customer","customerCode","supplier","supplierCode","keyContact","coreTeam","origDate","revDate","customerPartNo","material","stockLabel","docRev"],
+  sop:["partNo","partName","drawingNo","drawingRev","customer","material","stockLabel","supplier","docRev"],
   setup:["partNo","partName","drawingNo","drawingRev","customer","material","supplier","docRev"]
 };
 ["patrol","self","pdi","spc","msa","charts"].forEach(k=>INFO[k]=INFO.setup);
@@ -169,12 +169,15 @@ V.overview = (M)=>{
     <div class="kpi h"><b>${cnt.H||0}</b><span>${pstd==="aiag4"?`PFMEA: S ≥ 9 or RPN ≥ ${plim}`:"PFMEA AP = High"}</span></div><div class="kpi m"><b>${cnt.M||0}</b><span>${pstd==="aiag4"?`RPN ≥ ${Math.round(plim/2)}`:"AP = Medium"}</span></div><div class="kpi l"><b>${cnt.L||0}</b><span>${pstd==="aiag4"?"Lower risk":"AP = Low"}</span></div>
   </div>
   <div class="paper">
-    <div class="box"><h3>Part & customer details</h3><div class="frm">${["partNo","partName","drawingNo","drawingRev","customer","customerCode","customerPartNo","material","model","annualVolume","phase","generalTol"].map(k=>`<label class="fld">${esc(HL[k]||k)}<input data-hh="${k}" value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}</div></div>
+    <div class="box"><h3>Part & customer details</h3><div class="frm">${["partNo","partName","drawingNo","drawingRev","customer","customerCode","customerPartNo","material","model","annualVolume","phase","generalTol"].map(k=>`<label class="fld">${esc(HL[k]||k)}<input data-hh="${k}" value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}
+      <label class="fld">Raw material supplied as<select id="ovStock" ${ro()}>${window.PDStock.LIST.map(([v,t])=>`<option value="${v}" ${v===((P.source&&P.source.header&&P.source.header.stock)||"")?"selected":""}>${esc(v?t:t+" (now: "+((window.PDStock.def(h.stock)||{}).label||"Bar")+")")}</option>`).join("")}</select></label></div>
+      <p class="hintline" style="margin:6px 0 0">${esc((window.PDStock.def(h.stock)||{}).note||"")} Changing this re-runs the route and the documents.</p></div>
     <div class="box"><h3 style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">Team & approvals (appear on every document)<span style="flex:1"></span>${ro()?"":`<button class="btn small" id="ovHdr" type="button">Fill from company defaults</button>`}</h3><div class="frm">${["supplier","supplierCode","plant","keyContact","coreTeam","preparedBy","reviewedBy","approvedBy","origDate","revDate","docRev"].map(k=>`<label class="fld">${esc(HL[k]||({preparedBy:"Prepared by",reviewedBy:"Reviewed by",approvedBy:"Approved by"})[k]||k)}<input data-hh="${k}" ${/Date/.test(k)?'type="date"':""} value="${esc(h[k]??"")}" ${ro()}></label>`).join("")}</div></div>
     <div class="cols2">
       <div class="box"><h3>What the automation decided</h3><table class="stats">
         <tr><td>Part family</td><td>${esc(h.family==="rotational"?"Rotational (turned) part":"Prismatic (milled) part")}</td></tr>
         <tr><td>Material class</td><td>${esc(h.materialClass||"")}</td></tr>
+        <tr><td>Raw material supplied as</td><td>${esc(h.stockLabel||"Bar / rod (cut to length)")}</td></tr>
         <tr><td>Largest outer size</td><td>${fmtN(plan.ctxInfo&&plan.ctxInfo.maxOD,2)} mm</td></tr>
         <tr><td>Heat treatment</td><td>${plan.notes.ht?esc(plan.notes.htType+(plan.notes.hardness?" – "+plan.notes.hardness:"")):"Not required"}</td></tr>
         <tr><td>Surface treatment</td><td>${plan.notes.surf?esc(plan.notes.surfType+(plan.notes.coat?" "+plan.notes.coat:"")):"Not required"}</td></tr>
@@ -190,6 +193,9 @@ V.overview = (M)=>{
   bindHead(M,"overview");
   const st=$("ovStatus"); if(st) st.onchange=()=>{ P.status=st.value; A().changed(null); A().refreshChip(); };
   [$("ovRerun"),$("ovRerun2")].forEach(b=>b&&(b.onclick=()=>A().rerun()));
+  if($("ovStock")) $("ovStock").onchange=async e=>{ const v=e.target.value; const was=(P.source.header&&P.source.header.stock)||""; P.source.header=Object.assign({},P.source.header,{stock:v});
+    const ok=await A().rerun(`Raw material is now “${(window.PDStock.TYPES[v]||{label:"detected from the drawing"}).label}”.\n\nThe route, incoming inspection, PFMEA, Control Plan and work instructions are rebuilt for it. Readings, SPC / MSA data, document numbers and team names are kept.`);
+    if(!ok){ P.source.header=Object.assign({},P.source.header,{stock:was}); render("overview"); } };
   if($("ovHdr")) $("ovHdr").onclick=()=>{ const n=A().applyHeaderDefaults(h,true); A().changed(null); render("overview"); A().toast(n?`${n} header field${n===1?"":"s"} filled from Admin → Document header.`:"Nothing to fill – set the defaults in Admin → Document header first.",6000); };
   if($("ovDismiss")) $("ovDismiss").onclick=()=>{ P.doc.sourceChanged=false; A().changed(null); render("overview"); };
 };

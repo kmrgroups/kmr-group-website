@@ -256,8 +256,9 @@ function manualDialog(){
   const fi="width:100%;border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--field);color:inherit;font:inherit;min-width:0";
   const ci="width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 7px;background:var(--field);color:inherit;font:inherit;min-width:0";
   const hdr=[["mnPart","Part no. *","partNo",""],["mnName","Part name","partName",""],["mnDwg","Drawing no.","drawingNo",""],["mnRev","Revision","rev",""],["mnCust","Customer","customer",""],["mnMat","Material","material",""]];
+  const stockSel=`<label class="fld">Raw material supplied as<select id="mnStock" style="${fi}">${window.PDStock.LIST.map(([v,t])=>`<option value="${v}">${esc(t)}</option>`).join("")}</select></label>`;
   const body=`<p class="hintline" style="margin-top:0">Enter the part and its characteristics. The process route, machines, tools, gauges and all documents are generated automatically, exactly as from a ballooned drawing. You can add or change characteristics later on the Characteristics screen.</p>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px">${hdr.map(h=>`<label class="fld">${h[1]}<input id="${h[0]}" style="${fi}" autocomplete="off"></label>`).join("")}</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:12px">${hdr.map(h=>`<label class="fld">${h[1]}<input id="${h[0]}" style="${fi}" autocomplete="off"></label>`).join("")}${stockSel}</div>
     <div style="overflow:auto;max-height:46vh"><table class="plist" style="min-width:760px"><thead><tr><th>#</th><th>Type</th><th>Specification (as on drawing)</th><th>Nominal</th><th>Upper tol.</th><th>Lower tol.</th><th>Class</th><th>Instrument</th><th></th></tr></thead><tbody id="mnT"></tbody></table></div>
     <div class="addrow"><button class="btn small" id="mnAdd">+ Add row</button><span class="hintline">Tolerances as numbers: upper “+0.03”, lower “-0.02” (or 0). Leave Instrument empty to pick it automatically.</span></div>`;
   dialog("Create manually",body,`<button class="btn" id="mnCancel">Cancel</button><button class="btn primary" id="mnGo">Create documents</button>`,true);
@@ -285,7 +286,7 @@ function manualDialog(){
     let items; try{
       items=used.map((r,k)=>({no:k+1,sheet:0,type:r.type,text:r.text.trim(),nominal:toNum(r.nominal,"Nominal",k+1),upper:toNum(r.upper,"Upper tol.",k+1),lower:toNum(r.lower,"Lower tol.",k+1),unit:"mm",cls:r.cls,instr:r.instr.trim(),autoInstr:!r.instr.trim()}));
     }catch(err){ toast(err.message,7000); return; }
-    const src={v:1,manual:true,fileName:"",set:{gen:"m"},header:{partNo:hv("mnPart"),partName:hv("mnName"),drawingNo:hv("mnDwg"),rev:hv("mnRev"),customer:hv("mnCust"),material:hv("mnMat")},items};
+    const src={v:1,manual:true,fileName:"",set:{gen:"m"},header:{partNo:hv("mnPart"),partName:hv("mnName"),drawingNo:hv("mnDwg"),rev:hv("mnRev"),customer:hv("mnCust"),material:hv("mnMat"),stock:$("mnStock").value},items};
     closeDialog(); newFromSource(src,null);
   };
   $("mnPart").focus();
@@ -402,10 +403,10 @@ async function regenFromPlan(opt){
   (only||D.DOCS.map(d=>d.id)).forEach(id=>{ S.docs[id]=docs[id]; if(!only) P.doc.edited[id]=false; });
   P.doc.planDirty=false; changed(null); nav(); toast(only?`Updated ${only.length} documents; kept your edits in ${ed.length}.`:`All ${D.DOCS.length} documents updated from the process plan.`); UI.render(S.view);
 }
-async function rerun(){
-  if(!confirm("Re-run the full automation from the ballooning data?\n\nThe process plan and all documents are rebuilt. Readings, SPC / MSA data, document numbers and team names are kept.")) return;
+async function rerun(msg){
+  if(!confirm(msg||"Re-run the full automation from the ballooning data?\n\nThe process plan and all documents are rebuilt. Readings, SPC / MSA data, document numbers and team names are kept.")) return false;
   busy("Re-running automation"); await new Promise(r=>setTimeout(r,30));
-  generate(S.prj, S.plan&&S.plan.header); busy(null); changed(null); nav(); refreshChip(); UI.render(S.view); toast("Automation re-run – process plan and documents rebuilt.");
+  generate(S.prj, S.plan&&S.plan.header); busy(null); changed(null); nav(); refreshChip(); UI.render(S.view); toast("Automation re-run – process plan and documents rebuilt."); return true;
 }
 function regenOne(id){ const d=D.DOCS.find(x=>x.id===id); if(!confirm(`Regenerate the ${d.title} from the current process plan? Edits made on this document are replaced (readings are kept).`)) return;
   const n={}; n[id]=D.genOne(id,S.plan,genSettings()); preserve(S.docs,n,[id]); S.docs[id]=n[id]; S.prj.doc.edited[id]=false; changed(null); nav(); UI.render(id); toast(d.title+" regenerated."); }
