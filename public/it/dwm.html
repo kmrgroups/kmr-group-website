@@ -16,27 +16,28 @@ input,select,textarea,button{font:inherit;color:inherit}.row{display:flex;gap:10
 .sel{padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card)}
 /* ===== the sheet — same layout as the Excel: Arial 10, grey headers, blue band, frozen columns A:B and rows 1–5 ===== */
 .xl{font:10px/1.25 Arial,Helvetica,sans-serif;color:#000;background:#fff}
-.xs{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #bfbfbf}
+.xs{overflow:auto;max-height:calc(100vh - 210px);border:1px solid #444}
 .xl table{border-collapse:separate;border-spacing:0;width:max-content;table-layout:fixed}
-.xl td,.xl th{border-right:1px solid #bfbfbf;border-bottom:1px solid #bfbfbf;padding:2px 4px;font-weight:400;text-align:left;height:24px;overflow:hidden}
+.xl td,.xl th{border-right:1px solid #444;border-bottom:1px solid #444;padding:3px 5px;font-weight:400;text-align:left;height:26px;overflow:hidden;vertical-align:middle}
+.xl tr>:first-child{border-left:1px solid #444}.xl .t3 th{border-top:1px solid #444}
 .xl .gy{background:#e7e6e6}.xl .b{font-weight:700}.xl .c{text-align:center}.xl .nb{border:0}
-.xl .t1 td{height:76px;text-align:center;font-size:16px;font-weight:700;border:0;position:sticky;top:0;z-index:5;background:#fff}
+.xl .t1 td{height:76px;text-align:center;font-size:16px;font-weight:700;border:0;border-top:1px solid #444;border-left:1px solid #444;border-right:1px solid #444;position:sticky;top:0;z-index:5;background:#fff}
 .xl .t1 td .lg{position:absolute;left:0;top:0;height:76px;display:flex;align-items:center;padding:4px}.xl .t1 td .lg img{max-height:68px;max-width:190px;object-fit:contain}
-.xl .t2 td{height:30px;background:#e7e6e6;border:0;position:sticky;top:76px;z-index:5;white-space:nowrap}
+.xl .t2 td{height:30px;background:#e7e6e6;border:1px solid #444;border-top:0;position:sticky;top:76px;z-index:5;white-space:nowrap}
 .xl .t3 th,.xl .t4 th{background:#e7e6e6;font-weight:700;text-align:center;position:sticky;z-index:4;border-color:#999}.xl .t3 th{top:106px}.xl .t4 th{top:130px}
-.xl .band td{background:#174b80;color:#fff;height:23px;font-size:10px;position:sticky;top:154px;z-index:3;white-space:nowrap}
+.xl .band td{background:#174b80;color:#fff;height:26px;border-color:#444;font-size:10px;position:sticky;top:154px;z-index:3;white-space:nowrap}
 .xl td.fa,.xl th.fa{position:sticky;left:0;z-index:3;background:#fff}.xl td.fb,.xl th.fb{position:sticky;left:40px;z-index:3;background:#fff;box-shadow:1px 0 0 #999}
 .xl .t3 th.fa,.xl .t3 th.fb,.xl .t4 th.fa,.xl .t4 th.fb,.xl .t2 td.fa,.xl .t1 td.fa,.xl .band td.fa{z-index:6}
 .xl .t3 th.fa,.xl .t3 th.fb,.xl .t4 th.fa,.xl .t4 th.fb{background:#e7e6e6}
-.xl tr.ar td{height:37px}.xl td.wrap{white-space:normal;line-height:1.2}
+.xl tr.ar td{height:44px}.xl tr.ar td.d{padding:0;vertical-align:middle;font-size:11px}.xl tr.ar td.fa{text-align:center;font-weight:700}.xl td.wrap{white-space:normal;line-height:1.2}
 .xl td.d{text-align:center;padding:0;cursor:pointer;user-select:none;width:32px;min-width:32px}.xl td.d.ro{cursor:default}
 .xl td.d.C{background:#e2f0d9;color:#375623}.xl td.d.O{background:#fff;color:#174b80}.xl td.d.X{background:#fce4d6;color:#9c0006}.xl td.d.E{background:#fff2cc;color:#7f6000}.xl td.d.N{background:#e7e6e6;color:#808080}
 .xl td.d.sel{outline:2px solid #174b80;outline-offset:-2px;position:relative;z-index:2}
 .xl td.d.cur{box-shadow:inset 0 -3px 0 #174b80}
-.xl tr.tot td{background:#e7e6e6;border:0;height:24px;text-align:center}.xl tr.tot td.l{text-align:left}
+.xl tr.tot td{background:#e7e6e6;height:26px;text-align:center;font-weight:700}.xl tr.tot.gap td{background:#fff;border:0;border-bottom:1px solid #444;height:14px}.xl tr.tot td.l{text-align:left}
 .xl .pc{text-align:center}.xl .ok{color:#375623;font-weight:700}.xl .bad{color:#9c0006;font-weight:700}
-.xl .sgn td{border:0;height:34px;background:#fff;white-space:nowrap}
-.xl input.cell,.xl textarea.cell{font:inherit;border:0;background:transparent;width:100%;padding:0;margin:0;resize:none}
+.xl .sgn td{border:1px solid #444;border-top:0;height:36px;background:#fff;white-space:nowrap}
+.xl input.cell,.xl textarea.cell{font:inherit;border:0;background:transparent;width:100%;padding:0;margin:0;resize:none}.xl textarea.cell{field-sizing:content;height:auto;min-height:1.25em;max-height:60px;line-height:1.25;display:block;overflow:auto}.xl td.cc input.cell{text-align:center}
 .xl input.cell:focus,.xl textarea.cell:focus{outline:1px solid #174b80;background:#fffbe6}
 .pop{position:fixed;z-index:50;background:#fff;border:1px solid #999;box-shadow:0 4px 14px #0004;display:none}.pop.on{display:block}.pop div{padding:5px 18px;cursor:pointer;font:12px Arial}.pop div:hover,.pop div.hi{background:#cfe2f3}.pop b{display:inline-block;width:22px}
 .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:12px 0}.kpi{border:1px solid var(--line);border-radius:12px;padding:10px 12px;border-top:3px solid var(--c,var(--b1))}.kpi b{display:block;font-size:22px}.kpi span{color:var(--mut);font-size:12px}
@@ -50,10 +51,10 @@ input,select,textarea,button{font:inherit;color:inherit}.row{display:flex;gap:10
 .xl2 textarea,.xl2 input,.xl2 select{width:100%;border:0;background:transparent;font:inherit;resize:none;padding:0}.xl2 textarea:focus,.xl2 input:focus,.xl2 select:focus{outline:1px solid #174b80;background:#fffbe6}
 .xl2 .rd{display:block;min-height:1.3em}
 .xl input.cell.w{color:#fff}.xl input.cell.w::placeholder{color:#cfe0f3}
-.xl select.fq{font:10px Arial;border:1px solid #bfbfbf;background:#fff;padding:1px 2px;width:100%}.xl select.fq.un{color:#9c0006;border-color:#e0a0a0}
-.xl .wds{display:flex;gap:2px;margin-top:3px}.xl .wds button{font:9px Arial;border:1px solid #bfbfbf;background:#fff;padding:1px 3px;cursor:pointer;min-width:24px}.xl .wds button.on{background:#174b80;color:#fff;border-color:#174b80}
-.xl input.dts{font:10px Arial;border:1px solid #bfbfbf;background:#fff;padding:1px 3px;width:100%;margin-top:3px}
-.xl td.add{background:#f7f9fc;text-align:left;height:28px}.xl td.add button{font:11px Arial;border:0;background:none;color:#174b80;font-weight:700;cursor:pointer}
+.xl select.fq{font:10px Arial;border:1px solid #666;background:#fff;padding:2px;width:100%;display:block}.xl select.fq.un{color:#9c0006;border-color:#e0a0a0}
+.xl .wds{display:flex;gap:2px;margin-top:3px;justify-content:space-between}.xl .wds button{font:9px Arial;border:1px solid #666;flex:1;background:#fff;padding:1px 3px;cursor:pointer;min-width:24px}.xl .wds button.on{background:#174b80;color:#fff;border-color:#174b80}
+.xl input.dts{font:10px Arial;border:1px solid #666;background:#fff;padding:2px 3px;width:100%;margin-top:3px;display:block;box-sizing:border-box}
+.xl td.add{background:#f7f9fc;text-align:left;height:30px}.xl td.add button{font:11px Arial;border:0;background:none;color:#174b80;font-weight:700;cursor:pointer}
 .xl td.dl button{border:0;background:none;color:#9c0006;cursor:pointer;font-size:12px}
 .dsh .kpi b{font-size:22px}.dsh table{border-collapse:collapse;width:100%;font:12px Arial;margin:6px 0 14px}.dsh th,.dsh td{border:1px solid #d0d7e2;padding:5px 7px;text-align:left;vertical-align:middle}.dsh th{background:#e7e6e6}.dsh td.n,.dsh th.n{text-align:right}
 .dsh h3{margin:16px 0 4px;font-size:15px}.dsh .bar2{height:10px;border-radius:5px;background:#e5e9f2;overflow:hidden;min-width:90px}.dsh .bar2 i{display:block;height:100%}
@@ -64,7 +65,7 @@ input,select,textarea,button{font:inherit;color:inherit}.row{display:flex;gap:10
 @media print{body.printing{background:#fff!important;color:#000;padding:0}body.printing>*:not(#prdoc){display:none!important}body.printing #prdoc{display:block}
 #prdoc{font:7pt/1.25 Arial,Helvetica,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 #prdoc h2{margin:0 0 3mm;font-size:11pt;text-align:center}#prdoc .meta{display:flex;justify-content:space-between;gap:6mm;margin:0 0 2mm;font-size:7.5pt}
-#prdoc table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 3mm}#prdoc th,#prdoc td{border:.4pt solid #888;padding:1.2px 2px;overflow:hidden;vertical-align:middle}
+#prdoc table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 3mm}#prdoc th,#prdoc td{border:.5pt solid #000;padding:1.5px 2.5px;overflow:hidden;vertical-align:middle;word-break:break-word}#prdoc tbody tr td{height:5.2mm}
 #prdoc th{background:#e7e6e6;font-weight:700;text-align:center}#prdoc td.c{text-align:center}#prdoc td.l{text-align:left}
 #prdoc tr{break-inside:avoid}#prdoc .band td{background:#174b80;color:#fff;font-weight:700}#prdoc .tot td{background:#e7e6e6;text-align:center}#prdoc .tot td.l{text-align:left}
 #prdoc td.C{background:#e2f0d9;color:#375623;font-weight:700}#prdoc td.O{color:#174b80}#prdoc td.X{background:#fce4d6;color:#9c0006;font-weight:700}#prdoc td.E{background:#fff2cc;color:#7f6000;font-weight:700}#prdoc td.N{background:#e7e6e6;color:#808080}

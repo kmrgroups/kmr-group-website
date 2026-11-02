@@ -104,7 +104,7 @@
     h += `<tr class="band"><td colspan="40"><div ${vw}><input class="cell w" id="f_sec" style="width:70%" value="${esc(doc.section)}" placeholder="Type the heading of these reviews (e.g. Business leadership and management commitments)"${ro}></div></td></tr>`;
     c.rows.forEach((r, i) => {
       const a = r.a;
-      h += `<tr class="ar"><td class="fa c">${i + 1}</td><td class="fb wrap"><input class="cell" data-ac="${i}" data-f="activity" value="${esc(a.activity)}" placeholder="Type the review / activity"${ro}></td><td><input class="cell" data-ac="${i}" data-f="resp" value="${esc(a.resp)}" placeholder="${esc(e.desig || "Responsibility")}"${ro}></td><td>${fqHtml(a, i, ro)}</td><td><input class="cell" data-ac="${i}" data-f="dur" value="${esc(a.dur)}" placeholder="e.g. 30 min"${ro}></td>`;
+      h += `<tr class="ar"><td class="fa c">${i + 1}</td><td class="fb wrap"><textarea class="cell" rows="1" data-ac="${i}" data-f="activity" placeholder="Type the review / activity"${ro}>${esc(a.activity)}</textarea></td><td><input class="cell" data-ac="${i}" data-f="resp" value="${esc(a.resp)}" placeholder="${esc(e.desig || "Responsibility")}"${ro}></td><td>${fqHtml(a, i, ro)}</td><td class="cc"><input class="cell" data-ac="${i}" data-f="dur" value="${esc(a.dur)}" placeholder="e.g. 30 min"${ro}></td>`;
       for (let d = 1; d <= 31; d++) {
         const v = d > n ? OFF : D.cell(a, d), k = v === OFF ? "N" : v, od = v === "O" && d < c.dayNo && dayNo ? " od" : "";
         h += `<td class="d ${k}${d === dayNo ? " cur" : ""}${od}${!canEdit || d > n ? " ro" : ""}" data-i="${i}" data-d="${d}"${od ? ' title="Date has passed — update to C (done), X (missed) or E (concession)"' : ""}>${v}</td>`;
@@ -113,7 +113,7 @@
     });
     if (canEdit) h += `<tr class="noprint"><td colspan="40" class="add"><div ${vw}><button id="addact">＋ Add activity</button> <span class="mut" style="font-size:11px">${c.rows.length ? "" : "No activities yet. "}${!c.rows.length && prevHas ? '<button id="cp_prev" style="font-weight:400;text-decoration:underline">Copy the activities of ' + monthName(prevMonth(M)) + "</button>" : ""}</span></div></td></tr>`;
     const dayRow = (label, f, last) => `<tr class="tot"><td class="l" colspan="5" style="text-align:left">${label}</td>` + Array.from({ length: 31 }, (_, i) => `<td>${f(c.perDay[i], i)}</td>`).join("") + last + `<td class="noprint"></td></tr>`;
-    h += `<tr class="tot"><td colspan="40" style="height:16px;background:#fff"></td></tr>`;
+    h += `<tr class="tot gap"><td colspan="40"></td></tr>`;
     h += dayRow("No. of activities planned / day", (x) => x.plan, `<td>${T.plan}</td><td>${T.done}</td><td>${T.plan ? (T.pct * 100).toFixed(1) + "%" : ""}</td>`);
     h += dayRow("No. of activities completed / day", (x) => x.done, `<td colspan="3">Full-month adherence</td>`);
     h += dayRow("Adherence %", (x) => (x.plan ? (x.pct * 100).toFixed(1) + "%" : ""), `<td colspan="3">Target ≥${tgt}%</td>`);
@@ -207,7 +207,7 @@
       if (b.dataset.wd) { const [i, w] = b.dataset.wd.split(":").map(Number), a = doc.acts[i]; a.wd = a.wd.includes(w) ? a.wd.filter((x) => x !== w) : [...a.wd, w]; replan(a); qSheet(); drawSheet(); }
       else if (b.id === "pv" || b.id === "nx") { M = new Date(Date.UTC(+M.slice(0, 4), +M.slice(5, 7) - 1 + (b.id === "nx" ? 1 : -1), 1)).toISOString().slice(0, 7); sel = null; await go(view); }
       else if (b.id === "prt") printView();
-      else if (b.id === "addact") { const a = D.newAct(); a.id = D.newId(); a.resp = (curEmp() || {}).desig || ""; doc.acts.push(a); qSheet(); await drawSheet(); const inp = $(`input[data-ac="${doc.acts.length - 1}"][data-f="activity"]`); if (inp) { inp.focus(); inp.scrollIntoView({ block: "nearest" }); } }
+      else if (b.id === "addact") { const a = D.newAct(); a.id = D.newId(); a.resp = (curEmp() || {}).desig || ""; doc.acts.push(a); qSheet(); await drawSheet(); const inp = $(`[data-ac="${doc.acts.length - 1}"][data-f="activity"]`); if (inp) { inp.focus(); inp.scrollIntoView({ block: "nearest" }); } }
       else if (b.id === "cp_prev") { const p = normalise(await getDoc(sheetKey(empId, prevMonth(M)))); doc.acts = p.acts.map((a) => { const x = clone(a); x.id = D.newId(); x.cells = OFF.repeat(31); if (x.mode === "dates") x.dates = x.dates.filter((d) => d <= D.dim(M)); replan(x); return x; }); doc.off = p.off; doc.target = p.target; doc.section = p.section; doc.reviewed = p.reviewed; doc.approved = p.approved; qSheet(); await drawSheet(); say("Copied and planned for " + monthName(M) + ".", true); }
       else if (b.dataset.rm !== undefined) { const a = doc.acts[+b.dataset.rm], used = Array.from(a.cells).some((c) => c === "C" || c === "X" || c === "E"); if (used && !confirm("This activity has completed / missed / concession entries. Delete it with all its entries?")) return; doc.acts.splice(+b.dataset.rm, 1); sel = null; qSheet(); await drawSheet(); }
       else if (b.id === "emp_add") { adding = true; await drawSheet(); const i = $("#ne_name"); if (i) i.focus(); }
