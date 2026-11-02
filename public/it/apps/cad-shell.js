@@ -180,7 +180,7 @@
   const isFs = () => document.body.classList.contains("fs");
   function setFs(on, native) {
     document.body.classList.toggle("fs", !!on); pref("fs", on ? "1" : "0");
-    try { if (native && on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().catch(() => {}); if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* not allowed */ }
+    try { if (native && on && document.documentElement.requestFullscreen && !document.fullscreenElement) document.documentElement.requestFullscreen().then(escLock).catch(() => {}); if (!on && document.fullscreenElement) document.exitFullscreen().catch(() => {}); } catch (e) { /* not allowed */ }
     const b = document.querySelector(".cx-fsb[data-fs]"); if (b) b.querySelector("span").textContent = on ? "Exit full screen" : "Full screen";
     setTimeout(() => { fit(); window.dispatchEvent(new Event("resize")); }, 60);
   }
@@ -188,13 +188,18 @@
     const root = cxRoot(), qa = root.querySelector(".cx-qa"), help = qa.querySelector(".cx-help"); if (!qa || !help) return;
     const mk = (cls, t, title, fn) => { const b = document.createElement("button"); b.className = "cx-fsb"; b.title = title; b.innerHTML = "<span>" + t + "</span>"; b.onclick = fn; if (cls) b.setAttribute(cls, ""); qa.insertBefore(b, help); return b; };
     mk("", "Register", "Back to the drawings register", () => { if (E.dirty && !E.readOnly && !confirm("This drawing has changes that are not saved. Leave it? (A local draft is kept on this device.)")) return; go("go=list"); });
-    mk("data-fs", "Exit full screen", "Show or hide the page header (F11 for the whole browser)", () => setFs(!isFs(), !isFs()));
+    mk("data-fs", "Exit full screen", "Show or hide the page header (F11 for the whole browser). In full screen, Esc cancels the current command; hold Esc 2 seconds to leave full screen", () => setFs(!isFs(), !isFs()));
     mk("", "Ribbon", "Fold the ribbon away to get more drawing space", () => { root.classList.toggle("cx-rcol"); pref("rcol", root.classList.contains("cx-rcol") ? "1" : "0"); setTimeout(() => window.dispatchEvent(new Event("resize")), 30); });
     root.querySelector(".cx-rtabs").addEventListener("click", () => { if (root.classList.contains("cx-rcol")) { root.classList.remove("cx-rcol"); pref("rcol", "0"); setTimeout(() => window.dispatchEvent(new Event("resize")), 30); } }, true);
     if (pref("rcol") === "1") root.classList.add("cx-rcol");
     if (window.innerWidth > 820 && pref("side") !== "1") root.classList.add("cx-noside");
     root.addEventListener("click", (ev) => { const a = ev.target.closest("[data-act=side]"); if (a) setTimeout(() => pref("side", root.classList.contains("cx-noside") ? "0" : "1"), 0); });
-    document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && S.fsNative) S.fsNative = false; });
+    document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && S.fsNative) S.fsNative = false; escLock(); });
+  }
+  /* In full screen the browser normally takes the Esc key to leave full screen, so Esc could never cancel the current command or deselect.
+     The Keyboard Lock API (Chrome / Edge) hands Esc to the drawing instead; full screen is left with the "Exit full screen" button, F11, or by holding Esc for about 2 seconds. */
+  function escLock() {
+    try { const k = navigator.keyboard; if (!k || !k.lock) return; if (document.fullscreenElement) k.lock(["Escape"]).catch(() => {}); else k.unlock(); } catch (e) { /* not supported */ }
   }
   const draftKey = (id) => "kcad-draft-" + (QP.slug || "demo") + "-" + id;
   function draftSave() { const E = S.E; if (!E || !S.cur || !E.dirty || E.readOnly) return; try { localStorage.setItem(draftKey(S.cur.id), JSON.stringify({ at: new Date().toISOString(), base: S.cur.updated_at, data: E.data() })); } catch (e) { /* storage full */ } }
