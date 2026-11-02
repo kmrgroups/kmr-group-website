@@ -281,7 +281,7 @@
   (async () => {
     try {
       if (DEMO) { ctx = { role: "admin", company: "Demo Engineering (sample data)" }; $("#co").textContent = ctx.company; $("#role").textContent = "admin"; }
-      else { await QP.init("dwm"); if (!QP.ctx) return; ctx = QP.ctx; }
+      else { await QP.init("dwm", "kmr_dwm_context"); if (!QP.ctx) return; ctx = QP.ctx; }
       canEdit = ["admin", "editor"].includes(ctx.role);
       if (window.KMRTask && !DEMO) await KMRTask.init({ call: QP.call, slug: QP.slug, token: async () => { const r = QP.sb && (await QP.sb.auth.getSession()); return r && r.data.session ? r.data.session.access_token : null; } });
       const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; await go(["std", "sheet", "dash"].includes(h) ? h : "std");

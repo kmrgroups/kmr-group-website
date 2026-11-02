@@ -331,7 +331,7 @@
     };
   })();
   /* ---------- Daily Work Management: every employee's DWM added up (same model as the Dashboards screen, apps/dwm-core.js) ---------- */
-  KMRPA.dwm = { name: "Daily Work Management", code: "dwm", std: "dwm", deps: ["/it/apps/dwm-core.js"], controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = ym(d); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
+  KMRPA.dwm = { name: "Daily Work Management", code: "dwm", ctxFn: "kmr_dwm_context", std: "dwm", deps: ["/it/apps/dwm-core.js"], controls: function () { var o = [], d = new Date(); d.setDate(1); for (var k = 0; k < 6; k++) { var m = ym(d); o.push([m, m]); d.setMonth(d.getMonth() - 1); } return [{ id: "month", label: "Month", type: "select", value: o[0][0], options: o }]; }, load: async function (call, v) {
     var S = std, m = v.month, D = window.DWM, td = todayIso(), slug = (window.QP && QP.slug) || "", emps = [], docs = {};
     var esc = function (x) { return String(x == null ? "" : x).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
     try { var st = await call("kmr_dwm_get", { p_key: "staff" }); emps = (st && st.emps) || []; (await call("kmr_dwm_month", { p_month: m }) || []).forEach(function (r) { docs[r.key.split(":")[2]] = r.doc; }); } catch (e) { emps = []; }
