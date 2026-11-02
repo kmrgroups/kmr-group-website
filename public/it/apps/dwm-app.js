@@ -14,6 +14,12 @@
   const prevMonth = (m) => new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 2, 1)).toISOString().slice(0, 7);
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const say = (m, ok) => { const el = $("#msg"); el.innerHTML = m ? `<div class="msg${ok === "w" ? " w" : ok ? " ok" : ""}">${esc(m)}</div>` : ""; if (m && ok === true) setTimeout(() => { if (el.textContent === m) el.innerHTML = ""; }, 3500); };
+  /* ActionTrack: "make this a task" — shown only when the company has ActionTrack and the person can use it (same as MoM, MSA, SPC) */
+  let taskPool = [];
+  const canTask = () => !!(window.KMRTask && KMRTask.on) && canEdit;
+  const dmy = (d) => String(d || "").slice(0, 10).split("-").reverse().join("-");
+  const addD = (n) => new Date(Date.now() + 330 * 60000 + n * 864e5).toISOString().slice(0, 10);
+  const taskBtn = (o) => (canTask() ? `<button class="btn o s noprint" data-task="${taskPool.push(Object.assign({ source_app: "dwm", source_label: "DWM adherence", source_url: `/it/dwm.html?kmr=1&co=${encodeURIComponent(QP.slug || "")}#go=dash` }, o)) - 1}">→ Task</button>` : "");
   const fix1 = (v) => (v == null ? "—" : v.toFixed(1) + "%");
 
   let M = today().slice(0, 7), emps = [], empId = "", doc = null, canEdit = false, ctx = null, local = DEMO, view = "std", sel = null, adding = false, staffLoaded = false, deptF = "";
@@ -117,13 +123,13 @@
   }
   let prevHas = false;
   function logHtml(c) {
-    const items = []; doc.acts.forEach((a) => { for (let d = 1; d <= c.n; d++) { const v = D.cell(a, d); if (v === "X" || v === "E") items.push({ a, d, v }); } });
+    taskPool = []; const items = []; doc.acts.forEach((a) => { for (let d = 1; d <= c.n; d++) { const v = D.cell(a, d); if (v === "X" || v === "E") items.push({ a, d, v }); } });
     if (!items.length) return `<div class="log noprint no-sno" data-nofilter id="logbox"><p class="note">Missed (X) and concession (E) reviews are listed here with their reason, approver, revised due date and action reference.</p></div>`;
     return `<div class="log noprint no-sno" data-nofilter id="logbox"><h3 style="margin:14px 0 4px;font-size:14px">Missed and concession record</h3><p class="note">Record the reason for every X, and for every E the approver, revised due date and the action reference in the plant action log. Do not erase a planned entry to hide a miss.</p>
-      <table><thead><tr><th>Date</th><th>Activity</th><th>Status</th><th>Reason</th><th>Approver (for E)</th><th>Revised due date</th><th>Action reference</th></tr></thead><tbody>${items.map(({ a, d, v }) => { const k = a.id + ":" + d, L = doc.log[k] || {}, dis = canEdit ? "" : " disabled";
+      <table><thead><tr><th>Date</th><th>Activity</th><th>Status</th><th>Reason</th><th>Approver (for E)</th><th>Revised due date</th><th>Action reference</th><th></th></tr></thead><tbody>${items.map(({ a, d, v }) => { const k = a.id + ":" + d, L = doc.log[k] || {}, dis = canEdit ? "" : " disabled", em = curEmp() || {};
         return `<tr><td>${pad(d)}-${M.slice(5)}-${M.slice(0, 4)}</td><td>${esc(a.activity || "(no name)")}</td><td><span class="chip ${v === "X" ? "r" : "a"}">${v === "X" ? "Missed" : "Concession"}</span></td>
           <td><input data-lg="${esc(k)}" data-f="reason" value="${esc(L.reason || "")}"${dis}></td><td><input data-lg="${esc(k)}" data-f="approver" value="${esc(L.approver || "")}"${v === "E" ? "" : " disabled"}${dis}></td>
-          <td><input type="date" data-lg="${esc(k)}" data-f="due" value="${esc(L.due || "")}"${dis}></td><td><input data-lg="${esc(k)}" data-f="ref" value="${esc(L.ref || "")}"${dis}></td></tr>`; }).join("")}</tbody></table></div>`;
+          <td><input type="date" data-lg="${esc(k)}" data-f="due" value="${esc(L.due || "")}"${dis}></td><td><input data-lg="${esc(k)}" data-f="ref" value="${esc(L.ref || "")}"${dis}></td><td>${taskBtn({ title: (v === "X" ? "Missed review: " : "Concession review: ") + (a.activity || "(no name)") + " on " + pad(d) + "-" + M.slice(5) + "-" + M.slice(0, 4), detail: "DWM of " + (em.name || "") + ". Reason: " + (L.reason || "not recorded"), who: em.name || "", due: L.due || addD(3), priority: v === "X" ? "high" : "normal", source_ref: empId + ":" + a.id + ":" + M + "-" + pad(d) })}</td></tr>`; }).join("")}</tbody></table></div>`;
   }
   const addForm = () => `<div class="emp noprint" id="addbox" style="background:#f1f7fb;border:1px solid var(--line);border-radius:10px;padding:10px"><b>New employee</b><input id="ne_name" placeholder="Name *"><input id="ne_des" placeholder="Designation (e.g. Plant Head)"><input id="ne_dep" placeholder="Department"><button class="btn s" id="ne_ok">Add</button>${emps.length ? '<button class="btn o s" id="ne_no">Cancel</button>' : ""}</div>`;
   async function drawSheet() {
@@ -211,6 +217,7 @@
         const x = { id: D.newId(), name, desig: $("#ne_des").value.trim(), dept: $("#ne_dep").value.trim() }; emps.push(x); empId = x.id; adding = false; await putDoc("staff", { emps }); say("Employee added.", true); await go("sheet");
       }
       else if (b.id === "emp_del") { const x = curEmp(); if (!x || !confirm("Remove " + x.name + " and ALL their DWM sheets (every month)? This cannot be undone.")) return; await flush(); await delEmpDocs(x.id); emps = emps.filter((y) => y.id !== x.id); empId = emps[0] ? emps[0].id : ""; await putDoc("staff", { emps }); say("Employee removed.", true); await go("sheet"); }
+      else if (b.dataset.task !== undefined) { if (window.KMRTask && taskPool[+b.dataset.task]) KMRTask.assign([taskPool[+b.dataset.task]]); }
       else if (b.dataset.open) { empId = b.dataset.open; try { localStorage.setItem(lk("last"), empId); } catch (x) { /* ignore */ } sel = null; await go("sheet"); }
     } catch (err) { say(err.message); }
   });
@@ -232,7 +239,7 @@
   async function drawDash() {
     await flush(); await loadStaff();
     const el = $("#dash"); if (!emps.length) { el.innerHTML = `<p class="mut">There are no employees yet. Add them in the <b>DWM</b> tab — each employee gets a sheet and their adherence appears here.</p>`; return; }
-    const docs = await getMonthDocs(M), depts = [...new Set(emps.map((e) => e.dept).filter(Boolean))].sort(), list = emps.filter((e) => !deptF || e.dept === deptF);
+    taskPool = []; const docs = await getMonthDocs(M), depts = [...new Set(emps.map((e) => e.dept).filter(Boolean))].sort(), list = emps.filter((e) => !deptF || e.dept === deptF);
     const S = D.summary(list, docs, M, today(), 98), tg = S.target, T = S.total, withPlan = S.rows.filter((r) => r.T.plan > 0), below = withPlan.filter((r) => r.light === "r" || r.light === "a").length, noSheet = S.rows.filter((r) => !r.T.plan);
     const k = (v, s, c) => `<div class="kpi" style="--c:${c}"><b>${v}</b><span>${s}</span></div>`, lt = (v) => (v == null ? "var(--b1)" : v >= tg ? "var(--g)" : v >= tg - 8 ? "var(--a)" : "var(--r)");
     const sorted = withPlan.slice().sort((a, b) => (a.pctTo ?? a.pct ?? 0) - (b.pctTo ?? b.pct ?? 0));
@@ -253,9 +260,9 @@
       <div class="grid2"><div class="box"><h3 style="margin-top:0">Adherence by day — all employees</h3>${lineSvg(S.perDay.slice(0, S.n).map((x, i) => (i + 1 <= S.dayNo ? x.pct : null)), tg)}</div>
         <div class="box"><h3 style="margin-top:0">By frequency (to date)</h3><table class="no-sno" data-nofilter><thead><tr><th>Frequency</th><th class="n">Activities</th><th class="n">Planned</th><th class="n">Completed</th><th class="n">Adherence</th></tr></thead><tbody>${[["daily", "Daily"], ["weekly", "Weekly"], ["dates", "Specific dates"], ["", "Frequency not set"]].map(([key, t]) => { const g = fq[key]; return `<tr><td>${t}</td><td class="n">${g[0]}</td><td class="n">${g[1]}</td><td class="n">${g[2]}</td><td class="n">${g[1] ? fix1(g[2] / g[1] * 100) : "—"}</td></tr>`; }).join("")}</tbody></table></div></div>
       <h3>Activities below target — where to act</h3>
-      ${act.length ? `<table class="no-sno" data-nofilter><thead><tr><th>Employee</th><th>Activity</th><th>Frequency</th><th class="n">Planned to date</th><th class="n">Completed</th><th class="n">Adherence</th></tr></thead><tbody>${act.slice(0, 15).map(({ r, x }) => `<tr><td>${esc(r.emp.name)}</td><td>${esc(x.a.activity || "(no name)")}</td><td>${D.freqLabel(x.a)}</td><td class="n">${x.planTo}</td><td class="n">${x.doneTo}</td><td class="n"><b style="color:var(--r)">${(x.doneTo / x.planTo * 100).toFixed(0)}%</b></td></tr>`).join("")}</tbody></table>` : '<p class="mut">Every activity due so far is at or above the target.</p>'}
+      ${act.length ? `<table class="no-sno" data-nofilter><thead><tr><th>Employee</th><th>Activity</th><th>Frequency</th><th class="n">Planned to date</th><th class="n">Completed</th><th class="n">Adherence</th><th class="noprint"></th></tr></thead><tbody>${act.slice(0, 15).map(({ r, x }) => `<tr><td>${esc(r.emp.name)}</td><td>${esc(x.a.activity || "(no name)")}</td><td>${D.freqLabel(x.a)}</td><td class="n">${x.planTo}</td><td class="n">${x.doneTo}</td><td class="n"><b style="color:var(--r)">${(x.doneTo / x.planTo * 100).toFixed(0)}%</b></td><td>${taskBtn({ title: "Improve DWM adherence: " + (x.a.activity || "(no name)") + " — " + (x.doneTo / x.planTo * 100).toFixed(0) + "% against the " + tg + "% target", detail: r.emp.name + ": " + x.doneTo + " of " + x.planTo + " reviews due so far were completed in " + monthName(M) + ".", who: r.emp.name, due: addD(7), priority: "normal", source_ref: r.emp.id + ":" + x.a.id + ":" + M })}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">Every activity due so far is at or above the target.</p>'}
       <h3>Missed and concession record</h3>
-      ${logs.length ? `<table class="no-sno" data-nofilter><thead><tr><th>Date</th><th>Employee</th><th>Activity</th><th>Status</th><th>Reason</th><th>Approver</th><th>Revised due</th><th>Action ref.</th></tr></thead><tbody>${logs.slice(0, 40).map((x) => `<tr><td>${pad(x.d)}-${M.slice(5)}-${M.slice(0, 4)}</td><td>${esc(x.r.emp.name)}</td><td>${esc(x.a.activity || "(no name)")}</td><td>${x.v === "X" ? "Missed" : "Concession"}</td><td>${esc(x.L.reason || "—")}</td><td>${esc(x.L.approver || "—")}</td><td>${esc(x.L.due || "—")}</td><td>${esc(x.L.ref || "—")}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">No missed reviews or concessions this month.</p>'}
+      ${logs.length ? `<table class="no-sno" data-nofilter><thead><tr><th>Date</th><th>Employee</th><th>Activity</th><th>Status</th><th>Reason</th><th>Approver</th><th>Revised due</th><th>Action ref.</th><th class="noprint"></th></tr></thead><tbody>${logs.slice(0, 40).map((x) => `<tr><td>${pad(x.d)}-${M.slice(5)}-${M.slice(0, 4)}</td><td>${esc(x.r.emp.name)}</td><td>${esc(x.a.activity || "(no name)")}</td><td>${x.v === "X" ? "Missed" : "Concession"}</td><td>${esc(x.L.reason || "—")}</td><td>${esc(x.L.approver || "—")}</td><td>${esc(x.L.due || "—")}</td><td>${esc(x.L.ref || "—")}</td><td>${taskBtn({ title: (x.v === "X" ? "Missed review: " : "Concession review: ") + (x.a.activity || "(no name)") + " on " + pad(x.d) + "-" + M.slice(5) + "-" + M.slice(0, 4), detail: "DWM of " + x.r.emp.name + ". Reason: " + (x.L.reason || "not recorded"), who: x.r.emp.name, due: x.L.due || addD(3), priority: x.v === "X" ? "high" : "normal", source_ref: x.r.emp.id + ":" + x.a.id + ":" + M + "-" + pad(x.d) })}</td></tr>`).join("")}</tbody></table>` : '<p class="mut">No missed reviews or concessions this month.</p>'}
       </div>`;
   }
 
@@ -276,6 +283,7 @@
       if (DEMO) { ctx = { role: "admin", company: "Demo Engineering (sample data)" }; $("#co").textContent = ctx.company; $("#role").textContent = "admin"; }
       else { await QP.init("dwm"); if (!QP.ctx) return; ctx = QP.ctx; }
       canEdit = ["admin", "editor"].includes(ctx.role);
+      if (window.KMRTask && !DEMO) await KMRTask.init({ call: QP.call, slug: QP.slug, token: async () => { const r = QP.sb && (await QP.sb.auth.getSession()); return r && r.data.session ? r.data.session.access_token : null; } });
       const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; await go(["std", "sheet", "dash"].includes(h) ? h : "std");
     } catch (e) { say(e.message); }
   })();

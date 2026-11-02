@@ -61,6 +61,7 @@ dwm:[
 ['ISO','9.3.2','Management review inputs','The Dashboards screen gives management the adherence of every employee\u2019s reviews, the activities below target and the missed or conceded reviews.'],
 ['ISO','9.3.3','Management review outputs','The conclusions of the review of adherence (who is below target and which activities) are the basis for management decisions on the missed and conceded reviews.'],
 ['ISO','10.2','Nonconformity and corrective action','A missed review (X) or concession (E) is recorded with its reason, approver, revised due date and action reference; a planned entry is never erased to hide a miss.'],
+['ISO','10.2','Nonconformity and corrective action - follow-up in ActionTrack','Where the company also has ActionTrack, a missed or conceded review, or an activity below target, can be turned into a task for its responsible person with a due date; the task links back to the DWM dashboard.'],
 ['ISO','10.3','Continual improvement','Month after month the adherence trend and the repeated misses show where the review routine itself needs to change.']],
 calibration:[
 ['ISO','7.1.5.1','Monitoring and measuring resources','Every instrument is registered with calibration status, due date and certificate data.','reg'],
