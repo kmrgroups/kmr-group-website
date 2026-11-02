@@ -15,6 +15,7 @@
   const CODE = { balloon: "BAL", pd: "PD", capacity: "CAP", sales: "SAL", calib: "CAL", apqp: "APQP", ppap: "PPAP", rmp: "RMP", mmd: "MMD", mnt: "MNT", mom: "MOM", hrms: "HRM", tsk: "TSK", msa: "MSA", spc: "SPC", crm: "CRM", d8: "8D", qms: "QMS", aud: "AUD", off: "OFF", layout: "LAY" };
   /* format register: one line per report format. Format no. = KMR/<app>/F-nn. Raise rev + date whenever that report's layout changes. */
   const FORMATS = {
+    sales: { allplants: { no: 1, rev: "01", date: "2026-11-02", name: "Sales Flow — all-plants dashboard (plan, actual, loss)" }, loss: { no: 2, rev: "01", date: "2026-11-02", name: "Sales Flow — sales loss and reasons" }, concl: { no: 3, rev: "01", date: "2026-11-02", name: "Sales Flow — conclusion and action plan" } },
     layout: { report: { no: 1, rev: "01", date: "2026-10-29", name: "Factory & Office Layout Report" } },
     capacity: { workout: { no: 2, rev: "01", date: "2026-10-23", name: "Capacity workout — takt, throughput, load balance" } },
     off: { document: { no: 1, rev: "01", date: "2026-10-23", name: "Document" }, sheet: { no: 2, rev: "01", date: "2026-10-23", name: "Spreadsheet" }, slides: { no: 3, rev: "01", date: "2026-10-23", name: "Presentation" } },

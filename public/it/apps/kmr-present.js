@@ -71,7 +71,7 @@
     return '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto" role="img" aria-label="' + esc(c.title) + '">' + g + body + xl + "</svg>" + lg;
   }
 
-  var STATIC = { "ISO|9.3.2": "Management review inputs", "ISO|9.3.3": "Management review outputs", "ISO|10.2": "Nonconformity and corrective action", "ISO|10.3": "Continual improvement", "ISO|9.1.3": "Analysis and evaluation", "IATF|9.1.1.1": "Monitoring and measurement of manufacturing processes", "IATF|10.2.3": "Problem solving" };
+  var STATIC = { "ISO|8.1": "Operational planning and control", "ISO|8.2.1": "Customer communication", "ISO|8.2.3": "Review of requirements for products and services", "ISO|8.4": "Control of externally provided processes, products and services", "ISO|8.5.1": "Control of production and service provision", "ISO|8.5.4": "Preservation", "ISO|8.6": "Release of products and services", "ISO|8.7": "Control of nonconforming outputs", "ISO|7.1.2": "People", "ISO|7.1.3": "Infrastructure", "ISO|7.2": "Competence", "ISO|7.5.3": "Control of documented information", "ISO|9.1.2": "Customer satisfaction", "ISO|10.2.1": "Corrective action", "ISO|10.2.2": "Records of nonconformities and corrective actions", "IATF|8.4.2.4": "Supplier monitoring", "IATF|8.5.1.1": "Control plan", "IATF|8.5.1.5": "Total productive maintenance", "IATF|8.5.4.1": "Preservation", "IATF|8.7.1": "Control of nonconforming product", "IATF|7.2.1": "Competence - supplemental", "IATF|7.1.3.1": "Plant, facility and equipment planning", "IATF|8.2.3.1.3": "Organizational manufacturing feasibility", "IATF|9.1.2.1": "Customer satisfaction", "IATF|10.2.4": "Error-proofing", "IATF|10.2.5": "Warranty management systems", "VDA|P5": "Supplier management", "VDA|P6": "Process analysis / production", "VDA|P7": "Customer care, customer satisfaction, service", "ISO|9.3.2": "Management review inputs", "ISO|9.3.3": "Management review outputs", "ISO|10.2": "Nonconformity and corrective action", "ISO|10.3": "Continual improvement", "ISO|9.1.3": "Analysis and evaluation", "IATF|9.1.1.1": "Monitoring and measurement of manufacturing processes", "IATF|10.2.3": "Problem solving" };
   var stdName = function (k) { var c = (window.KMRStd && KMRStd.cat) || {}; return (c[k] && c[k][0]) || k; };
   var uniq = function (a) { var seen = {}, o = []; (a || []).forEach(function (x) { var k = x[0] + "|" + x[1]; if (!seen[k]) { seen[k] = 1; o.push(x); } }); return o; };
   function gapText(k) {
@@ -134,7 +134,7 @@
         var rel = K.filter(function (k) { return c.kpi && k.id === c.kpi; })[0];
         out.push({ std: (rel && rel.std && rel.std.length ? rel.std : ALLS), t: c.title, b: '<div class="cg"><div>' + chartSvg(c) + '</div><div>' + (rel ? kpiCard(rel) : "") + (c.note ? '<div class="note">' + c.note + "</div>" : "") + (rel && rel.why ? '<div class="note"><b>How it is measured:</b> ' + esc(rel.why) + "</div>" : "") + "</div></div>" });
       });
-      (D.extra || []).forEach(function (x) { out.push({ std: ALLS, t: x.title, b: x.html }); });
+      (D.extra || []).forEach(function (x) { out.push({ std: x.std && x.std.length ? x.std : ALLS, t: x.title, b: x.html }); });
       /* standards alignment: each clause with the KPI that gives its evidence */
       var rows = (window.KMRStd && cfg.stdKey ? KMRStd.rows(cfg.stdKey) : []), cat = (window.KMRStd && KMRStd.cat) || {};
       var link = rows.map(function (r) {

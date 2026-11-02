@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <script src="/it/apps/sso.js"></script><script src="/it/apps/tsk-assign.js"></script>
 <script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/kmr-import.js" defer></script><script src="/it/apps/standards.js"></script>
+<script src="/it/apps/sales-all.js"></script><script src="/it/apps/kmr-present.js"></script>
 <script src="/it/company-config.js"></script>
 <script src="/it/kmr-lock.js"></script>
 <title>Sales Flow · KMR Apps</title>
@@ -80,6 +81,18 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
 @media print{.back{display:none}}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--mut);margin:6px 0 12px}
 #dash{overflow-x:auto;max-width:100%}
+.pc{border:1px solid var(--line);border-radius:12px;padding:14px;border-top:4px solid var(--c,var(--brand))}.pc h3{margin:0 0 8px;font-size:15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pc .kpis{grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-bottom:10px}.pc .kpi{padding:8px 10px}.pc .kpi b{font-size:17px}
+.sec{margin:20px 0 8px;font-size:16px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sec small{font-weight:400;color:var(--mut);font-size:12px}
+.item{border:1px solid var(--line);border-left:6px solid var(--c,var(--amber));border-radius:12px;padding:12px 14px;margin:0 0 12px}
+.item.High{--c:var(--red)}.item.Medium{--c:var(--amber)}.item.Low{--c:var(--blue)}
+.item h4{margin:0 0 8px;font-size:14px;display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap}
+.igrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;font-size:13px}.igrid>div>b{display:block;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--mut);margin-bottom:2px}
+.tl{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}.tl span{border:1px solid var(--line);border-radius:8px;padding:2px 8px;font-size:12px;white-space:nowrap}
+.how{margin:8px 0 0;font-size:13px}.how summary{cursor:pointer;font-weight:700;color:var(--brand)}.how ol{margin:6px 0 0;padding-left:20px}.how li{margin:3px 0}
+.stdl{margin-top:6px;font-size:11px;color:var(--mut)}.stdl b{color:var(--brand)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+@media print{header,.tabs,.noprint,.pills,.back,footer,.modal,#msg{display:none!important}main{padding:0}.panel{border:0;padding:0}.item,.pc,.box{break-inside:avoid}.kpis{grid-template-columns:repeat(4,1fr)}details.how{display:block}details.how>*{display:block}}
 </style>
 </head>
 <body>
@@ -99,6 +112,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
   <a class="tab" data-t="daily" href="#go=daily">Daily despatch</a>
   <a class="tab" data-t="loss" href="#go=loss">Sales loss</a>
   <a class="tab" data-t="act" href="#go=act">Action plan <span id="actbadge"></span></a>
+  <a class="tab" data-t="concl" href="#go=concl">Conclusion &amp; actions</a>
+  <a class="tab" data-t="pres" href="#go=pres" hidden>Presentation</a>
 </div>
 <main><div class="panel">
   <div id="msg"></div>
@@ -108,6 +123,8 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
   <section id="daily" class="hide"></section>
   <section id="loss" class="hide"></section>
   <section id="act" class="hide"></section>
+  <section id="concl" class="hide"></section>
+  <section id="pres" class="hide"></section>
 </div></main>
 
 <div class="modal" id="amodal"><div class="in" style="width:min(780px,94vw)">
@@ -208,14 +225,14 @@ function calc(l) {
 /* ======== load / save ======== */
 async function load() {
   const r = await api.rpc(ALL ? 'kmr_sf_month_all' : 'kmr_sf_month', { p_slug: slug, p_month: M + '-01' });
-  if (ALL) { $('#co').textContent = r.company + ' · all plants'; PLANTS = r.plants || []; }
+  if (ALL) { $('#co').textContent = r.company + ' · all plants'; PLANTS = r.plants || []; ALLCO = r.company; if (!ACTS_OK) { await loadActionsAll(); ACTS_OK = true; } }
   lines = r.lines; desp = {};
   r.despatch.forEach(d => { (desp[d.line_id] ||= {})[d.day] = +d.qty; });
   draft = []; render();
 }
 
 /* ======== rendering ======== */
-function render() { keepScroll(() => { renderDash(); drawPlan(); renderDaily(); drawLoss(); drawAct(); }); }
+function render() { if (ALL) { keepScroll(renderAll); return; } keepScroll(() => { renderDash(); drawPlan(); renderDaily(); drawLoss(); drawAct(); }); }
 
 
 /* ======== ABC analysis of the sales plan ======== */
@@ -339,6 +356,7 @@ function renderDash() {
     </div>`;
   const pills = ALL ? '' : `<div class="pills">${[['over', 'Overview & ABC'], ['loss', 'Sales loss analysis'], ['act', 'Action plan status']].map(([k, n]) => `<button class="pill ${dashView === k ? 'on' : ''}" data-dv="${k}">${n}${k === 'act' && actOverdue() ? ` <span class="chip r">${actOverdue()}</span>` : ''}</button>`).join('')}</div>`;
   $('#dash').innerHTML = pills + (ALL ? OVER : dashView === 'loss' ? lossDash() : dashView === 'act' ? actDash() : OVER);
+  if (!ALL && window.SalesAll) try { drawConcl(); } catch (e) { $('#concl').innerHTML = '<p class="mut">' + esc(e.message) + '</p>'; }
 }
 
 let dashView = 'over';
@@ -420,7 +438,7 @@ function renderDaily() {
 document.addEventListener('click', async e => {
   const t = e.target;
   const tab = t.closest('.tab');
-  if (tab) { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); try { history.replaceState(null, '', location.pathname + location.search + '#go=' + tab.dataset.t); } catch (x) { /* ignore */ } document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === tab)); ['std', 'dash', 'plan', 'daily', 'loss', 'act'].forEach(s => $('#' + s).classList.toggle('hide', s !== tab.dataset.t)); return; }
+  if (tab) { if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return; e.preventDefault(); try { history.replaceState(null, '', location.pathname + location.search + '#go=' + tab.dataset.t); } catch (x) { /* ignore */ } document.querySelectorAll('.tab').forEach(b => b.classList.toggle('on', b === tab)); ['std', 'dash', 'plan', 'daily', 'loss', 'act', 'concl', 'pres'].forEach(s => $('#' + s).classList.toggle('hide', s !== tab.dataset.t)); if (tab.dataset.t === 'pres') mountPres(); return; }
   try {
     if (t.id === 'addp') { await openParts('plan'); }
     else if (t.id === 'addu') { await openParts('daily'); }
@@ -778,6 +796,148 @@ const el=document.getElementById('clogo');if(!el)return;const safe=String(b.logo
 el.innerHTML=safe?'<img src="'+safe+'" alt="">':String(b.name||'K').split(/\s+/).filter(Boolean).slice(0,2).map(w=>w[0]).join('').toUpperCase().replace(/[<>&]/g,'');el.hidden=false;
 if(safe){document.querySelectorAll('link[rel~="icon"]').forEach(l=>l.remove());const ic=document.createElement('link');ic.rel='icon';ic.href=safe;document.head.append(ic)}}
 
+/* ======== all-plants screens: dashboard, sales loss & reasons, conclusion & actions, presentation ======== */
+/* the numbers come from apps/sales-all.js — the same model feeds these screens and the presentation, so they always agree */
+let ALLCO = '', ACTS_ALL = [], ACTS_OK = false, basisAll = 'today', cf = { who: '', plant: '' }, PRES = false;
+const cr = v => v >= 1e7 ? '₹' + fmt(v / 1e7, 2) + ' Cr' : v >= 1e5 ? '₹' + fmt(v / 1e5, 2) + ' L' : '₹' + fmt(v);
+const inrf = v => '₹' + fmt(v);
+const LC = { g: 'var(--green)', a: 'var(--amber)', r: 'var(--red)' };
+const dm = d => window.SalesAll ? SalesAll.fd(d) : d;
+async function loadActionsAll() {
+  const res = await Promise.all(PLANTS.map(async p => { try { return ((await api.rpc('kmr_sf_actions', { p_slug: p.slug })) || []).map(a => ({ ...a, plant_code: p.code, plant_slug: p.slug })); } catch (e) { return []; } }));
+  ACTS_ALL = res.flat();
+}
+function despRows() { const o = []; Object.keys(desp).forEach(id => Object.keys(desp[id]).forEach(d => o.push({ line_id: id, day: d, qty: desp[id][d] }))); return o; }
+function modelFrom(L, D, P, A, month, basis) {
+  return SalesAll.build({ lines: L, despatch: D, plants: P, actions: A, month, basis: basis || basisAll, today: todayStr(), cfg: { FX: CFG.FX, WORK_DAYS: CFG.WORK_DAYS, CUSTOMER_DRIVEN: CFG.CUSTOMER_DRIVEN } });
+}
+function modelNow(basis) {
+  if (ALL) return modelFrom(lines, despRows(), PLANTS, ACTS_ALL, M, basis);
+  const code = (ctx && ctx.company) || 'This plant';
+  return modelFrom(lines.map(l => ({ ...l, plant_code: code })), despRows(), [{ code, slug, name: code }], actions.map(a => ({ ...a, plant_code: code })), M, basis);
+}
+const pn = p => `<a href="?co=${encodeURIComponent(p.slug)}#go=dash" title="Open this plant’s own Sales Flow"><b>${esc(p.code)}</b></a>`;
+const printBtn = (k, t) => `<button class="btn ghost sm noprint" data-print="${k}" data-ptitle="${esc(t)}" title="Print or save as PDF — the report gets the customer logo, a reference number and the format revision footer automatically">⎙ Print / PDF</button>`;
+function tiles(p, M) {
+  const k = (v, s, c, t) => `<div class="kpi" style="--c:${c}" ${t ? `title="${esc(t)}"` : ''}><b>${v}</b><span>${s}</span></div>`, lc = LC[p.light];
+  return `<div class="kpis">${k(cr(p.planV), 'Sales plan value', 'var(--brand)', inrf(p.planV))}${k(cr(p.actV), 'Actual despatch value', 'var(--green)', inrf(p.actV))}${k(cr(p.lossV), 'Sales loss value', lc, inrf(p.lossV) + ' — plan not yet despatched')}${k(fmt(p.lossPct, 1) + '%', 'Sales loss % of plan', lc, 'Target up to ' + M.cfg.LOSS_TARGET + '%')}${k(fmt(p.ach) + '%', 'Achieved % of plan', 'var(--blue)')}${k(fmt(p.vsExp) + '%', 'vs due by today', p.vsExp >= 90 ? 'var(--green)' : p.vsExp >= 70 ? 'var(--amber)' : 'var(--red)', 'Value despatched ÷ value scheduled up to today')}${k(cr(p.pendV), 'Pending for the month', 'var(--amber)', inrf(p.pendV) + ' — plan value still to be despatched this month')}</div>`;
+}
+function cumChart(p, M) {
+  const n = M.days.length, W = 600, H = 210, A = p.cumAct.filter(v => v != null), mx = Math.max(...p.cumPlan, ...A, 1), X = i => 48 + i * (W - 64) / Math.max(n - 1, 1), Y = v => H - 26 - v * (H - 46) / mx;
+  const path = a => { let d = '', st = false; a.forEach((v, i) => { if (v == null) return; d += (st ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(v).toFixed(1); st = true; }); return d; };
+  const last = A.length - 1;
+  return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Cumulative plan versus actual sales value">
+    ${[0, .25, .5, .75, 1].map(f => `<line x1="48" x2="${W - 12}" y1="${Y(mx * f)}" y2="${Y(mx * f)}" stroke="var(--line)"/><text x="44" y="${Y(mx * f) + 4}" text-anchor="end" font-size="10" fill="var(--mut)">${cr(mx * f).replace('₹', '')}</text>`).join('')}
+    ${[1, 8, 15, 22, n].map(d => `<text x="${X(d - 1)}" y="${H - 8}" text-anchor="middle" font-size="10" fill="var(--mut)">${d}</text>`).join('')}
+    <path d="${path(p.cumPlan)}" fill="none" stroke="#94a3b8" stroke-width="2.5" stroke-dasharray="6 4"/>
+    ${A.length ? `<path d="${path(p.cumAct)}" fill="none" stroke="var(--brand)" stroke-width="3"/><circle cx="${X(last)}" cy="${Y(A[last])}" r="4.5" fill="var(--brand)"/>` : ''}</svg>
+    <div class="legend"><span>━ Actual despatch value</span><span>┅ Plan value (per delivery schedule)</span><span>x-axis: day of the month · values in ₹ (L = lakh, Cr = crore)</span></div>`;
+}
+const PAL = ['#dc2626', '#f59e0b', '#2563eb', '#0d9488', '#7c3aed', '#94a3b8'];
+function reasonStack(p, M) {
+  if (!(p.lossV > 0)) return '<span class="mut">No sales loss.</span>';
+  const top = M.reasons.slice(0, 5).map(r => r.reason), seg = top.map(k => [k, p.byReason[k] || 0]); const oth = p.lossV - seg.reduce((a, x) => a + x[1], 0); if (oth > 0.5) seg.push(['Other reasons', oth]);
+  return `<div class="stack">${seg.map(([k, v], i) => `<i style="width:${v / p.lossV * 100}%;background:${PAL[i]}" title="${esc(k)}: ${inrf(v)}">${v / p.lossV >= .12 ? Math.round(v / p.lossV * 100) + '%' : ''}</i>`).join('')}</div>`;
+}
+function renderAll() {
+  const M1 = modelNow();
+  $('#dash').innerHTML = dashAll(M1); $('#loss').innerHTML = lossAll(M1); $('#concl').innerHTML = conclHtml(M1);
+}
+/* 1 + 2: overall, then every plant */
+function dashAll(M) {
+  const T = M.total, multi = M.plants.length > 1;
+  if (!M.plants.length || (!T.parts && !T.unplV)) return `<p class="mut">No sales plan for ${monthLabel(M.month)} in any plant yet. Open a plant’s Sales Flow and add its sales plan.</p>`;
+  const rowsT = M.plants.map(p => `<tr><td>${pn(p)}<br><span class="mut">${esc(String(p.name).split(' – ').pop())}</span></td><td class="n">${inrf(p.planV)}</td><td class="n">${inrf(p.actV)}</td><td class="n"><b style="color:${LC[p.light]}">${inrf(p.lossV)}</b></td><td class="n"><b style="color:${LC[p.light]}">${fmt(p.lossPct, 1)}%</b></td><td style="width:22%"><div class="bar" style="--c:${LC[p.light]}"><i style="width:${Math.min(p.ach, 100)}%"></i></div></td><td class="n">${fmt(p.ach)}%</td><td class="n">${fmt(p.vsExp)}%</td></tr>`).join('');
+  const rank = M.plants.slice().sort((a, b) => b.lossV - a.lossV);
+  return `<div class="row"><h2 style="margin:0;font-size:18px">${multi ? 'All-plants sales dashboard' : 'Sales dashboard'} · ${monthLabel(M.month)}</h2><div style="flex:1"></div>${printBtn('allplants', 'Sales Flow — all-plants dashboard (plan, actual, loss) · ' + monthLabel(M.month))}</div>
+    <p class="mut" style="margin:0 0 6px">Values are in ₹${M.mixedCur ? ' (USD and EUR parts are converted at the rates set in Sales Flow)' : ''}. <b>Sales loss</b> = plan value ${M.basis === 'today' ? 'that was due by today and is not despatched (behind schedule)' : 'not yet despatched in the whole month'} <select class="lbasisA noprint"><option value="today" ${M.basis === 'today' ? 'selected' : ''}>behind schedule till today</option><option value="month" ${M.basis === 'month' ? 'selected' : ''}>pending for the whole month</option></select>. Plan and actual are for planned parts; unplanned despatch (${cr(T.unplV)}) is kept outside.</p>
+    <h3 class="sec">1 · ${multi ? 'Overall — all plants added together' : 'Overall'}<small>sales plan, actual and loss in value</small></h3>
+    <div class="pc" style="--c:${LC[T.light]}">${tiles(T, M)}<div class="grid2"><div>${cumChart(T, M)}</div><div><b style="font-size:12px">What makes the loss</b>${reasonStack(T, M)}<div class="legend">${M.reasons.slice(0, 5).map((r, i) => `<span><i class="sw" style="background:${PAL[i]}"></i>${esc(r.reason)}</span>`).join('')}</div>
+      <p style="margin:8px 0 0;font-size:13px">${T.lossV > 0 ? `Loss is <b>${cr(T.lossV)}</b> = <b>${fmt(T.lossPct, 1)}%</b> of the plan value of ${cr(T.planV)}. ${multi ? `<b>${esc(rank[0].code)}</b> carries the most (${fmt(rank[0].lossV / T.lossV * 100)}%).` : ''}` : 'There is no sales loss — everything planned is despatched.'}</p></div></div></div>
+    ${multi ? `<h3 class="sec">2 · Plant by plant<small>the same figures for every plant — click a plant to open its own Sales Flow</small></h3>
+    <div class="box" style="margin-bottom:14px"><div class="scroll" style="max-height:none"><table><thead><tr><th>Plant</th><th class="n">Sales plan</th><th class="n">Actual</th><th class="n">Sales loss</th><th class="n">Loss %</th><th>Achieved</th><th class="n">%</th><th class="n">vs due today</th></tr></thead><tbody>${rowsT}</tbody><tfoot><tr style="font-weight:700"><td>All plants</td><td class="n">${inrf(T.planV)}</td><td class="n">${inrf(T.actV)}</td><td class="n">${inrf(T.lossV)}</td><td class="n">${fmt(T.lossPct, 1)}%</td><td></td><td class="n">${fmt(T.ach)}%</td><td class="n">${fmt(T.vsExp)}%</td></tr></tfoot></table></div></div>
+    <div class="grid2">${M.plants.map(p => `<div class="pc" style="--c:${LC[p.light]}"><h3>${pn(p)} <span class="mut" style="font-weight:400">${esc(String(p.name).split(' – ').pop())}</span><span class="chip ${p.light}" style="margin-left:auto">${p.light === 'g' ? 'Loss within target' : p.light === 'a' ? 'Watch' : 'Loss above target'}</span></h3>${p.planV || p.unplV ? tiles(p, M) + cumChart(p, M) + `<b style="font-size:12px">Loss by reason</b>${reasonStack(p, M)}` : '<p class="mut">No sales plan this month.</p>'}</div>`).join('')}</div>` : ''}`;
+}
+/* 3: sales loss and its reasons, for the management */
+function lossAll(M) {
+  const T = M.total, multi = M.plants.length > 1;
+  const head = `<div class="row"><h2 style="margin:0;font-size:18px">Sales loss &amp; reasons · ${monthLabel(M.month)}</h2><div style="flex:1"></div>
+    <label class="mut noprint">Loss means <select class="lbasisA"><option value="month" ${basisAll === 'month' ? 'selected' : ''}>Pending for the whole month</option><option value="today" ${basisAll === 'today' ? 'selected' : ''}>Behind schedule till today</option></select></label>${printBtn('loss', 'Sales Flow — sales loss and reasons · ' + monthLabel(M.month))}</div>`;
+  if (!(T.lossV > 0)) return head + '<p>No sales loss in the selected month. 🎉</p>';
+  const pcn = (v, d = 0) => fmt(T.lossV ? v / T.lossV * 100 : 0, d) + '%', k = (v, s, c) => `<div class="kpi" style="--c:${c}"><b>${v}</b><span>${s}</span></div>`;
+  const open = r => M.actions.list.some(a => a.status !== 'Closed' && a.issue === r);
+  const top3 = M.reasons.filter(r => !r.none).slice(0, 3);
+  const B = [`<b>Total sales loss ${cr(T.lossV)}</b> = ${fmt(T.lossPct, 1)}% of the plan value (${cr(T.planV)}) ${multi ? `across ${M.plants.filter(p => p.lossV > 0).length} plant(s)` : ''}.`];
+  if (top3.length) B.push(`<b>Main reasons:</b> ${top3.map(r => `${esc(r.reason)} (${fmt(r.share)}%)`).join(', ')} — together ${fmt(top3.reduce((a, r) => a + r.share, 0))}% of the loss.`);
+  B.push(`<b>Internal vs customer:</b> ${pcn(M.internalV)} of the loss can be fixed inside the plants, ${pcn(M.customerV)} is customer-driven${M.unknownV ? `, ${pcn(M.unknownV)} has no reason yet` : ''}.`);
+  if (multi) { const w = M.plants.slice().sort((a, b) => b.lossPct - a.lossPct)[0]; B.push(`<b>Highest loss %:</b> ${esc(w.code)} at ${fmt(w.lossPct, 1)}% of its plan value.`); }
+  const noA = M.reasons.filter(r => !r.none && !open(r.reason)); if (noA.length) B.push(`<b>No open action plan for:</b> ${noA.map(r => esc(r.reason)).join(', ')}.`);
+  const cols = multi ? M.plants.map(p => `<th class="n">${esc(p.code)}</th>`).join('') : '';
+  const body = M.reasons.map(r => `<tr><td>${esc(r.reason)} ${r.main ? '<span class="fl r">Main cause</span>' : ''}${r.customerDriven ? '<span class="fl u">Customer-driven</span>' : ''}${!r.none && !open(r.reason) ? '<span class="fl a" title="No open action plan for this reason">No action plan</span>' : ''}</td>
+    ${multi ? M.plants.map(p => `<td class="n">${r.byPlant[p.code] ? inrf(r.byPlant[p.code]) : '<span class="mut">—</span>'}</td>`).join('') : ''}<td class="n"><b>${inrf(r.v)}</b></td><td class="n">${r.n}</td><td class="n">${fmt(r.share, 1)}%</td><td class="n">${fmt(r.cum)}%</td></tr>`).join('');
+  const lines10 = T.lossLines.slice().sort((a, b) => b.v - a.v).slice(0, 15).map(x => `<tr><td>${esc(x.plant)}</td><td>${esc(x.l.buyer_name)}</td><td><b>${esc(x.l.part_code)}</b><br><span class="mut">${esc(x.l.part_name)}</span></td><td class="n">${fmt(x.qty)}</td><td class="n">${inrf(x.v)}</td><td>${x.reason === SalesAll.CFG.NONE ? '<span class="fl a">Reason not entered</span>' : esc(x.reason === 'Others' && x.l.loss_other ? 'Others: ' + x.l.loss_other : x.reason)}</td></tr>`).join('');
+  const cmx = (M.customers[0] || { v: 1 }).v;
+  return head + `<div class="kpis">${k(cr(T.lossV), 'Sales loss value', 'var(--red)')}${k(fmt(T.lossPct, 1) + '%', 'Loss % of plan value', LC[T.light])}${k(pcn(M.internalV), 'Internal (fixable in the plant)', 'var(--amber)')}${k(pcn(M.customerV), 'Customer-driven', 'var(--blue)')}${k(pcn(M.unknownV), 'Reason not entered', M.unknownV ? 'var(--red)' : 'var(--green)')}${k(M.actions.overdue, 'Overdue action plans', M.actions.overdue ? 'var(--red)' : 'var(--green)')}</div>
+    <div class="box" style="margin-bottom:16px"><h3 style="font-size:15px">Management view</h3><ul class="brief">${B.map(x => `<li>${x}</li>`).join('')}</ul></div>
+    ${multi ? `<div class="box" style="margin-bottom:16px"><h3>Reason mix of each plant</h3><table><tbody>${M.plants.map(p => `<tr><td style="width:90px">${pn(p)}</td><td>${reasonStack(p, M)}</td><td class="n" style="width:110px">${cr(p.lossV)}</td></tr>`).join('')}</tbody></table><div class="legend">${M.reasons.slice(0, 5).map((r, i) => `<span><i class="sw" style="background:${PAL[i]}"></i>${esc(r.reason)}</span>`).join('')}<span><i class="sw" style="background:${PAL[5]}"></i>Other reasons</span></div></div>` : ''}
+    <div class="box" style="margin-bottom:16px"><h3>Loss by reason${multi ? ' and plant' : ''} — largest first, with cumulative %</h3><div class="scroll" style="max-height:none"><table><thead><tr><th>Reason</th>${cols}<th class="n">Loss value</th><th class="n">Parts</th><th class="n">% of loss</th><th class="n">Cumulative</th></tr></thead><tbody>${body}</tbody></table></div></div>
+    <div class="grid2"><div class="box"><h3>Loss by customer</h3><table><tbody>${M.customers.slice(0, 8).map(c => `<tr><td>${esc(c.name)}</td><td style="width:38%"><div class="bar" style="--c:var(--red)"><i style="width:${c.v / cmx * 100}%"></i></div></td><td class="n">${inrf(c.v)}</td><td class="n">${fmt(c.share)}%</td></tr>`).join('')}</tbody></table></div>
+    <div class="box"><h3>Largest loss lines</h3><div class="scroll" style="max-height:46vh"><table><thead><tr><th>Plant</th><th>Customer</th><th>Part</th><th class="n">Loss qty</th><th class="n">Loss value</th><th>Reason</th></tr></thead><tbody>${lines10}</tbody></table></div></div></div>
+    <p class="mut" style="margin-top:10px">${multi ? 'Reasons are entered by each plant in its own Sales loss screen. ' : ''}The next screen, <b>Conclusion &amp; actions</b>, turns these numbers into what to do, where, who, when and how.</p>`;
+}
+/* 4: conclusion — for management and for each responsible person */
+const CLK = ['contain', 'root', 'fix', 'verify'];
+function conclHtml(M) {
+  const multi = M.plants.length > 1, C = M.concl, T = M.total;
+  const head = `<div class="row"><h2 style="margin:0;font-size:18px">Conclusion &amp; actions · ${monthLabel(M.month)}</h2><div style="flex:1"></div>${printBtn('concl', 'Sales Flow — conclusion and action plan · ' + monthLabel(M.month))}</div>`;
+  if (!C.length) return head + `<p>${T.planV ? 'There is no sales loss and no overdue action — nothing needs to be done beyond keeping the daily despatch routine. 🎉' : 'No sales plan for this month yet.'}</p>`;
+  const whoList = [...new Set(C.map(x => x.who))].sort(), shown = C.filter(x => (!cf.who || x.who === cf.who) && (!cf.plant || x.plant === cf.plant || x.plant === 'All plants'));
+  const by = {}; C.forEach(x => { const g = by[x.who] ||= { who: x.who, n: 0, hi: 0, due: x.due, v: 0, named: x.assigned }; g.n++; if (x.prio === 'High') g.hi++; if (x.due < g.due) g.due = x.due; g.v += x.value || 0; });
+  const persons = Object.values(by).sort((a, b) => b.hi - a.hi || b.v - a.v);
+  const hi = C.filter(x => x.prio === 'High').length, unnamed = C.filter(x => !x.assigned).length;
+  const k = (v, s, c) => `<div class="kpi" style="--c:${c}"><b>${v}</b><span>${s}</span></div>`;
+  const card = x => { const w = x.when, steps = SalesAll.SEQ, stamp = [w.contain, w.root, w.fix, w.verify];
+    return `<div class="item ${x.prio}"><h4><span class="chip ${x.prio === 'High' ? 'r' : x.prio === 'Medium' ? 'a' : 'b'}">${x.prio}</span><span>${x.no}. ${esc(x.what)}</span>${x.level === 'plant' && multi ? `<span class="chip x">${esc(x.plant)}</span>` : ''}</h4>
+      <div class="igrid"><div><b>Where to focus</b>${esc(x.where || '—')}</div><div><b>Who has to do it</b>${esc(x.who)}${x.assigned ? '' : '<br><span class="mut">proposed function — the plant names the person</span>'}</div>
+        <div><b>When</b><div class="tl"><span>Contain ${dm(w.contain)}</span><span>Root cause ${dm(w.root)}</span><span>Fix ${dm(w.fix)}</span><span>Verify ${dm(w.verify)}</span></div></div><div><b>Why it happened / why it matters</b>${esc(x.why)}</div></div>
+      <details class="how"><summary>How to handle it — in this order</summary><ol>${steps.map((s, i) => `<li><b>${esc(s[0])}</b> (by ${dm(i === 0 ? w.contain : i === 2 ? w.root : i === 3 ? w.fix : w.verify)}) — ${esc(s[1])}${i === 0 ? ' <i>Here: ' + esc(x.how[0]) + '</i>' : i === 2 ? ' <i>Here: ' + esc(x.how[1]) + '</i>' : i === 3 ? ' <i>Here: ' + esc(x.how[2]) + '</i>' : ''}</li>`).join('')}</ol></details>
+      <div class="stdl"><b>Standards:</b> ${x.std.map(s => esc(stdLabel(s[0]) + ' ' + s[1])).join(' · ')}${!ALL && canEdit && x.reason && x.reason !== SalesAll.CFG.NONE && x.level === 'plant' ? ` <button class="btn ghost sm noprint" data-cact="${x.no}" style="margin-left:8px">＋ Raise action plan</button>` : ''}</div></div>`; };
+  const grp = (title, sub, list) => list.length ? `<h3 class="sec">${title}<small>${sub}</small></h3>${list.map(card).join('')}` : '';
+  const mg = shown.filter(x => x.level === 'mgmt');
+  return head + `<p class="mut" style="margin:0 0 8px">Built from the live figures of the selected month. Every item says what to do, where to focus, who, by when, why it happened and how to handle it, in one fixed sequence. Dates run from today; the owner is the person already named in an open action plan, otherwise the function that normally owns the reason.</p>
+    <div class="kpis">${k(C.length, 'Items to act on', 'var(--brand)')}${k(hi, 'High priority', hi ? 'var(--red)' : 'var(--green)')}${k(unnamed, 'Owner still to be named', unnamed ? 'var(--amber)' : 'var(--green)')}${k(M.actions.overdue, 'Overdue action plans', M.actions.overdue ? 'var(--red)' : 'var(--green)')}${k(cr(T.lossV), 'Sales loss to recover', 'var(--red)')}</div>
+    <div class="row noprint"><label class="mut">Show for <select id="cf_who"><option value="">Everyone (management view)</option>${whoList.map(w => `<option ${cf.who === w ? 'selected' : ''}>${esc(w)}</option>`).join('')}</select></label>
+      ${multi ? `<label class="mut">Plant <select id="cf_plant"><option value="">All plants</option>${M.plants.map(p => `<option ${cf.plant === p.code ? 'selected' : ''}>${esc(p.code)}</option>`).join('')}</select></label>` : ''}</div>
+    <div class="box" style="margin-bottom:14px"><h3>Who has to do what — person / function wise</h3><table><thead><tr><th>Responsible</th><th class="n">Items</th><th class="n">High priority</th><th>First date</th><th class="n">Loss value involved</th></tr></thead><tbody>${persons.map(g => `<tr><td>${esc(g.who)}${g.named ? '' : ' <span class="mut">(proposed)</span>'}</td><td class="n">${g.n}</td><td class="n">${g.hi ? `<span class="fl r">${g.hi}</span>` : '0'}</td><td>${dm(g.due)}</td><td class="n">${g.v ? inrf(g.v) : '—'}</td></tr>`).join('')}</tbody></table></div>
+    ${grp('For the management', 'decisions and follow-up that only management can take', mg)}
+    ${M.plants.map(p => grp(multi ? 'Plant ' + esc(p.code) : 'For the plant', multi ? esc(String(p.name).split(' – ').pop()) + ' — what the plant team has to do' : 'what the plant team has to do', shown.filter(x => x.level === 'plant' && x.plant === p.code))).join('')}
+    ${shown.length ? '' : '<p class="mut">Nothing for this selection.</p>'}
+    <div class="box" style="margin-top:6px"><h3>The systemic sequence used for every item</h3><table><thead><tr><th>Step</th><th>What is done</th><th>Within</th></tr></thead><tbody>${SalesAll.SEQ.map((s, i) => `<tr><td><b>${i + 1}. ${esc(s[0])}</b></td><td>${esc(s[1])}</td><td>${esc(s[2])}</td></tr>`).join('')}</tbody></table><div class="stdl"><b>Standards:</b> ISO 9001 10.2 (nonconformity and corrective action), IATF 16949 10.2.3 problem solving / 10.2.4 error-proofing, ISO 9001 9.1.3 and 10.3, VDA 6.3 P7 — and ISO 9001 9.3.3 for management decisions.</div></div>`;
+}
+const stdLabel = k => ({ ISO: 'ISO 9001', IATF: 'IATF 16949', VDA: 'VDA 6.3' }[k] || k);
+function drawConcl() { $('#concl').innerHTML = conclHtml(modelNow()); }
+/* 5: presentation — drawn from the same model by the shared KMR presentation engine */
+function mountPres() {
+  if (PRES || !ALL) return; if (!window.KMRPresent || !window.SalesAll) { say('The presentation could not be loaded.'); return; } PRES = true;
+  const mo = []; { const d = new Date(); d.setDate(1); for (let i = 0; i < 6; i++) { const m = d.getFullYear() + '-' + pad(d.getMonth() + 1); mo.push([m, m]); d.setMonth(d.getMonth() - 1); } }
+  KMRPresent.mount($('#pres'), { app: 'sales', code: 'sales', stdKey: 'sales', appName: 'Sales Flow · all plants', company: ALLCO, slug, canEdit: true,
+    call: (fn, a) => api.rpc(fn, Object.assign({ p_slug: slug }, a || {})),
+    controls: [{ id: 'month', label: 'Month', type: 'select', value: M, options: mo.some(x => x[0] === M) ? mo : [[M, M]].concat(mo) }],
+    load: async v => { const r = await api.rpc('kmr_sf_month_all', { p_slug: slug, p_month: v.month + '-01' }), D = []; (r.despatch || []).forEach(d => D.push(d));
+      return SalesAll.presentData(modelFrom(r.lines || [], D, r.plants || PLANTS, ACTS_ALL, v.month)); } });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest && e.target.closest('button'); if (!b) return;
+  if (b.dataset.print) { if (window.KMRReport) KMRReport.set({ key: b.dataset.print, title: b.dataset.ptitle, doc: monthLabel(M), land: true }); window.print(); setTimeout(() => { if (window.KMRReport) KMRReport.set({}); }, 800); }
+  else if (b.dataset.cact) { const it = modelNow().concl.find(x => x.no === +b.dataset.cact); if (it) openAct(null, { issue: CFG.REASONS.includes(it.reason) ? it.reason : '', brief: it.what + '. ' + it.why, immediate_action: it.how[0], permanent_action: it.how[2], responsible: it.assigned ? it.who : '', target_date: it.due }); }
+});
+document.addEventListener('change', e => {
+  const t = e.target;
+  if (t.classList && t.classList.contains('lbasisA')) { basisAll = t.value; keepScroll(renderAll); }
+  else if (t.id === 'cf_who') { cf.who = t.value; ALL ? keepScroll(renderAll) : drawConcl(); }
+  else if (t.id === 'cf_plant') { cf.plant = t.value; keepScroll(renderAll); }
+});
+
 /* ======== plant picker (customers with more than one plant) ======== */
 let PLANTS0 = [];
 function plantPicker() {
@@ -822,12 +982,12 @@ async function boot() {
     canEdit = ['admin', 'editor'].includes(ctx.role);
     $('#co').textContent = ctx.company; $('#role').textContent = ctx.role;
     plantPicker();
-    if (ALL) document.querySelectorAll('.tabs .tab:not([data-t=dash])').forEach(t => t.hidden = true);
+    if (ALL) { document.querySelectorAll('.tabs .tab').forEach(t => { t.hidden = !['std', 'dash', 'loss', 'concl', 'pres'].includes(t.dataset.t); }); document.querySelector('[data-t=dash]').textContent = 'All-plants dashboard'; document.querySelector('[data-t=loss]').textContent = 'Sales loss & reasons'; }
     if (!DEMO && !ALL && window.KMRLock) await KMRLock.init(sb, slug, 'sales', { daily: 'sales.daily-despatch-abc-analysis', loss: 'sales.loss-reasons-action-plans', act: 'sales.loss-reasons-action-plans' }, { 'sales.daily-despatch-abc-analysis': 'Daily despatch & ABC analysis', 'sales.loss-reasons-action-plans': 'Loss reasons & action plans' });
     if (window.KMRTask && !ALL) await KMRTask.init({ call: (fn, x) => api.rpc(fn, Object.assign({ p_slug: slug }, x || {})), slug, token: async () => { try { const r = sb && await sb.auth.getSession(); return r && r.data.session ? r.data.session.access_token : null; } catch (e) { return null; } } });
     showBrand();   // logo + company name top-left, tab icon, and the shared footer's ← KMR Apps target
-    await load(); if (ALL) { document.querySelector('[data-t=dash]').click(); return; } try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
-    const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (window.KMRStd) KMRStd.draw($('#std'), 'sales'); if (['std', 'dash', 'plan', 'daily', 'loss', 'act'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
+    await load(); if (ALL) { if (window.KMRStd) KMRStd.draw($('#std'), 'sales'); const ha = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; document.querySelector(`[data-t=${['std', 'dash', 'loss', 'concl', 'pres'].includes(ha) ? ha : 'dash'}]`).click(); return; } try { await loadActions(); drawAct(); paintLoss(); renderDash(); } catch (err) { say(err.message); }
+    const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; if (window.KMRStd) KMRStd.draw($('#std'), 'sales'); if (['std', 'dash', 'plan', 'daily', 'loss', 'act', 'concl'].includes(h)) document.querySelector(`[data-t=${h}]`).click();
   } catch (err) { say(err.message); $('#co').textContent = ''; }
 }
 
@@ -997,6 +1157,7 @@ function demoApi() {
     { id: 'a2', month: m + '-01', line_id: 'l1', buyer_name: parts[0].buyer_name, part_code: 'DP-1101', part_name: 'Drive Flange', issue: 'Production Delay', brief: 'CNC-3 cycle time higher than planned.', immediate_action: 'Run extra shift Sat', permanent_action: 'Re-balance the line, update cycle time', responsible: 'Ramesh', target_date: iso(5), status: 'Opened', created_at: iso(-3) + 'T05:00:00Z' },
     { id: 'a3', month: m + '-01', line_id: null, buyer_name: '', part_code: '', part_name: '', issue: 'Machine Break Down', brief: 'Spindle bearing failure on VMC-2.', immediate_action: 'Moved jobs to VMC-1', permanent_action: 'Preventive maintenance schedule', responsible: 'Ramesh', target_date: iso(-9), status: 'Closed', closed_at: iso(-6) + 'T05:00:00Z', created_at: iso(-15) + 'T05:00:00Z' },
     { id: 'a4', month: m + '-01', line_id: 'l4', buyer_name: parts[3].buyer_name, part_code: 'DP-1104', part_name: 'Gear Blank 42T', issue: 'Others', issue_other: 'Customer holiday shutdown', brief: 'Customer closed gate for 3 days.', immediate_action: 'Reschedule with buyer', permanent_action: '', responsible: 'Anita', target_date: iso(-2), status: 'Opened', created_at: iso(-6) + 'T05:00:00Z' }];
+  let PA = [];
   const D = []; days(m).filter(x => x <= t).forEach(x => { if (isoDow(x) === 7) return;
     D.push({ line_id: 'l1', day: x, qty: 215 }); D.push({ line_id: 'l3', day: x, qty: 130 }); if (isoDow(x) === 3) D.push({ line_id: 'l2', day: x, qty: 740 }); if (isoDow(x) === 5) D.push({ line_id: 'l5', day: x, qty: 560 }); });
   D.push({ line_id: 'l4', day: d(Math.max(td - 3, 1)), qty: 900 });
@@ -1007,7 +1168,10 @@ function demoApi() {
     if (fn === 'kmr_sf_month') return { lines: JSON.parse(JSON.stringify(L)), despatch: JSON.parse(JSON.stringify(D)) };
     if (fn === 'kmr_sf_save_lines') { a.p.forEach(r => { const i = L.findIndex(x => x.id === r.id); if (i >= 0) L[i] = { ...L[i], ...r }; else L.push({ ...r, id: 'n' + Math.random() }); }); return a.p.length; }
     if (fn === 'kmr_sf_save_loss') { a.p_rows.forEach(r => { const x = L.find(y => y.id === r.id); if (x) { x.loss_reason = r.loss_reason || null; x.loss_other = r.loss_reason === 'Others' ? r.loss_other : null; } }); return a.p_rows.length; }
-    if (fn === 'kmr_sf_actions') return JSON.parse(JSON.stringify(ACT));
+    if (fn === 'kmr_sf_actions') { const r = JSON.parse(JSON.stringify(ACT)); return a && a.p_slug === 'demo-p2' ? r.slice(0, 2).map(x => ({ ...x, id: x.id + 'b', responsible: 'Meena' })) : r; }
+    if (fn === 'kmr_pres_actions_get') return JSON.parse(JSON.stringify(PA));
+    if (fn === 'kmr_pres_action_save') { const r = a.p, i = PA.findIndex(x => x.id === r.id); if (i >= 0) PA[i] = { ...PA[i], ...r }; else PA.push({ ...r, id: 'pa' + Math.random() }); return 'ok'; }
+    if (fn === 'kmr_pres_action_delete') { PA = PA.filter(x => x.id !== a.p_id); return 'ok'; }
     if (fn === 'kmr_sf_save_action') { const r = a.p; if (r.id) { const i = ACT.findIndex(x => x.id === r.id); ACT[i] = { ...ACT[i], ...r, closed_at: r.status === 'Closed' ? (ACT[i].closed_at || new Date().toISOString()) : null }; return { id: r.id }; }
       ACT.push({ ...r, id: 'n' + Math.random(), created_at: new Date().toISOString(), closed_at: r.status === 'Closed' ? new Date().toISOString() : null }); return { id: 'new' }; }
     if (fn === 'kmr_sf_delete_action') { ACT = ACT.filter(x => x.id !== a.p_id); return 'ok'; }

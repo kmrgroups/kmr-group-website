@@ -317,4 +317,17 @@
       charts: [{ title: "Pending quantity — top 10 parts", kind: "bar", kpi: "otd", labels: worst.map(name), series: [{ name: "Due by today", values: worst.map(function (x) { return Math.round(x.exp); }) }, { name: "Despatched", values: worst.map(function (x) { return x.done; }) }] },
         { title: "Daily despatch (pcs)", kind: "bar", kpi: "ach", labels: dk.map(function (d) { return d.slice(8); }), series: [{ name: "Pieces", values: dk.map(function (d) { return days[d]; }) }] }] };
   } };
+  /* Sales Flow, redesigned: value KPIs (plan, actual, loss), loss by reason, conclusion and the six-step method, from the same model as the Sales Flow screens (apps/sales-all.js) */
+  (function () {
+    var P = KMRPA.sales, old = P.load;
+    P.deps = (P.deps || []).concat(["/it/apps/sales-all.js"]);
+    P.load = async function (call, v) {
+      var base = await old(call, v), r = await call("kmr_sf_month", { p_month: v.month + "-01" }), acts = [];
+      try { acts = await call("kmr_sf_actions", {}) || []; } catch (e) { acts = []; }
+      var code = "This plant", tag = function (x) { return Object.assign({}, x, { plant_code: code }); };
+      var M = SalesAll.build({ lines: (r.lines || []).map(tag), despatch: r.despatch || [], plants: [{ code: code, slug: "", name: code }], actions: acts.map(tag), month: v.month, basis: "today" }), d = SalesAll.presentData(M), drop = { ach: 1, otd: 1 };
+      base.charts.forEach(function (c) { c.kpi = "ach"; });
+      return { period: base.period, kpis: d.kpis.concat(base.kpis.filter(function (k) { return !drop[k.id]; })), charts: d.charts.concat(base.charts), extra: d.extra };
+    };
+  })();
 })();

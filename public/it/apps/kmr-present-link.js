@@ -3,7 +3,7 @@
   "use strict";
   var MAP = { sales: "sales", calibration: "calibration", apqp: "apqp", ppap: "ppap", rmp: "rmp", mmd: "mmd", mnt: "mnt", msa: "msa", crm: "crm", d8: "d8", office: "off", aud: "aud", spc: "spc", tasks: "tsk", mom: "mom", cad: "cad" };
   var m = location.pathname.match(/\/it\/([a-z0-9]+)\.html/), key = m && MAP[m[1]];
-  if (!key || /[?&]demo=1(&|$)/.test(location.search)) return;
+  if (!key || /[?&]demo=1(&|$)/.test(location.search) || /[?&]scope=all(&|$)/.test(location.search)) return;   // the all-plants Sales Flow has its own Presentation tab
   function add() {
     if (document.getElementById("kp-link")) return true;
     var slug = (window.QP && QP.slug) || new URLSearchParams(location.search).get("co"); if (!slug) return false;
