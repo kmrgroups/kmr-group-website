@@ -62,6 +62,10 @@ dwm:[
 ['ISO','9.3.3','Management review outputs','The conclusions of the review of adherence (who is below target and which activities) are the basis for management decisions on the missed and conceded reviews.'],
 ['ISO','10.2','Nonconformity and corrective action','A missed review (X) or concession (E) is recorded with its reason, approver, revised due date and action reference; a planned entry is never erased to hide a miss.'],
 ['ISO','10.2','Nonconformity and corrective action - follow-up in ActionTrack','Where the company also has ActionTrack, a missed or conceded review, or an activity below target, can be turned into a task for its responsible person with a due date; the task links back to the DWM dashboard.'],
+['VDA','P6','Process analysis / production - process management and process results','Daily, weekly and monthly reviews of the production process (line walk, 5S and machine status, production review, stock and quality reviews) are planned per employee, ticked off when done, and their adherence and misses are measured against the target.'],
+['VDA','P7','Customer care, customer satisfaction, service','Sales and despatch reviews and customer delivery reviews are planned and tracked; a missed review is recorded with its reason and recovery date before it reaches the customer.'],
+['VDA','P5','Supplier management','Reviews of incoming material, GRN reconciliation and supplier delivery can be planned as DWM activities and their adherence shown to management.'],
+['VDA','P1','Potential analysis - organization and management','Clear owner, frequency and duration for every management review, with the adherence of each employee visible on the Dashboards screen, show that the routine is lived and not only defined.'],
 ['ISO','10.3','Continual improvement','Month after month the adherence trend and the repeated misses show where the review routine itself needs to change.']],
 calibration:[
 ['ISO','7.1.5.1','Monitoring and measuring resources','Every instrument is registered with calibration status, due date and certificate data.','reg'],
