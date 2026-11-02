@@ -60,7 +60,16 @@ input,select,textarea,button{font:inherit;color:inherit}.row{display:flex;gap:10
 .dsh .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}.dsh .box{border:1px solid var(--line);border-radius:12px;padding:12px}
 .emp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.emp input:not([type=checkbox]){padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-width:150px}.emp input[type=number]{min-width:0}.emp label{display:inline-flex;gap:4px;align-items:center}.emp input[type=checkbox]{width:auto;min-width:0;margin:0}
 .xl .wdoff{font:11px Arial}
-@media print{@page{size:A4 landscape;margin:8mm}body{background:#fff;padding:0}header,.tabs,.noprint,.back,.pop,#msg,footer{display:none!important}main{padding:0}.panel{border:0;padding:0}.xs{max-height:none;overflow:visible;border:0}.xl td.fa,.xl th.fa,.xl td.fb,.xl th.fb,.xl .t1 td,.xl .t2 td,.xl .t3 th,.xl .t4 th,.xl .band td{position:static}.xl{zoom:.5}.xl2{zoom:.7;overflow:visible}.xl2 th{position:static}.xl td.d.sel{outline:0}}
+#prdoc{display:none}
+@media print{body.printing{background:#fff!important;color:#000;padding:0}body.printing>*:not(#prdoc){display:none!important}body.printing #prdoc{display:block}
+#prdoc{font:7pt/1.25 Arial,Helvetica,sans-serif;color:#000;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+#prdoc h2{margin:0 0 3mm;font-size:11pt;text-align:center}#prdoc .meta{display:flex;justify-content:space-between;gap:6mm;margin:0 0 2mm;font-size:7.5pt}
+#prdoc table{border-collapse:collapse;width:100%;table-layout:fixed;margin:0 0 3mm}#prdoc th,#prdoc td{border:.4pt solid #888;padding:1.2px 2px;overflow:hidden;vertical-align:middle}
+#prdoc th{background:#e7e6e6;font-weight:700;text-align:center}#prdoc td.c{text-align:center}#prdoc td.l{text-align:left}
+#prdoc tr{break-inside:avoid}#prdoc .band td{background:#174b80;color:#fff;font-weight:700}#prdoc .tot td{background:#e7e6e6;text-align:center}#prdoc .tot td.l{text-align:left}
+#prdoc td.C{background:#e2f0d9;color:#375623;font-weight:700}#prdoc td.O{color:#174b80}#prdoc td.X{background:#fce4d6;color:#9c0006;font-weight:700}#prdoc td.E{background:#fff2cc;color:#7f6000;font-weight:700}#prdoc td.N{background:#e7e6e6;color:#808080}
+#prdoc .sg{display:flex;justify-content:space-between;margin:5mm 0 3mm;font-size:8pt}
+#prdoc .dsh{font-size:8pt}#prdoc .dsh table{font-size:7.5pt}#prdoc .cards{display:grid;grid-template-columns:repeat(4,1fr);gap:2mm;margin:2mm 0}#prdoc .kpi{border:.4pt solid #888;border-top:2pt solid var(--c,#174b80);padding:2mm}#prdoc .kpi b{font-size:12pt}#prdoc .grid2{display:grid;grid-template-columns:1fr 1fr;gap:4mm}#prdoc .box{border:.4pt solid #888;padding:2mm}#prdoc .bar2{height:6px;background:#e5e9f2}#prdoc .bar2 i{display:block;height:100%}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Daily Work Management</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
 <div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="sheet" href="#go=sheet">DWM</a><a class="tab" data-t="dash" href="#go=dash">Dashboards</a></div>

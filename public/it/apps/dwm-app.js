@@ -221,12 +221,41 @@
       else if (b.dataset.open) { empId = b.dataset.open; try { localStorage.setItem(lk("last"), empId); } catch (x) { /* ignore */ } sel = null; await go("sheet"); }
     } catch (err) { say(err.message); }
   });
+  /* ---------- printing: a proper A4 landscape document built from the data (not a picture of the screen); the logo, report reference and revision footer come from the KMR report frame ---------- */
+  function printDoc(html) {
+    let box = $("#prdoc"); if (!box) { box = document.createElement("div"); box.id = "prdoc"; box.className = "no-sno"; box.setAttribute("data-nofilter", ""); document.body.append(box); }
+    box.innerHTML = html; document.body.classList.add("printing");
+    const done = () => { document.body.classList.remove("printing"); box.innerHTML = ""; window.removeEventListener("afterprint", done); if (window.KMRReport) KMRReport.set({}); };
+    window.addEventListener("afterprint", done); setTimeout(() => window.print(), 120);
+  }
+  const freqText = (a) => (a.mode === "daily" ? "Daily" : a.mode === "weekly" ? "Weekly / " + (a.wd.length ? D.WD_ORDER.filter((w) => a.wd.includes(w)).map((w) => D.WD[w]).join(", ") : "—") : a.mode === "dates" ? "Dates: " + (a.dates.join(", ") || "—") : "—");
+  function sheetPrintHtml() {
+    const e = curEmp() || {}, n = D.dim(M), c = D.calc(doc, M, today()), T = c.total, tgt = +doc.target || 98, pcs = (v) => (v == null ? "" : (v * 100).toFixed(1) + "%");
+    const cw = (w, k) => `<col style="width:${w}mm">`.repeat(k), col = "<colgroup>" + cw(6, 1) + cw(54, 1) + cw(22, 1) + cw(23, 1) + cw(13, 1) + cw(4.1, 31) + cw(8, 3) + "</colgroup>";
+    let h = `<h2>DAILY WORK MANAGEMENT${e.desig ? " – " + esc(e.desig.toUpperCase()) : ""} (ACHIEVE ${tgt}%)</h2><div class="meta"><span><b>Name:</b> ${esc(e.name)}</span><span><b>Department:</b> ${esc(e.dept)}</span><span><b>Designation:</b> ${esc(e.desig)}</span><span><b>Period:</b> ${monthName(M)}</span><span>O = Plan &nbsp; C = Completed &nbsp; X = Missed &nbsp; E = Concession &nbsp; – = Off / not scheduled</span></div>`;
+    h += `<table>${col}<thead><tr><th rowspan="2">Sl #</th><th rowspan="2">Activity</th><th rowspan="2">Responsibility</th><th rowspan="2">Frequency</th><th rowspan="2">Duration</th>` + Array.from({ length: 31 }, (_, i) => `<th>${i + 1}</th>`).join("") + `<th colspan="3">Adherence</th></tr><tr>` + Array.from({ length: 31 }, (_, i) => `<th>${i + 1 <= n ? D.WD[D.dow(M, i + 1)].slice(0, 2) : OFF}</th>`).join("") + `<th>Plan</th><th>Actual</th><th>%</th></tr></thead><tbody>`;
+    if (doc.section) h += `<tr class="band"><td colspan="39">${esc(doc.section)}</td></tr>`;
+    c.rows.forEach((r, i) => {
+      const a = r.a; h += `<tr><td class="c">${i + 1}</td><td class="l">${esc(a.activity)}</td><td class="l">${esc(a.resp)}</td><td class="l">${esc(freqText(a))}</td><td class="l">${esc(a.dur)}</td>`;
+      for (let d = 1; d <= 31; d++) { const v = d > n ? OFF : D.cell(a, d); h += `<td class="c ${v === OFF ? "N" : v}">${v}</td>`; }
+      h += `<td class="c">${r.plan}</td><td class="c">${r.done}</td><td class="c">${pcs(r.pct)}</td></tr>`;
+    });
+    if (!c.rows.length) h += `<tr><td colspan="39" class="c">No activities.</td></tr>`;
+    const dr = (label, f, last) => `<tr class="tot"><td class="l" colspan="5">${label}</td>` + Array.from({ length: 31 }, (_, i) => `<td>${f(c.perDay[i])}</td>`).join("") + last + `</tr>`;
+    h += dr("No. of activities planned / day", (x) => x.plan, `<td>${T.plan}</td><td>${T.done}</td><td>${pcs(T.pct)}</td>`) + dr("No. of activities completed / day", (x) => x.done, `<td colspan="3">Full-month adherence</td>`) + dr("Adherence %", (x) => (x.plan ? (x.pct * 100).toFixed(0) + "%" : ""), `<td colspan="3">Target ≥${tgt}%</td>`) + `</tbody></table>`;
+    h += `<div class="sg"><span>Prepared by: ${esc(e.name)}</span><span>Reviewed by: ${esc(doc.reviewed) || "________________"}</span><span>Approved by: ${esc(doc.approved) || "________________"}</span><span>Date: ${esc(doc.date) || "________________"}</span></div>`;
+    const items = []; doc.acts.forEach((a) => { for (let d = 1; d <= n; d++) { const v = D.cell(a, d); if (v === "X" || v === "E") items.push({ a, d, v }); } });
+    if (items.length) h += `<table style="table-layout:auto"><thead><tr><th>Date</th><th>Activity</th><th>Status</th><th>Reason</th><th>Approver</th><th>Revised due date</th><th>Action reference</th></tr></thead><tbody>${items.map(({ a, d, v }) => { const L = doc.log[a.id + ":" + d] || {}; return `<tr><td class="l">${pad(d)}-${M.slice(5)}-${M.slice(0, 4)}</td><td class="l">${esc(a.activity)}</td><td class="l">${v === "X" ? "Missed" : "Concession"}</td><td class="l">${esc(L.reason || "")}</td><td class="l">${esc(L.approver || "")}</td><td class="l">${esc(L.due || "")}</td><td class="l">${esc(L.ref || "")}</td></tr>`; }).join("")}</tbody></table>`;
+    return h;
+  }
   function printView() {
     const key = view === "sheet" ? "sheet" : "dash", e = curEmp();
-    if (window.KMRReport) KMRReport.set({ key, title: key === "sheet" ? "Daily Work Management — " + (e ? e.name : "") + " · " + monthName(M) : "Daily Work Management — dashboard · " + monthName(M), doc: monthName(M), land: true });
-    window.print(); setTimeout(() => { if (window.KMRReport) KMRReport.set({}); }, 800);
+    if (window.KMRReport) KMRReport.set({ key, title: key === "sheet" ? "Daily Work Management — " + (e ? e.name : "") + " · " + monthName(M) : "Daily Work Management — dashboard · " + monthName(M), doc: "", land: true });
+    if (key === "sheet") { if (doc) printDoc(sheetPrintHtml()); return; }
+    const src = $("#dash .dsh"); if (!src) return; const cl = src.cloneNode(true); cl.querySelectorAll(".noprint").forEach((x) => x.remove()); printDoc(cl.outerHTML);
   }
 
+  window.DWMApp = { printView };
   /* ================= Dashboards: every employee's DWM added up ================= */
   const LCOL = { g: "var(--g)", a: "var(--a)", r: "var(--r)", n: "#94a3b8" };
   function lineSvg(vals, tgt) {
