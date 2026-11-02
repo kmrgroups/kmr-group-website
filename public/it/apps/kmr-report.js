@@ -16,7 +16,7 @@
   /* format register: one line per report format. Format no. = KMR/<app>/F-nn. Raise rev + date whenever that report's layout changes. */
   const FORMATS = {
     sales: { allplants: { no: 1, rev: "01", date: "2026-11-02", name: "Sales Flow — all-plants dashboard (plan, actual, loss)" }, loss: { no: 2, rev: "01", date: "2026-11-02", name: "Sales Flow — sales loss and reasons" }, concl: { no: 3, rev: "01", date: "2026-11-02", name: "Sales Flow — conclusion and action plan" } },
-    dwm: { sheet: { no: 1, rev: "01", date: "2026-11-02", name: "Daily Work Management — monthly plan, status and adherence" }, rs: { no: 2, rev: "01", date: "2026-11-02", name: "Plant head review standards" }, edr: { no: 3, rev: "01", date: "2026-11-02", name: "Plant Head reporting to Executive Director" } },
+    dwm: { sheet: { no: 1, rev: "01", date: "2026-11-02", name: "Daily Work Management — employee monthly plan, status and adherence" }, dash: { no: 2, rev: "01", date: "2026-11-02", name: "Daily Work Management — dashboard (all employees)" } },
     layout: { report: { no: 1, rev: "01", date: "2026-10-29", name: "Factory & Office Layout Report" } },
     capacity: { workout: { no: 2, rev: "01", date: "2026-10-23", name: "Capacity workout — takt, throughput, load balance" } },
     off: { document: { no: 1, rev: "01", date: "2026-10-23", name: "Document" }, sheet: { no: 2, rev: "01", date: "2026-10-23", name: "Spreadsheet" }, slides: { no: 3, rev: "01", date: "2026-10-23", name: "Presentation" } },

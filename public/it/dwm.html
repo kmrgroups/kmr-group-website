@@ -49,11 +49,22 @@ input,select,textarea,button{font:inherit;color:inherit}.row{display:flex;gap:10
 .xl2 h2{margin:0;padding:10px;text-align:center;font-size:16px;background:#fff}.xl2 .nt{padding:3px 8px;border:0;background:#fff;white-space:normal}
 .xl2 textarea,.xl2 input,.xl2 select{width:100%;border:0;background:transparent;font:inherit;resize:none;padding:0}.xl2 textarea:focus,.xl2 input:focus,.xl2 select:focus{outline:1px solid #174b80;background:#fffbe6}
 .xl2 .rd{display:block;min-height:1.3em}
+.xl input.cell.w{color:#fff}.xl input.cell.w::placeholder{color:#cfe0f3}
+.xl select.fq{font:10px Arial;border:1px solid #bfbfbf;background:#fff;padding:1px 2px;width:100%}.xl select.fq.un{color:#9c0006;border-color:#e0a0a0}
+.xl .wds{display:flex;gap:2px;margin-top:3px}.xl .wds button{font:9px Arial;border:1px solid #bfbfbf;background:#fff;padding:1px 3px;cursor:pointer;min-width:24px}.xl .wds button.on{background:#174b80;color:#fff;border-color:#174b80}
+.xl input.dts{font:10px Arial;border:1px solid #bfbfbf;background:#fff;padding:1px 3px;width:100%;margin-top:3px}
+.xl td.add{background:#f7f9fc;text-align:left;height:28px}.xl td.add button{font:11px Arial;border:0;background:none;color:#174b80;font-weight:700;cursor:pointer}
+.xl td.dl button{border:0;background:none;color:#9c0006;cursor:pointer;font-size:12px}
+.dsh .kpi b{font-size:22px}.dsh table{border-collapse:collapse;width:100%;font:12px Arial;margin:6px 0 14px}.dsh th,.dsh td{border:1px solid #d0d7e2;padding:5px 7px;text-align:left;vertical-align:middle}.dsh th{background:#e7e6e6}.dsh td.n,.dsh th.n{text-align:right}
+.dsh h3{margin:16px 0 4px;font-size:15px}.dsh .bar2{height:10px;border-radius:5px;background:#e5e9f2;overflow:hidden;min-width:90px}.dsh .bar2 i{display:block;height:100%}
+.dsh .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:16px}.dsh .box{border:1px solid var(--line);border-radius:12px;padding:12px}
+.emp{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}.emp input:not([type=checkbox]){padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--card);min-width:150px}.emp input[type=number]{min-width:0}.emp label{display:inline-flex;gap:4px;align-items:center}.emp input[type=checkbox]{width:auto;min-width:0;margin:0}
+.xl .wdoff{font:11px Arial}
 @media print{@page{size:A4 landscape;margin:8mm}body{background:#fff;padding:0}header,.tabs,.noprint,.back,.pop,#msg,footer{display:none!important}main{padding:0}.panel{border:0;padding:0}.xs{max-height:none;overflow:visible;border:0}.xl td.fa,.xl th.fa,.xl td.fb,.xl th.fb,.xl .t1 td,.xl .t2 td,.xl .t3 th,.xl .t4 th,.xl .band td{position:static}.xl{zoom:.5}.xl2{zoom:.7;overflow:visible}.xl2 th{position:static}.xl td.d.sel{outline:0}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Daily Work Management</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="sheet" href="#go=sheet">Plant Head DWM</a><a class="tab" data-t="rs" href="#go=rs">Review standards</a><a class="tab" data-t="edr" href="#go=edr">Executive Director reporting</a></div>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="sheet" href="#go=sheet">DWM</a><a class="tab" data-t="dash" href="#go=dash">Dashboards</a></div>
 <main><div class="panel"><div id="msg"></div>
-<section id="std"></section><section id="sheet" class="hide"></section><section id="rs" class="hide"></section><section id="edr" class="hide"></section></div></main>
+<section id="std"></section><section id="sheet" class="hide"></section><section id="dash" class="hide"></section></div></main>
 <div class="pop" id="pop"></div>
-<script src="/it/kmr-lock.js"></script><script src="/it/apps/qp-core.js"></script><script src="/it/apps/dwm-core.js"></script><script src="/it/apps/dwm-seed.js"></script><script src="/it/apps/dwm-app.js"></script><script src="/it/apps/back.js"></script><script src="/it/apps/kmr-present-link.js"></script></body></html>
+<script src="/it/kmr-lock.js"></script><script src="/it/apps/qp-core.js"></script><script src="/it/apps/dwm-core.js"></script><script src="/it/apps/dwm-app.js"></script><script src="/it/apps/back.js"></script><script src="/it/apps/kmr-present-link.js"></script></body></html>

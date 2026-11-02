@@ -53,13 +53,13 @@ sales:[
 ['IATF','10.2.4','Error-proofing','Each action in the conclusion screen ends with a permanent fix and a check in the next review; the permanent action is where error-proofing is decided.'],
 ['ISO','10.3','Continual improvement','The same loss figures are compared month after month; an action is closed only when the loss from its reason falls.']],
 dwm:[
-['ISO','5.1.1','Leadership and commitment - general','The Plant Head\u2019s own reviews (line walk, production review, sales and despatch review, weekly review with the Executive Director) are planned for every day of the month and ticked off when the review and its record are complete.'],
-['ISO','5.3','Organizational roles, responsibilities and authorities','Every review has an owner (Responsibility), a frequency and a duration; the Review standards screen gives the supporting owner, the required evidence and the escalation trigger for each.'],
+['ISO','5.1.1','Leadership and commitment - general','Each employee\u2019s reviews are planned for every day of the month from their frequency and ticked off (completed, missed or concession) when the review and its record are complete.'],
+['ISO','5.3','Organizational roles, responsibilities and authorities','Every review has an owner (Responsibility), a frequency (daily, weekly days or specific dates) and a duration, and every employee has a DWM sheet of their own.'],
 ['IATF','5.3.1','Organizational roles, responsibilities and authorities - supplemental','Responsibility for the customer and plant reviews is assigned and reported to the Executive Director on a fixed cadence.'],
-['ISO','9.1.3','Analysis and evaluation','Adherence (completed / planned reviews) is calculated per activity, per day and for the full month against the 98% target.'],
+['ISO','9.1.3','Analysis and evaluation','Adherence (completed / planned reviews) is calculated per activity, per day, per employee and for the whole company against the 98% target on the Dashboards screen.'],
 ['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','The daily production, sales and despatch, rejection and rework reviews are scheduled and their completion is measured.'],
-['ISO','9.3.2','Management review inputs','The daily flash, weekly business review and monthly business review to the Executive Director are planned, with their required analysis and completion evidence.'],
-['ISO','9.3.3','Management review outputs','Executive Director directions and commitments are recorded with owner, due date, status and closure evidence, and closed only after acceptance.'],
+['ISO','9.3.2','Management review inputs','The Dashboards screen gives management the adherence of every employee\u2019s reviews, the activities below target and the missed or conceded reviews.'],
+['ISO','9.3.3','Management review outputs','The conclusions of the review of adherence (who is below target and which activities) are the basis for management decisions on the missed and conceded reviews.'],
 ['ISO','10.2','Nonconformity and corrective action','A missed review (X) or concession (E) is recorded with its reason, approver, revised due date and action reference; a planned entry is never erased to hide a miss.'],
 ['ISO','10.3','Continual improvement','Month after month the adherence trend and the repeated misses show where the review routine itself needs to change.']],
 calibration:[
