@@ -60,6 +60,27 @@
         f.querySelector("#kmrPlant").append(sel);
       }
     }
+    /* The plant / unit being worked in, shown in the title bar of every app (same text as the plant switcher in the footer) */
+    (function plantInTitle() {
+      const esc = (t) => String(t == null ? "" : t).replace(/[<>&"]/g, "");
+      const sp = new URLSearchParams(location.search), cur = sp.get("co") || (portal && portal.slug) || "";
+      const pl = portal && Array.isArray(portal.plants) ? portal.plants : [];
+      let label = "", tip = "";
+      if (sp.get("scope") === "all") { label = "All plants"; tip = "All plants of the company, added up"; }
+      else { const x = pl.find((y) => y.slug === cur); if (x) { label = (x.main ? "Main" : x.code) + " · " + String(x.name).split(" – ").pop(); tip = x.name; } }
+      if (!label) return;
+      const css2 = document.createElement("style");
+      css2.textContent = ".kmr-plant{display:inline-flex;align-items:center;gap:6px;margin:0 10px;padding:3px 11px;border-radius:999px;background:rgba(127,127,127,.18);border:1px solid rgba(127,127,127,.4);color:inherit;font:600 12px \"Segoe UI\",Arial,sans-serif;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}@media print{.kmr-plant{display:none}}";
+      document.head.append(css2);
+      const put = () => {
+        const h = document.querySelector("header"); if (!h) return;
+        let c = h.querySelector(".kmr-plant");
+        if (!c) { c = document.createElement("span"); c.className = "kmr-plant"; c.id = "kmrPlantChip"; let an = h.querySelector("h1,h2,.title,.brand"); while (an && an.parentElement !== h) an = an.parentElement; if (an) h.insertBefore(c, an.nextSibling); else h.insertBefore(c, h.children[1] || null); }
+        const t = "Plant: " + esc(label); if (c.textContent !== t) { c.textContent = t; c.title = esc(tip); }
+      };
+      put();
+      new MutationObserver(put).observe(document.body, { childList: true, subtree: true });   // a tool that redraws its header keeps the plant
+    })();
     if (demo) {
       // Sample-data mode: explore the sample only; real work (own files, import, export, new work) needs a subscription
       const ALLOW = /sample|keep exploring|close|kmr apps|use my company|fit|zoom|^[-+−]$|drawing \+ table|side by side|^table$|^drawing$|settings|report details|find dimensions|renumber|mark sc|german|english|next|back|previous|welcome|help/i;
