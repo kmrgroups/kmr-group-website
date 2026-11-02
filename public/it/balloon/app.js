@@ -73,7 +73,7 @@ function parseCallout(t){
   if(/\bM\d/.test(s)) o.type="Thread"; else if(/\bR[az](?=\s*\d|\b)|√\s*\d|^\s*N\d{1,2}\s*$/i.test(s)) o.type="Surface finish";
   else if(/Ø/.test(s)) o.type="Diameter"; else if(/(^|\s)R\s?\d/.test(s)) o.type="Radius";
   else if(/\d\s*[x×X]\s*45\s*°/.test(s)) o.type="Chamfer"; else if(/°/.test(s)) o.type="Angle";
-  const m=s.replace(/^\s*\d+\s*[xX×]\s+/,"").replace(/^[^\d]*?(HEX|A\/F|AF|E|MIN|MAX|=|:|\s)+/i,"").match(/-?\d+(\.\d+)?/); if(m) o.nominal=+m[0];
+  const m=s.replace(/^\s*\d{1,3}\s*[xX×]\s*(?=[ØR]|S[ØR]|\s)/,"").replace(/^[^\d]*?(HEX|A\/F|AF|E|MIN|MAX|=|:|\s)+/i,"").match(/-?\d+(\.\d+)?/); if(m) o.nominal=+m[0];
   let pm=s.match(/±\s*(\d+(\.\d+)?)/); if(pm){o.upper=+pm[1];o.lower=-pm[1];}
   const st=s.match(/([+-]\s*\d*\.?\d+)\s*[\/^ ]\s*([+-]?\s*\d*\.?\d+)/)||s.match(/\s(0)\s*\/\s*([+-]\s*\d*\.?\d+)/);   // "45 0/-0.05": upper 0 has no sign
   if(!pm&&st){ const a=+st[1].replace(/\s/g,""), b=+st[2].replace(/\s/g,""); o.upper=Math.max(a,b); o.lower=Math.min(a,b); }
@@ -212,10 +212,48 @@ function newItem(sheet, ax, ay, data={}){
   const it=Object.assign({id:S.nextId++, sheet, ax, ay, bx, by, type:"Linear", text:"", nominal:null, upper:null, lower:null, unit:"mm", gdt:"", datum:"", cls:"", actual:"", conf:null, gen:false, instr:""}, data);
   applyGen(it); if(!it.instr) it.instr=instrument(it); return it;
 }
+/* ---------- balloon placement: circle and leg stay off the drawing (text, dimension lines, other balloons) ---------- */
+function darkMap(sh,r){
+  if(sh._dm&&Math.abs(sh._dm.r-r)<1e-6) return sh._dm;
+  const k=Math.max(1,Math.round(r/3)), w=Math.ceil(sh.w/k), h=Math.ceil(sh.h/k), c=document.createElement("canvas"); c.width=w; c.height=h;
+  const g=c.getContext("2d",{willReadFrequently:true}); g.fillStyle="#fff"; g.fillRect(0,0,w,h); g.drawImage(sh.canvas,0,0,w,h);
+  const d=g.getImageData(0,0,w,h).data, dark=new Uint8Array(w*h); for(let i=0;i<w*h;i++) dark[i]=(d[i*4]+d[i*4+1]+d[i*4+2])/3<225?1:0;
+  return sh._dm={r,k,w,h,dark};
+}
+function placeBalloons(items,force){
+  const bySheet=new Map(); items.forEach(it=>{ if(!bySheet.has(it.sheet)) bySheet.set(it.sheet,[]); bySheet.get(it.sheet).push(it); });
+  for(const [si,list] of bySheet){
+    const sh=S.sheets[si]; if(!sh) continue; const r=rFor(sh); let dm; try{ dm=darkMap(sh,r); }catch(e){ continue; }
+    const work=dm.dark.slice(), k=dm.k, W=dm.w, H=dm.h, at=(x,y)=>{ const i=Math.floor(x/k), j=Math.floor(y/k); return (i<0||j<0||i>=W||j>=H)?1:work[j*W+i]; };
+    const stamp=(cx,cy,rad)=>{ for(let y=cy-rad;y<=cy+rad;y+=k) for(let x=cx-rad;x<=cx+rad;x+=k) if(Math.hypot(x-cx,y-cy)<=rad){ const i=Math.floor(x/k), j=Math.floor(y/k); if(i>=0&&j>=0&&i<W&&j<H) work[j*W+i]=1; } };
+    const stampLine=(x0,y0,x1,y1)=>{ const n=Math.max(2,Math.ceil(Math.hypot(x1-x0,y1-y0)/(k*.7))); for(let t=0;t<=n;t++){ const x=x0+(x1-x0)*t/n, y=y0+(y1-y0)*t/n, i=Math.floor(x/k), j=Math.floor(y/k); if(i>=0&&j>=0&&i<W&&j<H) work[j*W+i]=1; } };
+    const fixed=list.filter(it=>!force&&it.manualPos);
+    fixed.forEach(it=>{ stamp(it.bx,it.by,r*1.1); const e=leaderEnd(it,r); stampLine(it.bx,it.by,e[0],e[1]); });
+    const todo=list.filter(it=>force||!it.manualPos);
+    for(const it of todo){
+      const tb=it.tb||{x0:it.ax-r*.25,x1:it.ax+r*.25,y0:it.ay-r*.4,y1:it.ay+r*.4}, cx=(tb.x0+tb.x1)/2, cy=(tb.y0+tb.y1)/2, hx=(tb.x1-tb.x0)/2+r*.18, hy=(tb.y1-tb.y0)/2+r*.18;
+      let best=null;
+      for(const rad of [1.9,2.6,3.5,4.6,6]) for(let a=0;a<360;a+=15){
+        const ux=Math.cos(a*Math.PI/180), uy=Math.sin(a*Math.PI/180), t=Math.min(Math.abs(ux)>1e-6?hx/Math.abs(ux):1e9,Math.abs(uy)>1e-6?hy/Math.abs(uy):1e9);
+        const px=cx+ux*t, py=cy+uy*t, bx=px+ux*rad*r, by=py+uy*rad*r;
+        let sc=rad*3+Math.abs(((a-225+540)%360)-180)/60;   // short leg, upper-left preferred
+        if(bx<r*1.2||by<r*1.2||bx>sh.w-r*1.2||by>sh.h-r*1.2) sc+=1e4;
+        let dk=0,n=0; for(const rr of [0,.5,.9,1.25]) for(let q=0;q<(rr?10:1);q++){ const aa=q/10*Math.PI*2; n++; dk+=at(bx+Math.cos(aa)*rr*r,by+Math.sin(aa)*rr*r); }
+        sc+=dk/n*400;                                                    // circle on text or lines
+        const L=Math.hypot(px-bx,py-by), steps=Math.max(2,Math.ceil((L-r)/(r*.35)));
+        let ld=0; for(let q=1;q<steps;q++){ const f=(r+(L-r)*q/steps)/L; ld+=at(bx+(px-bx)*f,by+(py-by)*f); }
+        sc+=ld*30;                                                       // leg over text or lines
+        if(!best||sc<best.sc) best={sc,bx,by,px,py};
+      }
+      if(best){ it.bx=best.bx; it.by=best.by; stamp(best.bx,best.by,r*1.1); stampLine(best.bx,best.by,best.px,best.py); }
+    }
+  }
+}
 function renumber(){
   const rows=S.set.rows*2;
   S.items.sort((a,b)=>{ if(a.sheet!==b.sheet) return a.sheet-b.sheet; const sh=S.sheets[a.sheet];
     const ra=Math.floor(a.ay/sh.h*rows), rb=Math.floor(b.ay/sh.h*rows); return ra!==rb?ra-rb:a.ax-b.ax; });
+  try{ placeBalloons(S.items); }catch(e){ console.warn(e); }
   renderAll();
 }
 
@@ -235,16 +273,25 @@ function zoomAt(f, sx, sy){
 }
 function toSheet(sx,sy){ return [(sx-S.view.ox)/S.view.scale,(sy-S.view.oy)/S.view.scale]; }
 
+/* where the leg touches the drawing: the edge of the dimension text nearest the balloon (never on the digits); a hand-moved anchor wins */
+function leaderEnd(it,r){
+  const tb=it.tb; if(!tb) return [it.ax,it.ay];
+  const pad=r*0.18, x0=tb.x0-pad, y0=tb.y0-pad, x1=tb.x1+pad, y1=tb.y1+pad;
+  if(it.bx>x0&&it.bx<x1&&it.by>y0&&it.by<y1) return [it.ax,it.ay];
+  return [Math.min(Math.max(it.bx,x0),x1), Math.min(Math.max(it.by,y0),y1)];
+}
 function drawBalloon(c, it, no, r, selected){
   const res=result(it), css=getComputedStyle(document.documentElement);
   const red="#C8102E", green="#1E7B4A";
   const stroke = res==="pass"?green:red;
-  const dx=it.ax-it.bx, dy=it.ay-it.by, d=Math.hypot(dx,dy);
-  c.lineWidth=r*0.13; c.strokeStyle=stroke; c.fillStyle=stroke;
-  if(d>r){ c.beginPath(); c.moveTo(it.bx+dx/d*r, it.by+dy/d*r); c.lineTo(it.ax,it.ay); c.stroke();
-    c.beginPath(); c.arc(it.ax,it.ay,r*0.18,0,Math.PI*2); c.fill(); }
-  if(selected){ c.beginPath(); c.arc(it.bx,it.by,r*1.45,0,Math.PI*2); c.fillStyle="rgba(31,95,191,.22)"; c.fill();
-    c.beginPath(); c.arc(it.ax,it.ay,r*0.42,0,Math.PI*2); c.strokeStyle="#1F5FBF"; c.lineWidth=r*0.1; c.stroke(); c.strokeStyle=stroke; c.lineWidth=r*0.13; }
+  const [ex,ey]=leaderEnd(it,r), dx=ex-it.bx, dy=ey-it.by, d=Math.hypot(dx,dy);
+  c.lineWidth=r*0.09; c.strokeStyle=stroke; c.fillStyle=stroke;
+  if(d>r){ c.beginPath(); c.moveTo(it.bx+dx/d*r, it.by+dy/d*r); c.lineTo(ex,ey); c.stroke();
+    c.beginPath(); c.arc(ex,ey,r*0.13,0,Math.PI*2); c.fill(); }
+  c.lineWidth=r*0.13;
+  if(selected){ if(it.tb){ c.save(); c.setLineDash([r*.3,r*.2]); c.strokeStyle="#1F5FBF"; c.lineWidth=r*0.08; c.strokeRect(it.tb.x0-r*.15,it.tb.y0-r*.15,it.tb.x1-it.tb.x0+r*.3,it.tb.y1-it.tb.y0+r*.3); c.restore(); }
+    c.beginPath(); c.arc(it.bx,it.by,r*1.45,0,Math.PI*2); c.fillStyle="rgba(31,95,191,.22)"; c.fill();
+    c.beginPath(); c.arc(ex,ey,r*0.42,0,Math.PI*2); c.strokeStyle="#1F5FBF"; c.lineWidth=r*0.1; c.stroke(); c.strokeStyle=stroke; c.lineWidth=r*0.13; }
   c.beginPath(); c.arc(it.bx,it.by,r,0,Math.PI*2); c.fillStyle=res==="fail"?red:"#fff"; c.fill(); c.stroke();
   c.fillStyle=res==="fail"?"#fff":stroke; c.textAlign="center"; c.textBaseline="middle";
   const s=String(no); c.font=`700 ${r*(s.length>2?0.8:1.05)}px "Barlow Condensed", Arial, sans-serif`; c.fillText(s, it.bx, it.by+r*0.05);
@@ -266,7 +313,8 @@ cv.addEventListener("pointerdown",e=>{
   if(ptrs.size===2){ const [a,b]=[...ptrs.values()]; drag={kind:"pinch", d:Math.hypot(a.x-b.x,a.y-b.y), mx:(a.x+b.x)/2, my:(a.y+b.y)/2}; return; }
   const [x,y]=toSheet(e.offsetX,e.offsetY), r=r0();
   const selIt=S.items.find(i=>i.id===S.sel&&i.sheet===S.cur);
-  if(selIt && !S.readonly && Math.hypot(selIt.ax-x,selIt.ay-y)<r*0.9){ drag={kind:"anchor",it:selIt,moved:false}; return; }
+  const le=selIt?leaderEnd(selIt,r):null;
+  if(selIt && !S.readonly && Math.hypot(le[0]-x,le[1]-y)<r*0.9){ drag={kind:"anchor",it:selIt,moved:false}; return; }
   for(let i=S.items.length-1;i>=0;i--){ const it=S.items[i]; if(it.sheet===S.cur && Math.hypot(it.bx-x,it.by-y)<r*1.25){ if(S.readonly){ select(it.id,true); return; } drag={kind:"balloon",it,ox:x-it.bx,oy:y-it.by,moved:false}; select(it.id,true); return; } }
   if(S.mode==="sym"){ setMode("pan"); markFromTap(x,y); return; }
   if(S.readonly){ drag={kind:"pan",sx:e.offsetX,sy:e.offsetY,ox:S.view.ox,oy:S.view.oy,moved:false}; return; }
@@ -278,8 +326,8 @@ cv.addEventListener("pointermove",e=>{
   if(drag.kind==="pinch"&&ptrs.size===2){ const [a,b]=[...ptrs.values()], nd=Math.hypot(a.x-b.x,a.y-b.y), mx=(a.x+b.x)/2,my=(a.y+b.y)/2;
     S.view.ox+=mx-drag.mx; S.view.oy+=my-drag.my; zoomAt(nd/drag.d,mx,my); drag.d=nd; drag.mx=mx; drag.my=my; return; }
   const [x,y]=toSheet(e.offsetX,e.offsetY);
-  if(drag.kind==="balloon"){ drag.it.bx=x-drag.ox; drag.it.by=y-drag.oy; drag.moved=true; draw(); }
-  else if(drag.kind==="anchor"){ drag.it.ax=x; drag.it.ay=y; drag.moved=true; draw(); }
+  if(drag.kind==="balloon"){ drag.it.bx=x-drag.ox; drag.it.by=y-drag.oy; drag.it.manualPos=true; drag.moved=true; draw(); }
+  else if(drag.kind==="anchor"){ drag.it.ax=x; drag.it.ay=y; drag.it.tb=null; drag.moved=true; draw(); }
   else if(drag.kind==="pan"){ S.view.ox=drag.ox+e.offsetX-drag.sx; S.view.oy=drag.oy+e.offsetY-drag.sy; if(Math.abs(e.offsetX-drag.sx)+Math.abs(e.offsetY-drag.sy)>4) drag.moved=true; draw(); }
 });
 function endPtr(e){ ptrs.delete(e.pointerId);
@@ -318,7 +366,7 @@ function rowHtml(it,i){
     const [l,u]=limits(it), res=result(it), g=it.gen?' class="gen" title="From general tolerance"':"";
     const spec = it.type==="GD&T" ? [it.gdt, it.text, it.datum?("| "+it.datum):""].filter(Boolean).join(" ") : it.text;
     h+=`<tr data-id="${it.id}" class="${it.id===S.sel?"sel ":""}${res}">
-      <td><span class="no" data-act="go" title="Show on drawing">${i+1}</span></td>
+      <td><span class="no" data-act="go" title="Show on drawing">${i+1}</span>${mismatch(it)?`<span class="mm" data-act="fix" title="The values in this row differ from the text “${esc(it.text)}”. Click to take the values from the text again.">⚠</span>`:""}</td>
       <td class="num">${multi?(it.sheet+1)+"·":""}${zone(it)}</td>
       <td><select data-f="type" title="${it.type}">${TYPES.map(t=>`<option${t===it.type?" selected":""}>${t}</option>`).join("")}</select></td>
       <td><input data-f="text" value="${esc(it.type==="GD&T"?spec:it.text)}" title="${esc(spec)}"></td>
@@ -335,6 +383,14 @@ function rowHtml(it,i){
       <td><span class="conf${it.conf!=null&&it.conf<0.7?" low":""}">${it.conf==null?(it.source==="cad"?"CAD":"manual"):Math.round(it.conf*100)+"%"}</span></td>
       <td><button class="del" data-act="del" aria-label="Delete balloon ${i+1}">×</button></td></tr>`;
   return h;
+}
+/* does the row still agree with the text read from the drawing? */
+function mismatch(it){
+  if(!it.text||["GD&T","Note","Material","Surface finish"].includes(it.type)||it.source==="cad"||it.fit||it.lim||/\d\s*\/\s*\d/.test(it.text)) return false;
+  const p=parseCallout(it.text); if(p.nominal==null) return false;
+  if(it.nominal==null||Math.abs(p.nominal-it.nominal)>1e-6) return true;
+  if(!it.gen&&(p.upper!=null||p.lower!=null)){ const e=(a,b)=>a==null?b==null||b===0:b!=null&&Math.abs(a-b)<1e-6; return !(e(p.upper,it.upper)&&e(p.lower,it.lower)); }
+  return false;
 }
 /* keep the cursor where the user is working when the table redraws */
 function focusKey(){ const a=document.activeElement; if(!a||!a.dataset||!a.dataset.f||!$("tw").contains(a)) return null; const tr=a.closest("tr"); return {id:tr&&tr.dataset.id,f:a.dataset.f,s:a.selectionStart,e:a.selectionEnd}; }
@@ -374,6 +430,7 @@ $("tw").addEventListener("click",e=>{
   const tr=e.target.closest("tr[data-id]"); if(!tr) return; const id=+tr.dataset.id, act=e.target.closest("[data-act]")?.dataset.act;
   if(act==="del"){ S.items=S.items.filter(i=>i.id!==id); if(S.sel===id) S.sel=null; renderAll(); return; }
   if(act==="go"){ const it=S.items.find(i=>i.id===id); select(id); centerOn(it); return; }
+  if(act==="fix"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; const p=parseCallout(it.text); it.nominal=p.nominal??it.nominal; it.upper=p.upper??null; it.lower=p.lower??null; if(p.type) it.type=p.type; it.gen=false; applyGen(it); renderTable(); draw(); return; }
   if(act==="gdel"){ const it=S.items.find(i=>i.id===id); if(!it||S.readonly) return; it.gauges=gUsed(it).filter((_,k)=>k!==+e.target.closest("[data-gi]").dataset.gi); it.gaugeManual=true; it.gaugeAuto=false; setInstrFromGauges(it); updateRow(it); return; }
   if(S.sel!==id){ S.sel=id; draw(); document.querySelectorAll("tr.sel").forEach(r=>r.classList.remove("sel")); tr.classList.add("sel"); }
 });
@@ -385,7 +442,9 @@ $("tw").addEventListener("change",e=>{
     if(v==="__new") it.gauges.push(gaugeSuggest(it)); else { const g=(window.KMR_GAUGES||[]).find(x=>x.id===v); if(g) it.gauges.push({id:g.id,name:g.name,range:g.range||"",lc:g.lc||"",type:g.type||"",purchase:false}); }
     setInstrFromGauges(it); updateRow(it); return; }
   if(["nominal","upper","lower"].includes(f)){ it[f]=num(v.replace(/−/g,"-").replace("±","")); if(f!=="nominal") it.gen=false; if(f==="nominal") applyGen(it); }
-  else if(f==="text"){ it.text=v; it.en=translate(v,S.lang); if(it.type==="GD&T"){it.gdt="";it.datum="";} }
+  else if(f==="text"){ it.text=v; it.en=translate(v,S.lang);
+    if(it.type==="GD&T"){it.gdt="";it.datum="";}
+    else if(it.type!=="Note"&&it.type!=="Material"){ const p=parseCallout(v); if(p.nominal!=null||p.upper!=null){ if(p.type) it.type=p.type; it.nominal=p.nominal??null; it.upper=p.upper??null; it.lower=p.lower??null; it.gen=false; applyGen(it); it.instr=it.autoInstr===false?it.instr:instrument(it); toast("Values updated from the text you typed. Check them in the row.",3500); } } }
   else it[f]=v;
   if(f==="type"){ applyGen(it); it.instr=instrument(it); }
   if(["type","nominal","upper","lower","unit"].includes(f)&&it.gaugeAuto&&!it.gaugeManual){ it.gauges=[]; it.gaugeAuto=false; }
@@ -401,7 +460,7 @@ function renderSheets(){
 }
 function renderAll(){
   const has=S.sheets.length>0; $("empty").hidden=has; $("zoomBar").hidden=!has;
-  ["bAdd","bRenum","bPDF","bCSV","bSym"].forEach(id=>$(id).disabled=!has);
+  ["bAdd","bRenum","bPDF","bCSV","bSym","bTidy"].forEach(id=>{ if($(id)) $(id).disabled=!has; });
   $("bRenum").disabled=!S.items.length; $("bPDF").disabled=!has; $("bCSV").disabled=!S.items.length;
   $("bAI").disabled=!has; $("bText").disabled=!has;
   $("bAI").title=!has?"Open a drawing first":"Smart read: every dimension, tolerance, Ø, thread, GD&T frame and the title block — free, in this browser; the drawing is not sent anywhere";
@@ -865,7 +924,7 @@ function groupH(flat){
     let best=null,bd=Infinity;
     for(const n of groups){ if(n===g||n.used||n.limits||isTol(n.s)||!/\d/.test(n.s)) continue;
       const dx=g.x0-n.xn, dy=Math.abs((g.y-g.h/2)-(n.y-n.h/2)); if(dx<-0.5*n.h||dx>2.5*n.h||dy>1.4*n.h) continue; const d=dx+dy; if(d<bd){bd=d;best=n;} }
-    if(best){ best.s+=" "+g.s; g.used=true; }
+    if(best){ best.s+=" "+g.s; g.used=true; const gb={x0:g.x0,x1:g.x1,y0:g.y-g.h,y1:g.y+g.h*0.2}, nb=best.u||{x0:best.x0,x1:best.x1,y0:best.y-best.h,y1:best.y+best.h*0.2}; best.u={x0:Math.min(nb.x0,gb.x0),x1:Math.max(nb.x1,gb.x1),y0:Math.min(nb.y0,gb.y0),y1:Math.max(nb.y1,gb.y1)}; }
   }
   return groups.filter(g=>!g.used);
 }
@@ -879,7 +938,7 @@ function groupText(items){
     const loc=list.map(t=>({...t,x:t.x*d[0]+t.y*d[1],y:t.x*n[0]+t.y*n[1]}));
     for(const g of groupH(loc)){
       const P=(u,v)=>[u*d[0]+v*n[0],u*d[1]+v*n[1]], p0=P(g.x0,g.y-g.h*0.35), p1=P(g.x1,g.y-g.h*0.35);
-      out.push({...g,rot:true,ax:p0[0],ay:p0[1],x0:Math.min(p0[0],p1[0])-g.h/2,x1:Math.max(p0[0],p1[0])+g.h/2,y:(p0[1]+p1[1])/2+g.h/2});
+      out.push({...g,rot:true,ax:p0[0],ay:p0[1],x0:Math.min(p0[0],p1[0])-g.h/2,x1:Math.max(p0[0],p1[0])+g.h/2,y:(p0[1]+p1[1])/2+g.h/2,tb:{x0:Math.min(p0[0],p1[0])-g.h/2,x1:Math.max(p0[0],p1[0])+g.h/2,y0:Math.min(p0[1],p1[1])-g.h/2,y1:Math.max(p0[1],p1[1])+g.h/2}});
     }
   }
   return out;
@@ -888,8 +947,9 @@ const SC_GLYPH=/[▼▽▲△◆◇⬥⬦⯁⯆\uE000-\uF8FF]/g;
 function classify(g,sh){
   let s=g.s.replace(/\s+/g," ").trim(), cls="";
   if(SC_GLYPH.test(s)){ SC_GLYPH.lastIndex=0; const t=s.replace(SC_GLYPH,"").trim(); if(t&&/\d/.test(t)){ s=t; cls="SC"; } }
-  SC_GLYPH.lastIndex=0; if(!/\d/.test(s)&&!(NOTE_RX.test(s)&&s.length>=8)) return null;   // notes such as "REMOVE ALL BURRS" have no digit
-  if(g.limits){ const L=g.limits; return {type:L.dia?"Diameter":"Linear",text:s,nominal:L.lo,upper:+(L.hi-L.lo).toFixed(4),lower:0,unit:"mm",conf:0.85,cls}; }
+  SC_GLYPH.lastIndex=0; if(/^[+\-±]?\s*0$/.test(s)) return null;   // a lone 0 is the lower limit of a tolerance, not a characteristic
+  if(!/\d/.test(s)&&!(NOTE_RX.test(s)&&s.length>=8)) return null;   // notes such as "REMOVE ALL BURRS" have no digit
+  if(g.limits){ const L=g.limits, half=+((L.hi-L.lo)/2).toFixed(4); return {type:L.dia?"Diameter":"Linear",text:s,nominal:+((L.hi+L.lo)/2).toFixed(4),upper:half,lower:-half,unit:"mm",conf:0.85,cls,lim:true}; }   // limit dimension 50.05/49.95 = 50 ±0.05 (same limits)
   const r=classify0(g,sh,s); if(r&&cls) r.cls=cls; return r;
 }
 function classify0(g,sh,s){
@@ -922,7 +982,7 @@ function markGrid(groups,sh){
 function itemsFromGroups(groups,sh,si,source,confScale=1){
   const out=[]; markGrid(groups,sh);
   for(const g of groups){ const c=classify(g,sh); if(!c) continue; if(c.conf!=null) c.conf=+(c.conf*confScale).toFixed(2);
-    out.push(newItem(si,g.ax??g.x0,g.ay??(g.y-g.h*0.35),Object.assign({source,ex:g.ax!=null||g.rot?null:g.x1},c))); }
+    out.push(newItem(si,g.ax??g.x0,g.ay??(g.y-g.h*0.35),Object.assign({source,ex:g.ax!=null||g.rot?null:g.x1,tb:g.tb||g.u||{x0:g.x0,x1:g.x1,y0:g.y-g.h,y1:g.y+g.h*0.2}},c))); }
   return out;
 }
 function findTextItems(){
@@ -1161,17 +1221,37 @@ async function readRegion(sh,x,y){
   }
   best.sort((a,b)=>b.conf-a.conf); return best[0]||null;
 }
-async function readUnder(it){
-  const sh=S.sheets[it.sheet]; if(sh.isCad) return;
-  if(sh.text&&sh.text.length>5&&!sh.ocr){
-    const g=groupText(sh.text).map(g=>({g,d:Math.hypot((g.x0+g.x1)/2-it.ax,g.y-g.h/2-it.ay)})).sort((a,b)=>a.d-b.d)[0];
-    if(g&&g.d<sh.w*0.05) applyRead(it,g.g.s,0.9); return; }
-  try{ busy("Reading the text under the balloon"); const r=await readRegion(sh,it.ax,it.ay); busy(null); if(r) applyRead(it,r.s,Math.min(0.85,r.conf)); }
-  catch(e){ busy(null); }
+/* the text under a hand-placed balloon: nearest dimension text that no other balloon owns, with its stacked / trailing tolerances; GD&T frames; then OCR */
+const TOL_FRAG=/^[+\-±]\s*\d*[.,]?\d+$|^0$/;
+function pickText(sh,it){
+  const groups=groupText(sh.text), cx=it.ax, cy=it.ay, lim=Math.max(sh.w*0.04,60);
+  const bb=g=>g.tb||g.u||{x0:g.x0,x1:g.x1,y0:g.y-g.h,y1:g.y+g.h*0.2};
+  const taken=g=>{ const b=bb(g); return S.items.some(o=>o!==it&&o.sheet===it.sheet&&o.tb&&Math.abs(o.tb.x0-b.x0)<3&&Math.abs(o.tb.y0-b.y0)<3); };
+  let best=null,bs=Infinity;
+  for(const g of groups){ if(!/\d/.test(g.s)||g.grid) continue; const b=bb(g), dx=Math.max(b.x0-cx,0,cx-b.x1), dy=Math.max(b.y0-cy,0,cy-b.y1), d=Math.hypot(dx,dy); if(d>lim) continue;
+    const sc=d+(taken(g)?lim*0.6:0)+(TOL_FRAG.test(g.s.trim())?lim*0.5:0); if(sc<bs){ bs=sc; best=g; } }
+  if(!best) return null;
+  let s=best.s, b={...bb(best)};
+  for(const o of groups){ if(o===best||!TOL_FRAG.test(o.s.trim().replace(/\s+/g,""))||taken(o)) continue; const ob=bb(o), h=best.h;
+    if(ob.x0>=b.x1-0.5*h&&ob.x0<=b.x1+5*h&&ob.y1>=b.y0-2.5*h&&ob.y0<=b.y1+2.5*h&&!/[+\-±]\s*\d*[.,]?\d+/.test(s.replace(/^[^+\-±]*\d/,"X"))){ s+=" "+o.s.trim(); b={x0:Math.min(b.x0,ob.x0),x1:Math.max(b.x1,ob.x1),y0:Math.min(b.y0,ob.y0),y1:Math.max(b.y1,ob.y1)}; } }
+  return {s,tb:b};
 }
-function applyRead(it,s,conf){
-  const c=classify({s,x0:0,x1:0,y:0,h:1},{w:1e9,h:1e9})||Object.assign({type:"Note",text:s},parseCallout(s));
+async function readUnder(it){
+  const sh=S.sheets[it.sheet]; if(sh.isCad) return; let done=false;
+  try{
+    if(sh.text&&sh.text.length>5&&!sh.ocr){ const p=pickText(sh,it); if(p){ applyRead(it,p.s,0.9,p.tb); done=true; } }
+    if(!done&&window.BIR){   // a GD&T frame is lines, not text
+      const fr=sh._fr||(sh._fr=BIR.findFrames(sh)), m=sh.w*0.02, f=fr.find(f=>it.ax>f.x0-m&&it.ax<f.x1+m&&it.ay>f.y0-m&&it.ay<f.y1+m);
+      if(f){ const t=await BIR.readFrame(sh,it.sheet,f); if(t){ for(const k of ["type","text","nominal","upper","lower","gdt","datum","unit","cls","conf"]) if(t[k]!==undefined) it[k]=t[k]; it.tb={x0:f.x0,x1:f.x1,y0:f.y0,y1:f.y1}; it.ax=f.x0; it.ay=(f.y0+f.y1)/2; it.source="ocr"; applyGen(it); it.instr=instrument(it); done=true; } } }
+    if(!done){ busy("Reading the text under the balloon"); const r=await readRegion(sh,it.ax,it.ay); busy(null); if(r){ applyRead(it,r.s,Math.min(0.85,r.conf)); done=true; } }
+  }catch(e){ busy(null); console.warn(e); }
+  if(!done){ toast("Nothing readable was found under this balloon. Type the characteristic in the highlighted row, or tap closer to the text.",7000); const tr=document.querySelector(`tr[data-id="${it.id}"] input[data-f="text"]`); if(tr) tr.focus(); }
+  try{ placeBalloons([it]); }catch(e){} renderTable(); draw();
+}
+function applyRead(it,s,conf,tb){
+  const c=classify({s,x0:0,x1:0,y:0,h:1},{w:1e9,h:1e9})||(()=>{ const p=parseCallout(s); return Object.assign({type:p.nominal!=null?(p.type||"Linear"):"Note",text:s},p); })();
   Object.assign(it,{text:c.text||s,type:c.type||it.type,nominal:c.nominal??null,upper:c.upper??null,lower:c.lower??null,gdt:c.gdt||"",datum:c.datum||"",unit:c.unit||it.unit,conf:+conf.toFixed(2),gen:false,source:"ocr"});
+  if(tb){ it.tb=tb; it.ax=tb.x0; it.ay=(tb.y0+tb.y1)/2; }
   applyGen(it); it.instr=instrument(it); renderTable(); draw();
 }
 async function fillBlanks(list){
@@ -1268,7 +1348,8 @@ async function runAI(auto){
 $("bAI").onclick=runSmart;
 $("busyStop").onclick=()=>aiCtl&&aiCtl.abort();
 $("bAdd").onclick=()=>setMode(S.mode==="add"?"pan":"add");
-$("bRenum").onclick=()=>{renumber();toast("Balloons renumbered top-to-bottom, left-to-right on each sheet.");};
+$("bRenum").onclick=()=>{renumber();toast("Balloons renumbered top-to-bottom, left-to-right on each sheet; balloons you moved by hand stay where you put them.");};
+if($("bTidy")) $("bTidy").onclick=()=>{ if(!S.items.length) return; S.items.forEach(i=>{ delete i.manualPos; }); placeBalloons(S.items,true); draw(); toast("Every balloon was moved off the dimensions so no leg touches or hides the text."); };
 
 /* ---------- header + settings ---------- */
 function syncHeader(){ document.querySelectorAll("[data-h]").forEach(i=>i.value=S.header[i.dataset.h]||""); headSum(); }

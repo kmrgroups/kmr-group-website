@@ -143,7 +143,7 @@ tr.fail .no{background:var(--fail);border-color:var(--fail);color:#fff}
 .emptytable{padding:28px 16px;color:var(--muted);text-align:center}
 .toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surface);padding:10px 16px;border-radius:8px;font-size:14px;z-index:20;max-width:min(92vw,520px);display:none}
 .toast.show{display:block}
-body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenum,body.readonly #bSym,body.readonly #bOpen{display:none}
+body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenum,body.readonly #bTidy,body.readonly #bSym,body.readonly #bOpen{display:none}
 .hint{padding:8px 16px;font-size:12.5px;color:var(--muted);border-top:1px solid var(--line)}
 @media (max-width:900px){
   .work,.work.m-stack{grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr) 8px minmax(0,var(--tableH,300px))}
@@ -156,6 +156,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
   .btn{padding:6px 10px;font-size:14px}
   .sep{display:none}
 }
+.mm{color:#d97706;cursor:pointer;margin-left:3px;font-size:13px}
 </style>
 </head>
 <body>
@@ -168,6 +169,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
       <button class="btn ai" id="bAI" disabled title="Open a drawing first">Smart read</button>
       <button class="btn" id="bAdd" disabled>Add balloon</button>
       <button class="btn" id="bRenum" disabled>Renumber</button>
+      <button class="btn" id="bTidy" disabled title="Moves every balloon off the dimension text so no leg touches or hides it">Tidy balloons</button>
       <button class="btn" id="bSym" disabled title="Tap one special-characteristic symbol on the drawing; every copy gets marked">Mark SC</button>
       <span class="sep"></span>
       <div class="seg" role="group" aria-label="Layout"><button data-m="draw" aria-pressed="false">Drawing</button><button data-m="stack" aria-pressed="true">Drawing + table</button><button data-m="side" aria-pressed="false">Side by side</button><button data-m="table" aria-pressed="false">Table</button></div>
