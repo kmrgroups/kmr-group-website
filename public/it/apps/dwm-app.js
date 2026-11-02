@@ -22,7 +22,7 @@
   const taskBtn = (o) => (canTask() ? `<button class="btn o s noprint" data-task="${taskPool.push(Object.assign({ source_app: "dwm", source_label: "DWM adherence", source_url: `/it/dwm.html?kmr=1&co=${encodeURIComponent(QP.slug || "")}#go=dash` }, o)) - 1}">→ Task</button>` : "");
   const fix1 = (v) => (v == null ? "—" : v.toFixed(1) + "%");
 
-  let M = today().slice(0, 7), emps = [], empId = "", doc = null, canEdit = false, ctx = null, local = DEMO, view = "std", sel = null, adding = false, staffLoaded = false, deptF = "";
+  let M = today().slice(0, 7), emps = [], empId = "", doc = null, canEdit = false, canStruct = false, ctx = null, local = DEMO, view = "std", sel = null, adding = false, staffLoaded = false, deptF = "";
   const pend = {}; let saveT = null;
   const sheetKey = (id = empId, m = M) => "dwm:" + m + ":" + id;
   const curEmp = () => emps.find((e) => e.id === empId) || null;
@@ -85,17 +85,17 @@
   }
   function sheetHtml() {
     const e = curEmp(), n = D.dim(M), c = D.calc(doc, M, today()), T = c.total, tgt = +doc.target || 98, td = today(), dayNo = td.slice(0, 7) === M ? +td.slice(8) : 0;
-    const ro = canEdit ? "" : " disabled", cg = (w, k) => `<col style="width:${w}px">`.repeat(k);
+    const ro = canStruct ? "" : " disabled", cg = (w, k) => `<col style="width:${w}px">`.repeat(k);
     const col = "<colgroup>" + cg(W.a, 1) + cg(W.b, 1) + cg(W.c, 1) + cg(W.d, 1) + cg(W.e, 1) + cg(W.day, 31) + cg(W.ad, 3) + cg(W.x, 1) + "</colgroup>";
     const vw = 'style="position:sticky;left:0;width:var(--vw,900px)"';
     const title = "DAILY WORK MANAGEMENT" + (e.desig ? " – " + e.desig.toUpperCase() : "") + " (ACHIEVE " + tgt + "%)";
     let h = `<div class="emp noprint"><label>Employee <select id="emp" class="sel">${emps.map((x) => `<option value="${x.id}" ${x.id === empId ? "selected" : ""}>${esc(x.name || "(no name)")}${x.desig ? " · " + esc(x.desig) : ""}</option>`).join("")}</select></label>
-      ${canEdit ? `<button class="btn o s" id="emp_add">＋ Add employee</button><button class="btn o s" id="emp_del">Remove employee</button>` : ""}
+      ${canStruct ? `<button class="btn o s" id="emp_add">＋ Add employee</button><button class="btn o s" id="emp_del">Remove employee</button>` : ""}
       <span style="width:12px"></span><button class="btn o s" id="pv">‹</button><input type="month" id="mon" class="sel" value="${M}"><button class="btn o s" id="nx">›</button>
       <span class="wdoff">Weekly off:</span>${D.WD_ORDER.map((w) => `<label class="wdoff"><input type="checkbox" data-off="${w}" ${doc.off.includes(w) ? "checked" : ""}${ro}> ${D.WD[w]}</label>`).join("")}
       <label class="wdoff">Target <input type="number" id="tgt" min="1" max="100" value="${tgt}" style="width:58px"${ro}> %</label>
       <span id="svst" class="mut" style="font-size:12px"></span><span style="flex:1"></span><button class="btn s" id="prt">⎙ Print / PDF</button></div>
-      <p class="note noprint" style="margin:0 0 8px"><b>How it works:</b> add a review, choose its frequency and the days are planned automatically — <b>Daily</b> = every day except the weekly-off days, <b>Weekly</b> = the days you tick, <b>Specific dates</b> = the dates you type. Click a day to mark it <b>C</b> completed, <b>X</b> missed or <b>E</b> concession (or type the letter). Everything saves as you type.</p>
+      <p class="note noprint" style="margin:0 0 8px">${canStruct ? "" : "<b>The table is locked.</b> You can mark the planned days (C completed, X missed, E concession) and record the reasons; only an administrator can change anything else. "}<b>How it works:</b> add a review, choose its frequency and the days are planned automatically — <b>Daily</b> = every day except the weekly-off days, <b>Weekly</b> = the days you tick, <b>Specific dates</b> = the dates you type. Click a day to mark it <b>C</b> completed, <b>X</b> missed or <b>E</b> concession (or type the letter). Everything saves as you type.</p>
       <div class="xl no-sno" data-nofilter><div class="xs" id="xs"><table>${col}<tbody>`;
     h += `<tr class="t1"><td colspan="40"><div style="position:sticky;left:0;width:var(--vw,900px);height:76px;line-height:76px;text-align:center"><span id="xlogo" style="position:absolute;left:0;top:0;line-height:0"></span><span id="xtitle">${esc(title)}</span></div></td></tr>`;
     h += `<tr class="t2"><td colspan="2" class="fa" style="left:0">Name: <input class="cell" id="f_name" style="width:70%;display:inline-block" value="${esc(e.name)}" placeholder="[enter name]"${ro}></td><td colspan="3">Department: <input class="cell" id="f_dept" style="width:38%;display:inline-block" value="${esc(e.dept)}" placeholder="[department]"${ro}> Designation: <input class="cell" id="f_des" style="width:30%;display:inline-block" value="${esc(e.desig)}" placeholder="[designation]"${ro}></td><td colspan="8">Period: ${monthName(M)}</td><td colspan="9">O = Plan &nbsp; C = Completed</td><td colspan="10">X = Missed &nbsp; E = Concession</td><td colspan="8">– = Off / not scheduled</td></tr>`;
@@ -107,11 +107,11 @@
       h += `<tr class="ar"><td class="fa c">${i + 1}</td><td class="fb wrap"><textarea class="cell" rows="1" data-ac="${i}" data-f="activity" placeholder="Type the review / activity"${ro}>${esc(a.activity)}</textarea></td><td><input class="cell" data-ac="${i}" data-f="resp" value="${esc(a.resp)}" placeholder="${esc(e.desig || "Responsibility")}"${ro}></td><td>${fqHtml(a, i, ro)}</td><td class="cc"><input class="cell" data-ac="${i}" data-f="dur" value="${esc(a.dur)}" placeholder="e.g. 30 min"${ro}></td>`;
       for (let d = 1; d <= 31; d++) {
         const v = d > n ? OFF : D.cell(a, d), k = v === OFF ? "N" : v, od = v === "O" && d < c.dayNo && dayNo ? " od" : "";
-        h += `<td class="d ${k}${d === dayNo ? " cur" : ""}${od}${!canEdit || d > n ? " ro" : ""}" data-i="${i}" data-d="${d}"${od ? ' title="Date has passed — update to C (done), X (missed) or E (concession)"' : ""}>${v}</td>`;
+        h += `<td class="d ${k}${d === dayNo ? " cur" : ""}${od}${!canEdit || d > n || (!canStruct && v === OFF) ? " ro" : ""}" data-i="${i}" data-d="${d}"${od ? ' title="Date has passed — update to C (done), X (missed) or E (concession)"' : ""}>${v}</td>`;
       }
-      h += `<td class="c">${r.plan}</td><td class="c">${r.done}</td><td class="c">${r.plan ? (r.pct * 100).toFixed(1) + "%" : ""}</td><td class="dl noprint">${canEdit ? `<button data-rm="${i}" title="Delete this activity">✕</button>` : ""}</td></tr>`;
+      h += `<td class="c">${r.plan}</td><td class="c">${r.done}</td><td class="c">${r.plan ? (r.pct * 100).toFixed(1) + "%" : ""}</td><td class="dl noprint">${canStruct ? `<button data-rm="${i}" title="Delete this activity">✕</button>` : ""}</td></tr>`;
     });
-    if (canEdit) h += `<tr class="noprint"><td colspan="40" class="add"><div ${vw}><button id="addact">＋ Add activity</button> <span class="mut" style="font-size:11px">${c.rows.length ? "" : "No activities yet. "}${!c.rows.length && prevHas ? '<button id="cp_prev" style="font-weight:400;text-decoration:underline">Copy the activities of ' + monthName(prevMonth(M)) + "</button>" : ""}</span></div></td></tr>`;
+    if (canStruct) h += `<tr class="noprint"><td colspan="40" class="add"><div ${vw}><button id="addact">＋ Add activity</button> <span class="mut" style="font-size:11px">${c.rows.length ? "" : "No activities yet. "}${!c.rows.length && prevHas ? '<button id="cp_prev" style="font-weight:400;text-decoration:underline">Copy the activities of ' + monthName(prevMonth(M)) + "</button>" : ""}</span></div></td></tr>`;
     const dayRow = (label, f, last) => `<tr class="tot"><td class="l" colspan="5" style="text-align:left">${label}</td>` + Array.from({ length: 31 }, (_, i) => `<td>${f(c.perDay[i], i)}</td>`).join("") + last + `<td class="noprint"></td></tr>`;
     h += `<tr class="tot gap"><td colspan="40"></td></tr>`;
     h += dayRow("No. of activities planned / day", (x) => x.plan, `<td>${T.plan}</td><td>${T.done}</td><td>${T.plan ? (T.pct * 100).toFixed(1) + "%" : ""}</td>`);
@@ -133,10 +133,10 @@
   }
   const addForm = () => `<div class="emp noprint" id="addbox" style="background:#f1f7fb;border:1px solid var(--line);border-radius:10px;padding:10px"><b>New employee</b><input id="ne_name" placeholder="Name *"><input id="ne_des" placeholder="Designation (e.g. Plant Head)"><input id="ne_dep" placeholder="Department"><button class="btn s" id="ne_ok">Add</button>${emps.length ? '<button class="btn o s" id="ne_no">Cancel</button>' : ""}</div>`;
   async function drawSheet() {
-    if (!canEdit && !emps.length) { $("#sheet").innerHTML = `<p class="mut">No employee has a DWM yet. An editor adds the employees here.</p>`; return; }
+    if (!canStruct && !emps.length) { $("#sheet").innerHTML = `<p class="mut">No employee has a DWM yet. An administrator adds the employees here.</p>`; return; }
     if (!emps.length) { $("#sheet").innerHTML = `<h3 style="margin:4px 0">Daily Work Management</h3><p class="mut">Add the first employee — each employee gets an empty monthly DWM sheet of their own.</p>` + addForm(); return; }
     const keep = $("#xs"), sx = keep ? keep.scrollLeft : 0, sy = keep ? keep.scrollTop : 0, wy = window.scrollY;
-    prevHas = false; if (canEdit && !doc.acts.length) { try { const p = await getDoc(sheetKey(empId, prevMonth(M))); prevHas = !!(p && p.acts && p.acts.length); } catch (e) { prevHas = false; } }
+    prevHas = false; if (canStruct && !doc.acts.length) { try { const p = await getDoc(sheetKey(empId, prevMonth(M))); prevHas = !!(p && p.acts && p.acts.length); } catch (e) { prevHas = false; } }
     $("#sheet").innerHTML = (adding ? addForm() : "") + sheetHtml(); const x = $("#xs"); if (x) { x.scrollLeft = sx; x.scrollTop = sy; } window.scrollTo(0, wy); saved(Object.keys(pend).length ? "saving" : "ok"); paintLogo(); fitVw();
     if (sel) { const t = cellEl(sel.i, sel.d); if (t) t.classList.add("sel"); }
   }
@@ -152,11 +152,12 @@
   /* ---------- marking a day ---------- */
   const pop = $("#pop");
   const LIST = [["O", "Plan"], ["C", "Completed"], ["X", "Missed"], ["E", "Concession"], [OFF, "Off / not scheduled"]];
-  function openMenu(t) { const r = t.getBoundingClientRect(); pop.innerHTML = LIST.map(([k, n]) => `<div data-set="${k}"><b>${k}</b>${n}</div>`).join(""); pop.style.left = Math.min(r.left, innerWidth - 190) + "px"; pop.style.top = Math.min(r.bottom + 2, innerHeight - 160) + "px"; pop.classList.add("on"); }
+  function openMenu(t) { const r = t.getBoundingClientRect(); pop.innerHTML = LIST.filter(([k]) => canStruct || k !== OFF).map(([k, n]) => `<div data-set="${k}"><b>${k}</b>${n}</div>`).join(""); pop.style.left = Math.min(r.left, innerWidth - 190) + "px"; pop.style.top = Math.min(r.bottom + 2, innerHeight - 160) + "px"; pop.classList.add("on"); }
   const closeMenu = () => pop.classList.remove("on");
   function setCell(i, d, v) {
     if (!canEdit) return; const a = doc.acts[i], n = D.dim(M); if (d > n) return;
     const cur = D.cell(a, d); if (cur === v) return;
+    if (!canStruct && (cur === OFF || v === OFF)) { say("Only an administrator can add or remove a planned day. You can mark a planned day as Completed, Missed or Concession.", "w"); return; }
     if (v === OFF && D.isPlan(cur) && !confirm("Do not erase a planned entry to hide a miss — use X for a missed review.\n\nRemove this planned review from the calendar anyway?")) return;
     if (v === "C" && M + "-" + pad(d) > today() && !confirm("This date is in the future. Mark the review as completed anyway?")) return;
     const arr = Array.from(a.cells || OFF.repeat(31)); while (arr.length < 31) arr.push(OFF); arr[d - 1] = v; a.cells = arr.join("");
@@ -166,7 +167,7 @@
   }
   document.addEventListener("click", (e) => {
     const t = e.target, dc = t.closest && t.closest(".xl td.d");
-    if (dc && view === "sheet") { const i = +dc.dataset.i, d = +dc.dataset.d; $$(".xl td.d.sel").forEach((x) => x.classList.remove("sel")); dc.classList.add("sel"); sel = { i, d }; if (canEdit && d <= D.dim(M)) openMenu(dc); return; }
+    if (dc && view === "sheet") { const i = +dc.dataset.i, d = +dc.dataset.d; $$(".xl td.d.sel").forEach((x) => x.classList.remove("sel")); dc.classList.add("sel"); sel = { i, d }; if (canEdit && d <= D.dim(M) && (canStruct || D.cell(doc.acts[i], d) !== OFF)) openMenu(dc); return; }
     const s = t.closest && t.closest("[data-set]"); if (s && sel) { closeMenu(); setCell(sel.i, sel.d, s.dataset.set); return; }
     if (!(t.closest && t.closest("#pop"))) closeMenu();
   });
@@ -174,7 +175,7 @@
     if (view !== "sheet" || !sel || !doc || /INPUT|TEXTAREA|SELECT/.test((e.target || {}).tagName || "")) return;
     const k = e.key, n = D.dim(M);
     if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(k)) { e.preventDefault(); closeMenu(); let { i, d } = sel; if (k === "ArrowLeft") d = Math.max(1, d - 1); if (k === "ArrowRight") d = Math.min(31, d + 1); if (k === "ArrowUp") i = Math.max(0, i - 1); if (k === "ArrowDown") i = Math.min(doc.acts.length - 1, i + 1); $$(".xl td.d.sel").forEach((x) => x.classList.remove("sel")); sel = { i, d }; const t = cellEl(i, d); if (t) { t.classList.add("sel"); t.scrollIntoView({ block: "nearest", inline: "nearest" }); } return; }
-    const m = { o: "O", c: "C", x: "X", e: "E", "-": OFF, "–": OFF }[k.length === 1 ? k.toLowerCase() : ""]; if (m && canEdit && sel.d <= n) { e.preventDefault(); setCell(sel.i, sel.d, m); }
+    const m = { o: "O", c: "C", x: "X", e: "E", "-": OFF, "–": OFF }[k.length === 1 ? k.toLowerCase() : ""]; if (m && canEdit && sel.d <= n && (canStruct || m !== OFF)) { e.preventDefault(); setCell(sel.i, sel.d, m); }
     if (k === "Escape") closeMenu();
   });
 
@@ -309,9 +310,9 @@
 
   (async () => {
     try {
-      if (DEMO) { ctx = { role: "admin", company: "Demo Engineering (sample data)" }; $("#co").textContent = ctx.company; $("#role").textContent = "admin"; }
+      if (DEMO) { const rl = new URLSearchParams(location.search).get("role") || "admin"; ctx = { role: rl, company: "Demo Engineering (sample data)" }; $("#co").textContent = ctx.company; $("#role").textContent = rl; }   // ?demo=1&role=editor shows what an editor sees
       else { await QP.init("dwm", "kmr_dwm_context"); if (!QP.ctx) return; ctx = QP.ctx; }
-      canEdit = ["admin", "editor"].includes(ctx.role);
+      canEdit = ["admin", "editor"].includes(ctx.role); canStruct = ctx.role === "admin";   // administrators and the KMR developer admin change everything; editors only mark the days
       if (window.KMRTask && !DEMO) await KMRTask.init({ call: QP.call, slug: QP.slug, token: async () => { const r = QP.sb && (await QP.sb.auth.getSession()); return r && r.data.session ? r.data.session.access_token : null; } });
       const h = (window.KMRNav && KMRNav.pending() || { go: location.hash.slice(1) }).go; await go(["std", "sheet", "dash"].includes(h) ? h : "std");
     } catch (e) { say(e.message); }
