@@ -1367,7 +1367,7 @@ function paintML() {
     <div style="background:#fff;border-radius:10px;padding:6px;max-width:900px">${drawSVG(o, 'light', 'mlp')}</div>${legendHTML(o)}
     <div class="mut" style="margin:6px 0">Doors: RS 1 inbound (north), RS 2 scrap (west), RS 3 dispatch (east), emergency exit (south). The central corridor runs from the north door to the south emergency exit.</div>
     <details><summary><b>Material in and out, machine by machine</b> (${o.placed.length} machines)</summary><div style="max-height:40vh;overflow:auto"><table class="mt" data-nofilter><thead><tr><th>Code</th><th>Machine</th><th>Input material</th><th>Fed from</th><th>Distance m</th><th>Output material</th><th>Sent to</th><th>Distance m</th></tr></thead><tbody>${mlMaterialRows(o).map(x => `<tr><td>${esc(x.m.id)}</td><td>${esc(x.m.name)}</td><td>${esc(x.m.inMat || '—')}</td><td>${x.src}</td><td>${x.d1 == null ? '—' : x.d1}</td><td>${esc(x.m.outMat || '—')}</td><td>${x.dst}</td><td>${x.d2 == null ? '—' : x.d2}</td></tr>`).join('')}</tbody></table></div><div class="mut">A machine whose input material names raw material (bar, forging, casting, blank …) is fed from the raw material store; a finishing machine or an output marked finished goes to the FG store; everything else moves through the WIP store. Distances are walking distances along the aisles.</div></details>
-    <div class="row" style="margin-top:12px"><input id="ml_title" data-mli="title" value="${esc(ML.title || '')}" style="min-width:260px;max-width:380px"><button class="btn" type="button" id="ml_create">${R.ok ? 'Create the layouts in the Studio →' : 'Create anyway (the Studio will list what does not fit) →'}</button></div>`;
+    <div class="row" style="margin-top:12px"><input id="ml_title" data-mli="title" value="${esc(ML.title || '')}" style="min-width:260px;max-width:380px"><span class="row" style="gap:6px;flex-wrap:nowrap">${saveSel("ml_sv")}</span><button class="btn" type="button" id="ml_create">${R.ok ? 'Create the layouts in the Studio →' : 'Create anyway (the Studio will list what does not fit) →'}</button></div>`;
   }
   el.innerHTML = h + '</div>';
 }
@@ -1431,7 +1431,7 @@ function paintStu() {
      <p class="mut" style="margin:8px 0 0">These are starting values. Set them to what your local rules and your fire / safety officer require. The rules table in the Analysis view shows which rule each limit is based on.</p></div>
      <div class="sec"><h3>What matters most</h3><label for="d_pr">The best design is the one that is strongest for</label><select id="d_pr" data-dims="priority" ${dis}>${Object.entries(PRIORITY).map(([k, v]) => `<option value="${k}" ${P.dim.priority === k ? 'selected' : ''}>${esc(v.n)}</option>`).join('')}</select>
      <table style="margin-top:10px" data-nofilter><thead><tr><th>Criterion</th><th>Weight</th></tr></thead><tbody>${Object.keys(CRIT).map(k => `<tr><td>${esc(CRIT[k])}</td><td>${(PRIORITY[P.dim.priority] || PRIORITY.balanced).w[k]}%</td></tr>`).join('')}</tbody></table></div></div>`;
-  $('#stu').innerHTML = `<div class="studio"><div class="stk"><div class="head"><div class="tt"><b>Layout Studio</b></div><div class="seg" data-nofilter>${seg.map(s => `<button data-sv="${s[0]}" class="${STV === s[0] ? 'on' : ''}">${esc(s[1])}</button>`).join('')}</div><div class="acts"><button class="btn o" id="b_dxf">⬇ Export DXF</button><button class="btn o" id="b_pdf1">⬇ Export PDF</button><button class="btn o" id="b_cad">Open in KMR CAD</button><button class="btn o" id="b_full2">⛶ Full screen</button><button class="btn" id="b_rep">Make the report →</button></div></div>
+  $('#stu').innerHTML = `<div class="studio"><div class="stk"><div class="head"><div class="tt"><b>Layout Studio</b></div><div class="seg" data-nofilter>${seg.map(s => `<button data-sv="${s[0]}" class="${STV === s[0] ? 'on' : ''}">${esc(s[1])}</button>`).join('')}</div><div class="acts"><span class="row" style="gap:6px;flex-wrap:nowrap">${saveSel("sv_fmt")}</span><button class="btn o" id="b_dxf">⬇ Export DXF</button><button class="btn o" id="b_pdf1">⬇ Export PDF</button><button class="btn o" id="b_cad">Open in KMR CAD</button><button class="btn o" id="b_full2">⛶ Full screen</button><button class="btn" id="b_rep">Make the report →</button></div></div>
    <div class="sbar"><div class="pills" id="otabs" data-nofilter></div><div class="kb" id="kp"></div></div></div>
    <div class="vw">${view}</div></div>`;
   paintOpts(); stk();
@@ -1483,6 +1483,48 @@ function anHTML(o) {
 function dirty() { P.dirty = true; clearTimeout(timer); timer = setTimeout(() => { recalc(); paintOpts(); paintHead(); const c = $('#mchk'); if (c) c.innerHTML = checkHTML(P.items, 'data-sms'); }, 250); }
 function paintHead() { const c = $('#co'); if (c && ctx) c.textContent = ctx.company + (P ? ' · ' + (P.no || 'new') + ' ' + P.title + (P.dirty ? '  (not saved)' : '') : ''); }
 
+/* ---------- Save as: choose the format and the place on your own drive (CAD, PDF, pictures, drawing, table, project) ---------- */
+const SAVE_FMT = [['dxf', 'CAD drawing (.dxf) — opens in AutoCAD, KMR CAD', 'application/dxf'], ['pdf', 'PDF drawing (.pdf)', 'application/pdf'], ['png', 'Picture (.png)', 'image/png'], ['jpg', 'Picture (.jpg)', 'image/jpeg'], ['svg', 'Vector drawing (.svg)', 'image/svg+xml'], ['csv', 'Machine table (.csv) — opens in Excel', 'text/csv'], ['json', 'Layout project (.json)', 'application/json']];
+const saveSel = id => `<select id="${id}" style="width:auto;max-width:260px" title="Choose the file type">${SAVE_FMT.map(f => `<option value="${f[0]}">${esc(f[1])}</option>`).join('')}</select><button class="btn o" id="${id}_go" type="button">💾 Save as…</button>`;
+function svgToCanvas(svg, scale, white) {
+  return new Promise((ok, no) => { const m = svg.match(/viewBox="0 0 ([\d.]+) ([\d.]+)"/), w = Math.round(+m[1] * scale), h = Math.round(+m[2] * scale), im = new Image();
+    im.onload = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const g = c.getContext('2d'); if (white) { g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); } g.drawImage(im, 0, 0, w, h); ok(c); };
+    im.onerror = () => no(new Error('The drawing could not be turned into a picture.')); im.src = URL.createObjectURL(new Blob([svg.replace('<svg ', '<svg width="' + w + '" height="' + h + '" ')], { type: 'image/svg+xml' })); });
+}
+const canvasBlob = (c, type, q) => new Promise(ok => c.toBlob(ok, type, q));
+/* a PDF made in the browser: one A3 landscape page, the drawing as a full-quality JPEG, title and reference in the header */
+async function pdfFromCanvas(c, title) {
+  const jpg = new Uint8Array(await (await canvasBlob(c, 'image/jpeg', .95)).arrayBuffer()), PW = 1191, PH = 842, M = 28, top = 50, k = Math.min((PW - 2 * M) / c.width, (PH - top - M) / c.height), iw = c.width * k, ih = c.height * k, x = (PW - iw) / 2, y = PH - top - ih;
+  const enc = new TextEncoder(), parts = [], off = []; let len = 0; const add = b => { const u = typeof b === 'string' ? enc.encode(b) : b; parts.push(u); len += u.length; };
+  const obj = (n, body) => { off[n] = len; add(`${n} 0 obj\n`); add(body); add('\nendobj\n'); };
+  const safe = String(title || 'Layout').replace(/[^\x20-\x7E]/g, '?').replace(/([()\\])/g, '\\$1').slice(0, 90);
+  const content = `q ${iw.toFixed(2)} 0 0 ${ih.toFixed(2)} ${x.toFixed(2)} ${y.toFixed(2)} cm /Im0 Do Q\nBT /F1 13 Tf ${M} ${PH - 30} Td (${safe}) Tj ET\nBT /F1 8 Tf ${M} 12 Td (KMR Layout Studio - drawn to scale, dimensions in metres) Tj ET\n`;
+  add('%PDF-1.4\n'); obj(1, '<< /Type /Catalog /Pages 2 0 R >>'); obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>');
+  obj(3, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${PW} ${PH}] /Resources << /XObject << /Im0 5 0 R >> /Font << /F1 6 0 R >> >> /Contents 4 0 R >>`);
+  obj(4, `<< /Length ${content.length} >>\nstream\n${content}endstream`);
+  off[5] = len; add(`5 0 obj\n<< /Type /XObject /Subtype /Image /Width ${c.width} /Height ${c.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${jpg.length} >>\nstream\n`); add(jpg); add('\nendstream\nendobj\n');
+  obj(6, '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>');
+  const xr = len; add(`xref\n0 7\n0000000000 65535 f \n` + [1, 2, 3, 4, 5, 6].map(n => String(off[n]).padStart(10, '0') + ' 00000 n \n').join('') + `trailer\n<< /Size 7 /Root 1 0 R >>\nstartxref\n${xr}\n%%EOF`);
+  return new Blob(parts, { type: 'application/pdf' });
+}
+/* write the file where the person chooses (browser file dialog); older browsers download it to the Downloads folder */
+async function writeFile(name, blob, desc) {
+  const ext = '.' + name.split('.').pop();
+  if (window.showSaveFilePicker) { try { const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: desc, accept: { [blob.type || 'application/octet-stream']: [ext] } }] }); const w = await h.createWritable(); await w.write(blob); await w.close(); return 'saved'; } catch (e) { if (e && e.name === 'AbortError') return 'cancel'; } }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 8000); return 'downloaded';
+}
+function csvOf(items) { const q = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; return '\ufeffCode,Name,Type,Cell group,Length m,Width m,Input material,Output material\r\n' + items.map(m => [m.id, m.name, (TYPES[m.type] || {}).s || m.type, m.cell || '', m.w, m.h, m.inMat || '', m.outMat || ''].map(q).join(',')).join('\r\n') + '\r\n'; }
+async function saveAs(fmt, o, title, items, proj) {
+  const f = SAVE_FMT.find(x => x[0] === fmt); if (!f) return; const base = 'KMR_Layout_' + ((proj && proj.no) || 'new') + (o ? '_' + String(o.short || '').replace(/\W+/g, '') : '');
+  try {
+    let blob;
+    if (fmt === 'dxf') blob = new Blob([dxf(o, title)], { type: f[2] });
+    else if (fmt === 'csv') blob = new Blob([csvOf(items)], { type: f[2] });
+    else if (fmt === 'json') blob = new Blob([JSON.stringify({ app: 'KMR Layout Studio', title, no: proj && proj.no, dimensions: proj && proj.dim, machines: items, option: o && o.name }, null, 1)], { type: f[2] });
+    else { const svg = drawSVG(o, 'light', 'sv'); if (fmt === 'svg') blob = new Blob([svg], { type: f[2] }); else { const c = await svgToCanvas(svg, 2, true); blob = fmt === 'pdf' ? await pdfFromCanvas(c, (title || '') + ' - ' + (o.name || '')) : await canvasBlob(c, f[2], .95); } }
+    const r = await writeFile(base + '.' + fmt, blob, f[1]); if (r !== 'cancel') say(r === 'saved' ? 'Saved ' + base + '.' + fmt + ' where you chose.' : 'Downloaded ' + base + '.' + fmt + ' to your Downloads folder (this browser cannot ask for a folder).', true);
+  } catch (err) { say(err.message); }
+}
 /* ---------- open in KMR CAD, print / PDF ---------- */
 function openCAD() {
   const o = OPTS[P.sel]; if (!o) return;
@@ -1609,6 +1651,8 @@ document.addEventListener('click', async e => {
     if (d.opt !== undefined) { P.sel = +d.opt; P.dirty = true; paintOpts(); paintHead(); return; }
     if (d.sv) { e.preventDefault(); STV = d.sv; paintStu(); return; }
     if (t.id === 'b_full2') { const s = $('.studio'); if (document.fullscreenElement) await document.exitFullscreen(); else if (s && s.requestFullscreen) await s.requestFullscreen(); else say('This browser cannot show full screen.'); return; }
+    if (t.id === 'sv_fmt_go') return saveAs($('#sv_fmt').value, OPTS[P.sel], P.title, P.items, P);
+    if (t.id === 'ml_sv_go') { const R = mlCompute(); if (!R.opts) { say('Enter the building size first.'); return; } return saveAs($('#ml_sv').value, R.opts[Math.min(ML.sel, R.opts.length - 1)], ML.title, R.items, { no: '', dim: R.dim }); }
     if (t.id === 'b_dxf') { const o = OPTS[P.sel]; download(`KMR_Layout_${(P.no || 'new')}_${o.short.replace(/\W+/g, '')}_1to1.dxf`, dxf(o, P.title), 'application/dxf'); return; }
     if (t.id === 'b_cad') return openCAD();
     if (t.id === 'b_pdf1') { REPORT = REPORT || null; return printReport(true); }
