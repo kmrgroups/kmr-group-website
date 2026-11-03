@@ -31,6 +31,7 @@ layout:[
 ['IATF','8.5.4.1','Storage and inventory','Raw material, WIP and finished goods stores sit on the material route (inbound door, machines, inspection, dispatch); each machine lists its input and output material and the distance to the store it is fed from.'],
 ['ISO','8.7','Control of nonconforming outputs','The scrap yard is a separate area at its own door (RS 2), apart from the finished goods store and the dispatch door (RS 3).'],
 ['VDA','P6','Process input / material flow (VDA 6.3)','Storage areas, transport aisles and the machine-wise input and output material are laid out and checked for the shortest route without crossings.'],
+['IATF','7.1.3.1','Plant, facility and equipment planning - site access','The sides of the building that are roads and the sides blocked by a neighbour are entered; material comes in and goes out only through road sides, offices already standing in the hall are planned around, and the current layout can be analysed and drawn at full size (1:1).'],
 ['IATF','8.5.4','Preservation - handling of material','The shorter material route per part reduces handling and damage risk.','route'],
 ['APQP','Phase 3','Process design and development - floor plan layout','The floor plan layout is a Phase 3 output and is issued as a numbered, revision-controlled report.','rpt'],
 ['PPAP','Element 5','Process flow diagram','The route leg by leg (from-to distances) supports the process flow diagram.','route'],

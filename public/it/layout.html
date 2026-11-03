@@ -236,7 +236,9 @@ function cellsOf(items) {
 }
 
 /* Storage and service areas (from a machine list): raw material, tools / maintenance, DG room north; scrap, WIP, quality room, finished goods south.
-   A central corridor runs through both bands, so the north door, the south emergency door and the side doors stay reachable. */
+   A central corridor runs through both bands, so the inbound door, the far-end exit and the side doors stay reachable.
+   SITE: each of the four sides is either a road (door possible) or blocked by a neighbour's building. The plan is made in one fixed frame
+   (inbound wall = north, flow north to south) and turned / mirrored onto the real sides afterwards (frameT / viewOf). */
 const ZONE_DEF = [
   { key: 'rm', name: 'Raw material store', side: 'nw', c: '#0284c7', ratio: .25, min: 20 },
   { key: 'tool', name: 'Tool crib and maintenance room', side: 'ne', c: '#64748b', ratio: .06, min: 12 },
@@ -246,36 +248,100 @@ const ZONE_DEF = [
   { key: 'qc', name: 'Quality control room', side: 'se', c: '#059669', ratio: 0, min: 15 },
   { key: 'fg', name: 'Finished goods (FG) store', side: 'se', c: '#db2777', ratio: .2, min: 20 }
 ];
-function zonePlan(dim, W, D, aisle) {
-  const Z = (dim.zones || []).filter(z => z.on !== false && +z.area > 0); if (!Z.length) return null;
-  const segW = (W - aisle) / 2 - WALL, def = k => ZONE_DEF.find(d => d.key === k) || { side: 'nw', name: k, c: '#64748b' };
-  const sides = { nw: [], ne: [], sw: [], se: [] };
-  const ord = { nw: ['rm'], ne: ['tool', 'dg'], sw: ['scrap', 'wip'], se: ['qc', 'fg'] };
-  for (const z of Z) sides[def(z.key).side].push(z);
-  for (const k in sides) sides[k].sort((a, b) => ord[k].indexOf(a.key) - ord[k].indexOf(b.key));
-  const sum = l => l.reduce((t, z) => t + (+z.area), 0), dep = l => l.length ? Math.max(3, Math.ceil(2 * sum(l) / segW) / 2) : 0;
+const OPP = { N: 'S', S: 'N', E: 'W', W: 'E' }, VEC = { N: [0, -1], S: [0, 1], E: [1, 0], W: [-1, 0] };
+const SIDE_NAME = { N: 'north', E: 'east', S: 'south', W: 'west' };
+/* which real sides are roads, which side material comes IN and which side it goes OUT (auto = best from the open sides) */
+function planFrame(site, Wr, Dr) {
+  const sd = (site && site.sides) || {}, R = ['N', 'E', 'S', 'W'].filter(s => sd[s] !== 'blocked');
+  if (!R.length) return { err: 'No side of the building is open to a road, so material cannot come in or go out.' };
+  let a = site && R.includes(site.inSide) ? site.inSide : null, b = site && R.includes(site.outSide) ? site.outSide : null;
+  const pickOut = s => R.includes(OPP[s]) ? OPP[s] : (R.find(x => x !== s) || s);
+  if (!a && !b) { const pr = ['N', 'W', 'E', 'S'].find(s => R.includes(s) && R.includes(OPP[s])); if (pr) { a = pr; b = OPP[pr]; } else { a = R[0]; b = pickOut(a); } }
+  else if (a && !b) b = pickOut(a); else if (!a && b) a = pickOut(b);
+  const kind = a === b ? 'same' : b === OPP[a] ? 'opposite' : 'adjacent';
+  const e = kind === 'adjacent' ? b : (a === 'N' || a === 'S' ? 'E' : 'S');
+  const cw = { N: a, S: OPP[a], E: e, W: OPP[e] }, roadC = {}; for (const k of 'NESW') roadC[k] = R.includes(cw[k]);
+  const ccw = {}; for (const k of 'NESW') ccw[cw[k]] = k;      // real side -> canonical side
+  return { R, kind, in: a, out: b, e, down: VEC[OPP[a]], right: VEC[e], cw, ccw, roadC, Wr, Dr, swap: a === 'E' || a === 'W', sides: sd };
+}
+function frameT(fr) {
+  const dd = fr.down, dr = fr.right, x0 = (dr[0] < 0 || dd[0] < 0) ? fr.Wr : 0, y0 = (dr[1] < 0 || dd[1] < 0) ? fr.Dr : 0;
+  const P = (x, y) => [x0 + x * dr[0] + y * dd[0], y0 + x * dr[1] + y * dd[1]];
+  const R = (x, y, w, h) => { const a = P(x, y), b = P(x + w, y + h); return { x: r2(Math.min(a[0], b[0])), y: r2(Math.min(a[1], b[1])), w: r2(Math.abs(b[0] - a[0])), h: r2(Math.abs(b[1] - a[1])) }; };
+  return { P, R };
+}
+function zonePlan(dim, W, D, aisle, fr) {
+  const Z = (dim.zones || []).filter(z => z.on !== false && +z.area > 0).map(z => ({ ...z }));
+  const kind = fr ? fr.kind : 'adjacent', scrapE = fr && kind === 'adjacent' && !fr.roadC.W && !fr.roadC.S;
+  const def = k => { const d = ZONE_DEF.find(q => q.key === k); if (!d) return { side: 'nw', name: k, c: '#64748b' }; const o = { ...d };
+    if (kind === 'same' && (k === 'fg' || k === 'scrap')) o.side = 'ne'; else if (k === 'scrap' && scrapE) o.side = 'se'; return o; };
+  const strips = [];
+  for (const o of (dim.offices || [])) {   // offices inside the building: real compass position -> canonical wall / corner
+    const len = +o.len, dep = +o.dep; if (!(len > 0 && dep > 0)) continue;
+    const pos = String(o.pos || 'NW').toUpperCase(), real = pos.split(''), cs = real.map(s => fr ? fr.ccw[s] : s);
+    const ns = cs.find(c => c === 'N' || c === 'S'), ew = cs.find(c => c === 'E' || c === 'W');
+    if (!ns && ew) { strips.push({ name: o.name || 'Office', len, dep, side: ew }); continue; }   // along a side wall: cuts the hall
+    const side = (ns === 'N' ? 'n' : 's') + (ew === 'E' ? 'e' : 'w');
+    Z.push({ key: 'office:' + (o.name || 'Office') + ':' + Z.length, on: true, area: len * dep, fixed: { w: len, h: dep }, side, name: o.name || 'Office' });
+  }
+  if (!Z.length && !strips.length) return null;
+  const segW = (W - aisle) / 2 - WALL, sides = { nw: [], ne: [], sw: [], se: [] };
+  const ord = { nw: ['rm'], ne: kind === 'same' ? ['fg', 'scrap', 'tool', 'dg'] : ['tool', 'dg'], sw: ['scrap', 'wip'], se: scrapE ? ['qc', 'scrap', 'fg'] : ['qc', 'fg'] };
+  for (const z of Z) { const d = z.fixed ? { side: z.side, name: z.name, c: '#0891b2' } : def(z.key); z._d = d; sides[d.side].push(z); }
+  for (const k in sides) { const left = k[1] === 'w', rank = z => z.fixed ? (left ? -1 : 99) : ord[k].indexOf(z.key); sides[k].sort((a, b) => rank(a) - rank(b)); }
+  const fixedW = l => l.filter(z => z.fixed).reduce((t, z) => t + z.fixed.w + .15, 0), flex = l => l.filter(z => !z.fixed).reduce((t, z) => t + (+z.area), 0);
+  const dep = l => { if (!l.length) return 0; const free = segW - fixedW(l); if (free <= 0) return 99; const A = flex(l), fh = Math.max(0, ...l.filter(z => z.fixed).map(z => z.fixed.h)); return Math.max(3, fh, A ? Math.ceil(2 * A / free) / 2 : 0); };
   const dN = Math.max(dep(sides.nw), dep(sides.ne)), dS = Math.max(dep(sides.sw), dep(sides.se));
   const N = dN ? dN + .3 : 0, S = dS ? dS + .6 : 0, rects = [];
-  const put = (list, d, y, fromCorridor) => {
+  const put = (list, d, south, fromCorridor) => {
     let x = fromCorridor ? W / 2 + aisle / 2 : WALL;
-    for (const z of list) { const w = r2(+z.area / d), df = def(z.key); rects.push({ key: z.key, name: df.name, c: df.c, x: r2(x), y: r2(y), w, h: d, area: r1(+z.area) }); x += w + .15; }
+    for (const z of list) { const w = z.fixed ? z.fixed.w : r2(+z.area / d), h = z.fixed ? Math.min(d, z.fixed.h) : d, y = south ? D - .3 - h : .3;
+      rects.push({ key: z.key, name: z._d.name, c: z._d.c, x: r2(x), y: r2(y), w, h, area: r1(z.fixed ? w * h : +z.area), office: !!z.fixed }); x += w + .15; }
   };
-  put(sides.nw, dN, .3, false); put(sides.ne, dN, .3, true); put(sides.sw, dS, D - .3 - dS, false); put(sides.se, dS, D - .3 - dS, true);
-  const fail = N + S > D * .6 ? `Storage and service areas need ${r1(N + S)} m of the ${r1(D)} m building depth, more than 60% of it.` : '';
-  return { N, S, rects, fail, W, D };
+  put(sides.nw, dN, false, false); put(sides.ne, dN, false, true); put(sides.sw, dS, true, false); put(sides.se, dS, true, true);
+  const fail = N + S > D * .6 ? `Storage, service and office areas need ${r1(N + S)} m of the ${r1(D)} m building depth, more than 60% of it.` : '';
+  return { N, S, rects, fail, W, D, strips };
 }
 function geometry(dim) {
-  const W = num(dim.width, 20), D = num(dim.depth, 30);
+  const site = dim.site && dim.zones ? dim.site : null, Wr = num(dim.width, 20), Dr = num(dim.depth, 30);
+  const fr = site ? planFrame(site, Wr, Dr) : null, frOk = fr && !fr.err ? fr : null;
+  const W = frOk && frOk.swap ? Dr : Wr, D = frOk && frOk.swap ? Wr : Dr;
   let Hh = num(dim.hallDepth, 24); if (Hh > D - 1) Hh = Math.max(1, D - 1);
   const aisle = num(dim.aisle, 2.8), op = num(dim.opClearance, 1.2), maint = num(dim.maintClearance, 1.5);
   let qcDepth = Math.max(0, D - Hh);
   const west = [WALL, W / 2 - aisle / 2 - AISLE_SIDE], east = [W / 2 + aisle / 2 + AISLE_SIDE, W - WALL];
-  const zp = zonePlan(dim, W, D, aisle);
+  const zp = zonePlan(dim, W, D, aisle, frOk);
   if (zp) { Hh = Math.max(1, D - zp.S); qcDepth = zp.S; }
-  const G = { W, D, Hh, aisle, op, maint, qcDepth, west, east, yMin: WALL + (zp ? zp.N : 0), yMax: Hh - WALL,
-    inbound: [W / 2, 0], dispatch: [W, Math.max(2, Hh - 2)], scrap: [0, Math.max(2, Hh - 2)], d1: [W / 2, Hh], zp };
-  if (zp) { const mid = k => { const r = zp.rects.find(z => z.key === k); return r ? r.y + r.h / 2 : Hh + zp.S / 2; }; G.scrap = [0, mid('scrap')]; G.dispatch = [W, mid('fg')]; G.exit2 = [W / 2, D]; }
+  const yMin = WALL + (zp ? zp.N : 0), yMax = Hh - WALL;
+  if (zp) for (const st of zp.strips) {   // an office along a side wall: it stands in the hall, the machine bays become narrower
+    const h = Math.min(st.len, Math.max(1, yMax - yMin)), y = (yMin + yMax - h) / 2, x = st.side === 'W' ? WALL : W - WALL - st.dep;
+    zp.rects.push({ key: 'office:' + st.name, name: st.name, c: '#0891b2', x: r2(x), y: r2(y), w: st.dep, h: r2(h), area: r1(st.dep * h), office: true });
+    if (st.side === 'W') west[0] = Math.max(west[0], WALL + st.dep + .8); else east[1] = Math.min(east[1], W - WALL - st.dep - .8);
+  }
+  const G = { W, D, Hh, aisle, op, maint, qcDepth, west, east, yMin, yMax, d1: [W / 2, Hh], zp, fr: frOk, frErr: fr && fr.err ? fr.err : '', site };
+  const mid = (k, ax) => { const r = zp && zp.rects.find(z => z.key === k); return r ? (ax === 'x' ? r.x + r.w / 2 : r.y + r.h / 2) : null; };
+  const kind = frOk ? frOk.kind : 'adjacent', rc = frOk ? frOk.roadC : { N: 1, E: 1, S: 1, W: 1 };
+  const dispWall = kind === 'opposite' ? 'S' : kind === 'same' ? 'N' : 'E';
+  const scrapWall = kind === 'opposite' ? 'S' : kind === 'same' ? 'N' : (rc.W ? 'W' : rc.S ? 'S' : 'E');
+  const at = (wall, k) => { const fallY = Math.max(2, Hh - 2); if (wall === 'N' || wall === 'S') return [mid(k, 'x') != null ? mid(k, 'x') : W / 2, wall === 'N' ? 0 : D]; return [wall === 'W' ? 0 : W, mid(k, 'y') != null ? mid(k, 'y') : fallY]; };
+  G.inbound = kind === 'same' && mid('rm', 'x') != null ? [mid('rm', 'x'), 0] : [W / 2, 0];
+  G.dispatch = at(dispWall, 'fg'); G.scrap = at(scrapWall, 'scrap'); G.dispWall = dispWall; G.scrapWall = scrapWall;
+  G.exit2 = zp && rc.S ? [W / 2, D] : null;
+  G.doorList = [{ k: 'in', n: 'RS 1 inbound', c: G.inbound, wall: 'N' }, { k: 'scrap', n: 'RS 2 scrap', c: G.scrap, wall: scrapWall }, { k: 'disp', n: 'RS 3 dispatch', c: G.dispatch, wall: dispWall }].concat(G.exit2 ? [{ k: 'exit', n: 'Emergency exit', c: G.exit2, wall: 'S' }] : []);
   return G;
+}
+/* the plan as it stands on the real sides: rectangles, route and doors turned from the fixed frame */
+function viewOf(o) {
+  if (o.kind !== 'factory') return o; if (o._v) return o._v;
+  const G = o.G, fr = G.fr, T = fr ? frameT(fr) : { P: (x, y) => [x, y], R: (x, y, w, h) => ({ x, y, w, h }) }, wm = fr ? fr.cw : { N: 'N', E: 'E', S: 'S', W: 'W' };
+  const Wr = fr ? fr.Wr : G.W, Dr = fr ? fr.Dr : G.D;
+  const v = Object.assign({}, o, { G: Object.assign({}, G, { W: Wr, D: Dr }),
+    placed: o.placed.map(m => Object.assign({}, m, T.R(m.x, m.y, m.w, m.h))), zones: (o.zones || []).map(z => Object.assign({}, z, T.R(z.x, z.y, z.w, z.h))),
+    blocks: (o.blocks || []).map(b => Object.assign({}, b, T.R(b.x, b.y, b.w, b.h))), route: o.route.map(p => T.P(p[0], p[1])),
+    aisle: T.R(G.W / 2 - G.aisle / 2, .5, G.aisle, (G.zp ? G.D : G.Hh) - 1), hallLine: [T.P(0, G.Hh), T.P(G.W, G.Hh)],
+    qcRect: (!o.asIs && !G.zp && G.qcDepth > .7) ? Object.assign(T.R(.3, G.Hh + .3, G.W - .6, G.qcDepth - .6), { depth: G.qcDepth - .6, len: G.W - .6 }) : null,
+    doors: G.doorList.map(d => { const p = T.P(d.c[0], d.c[1]); return Object.assign({}, d, { x: p[0], y: p[1], wall: wm[d.wall] }); }) });
+  v._v = v; return o._v = v;
 }
 
 function layoutQC(items, G) {
@@ -419,7 +485,7 @@ function factoryOption(items, dim, idx) {
   go(G.dispatch, 'Dispatch door');
   const hallArea = G.W * (G.Hh - (G.zp ? G.zp.N : 0));
   const util = hallArea ? (asIs ? placed.reduce((s, m) => s + m.w * m.h, 0) * 1.8 : (lay.blocks || []).reduce((s, b) => s + b.w * b.h, 0)) / hallArea * 100 : 0;
-  return { idx, key: concept.key, name: concept.name, short: concept.short, kind: 'factory', asIs, G, placed, noFit, blocks: lay.blocks || [], route, legs, travel: r1(travel), util: r1(util), total: items.length, placedN: placed.length, turned: placed.filter(m => m.rot).length, zones: G.zp ? G.zp.rects : [], zoneFail: G.zp ? G.zp.fail : '' };
+  return { idx, key: concept.key, name: concept.name, short: concept.short, kind: 'factory', asIs, G, placed, noFit, blocks: lay.blocks || [], route, legs, travel: r1(travel), util: r1(util), total: items.length, placedN: placed.length, turned: placed.filter(m => m.rot).length, zones: G.zp ? G.zp.rects : [], zoneFail: G.zp ? G.zp.fail : '', siteErr: G.frErr || '' };
 }
 
 function officeOption(items, dim, idx) {
@@ -681,7 +747,7 @@ async function readImage(file) {
 
 /* ---------- DXF (Drawing Exchange Format, AutoCAD R12) — one closed polyline per machine, so CAD programmes and this app can read each machine back ---------- */
 function dxf(o, title) {
-  const G = o.G, D = G.D, mm = v => Math.round(v * 1000), Y = y => mm(D - y); let e = '';
+  o = viewOf(o); const G = o.G, D = G.D, mm = v => Math.round(v * 1000), Y = y => mm(D - y); let e = '';
   const L = (ly, a, b, c, d) => { e += `0\nLINE\n8\n${ly}\n10\n${a}\n20\n${b}\n30\n0\n11\n${c}\n21\n${d}\n31\n0\n`; };
   const R = (ly, x, y, w, h) => {
     const X = mm(x), X2 = mm(x + w), Y1 = Y(y), Y2 = Y(y + h);
@@ -692,12 +758,12 @@ function dxf(o, title) {
   const T = (ly, x, y, ht, t) => { e += `0\nTEXT\n8\n${ly}\n10\n${mm(x)}\n20\n${Y(y)}\n30\n0\n40\n${ht}\n1\n${String(t).replace(/[\r\n]/g, ' ')}\n`; };
   R('WALLS', 0, 0, G.W, D);
   if (o.kind === 'factory') {
-    R('AISLES', G.W / 2 - G.aisle / 2, .5, G.aisle, G.Hh - 1); L('WALLS', 0, Y(G.Hh), mm(G.W), Y(G.Hh));
+    if (o.aisle) R('AISLES', o.aisle.x, o.aisle.y, o.aisle.w, o.aisle.h); L('WALLS', mm(o.hallLine[0][0]), Y(o.hallLine[0][1]), mm(o.hallLine[1][0]), Y(o.hallLine[1][1]));
     for (const z of (o.zones || [])) { R('ZONES', z.x, z.y, z.w, z.h); T('ANNOTATIONS', z.x + .1, z.y + .5, 200, z.name + ' ' + z.area + ' m2'); }
-    if (!G.zp && G.qcDepth > 0.7) { R('ZONES', .3, G.Hh + .3, G.W - .6, G.qcDepth - .6); T('ANNOTATIONS', G.W / 2 - 3, G.Hh + .9, 250, 'QUALITY CONTROL AND MEASUREMENT ROOM'); }
+    if (o.qcRect) { R('ZONES', o.qcRect.x, o.qcRect.y, o.qcRect.w, o.qcRect.h); T('ANNOTATIONS', o.qcRect.x + 1, o.qcRect.y + .6, 250, 'QUALITY CONTROL AND MEASUREMENT ROOM'); }
     for (const b of o.blocks) { R('ZONES', b.x, b.y, b.w, b.h); T('ANNOTATIONS', b.x + .1, b.y + .4, 200, b.label); }
   } else { R('AISLES', G.W / 2 - G.cw / 2, .3, G.cw, D - .6); }
-  for (const m of o.placed) { R('MACHINES', m.x, m.y, m.w, m.h); T('ANNOTATIONS', m.x + .15, m.y + m.h / 2, 200, m.name); }
+  for (const m of o.placed) { R('MACHINES', m.x, m.y, m.w, m.h); T('ANNOTATIONS', m.x + .15, m.y + m.h / 2, 200, (m.id && m.id !== m.name ? m.id + ' ' : '') + m.name); }
   T('ANNOTATIONS', 0, -1, 300, `${title || ''} — ${o.name} — scale 1:1, units mm`);
   const lay = [['WALLS', 7], ['MACHINES', 1], ['AISLES', 4], ['ZONES', 3], ['ANNOTATIONS', 2]];
   return '0\nSECTION\n2\nHEADER\n9\n$ACADVER\n1\nAC1009\n9\n$INSUNITS\n70\n4\n0\nENDSEC\n0\nSECTION\n2\nTABLES\n0\nTABLE\n2\nLTYPE\n70\n1\n0\nLTYPE\n2\nCONTINUOUS\n70\n0\n3\nSolid line\n72\n65\n73\n0\n40\n0.0\n0\nENDTAB\n0\nTABLE\n2\nLAYER\n70\n' + lay.length + '\n' + lay.map(l => `0\nLAYER\n2\n${l[0]}\n70\n0\n62\n${l[1]}\n6\nCONTINUOUS\n`).join('') + '0\nENDTAB\n0\nENDSEC\n0\nSECTION\n2\nENTITIES\n' + e + '0\nENDSEC\n0\nEOF\n';
@@ -747,11 +813,10 @@ function segCross(p1, p2, p3, p4) {
 }
 function analyse(o, dim) {
   const R = Object.assign({}, REG_DEF, dim || {}), G = o.G, pl = o.placed, W = G.W, D = G.D, off = o.kind === 'office';
+  const wz = (c, wall, hw) => wall === 'N' ? { x0: c[0] - hw, y0: 0, x1: c[0] + hw, y1: R.doorClear } : wall === 'S' ? { x0: c[0] - hw, y0: D - R.doorClear, x1: c[0] + hw, y1: D }
+    : wall === 'W' ? { x0: 0, y0: c[1] - hw, x1: R.doorClear, y1: c[1] + hw } : { x0: W - R.doorClear, y0: c[1] - hw, x1: W, y1: c[1] + hw };
   const doors = off ? [{ n: 'Entrance', c: G.entrance, zone: { x0: W / 2 - 1.2, y0: D - R.doorClear, x1: W / 2 + 1.2, y1: D } }]
-    : [{ n: 'RS 1 inbound', c: G.inbound, zone: { x0: W / 2 - Math.min(1.8, G.aisle / 2), y0: 0, x1: W / 2 + Math.min(1.8, G.aisle / 2), y1: R.doorClear } },
-       { n: 'RS 2 scrap', c: G.scrap, zone: { x0: 0, y0: G.scrap[1] - 1.8, x1: R.doorClear, y1: G.scrap[1] + 1.8 } },
-       { n: 'RS 3 dispatch', c: G.dispatch, zone: { x0: W - R.doorClear, y0: G.dispatch[1] - 1.8, x1: W, y1: G.dispatch[1] + 1.8 } }];
-  if (!off && G.exit2) doors.push({ n: 'Emergency exit (south)', c: G.exit2, zone: { x0: W / 2 - Math.min(1.2, G.aisle / 2), y0: D - R.doorClear, x1: W / 2 + Math.min(1.2, G.aisle / 2), y1: D } });
+    : G.doorList.map(d => ({ n: d.k === 'exit' ? 'Emergency exit (far end of the corridor)' : d.n, c: d.c, zone: wz(d.c, d.wall, d.k === 'in' ? Math.min(1.8, G.aisle / 2) : d.k === 'exit' ? Math.min(1.2, G.aisle / 2) : 1.8) }));
   /* evacuation */
   const ev = pl.map(m => { const c = [m.x + m.w / 2, m.y + m.h / 2]; let best = null; for (const d of doors) { const x = mdist(c, d.c); if (!best || x < best.d) best = { d: x, door: d.n }; } return { m, d: best.d, door: best.door }; });
   const over = ev.filter(e => e.d > R.exitDist + 1e-9).sort((a, b) => b.d - a.d);
@@ -800,6 +865,7 @@ function scoreAll(opts, dim) {
     o.sc = s; o.hard = [];
     if (o.noFit.length) o.hard.push(o.noFit.length + ' item(s) could not be placed');
     if (o.zoneFail) o.hard.push(o.zoneFail);
+    if (o.siteErr) o.hard.push(o.siteErr);
     if (a.blocked.length) o.hard.push('A machine stands in the clear zone of ' + a.blocked.map(d => d.n).join(', '));
     if (a.exits < 2) o.hard.push('Only one exit — a second exit is needed');
     let tot = 0, wt = 0; for (const k in W) { tot += W[k] * s[k]; wt += W[k]; }
@@ -813,6 +879,11 @@ function scoreAll(opts, dim) {
 function findings(o, opts) {
   const a = o.an, off = o.kind === 'office', info = a.info, asis = opts.find(x => x.asIs), pros = [], cons = [], act = [];
   const gen = opts.filter(x => !x.asIs && !x.noFit.length), minT = Math.min(...gen.map(x => x.travel), Infinity), maxT = Math.max(...gen.map(x => x.travel), 0);
+  if (o.G.fr) { const f = o.G.fr, sn = s => SIDE_NAME[s];
+    pros.push(`Material comes in from the ${sn(f.in)} road and goes out to the ${sn(f.out)} road${f.kind === 'adjacent' ? '' : f.kind === 'opposite' ? ' (through flow)' : ''}; sides blocked by a neighbour carry no doors.`);
+    if (f.kind === 'same') cons.push('Only one side is a road: inbound, dispatch and scrap share one wall, so material flow doubles back.');
+    if (!o.G.exit2) cons.push(`The far end of the central corridor is the ${sn(OPP[f.in])} side, which is blocked by a neighbour: no emergency exit there.`), act.push('Agree an escape passage with the neighbour, or add an exit on a road side.'); }
+  if (o.siteErr) cons.push(o.siteErr);
   if (o.noFit.length) cons.push(`${o.noFit.length} item(s) do not fit: ${o.noFit.slice(0, 4).map(m => m.name).join(', ')}${o.noFit.length > 4 ? '…' : ''}.`), act.push('Make the building larger, reduce clearances or remove items, then check again.');
   if (o.vsCurrent != null) (o.vsCurrent >= TARGETS.saving ? pros : cons).push(`Route per part is ${o.travel} m — ${Math.abs(o.vsCurrent)}% ${o.vsCurrent >= 0 ? 'shorter' : 'longer'} than your current layout (${asis.travel} m).`);
   else if (!o.asIs && o.travel === minT && gen.length > 1) pros.push(`Shortest route of the designs: ${o.travel} m.`);
@@ -904,7 +975,7 @@ function checkHTML(items, attr) {
 }
 const cnt2 = (rows, s) => rows.filter(x => x.c.s === s).length;
 /* ---------- loading and saving ---------- */
-function fromRow(r) { const d = r.dimensions || {}; return { id: r.id, no: r.no, title: r.title, kind: r.kind, status: r.status, source_file: r.source_file || '', sample: !!r.sample, history: r.history || [], sel: Math.max(0, (r.selected_option || 1) - 1), dirty: false, dim: { width: +d.width || 20, depth: +d.depth || 30, hallDepth: +d.hallDepth || 24, qcDepth: +d.qcDepth || 5.4, aisle: +d.aisle || 2.8, opClearance: +d.opClearance || 1.2, maintClearance: +d.maintClearance || 1.5, exitDist: +d.exitDist || REG_DEF.exitDist, minExit: +d.minExit || REG_DEF.minExit, doorClear: +d.doorClear || REG_DEF.doorClear, handling: d.handling || REG_DEF.handling, priority: d.priority || REG_DEF.priority, zones: Array.isArray(d.zones) ? d.zones : undefined }, items: (r.machines || []).map(m => ({ ...m, w: +m.w, h: +m.h })) }; }
+function fromRow(r) { const d = r.dimensions || {}; return { id: r.id, no: r.no, title: r.title, kind: r.kind, status: r.status, source_file: r.source_file || '', sample: !!r.sample, history: r.history || [], sel: Math.max(0, (r.selected_option || 1) - 1), dirty: false, dim: { width: +d.width || 20, depth: +d.depth || 30, hallDepth: +d.hallDepth || 24, qcDepth: +d.qcDepth || 5.4, aisle: +d.aisle || 2.8, opClearance: +d.opClearance || 1.2, maintClearance: +d.maintClearance || 1.5, exitDist: +d.exitDist || REG_DEF.exitDist, minExit: +d.minExit || REG_DEF.minExit, doorClear: +d.doorClear || REG_DEF.doorClear, handling: d.handling || REG_DEF.handling, priority: d.priority || REG_DEF.priority, zones: Array.isArray(d.zones) ? d.zones : undefined, site: d.site || undefined, offices: Array.isArray(d.offices) ? d.offices : undefined }, items: (r.machines || []).map(m => ({ ...m, w: +m.w, h: +m.h })) }; }
 const good = m => m.w > 0 && m.h > 0;
 function recalc() { OPTS = P ? evaluate(P.items.filter(good), P.dim, P.kind) : []; if (OPTS.length) scoreAll(OPTS, P.dim); if (P && P.sel > OPTS.length - 1) P.sel = 0; }
 const curKind = () => (P && P.kind === 'office') ? 'office-ergonomic' : (OPTS[P.sel] ? OPTS[P.sel].key : 'cellular-u');
@@ -931,26 +1002,28 @@ async function loadActions() { try { ACTIONS = (await api.rpc('kmr_pres_actions_
 /* ---------- drawing ---------- */
 const PX = 40;
 function drawSVG(o, th, id, opt) {
-  opt = opt || {};
-  const S = PX, M = 56, G = o.G, W = G.W, D = G.D, dk = th === 'dark', C = dk ? { bg: '#0b1120', wall: '#94a3b8', grid: '#1e293b', tx: '#e2e8f0', aisle: '#33415566', blk: '#94a3b8', rt: '#fbbf24', dim: '#38bdf8', qc: '#10b98122', qcs: '#10b981' } : { bg: '#ffffff', wall: '#0f172a', grid: '#e5e9f2', tx: '#0f172a', aisle: '#cbd5e155', blk: '#475569', rt: '#b45309', dim: '#0369a1', qc: '#10b98118', qcs: '#047857' };
+  opt = opt || {}; o = viewOf(o);
+  const S = PX, G = o.G, M = (G.site && G.fr) ? 84 : 56, W = G.W, D = G.D, dk = th === 'dark', C = dk ? { bg: '#0b1120', wall: '#94a3b8', grid: '#1e293b', tx: '#e2e8f0', aisle: '#33415566', blk: '#94a3b8', rt: '#fbbf24', dim: '#38bdf8', qc: '#10b98122', qcs: '#10b981' } : { bg: '#ffffff', wall: '#0f172a', grid: '#e5e9f2', tx: '#0f172a', aisle: '#cbd5e155', blk: '#475569', rt: '#b45309', dim: '#0369a1', qc: '#10b98118', qcs: '#047857' };
   const px = v => v * S, w = px(W) + 2 * M, h = px(D) + 2 * M, u = id || 'a';
   let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${w} ${h}" style="width:100%;height:auto;font-family:system-ui,sans-serif"><defs><pattern id="g${u}" width="${S}" height="${S}" patternUnits="userSpaceOnUse"><path d="M${S} 0H0V${S}" fill="none" stroke="${C.grid}" stroke-width=".6"/></pattern><marker id="m${u}" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="${C.rt}"/></marker></defs><rect width="${w}" height="${h}" fill="${C.bg}"/>`;
   s += `<g transform="translate(${M},${M})"><rect width="${px(W)}" height="${px(D)}" fill="url(#g${u})" stroke="${C.wall}" stroke-width="3"/>`;
   const T = (x, y, t, sz, fill, extra) => `<text x="${x}" y="${y}" font-size="${sz}" fill="${fill || C.tx}" ${extra || ''}>${esc(t)}</text>`;
   if (o.kind === 'factory') {
-    const hh = px(G.Hh);
-    if (!o.asIs) {
-      s += `<rect x="${px(W / 2 - G.aisle / 2)}" y="${px(.5)}" width="${px(G.aisle)}" height="${G.zp ? px(D) - px(1) : hh - px(1)}" fill="${C.aisle}" stroke="${C.blk}" stroke-dasharray="5 4"/>`;
-      s += T(px(W / 2) + 4, px(G.Hh / 2), G.aisle.toFixed(1) + ' m central transport aisle', 10, C.blk, `text-anchor="middle" transform="rotate(-90 ${px(W / 2) + 4} ${px(G.Hh / 2)})" letter-spacing="2"`);
-    }
-    s += `<line x1="0" y1="${hh}" x2="${px(W)}" y2="${hh}" stroke="${C.wall}" stroke-width="3" stroke-dasharray="${o.asIs ? '8 6' : ''}"/>`;
-    const door = (x, y, wd, ht, col, lab, lx, ly, rot) => `<rect x="${x}" y="${y}" width="${wd}" height="${ht}" fill="${col}" stroke="${C.wall}" rx="2"/>` + T(lx, ly, lab, 9, col, rot ? `text-anchor="middle" transform="rotate(${rot} ${lx} ${ly})"` : 'text-anchor="middle"');
-    s += door(px(W / 2 - 1.8), -5, px(3.6), 10, '#0284c7', 'RS 1 inbound (3.6 m Rolling Shutter)', px(W / 2), -12, 0);
-    s += door(-5, px(G.scrap[1] - 1.8), 10, px(3.6), '#d97706', 'RS 2 scrap', -12, px(G.scrap[1]), -90);
-    s += door(px(W) - 5, px(G.dispatch[1] - 1.8), 10, px(3.6), '#db2777', 'RS 3 dispatch', px(W) + 16, px(G.dispatch[1]), 90);
-    if (G.exit2) s += door(px(W / 2 - 1.2), px(D) - 5, px(2.4), 10, '#16a34a', 'EMERGENCY EXIT', px(W / 2), px(D) + 18, 0);
+    if (G.fr) { const sd = G.fr.sides || {}, band = (side, x, y, w, h, tx, ty, rot) => { const road = sd[side] !== 'blocked', col = road ? '#64748b' : '#b45309';
+        return `<rect x="${x}" y="${y}" width="${w}" height="${h}" fill="${road ? (dk ? '#334155' : '#e2e8f0') : (dk ? '#78350f55' : '#fde68a88')}" stroke="${col}" stroke-dasharray="${road ? '' : '4 3'}"/>` + T(tx, ty, road ? 'ROAD' : 'NEIGHBOUR BUILDING (blocked)', 9, col, `text-anchor="middle" font-weight="700" letter-spacing="1.5"${rot ? ` transform="rotate(${rot} ${tx} ${ty})"` : ''}`); };
+      s += band('N', 0, -74, px(W), 16, px(W / 2), -62, 0) + band('S', 0, px(D) + 56, px(W), 16, px(W / 2), px(D) + 68, 0) + band('W', -80, 0, 16, px(D), -68, px(D / 2), -90) + band('E', px(W) + 56, 0, 16, px(D), px(W) + 68, px(D / 2), 90); }
+    if (!o.asIs && o.aisle) { const a = o.aisle, hz = a.w > a.h;
+      s += `<rect x="${px(a.x)}" y="${px(a.y)}" width="${px(a.w)}" height="${px(a.h)}" fill="${C.aisle}" stroke="${C.blk}" stroke-dasharray="5 4"/>`;
+      s += hz ? T(px(a.x + a.w / 2), px(a.y + a.h / 2) + 4, G.aisle.toFixed(1) + ' m central transport aisle', 10, C.blk, 'text-anchor="middle" letter-spacing="2"') : T(px(a.x + a.w / 2) + 4, px(a.y + a.h / 2), G.aisle.toFixed(1) + ' m central transport aisle', 10, C.blk, `text-anchor="middle" transform="rotate(-90 ${px(a.x + a.w / 2) + 4} ${px(a.y + a.h / 2)})" letter-spacing="2"`); }
+    const hl = o.hallLine; s += `<line x1="${px(hl[0][0])}" y1="${px(hl[0][1])}" x2="${px(hl[1][0])}" y2="${px(hl[1][1])}" stroke="${C.wall}" stroke-width="3" stroke-dasharray="${o.asIs ? '8 6' : ''}"/>`;
+    const COL = { in: '#0284c7', scrap: '#d97706', disp: '#db2777', exit: '#16a34a' }, LAB = { in: 'IN · RS 1 inbound (3.6 m Rolling Shutter)', scrap: 'OUT · RS 2 scrap', disp: 'OUT · RS 3 dispatch', exit: 'EMERGENCY EXIT' };
+    for (const d of o.doors) { const col = COL[d.k], hw = d.k === 'exit' ? 1.2 : 1.8, lab = LAB[d.k];
+      if (d.wall === 'N' || d.wall === 'S') { const y = d.wall === 'N' ? -5 : px(D) - 5, ly = d.wall === 'N' ? -12 : px(D) + 18;
+        s += `<rect x="${px(d.x - hw)}" y="${y}" width="${px(2 * hw)}" height="10" fill="${col}" stroke="${C.wall}" rx="2"/>` + T(px(d.x), ly, lab, 9, col, 'text-anchor="middle" font-weight="700"'); }
+      else { const x = d.wall === 'W' ? -5 : px(W) - 5, lx = d.wall === 'W' ? -12 : px(W) + 16;
+        s += `<rect x="${x}" y="${px(d.y - hw)}" width="10" height="${px(2 * hw)}" fill="${col}" stroke="${C.wall}" rx="2"/>` + T(lx, px(d.y), lab, 9, col, `text-anchor="middle" font-weight="700" transform="rotate(${d.wall === 'W' ? -90 : 90} ${lx} ${px(d.y)})"`); } }
     for (const z of (o.zones || [])) s += `<rect x="${px(z.x)}" y="${px(z.y)}" width="${px(z.w)}" height="${px(z.h)}" rx="4" fill="${z.c}" fill-opacity="${dk ? .28 : .16}" stroke="${z.c}" stroke-width="1.6"/>` + T(px(z.x + z.w / 2), px(z.y) + 13, z.name.toUpperCase().slice(0, Math.max(6, Math.floor(px(z.w) / 6.2))), 8.5, z.c, 'text-anchor="middle" font-weight="700"') + T(px(z.x + z.w / 2), px(z.y) + 25, `${r1(z.w)} × ${r1(z.h)} m = ${z.area} m²`, 8, C.tx, 'text-anchor="middle"');
-    if (!o.asIs && !G.zp && G.qcDepth > 0.7) s += `<rect x="${px(.3)}" y="${hh + px(.3)}" width="${px(W - .6)}" height="${px(G.qcDepth - .6)}" rx="4" fill="${C.qc}" stroke="${C.qcs}"/>` + T(px(W / 2), hh + px(.3) + 14, `QUALITY CONTROL AND MEASUREMENT ROOM — ${(W - .6).toFixed(1)} m × ${(G.qcDepth - .6).toFixed(1)} m`, 10, C.qcs, 'text-anchor="middle" font-weight="700"');
+    if (o.qcRect) { const q = o.qcRect; s += `<rect x="${px(q.x)}" y="${px(q.y)}" width="${px(q.w)}" height="${px(q.h)}" rx="4" fill="${C.qc}" stroke="${C.qcs}"/>` + T(px(q.x + q.w / 2), px(q.y) + 14, `QUALITY CONTROL AND MEASUREMENT ROOM — ${q.len.toFixed(1)} m × ${q.depth.toFixed(1)} m`, 10, C.qcs, 'text-anchor="middle" font-weight="700"'); }
     for (const b of o.blocks) s += `<rect x="${px(b.x)}" y="${px(b.y)}" width="${px(b.w)}" height="${px(b.h)}" rx="8" fill="none" stroke="${C.blk}" stroke-dasharray="6 4" stroke-width="1.5"/>` + T(px(b.x) + 4, px(b.y) - 3, String(b.label).toUpperCase(), 8, C.blk, 'font-weight="700"');
     if (o.route.length > 1) s += `<polyline points="${o.route.map(p => px(p[0]) + ',' + px(p[1])).join(' ')}" fill="none" stroke="${C.rt}" stroke-width="2.2" stroke-dasharray="7 5" marker-end="url(#m${u})" opacity=".9"/>`;
   } else {
@@ -958,11 +1031,17 @@ function drawSVG(o, th, id, opt) {
     s += `<rect x="${px(W / 2 - 1)}" y="${px(D) - 5}" width="${px(2)}" height="10" fill="#0284c7" stroke="${C.wall}"/>` + T(px(W / 2), px(D) + 16, 'ENTRANCE', 10, C.dim, 'text-anchor="middle" font-weight="700"');
   }
   for (const m of o.placed) {
-    const col = o.kind === 'office' ? (KINDS[m.kind] || { c: '#0891b2' }).c : (TYPES[m.type] || { c: '#64748b' }).c, x = px(m.x), y = px(m.y), mw = px(m.w), mh = px(m.h), ch = Math.max(4, Math.floor(mw / 5.4));
+    const col = o.kind === 'office' ? (KINDS[m.kind] || { c: '#0891b2' }).c : (TYPES[m.type] || { c: '#64748b' }).c, x = px(m.x), y = px(m.y), mw = px(m.w), mh = px(m.h);
     s += `<rect x="${x}" y="${y}" width="${mw}" height="${mh}" rx="3" fill="${col}" fill-opacity="${o.kind === 'office' ? .82 : .92}" stroke="${dk ? '#fff' : '#0f172a'}" stroke-opacity=".55"/>`;
-    const lab = mw >= 70 ? m.name : (m.id || m.name), dims = `${r2(m.w)}×${r2(m.h)}${m.rot ? ' ↻' : ''}`;
-    s += `<text x="${x + mw / 2}" y="${y + mh / 2 - (mw >= 70 && mh >= 34 ? 2 : -3)}" font-size="${mw >= 70 ? 9.5 : 8}" fill="#fff" text-anchor="middle" font-weight="700">${esc(String(lab).slice(0, ch))}</text>`;
-    if (mw >= 70 && mh >= 34) s += `<text x="${x + mw / 2}" y="${y + mh / 2 + 10}" font-size="8" fill="#fff" fill-opacity=".85" text-anchor="middle">${dims}${o.kind === 'office' ? ' · ' + r1(m.w * m.h) + ' m²' : ''}</text>`;
+    const code = String(m.id || ''), nm = String(m.name || ''), lines = [[code || nm, 1]]; if (code && nm && nm !== code) lines.push([nm, 0]);
+    const dims = `${r2(m.w)}×${r2(m.h)}${m.rot ? ' ↻' : ''}${o.kind === 'office' ? ' · ' + r1(m.w * m.h) + ' m²' : ''}`;
+    const tall = mh > mw * 1.5 && mw < 60, aw = (tall ? mh : mw) - 5, ah = (tall ? mw : mh) - 3, cx = x + mw / 2, cy = y + mh / 2;
+    const fit = (txt, base) => { const fs = Math.max(4.8, Math.min(base, aw / (Math.max(1, txt.length) * 0.56))); const n = Math.max(2, Math.floor(aw / (fs * 0.56))); return [txt.length > n ? txt.slice(0, n - 1) + '…' : txt, fs]; };
+    let rows = lines.map((l, i) => { const f = fit(l[0], i ? 8 : 9.5); return { t: f[0], fs: f[1], b: l[1] }; }); rows.push({ ...(() => { const f = fit(dims, 7.5); return { t: f[0], fs: f[1] }; })(), d: 1 });
+    while (rows.length > 1 && rows.reduce((t, r) => t + r.fs * 1.2, 0) > ah) rows.splice(rows.length - 1 - (rows.length > 2 && rows[rows.length - 1].d ? 0 : 0), 1);
+    const tot = rows.reduce((t, r) => t + r.fs * 1.2, 0); let yy = -tot / 2;
+    const g = rows.map(r => { yy += r.fs * 1.2; return `<text x="0" y="${(yy - r.fs * .3).toFixed(1)}" font-size="${r.fs.toFixed(1)}" fill="#fff" ${r.b ? 'font-weight="700"' : r.d ? 'fill-opacity=".8"' : 'fill-opacity=".95"'} text-anchor="middle">${esc(r.t)}</text>`; }).join('');
+    s += `<g transform="translate(${cx.toFixed(1)} ${cy.toFixed(1)})${tall ? ' rotate(-90)' : ''}">${g}</g>`;
   }
   s += T(px(W / 2), px(D) + 34, `WIDTH ${W.toFixed(1)} m (${Math.round(W * 1000)} mm)`, 11, C.dim, 'text-anchor="middle" font-weight="700"') + T(-30, px(D / 2), `DEPTH ${D.toFixed(1)} m (${Math.round(D * 1000)} mm)`, 11, C.dim, `text-anchor="middle" font-weight="700" transform="rotate(-90 -30 ${px(D / 2)})"`);
   return s + '</g></svg>';
@@ -1058,7 +1137,7 @@ function paintImp() {
     body = `<div class="card"><h3>What was read from “${esc(IM.name)}”</h3><p style="margin:0 0 8px">Building <b>${r.building.w} m × ${r.building.h} m</b> · <b>${kept}</b> of ${r.items.length} machine boxes kept${r.skipped > 0 ? ` · ${r.skipped} other shapes ignored (walls, zones, duplicates)` : ''}${IM.warn ? ' · ' + esc(IM.warn) : ''}.</p>
     <div class="mut" style="margin-bottom:8px">${MASTER_OK ? `<b>Machine type and size are checked against your Machine master</b> (Operations Master): ${IM.matched || 0} of ${r.items.length} machines were found by machine code and their type was set from the master. <button class="btn o sm" id="b_rematch">Match again</button>` : 'Your Machine master has no machines yet (or you have no access), so types were guessed from the names. Add the machines in the Operations Master and the types will be taken from there.'}</div>${checkHTML(r.items.filter(m => m.keep), 'data-ims')}<div class="mut" style="margin-bottom:8px">Check the sizes against the real machines. If the drawing shows only an outline, type the real size — the app uses exactly the sizes you confirm here and never changes them afterwards.</div>
     <div class="stu" style="grid-template-columns:minmax(320px,1fr) minmax(300px,520px)"><div style="max-height:60vh;overflow:auto"><table class="mt"><thead><tr><th>Keep</th><th>#</th><th>Name</th><th>Type</th><th>Master</th><th>Width m</th><th>Depth m</th><th>At x, y m</th></tr></thead><tbody>${r.items.map((m, i) => `<tr><td><input type="checkbox" data-ik="${i}" ${m.keep ? 'checked' : ''}></td><td>${i + 1}</td><td><input data-iv="${i}" data-f="name" value="${esc(m.name)}" style="min-width:110px"></td><td><select data-iv="${i}" data-f="type">${Object.entries(TYPES).filter(([k]) => k !== 'office').map(([k, v]) => `<option value="${k}" ${m.type === k ? 'selected' : ''}>${esc(v.s)}</option>`).join('')}</select></td><td>${m.mcode ? `<span class="chip g" title="Type set from the Machine master">${esc(m.mcode)}</span>` : '<span class="chip a">not in master</span>'}</td><td><input data-iv="${i}" data-f="w" type="number" step=".05" value="${m.w}" style="width:64px"></td><td><input data-iv="${i}" data-f="h" type="number" step=".05" value="${m.h}" style="width:64px"></td><td class="mut">${m.ax}, ${m.ay}</td></tr>`).join('')}</tbody></table></div><div class="pv" id="im_pv">${impPreview()}</div></div>
-    <div class="row" style="margin-top:10px"><input id="im_title" value="${esc(IM.name.replace(/\.[^.]+$/, ''))} — re-layout" style="min-width:260px;max-width:380px"><button class="btn" id="b_accept">Use these ${kept} machines → design better layouts</button></div></div>`;
+    <div class="row" style="margin-top:10px"><input id="im_title" value="${esc(IM.name.replace(/\.[^.]+$/, ''))} — re-layout" style="min-width:260px;max-width:380px"><button class="btn" id="b_accept">Use these ${kept} machines → design better layouts</button><button class="btn o" id="b_analyse" title="Measure the layout you have today: safety, evacuation, maintenance space, material route">Analyse the current layout →</button><button class="btn o" id="b_dxf11" title="A CAD drawing at full size (1 unit = 1 mm) of the layout as read, with machine codes and names">⬇ 1:1 drawing (DXF)</button></div></div>`;
   } else if (IM.src !== 'img' && !TR) body = '<p class="mut">No machines found yet. Check the drawing units or paper scale above, or trace by hand.</p>';
   let trace = '';
   if (TR && IM.underlay) trace = traceHTML();
@@ -1088,14 +1167,21 @@ function trFinish() {
   const S = TR, items = S.boxes.map((b, i) => { const type = b.type || 'conv'; return { id: 'M-' + (i + 1), type, name: b.name || 'Machine ' + (i + 1), cell: CELL_OF[type], w: r2(b.w / S.pxm), h: r2(b.h / S.pxm), ax: r2((b.x - S.bld.x) / S.pxm), ay: r2((b.y - S.bld.y) / S.pxm), arot: false, keep: true }; });
   IM.matched = applyMaster(items); IM.res = { building: { w: r2(S.bld.w / S.pxm), h: r2(S.bld.h / S.pxm), x0: 0, y0: 0 }, items, skipped: 0 }; IM.src = 'img'; IM.underlay = null; TR = null; paintImp();
 }
-async function acceptImport() {
+async function acceptImport(toAnalysis) {
   const r = IM.res, kept = r.items.filter(m => m.keep && m.w > 0 && m.h > 0); if (!kept.length) { say('Keep at least one machine.'); return; }
   const msa = kept.filter(m => m.type === 'msa'), depth = r.building.h;
   const low = msa.filter(m => m.ay >= depth * .7), hall = low.length ? Math.max(depth * .5, Math.min(...low.map(m => m.ay)) - .3) : depth * .85;
   P = { id: null, no: null, title: ($('#im_title') || {}).value || 'Re-layout', kind: 'factory', status: 'draft', source_file: IM.name, history: [], sel: 0, dirty: true, dim: { ...DEFAULT_DIM, ...REG_DEF, width: r.building.w, depth, hallDepth: r1(hall), qcDepth: r1(depth - hall) }, items: kept.map((m, i) => ({ id: m.id || 'M-' + (i + 1), type: m.type, name: m.name, cell: m.cell || CELL_OF[m.type], w: m.w, h: m.h, ax: m.ax, ay: m.ay, arot: false, mcode: m.mcode })) };
   recalc(); REPORT = null; ACTIONS = [];
   if (await save(true)) say(`Layout ${P.no} created from your plan: ${P.items.length} machines. Option “Current layout” shows what you have today; the other options are new designs in the same building.`, true);
-  P.sel = Math.max(0, OPTS.findIndex(x => x.asIs)); paint(); go('stu');
+  P.sel = Math.max(0, OPTS.findIndex(x => x.asIs)); if (toAnalysis === true) STV = 'an'; paint(); go('stu');
+}
+/* the layout as read, drawn full size: one DXF unit = 1 mm, machine code and name on each box */
+function imDXF() {
+  const r = IM.res, kept = r.items.filter(m => m.keep && m.w > 0 && m.h > 0); if (!kept.length) { say('Keep at least one machine.'); return; }
+  const depth = r.building.h, items = kept.map((m, i) => ({ id: m.id || 'M-' + (i + 1), type: m.type, name: m.name, cell: m.cell || CELL_OF[m.type], w: m.w, h: m.h, ax: m.ax, ay: m.ay, arot: false }));
+  const dim = { ...DEFAULT_DIM, ...REG_DEF, width: r.building.w, depth, hallDepth: r1(depth * .85), qcDepth: r1(depth * .15) };
+  const o = factoryOption(items, dim, 'asis'); download(((IM.name || 'plan').replace(/\.[^.]+$/, '')) + '_current_layout_1to1.dxf', dxf(o, ($('#im_title') || {}).value || IM.name), 'application/dxf'); say('Full-size drawing (1 unit = 1 mm) downloaded: building, ' + kept.length + ' machines with code and name.', true);
 }
 
 /* ---------- machine list: Excel / CSV / PDF / picture -> machines + storage and service areas -> layout concepts, or "not sufficient" ---------- */
@@ -1122,7 +1208,29 @@ function lineToCells(line) {
   return [tk[0], '', mid, n2[0], n2[1]];
 }
 /* find the header row (code, type, name, length, width, input, output) and read the machines; units come from the header ("mm", "m") or from the size of the numbers */
+const COMP = { north: 'N', south: 'S', east: 'E', west: 'W', n: 'N', s: 'S', e: 'E', w: 'W' };
+function compassOf(t) { const l = String(t || '').toLowerCase().replace(/[^a-z ]/g, ' '); const c = l.match(/\b(north|south)[ -]?(east|west)\b/); if (c) return COMP[c[1]] + COMP[c[2]]; const k = l.match(/\b(ne|nw|se|sw)\b/); if (k) return k[1].toUpperCase(); const w = l.match(/\b(north|south|east|west)\b/); return w ? COMP[w[1]] : ''; }
+/* site facts written in the same file: "North side | Road", "East side | Neighbour building", "Entry side | North", "Exit side | South", "Building width (m) | 40", "Office | 8 | 5 | NW" */
+function mlSite(grid) {
+  const out = { sides: {}, offices: [] };
+  for (const row0 of grid) { const row = row0.map(c => String(c == null ? '' : c).trim()); if (!row.some(Boolean)) continue; const first = (row.find(Boolean) || '').toLowerCase();
+    const sideCell = row.findIndex(c => /^(north|south|east|west)\b/i.test(c) && c.length < 24);
+    if (sideCell >= 0 && !/^(entry|exit|inward|outward|inbound|outbound|material|dispatch)/i.test(first)) { const rest = row.filter((c, j) => j !== sideCell).join(' ').toLowerCase(), sd = COMP[row[sideCell].toLowerCase().match(/^(north|south|east|west)/)[1]];
+      if (/road|open|gate|street|access|free/.test(rest) && !/no access|not open/.test(rest)) out.sides[sd] = 'road'; else if (/block|neighbo|building|wall|adjacent|compound|closed|no access|factory/.test(rest)) out.sides[sd] = 'blocked'; continue; }
+    const other = row.slice(1).map(compassOf).find(x => x && x.length === 1);
+    if (/^(entry|entrance|inward|inbound|material in)\b/.test(first) && other) { out.inSide = other; continue; }
+    if (/^(exit|outward|outbound|dispatch|material out)\b/.test(first) && other) { out.outSide = other; continue; }
+    const nums = row.slice(1).map(c => mnum(c)).filter(v => v > 0);
+    if (/building\s*(width|breadth)/.test(first) && nums[0]) { out.W = nums[0]; continue; }
+    if (/building\s*(depth|length)/.test(first) && nums[0]) { out.D = nums[0]; continue; }
+    if (/^(office|cabin|canteen|admin|toilet|store room|stores office)/.test(first) && nums.length >= 2) { out.offices.push({ name: row[0], len: nums[0], dep: nums[1], pos: row.slice(1).map(compassOf).find(Boolean) || 'NW' }); }
+  }
+  return out;
+}
+function mlMergeSite(a, b) { const o = { sides: { ...a.sides, ...b.sides }, offices: (a.offices || []).concat(b.offices || []) }; for (const k of ['inSide', 'outSide', 'W', 'D']) if (b[k] || a[k]) o[k] = b[k] || a[k]; return o; }
+let ML_SITE = { sides: {}, offices: [] };
 function mlParse(grid) {
+  try { ML_SITE = mlMergeSite(ML_SITE, mlSite(grid)); } catch (e) { console.warn(e); }
   grid = grid.map(r => r.map(c => String(c == null ? '' : c).trim())).filter(r => r.some(c => c));
   let hi = -1, col = {}, unitTxt = '';
   for (let i = 0; i < Math.min(grid.length, 15); i++) {
@@ -1173,7 +1281,8 @@ async function pdfPictures(buf) {
 }
 async function mlRead(f) {
   if (!f) return; const ext = (f.name.split('.').pop() || '').toLowerCase(), keep = ML || {};
-  ML = { name: f.name, rows: [], W: keep.W || 0, D: keep.D || 0, zones: null, sel: 0, busy: true, note: '', title: (f.name.replace(/\.[^.]+$/, '') + ' — new layout') }; paintML(); say('');
+  ML_SITE = { sides: {}, offices: [] };
+  ML = { name: f.name, rows: [], W: keep.W || 0, D: keep.D || 0, zones: null, sel: 0, busy: true, site: keep.site, offices: keep.offices, note: '', title: (f.name.replace(/\.[^.]+$/, '') + ' — new layout') }; paintML(); say('');
   try {
     let rows = [];
     if (/^(xlsx|xlsm|xls|csv|tsv|ods)$/.test(ext)) rows = await xlsxRows(await f.arrayBuffer());
@@ -1185,7 +1294,10 @@ async function mlRead(f) {
       ML.note = 'The picture was read with text recognition (OCR). Please check every size below.'; rows = mlParse(await ocrGrid(url));
     } else throw new Error('Upload an Excel (.xlsx, .xls), CSV, PDF, JPG or PNG file.');
     if (!rows.length) { ML.busy = false; paintML(); say('No machines with a length and a width were found in this file. Keep the columns: machine code, machine type, machine name, length, width. You can also add the machines by hand below.'); return; }
-    ML.rows = rows; ML.busy = false; mlAuto(true); say(rows.length + ' machines read from ' + f.name + '. Check them, enter the building size and the storage areas.', true);
+    ML.rows = rows; ML.busy = false; mlAuto(true); const st = ML_SITE;
+    if (st.W) ML.W = st.W; if (st.D) ML.D = st.D;
+    if (Object.keys(st.sides).length || st.inSide || st.outSide) ML.site = { sides: { N: 'road', E: 'road', S: 'road', W: 'road', ...st.sides }, inSide: st.inSide || 'auto', outSide: st.outSide || 'auto', fromFile: true };
+    if (st.offices.length) ML.offices = st.offices; say(rows.length + ' machines read from ' + f.name + '. Check them, enter the building size and the storage areas.', true);
   } catch (err) { ML.busy = false; say(err.message); }
   paintML();
 }
@@ -1196,7 +1308,8 @@ function mlAuto(reset) {
   ML.zones = ZONE_DEF.map(d => { const o = old.find(z => z.key === d.key); if (o && o.auto === false) return o; const a = d.key === 'qc' ? Math.max(d.min, Math.ceil(3 * Q)) : Math.max(d.min, Math.ceil(d.ratio * F)); return { key: d.key, on: o ? o.on !== false : true, area: a, auto: true }; });
 }
 function mlItems() { return ML.rows.map((r, i) => ({ id: r.code || 'M-' + (i + 1), type: r.type, name: r.name || r.code, cell: CELL_OF[r.type], w: r.l, h: r.w, inMat: r.inMat || '', outMat: r.outMat || '' })).filter(good); }
-function mlDim(W, D) { return { ...DEFAULT_DIM, ...REG_DEF, width: W, depth: D, hallDepth: r1(D * .75), qcDepth: r1(D * .25), zones: ML.zones.map(z => ({ ...z })) }; }
+function mlSiteOf() { return ML.site || { sides: { N: 'road', E: 'road', S: 'road', W: 'road' }, inSide: 'auto', outSide: 'auto' }; }
+function mlDim(W, D) { return { ...DEFAULT_DIM, ...REG_DEF, width: W, depth: D, hallDepth: r1(D * .75), qcDepth: r1(D * .25), zones: ML.zones.map(z => ({ ...z })), site: mlSiteOf(), offices: (ML.offices || []).filter(o => +o.len > 0 && +o.dep > 0).map(o => ({ ...o })) }; }
 const mlFits = o => !o.noFit.length && !o.zoneFail;
 function mlCompute() {
   const items = mlItems(), W = +ML.W, D = +ML.D; if (!items.length || !(W > 0 && D > 0)) return { items, ok: null };
@@ -1211,11 +1324,12 @@ function mlCompute() {
 }
 function mlVerdict(R) {
   if (R.ok === null) return `<div class="msg" style="background:#fef3c7;color:#92400e">Enter the <b>available building width and depth</b> (metres) to check whether everything fits.</div>`;
-  const a = R.avail.toFixed(0), n = R.opts.length;
-  if (R.ok) return `<div class="msg ok"><b>✔ Sufficient.</b> ${R.fit.length} of ${n} concepts place all ${R.items.length} machines and all ${ML.zones.filter(z => z.on !== false).length} storage and service areas inside ${ML.W} × ${ML.D} m (${a} m²). Machines need about ${R.F.toFixed(0)} m² of floor, storage and service areas ${R.Z.toFixed(0)} m².</div>`;
+  const a = R.avail.toFixed(0), n = R.opts.length, fr = R.opts[0] && R.opts[0].G.fr, sn = k => SIDE_NAME[k];
+  const sideTxt = R.opts[0] && R.opts[0].G.frErr ? `<div class="msg">✘ ${esc(R.opts[0].G.frErr)}</div>` : fr ? `<div class="mut" style="margin:6px 0"><b>Roads and doors:</b> material comes <b>in</b> from the ${sn(fr.in)} road and goes <b>out</b> to the ${sn(fr.out)} road${fr.kind === 'same' ? ' (the only road side, so inbound, dispatch and scrap share one wall)' : ''}. Blocked sides: ${['N', 'E', 'S', 'W'].filter(k => !fr.R.includes(k)).map(sn).join(', ') || 'none'}.${R.opts[0].G.exit2 ? '' : ' <b>No emergency exit is possible on the far side of the corridor (blocked).</b>'}</div>` : '';
+  if (R.ok) return sideTxt + `<div class="msg ok"><b>✔ Sufficient.</b> ${R.fit.length} of ${n} concepts place all ${R.items.length} machines and all ${ML.zones.filter(z => z.on !== false).length} storage and service areas inside ${ML.W} × ${ML.D} m (${a} m²). Machines need about ${R.F.toFixed(0)} m² of floor, storage and service areas ${R.Z.toFixed(0)} m².</div>`;
   const left = R.best.noFit.slice(0, 5).map(m => m.name).join(', ') + (R.best.noFit.length > 5 ? ' …' : '');
   const sug = [R.minD ? `keep the width ${ML.W} m and make the depth at least <b>${R.minD} m</b>` : '', R.minW ? `keep the depth ${ML.D} m and make the width at least <b>${R.minW} m</b>` : ''].filter(Boolean).join(', or ');
-  return `<div class="msg"><b>✘ Area NOT sufficient.</b> ${R.need > R.avail ? `The building has ${a} m², but about <b>${R.need} m²</b> is needed: ${R.F.toFixed(0)} m² of machines (with operator, maintenance and aisle space) plus ${R.Z.toFixed(0)} m² of storage and service areas.` : `The building has ${a} m² and the total (about ${R.need} m²) looks close, but with the aisles, operator and maintenance space, the storage and service bands and the building shape, not everything can be placed.`} ${R.best.zoneFail ? esc(R.best.zoneFail) + ' ' : ''}${R.best.noFit.length ? `Even the best concept leaves ${R.best.noFit.length} machine(s) out (${esc(left)}). ` : ''}${sug ? 'To fit: ' + sug + '.' : 'Even 60 m more does not make it fit; check the machine sizes.'} Or remove machines, or reduce the storage areas below.</div>`;
+  return sideTxt + `<div class="msg"><b>✘ Area NOT sufficient.</b> ${R.need > R.avail ? `The building has ${a} m², but about <b>${R.need} m²</b> is needed: ${R.F.toFixed(0)} m² of machines (with operator, maintenance and aisle space) plus ${R.Z.toFixed(0)} m² of storage and service areas.` : `The building has ${a} m² and the total (about ${R.need} m²) looks close, but with the aisles, operator and maintenance space, the storage and service bands and the building shape, not everything can be placed.`} ${R.best.zoneFail ? esc(R.best.zoneFail) + ' ' : ''}${R.best.noFit.length ? `Even the best concept leaves ${R.best.noFit.length} machine(s) out (${esc(left)}). ` : ''}${sug ? 'To fit: ' + sug + '.' : 'Even 60 m more does not make it fit; check the machine sizes.'} Or remove machines, or reduce the storage areas below.</div>`;
 }
 function mlMaterialRows(o) {
   const zc = k => { const r = (o.zones || []).find(z => z.key === k); return r ? [r.x + r.w / 2, r.y + r.h / 2] : null; };
@@ -1235,7 +1349,14 @@ function paintML() {
   if (ML.busy) { el.innerHTML = intro + up + '<p class="mut">Reading the file… (a picture or scanned PDF takes up to a minute)</p>'; return; }
   const R = mlCompute(), typeOpts = t => Object.entries(TYPES).filter(([k]) => k !== 'office').map(([k, v]) => `<option value="${k}" ${t === k ? 'selected' : ''}>${esc(v.s)}</option>`).join('');
   let h = intro + up + (ML.note ? `<div class="msg" style="background:#fef3c7;color:#92400e;margin-top:10px">${esc(ML.note)}</div>` : '');
-  h += `<div class="card" style="margin-top:12px"><h3>1 · Available building</h3><div class="frm" style="max-width:520px"><div><label class="lb" for="ml_W">Width m</label><input id="ml_W" type="number" step=".5" min="0" data-mli="W" value="${ML.W || ''}"></div><div><label class="lb" for="ml_D">Depth m</label><input id="ml_D" type="number" step=".5" min="0" data-mli="D" value="${ML.D || ''}"></div></div></div>`;
+  const site = mlSiteOf(), sideSel = k => `<div><label class="lb">${{ N: 'North', E: 'East', S: 'South', W: 'West' }[k]} side</label><select data-mli="side" data-k="${k}"><option value="road" ${site.sides[k] !== 'blocked' ? 'selected' : ''}>Road / open (doors possible)</option><option value="blocked" ${site.sides[k] === 'blocked' ? 'selected' : ''}>Neighbour building (blocked)</option></select></div>`;
+  const roads = ['N', 'E', 'S', 'W'].filter(k => site.sides[k] !== 'blocked'), opt = (cur) => `<option value="auto" ${cur === 'auto' || !cur ? 'selected' : ''}>Auto (best)</option>` + roads.map(k => `<option value="${k}" ${cur === k ? 'selected' : ''}>${{ N: 'North', E: 'East', S: 'South', W: 'West' }[k]} road</option>`).join('');
+  h += `<div class="card" style="margin-top:12px"><h3>1 · Building, roads and offices</h3><div class="frm" style="max-width:520px"><div><label class="lb" for="ml_W">Width m (east–west)</label><input id="ml_W" type="number" step=".5" min="0" data-mli="W" value="${ML.W || ''}"></div><div><label class="lb" for="ml_D">Depth m (north–south)</label><input id="ml_D" type="number" step=".5" min="0" data-mli="D" value="${ML.D || ''}"></div></div>
+    <div class="mut" style="margin:10px 0 4px">Which sides have a road, and which are blocked by a neighbour's building?${site.fromFile ? ' <span class="chip g">read from your file</span>' : ''} Material comes <b>in</b> and goes <b>out</b> only through road sides; blocked sides get no doors.</div>
+    <div class="frm" style="max-width:760px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))">${['N', 'E', 'S', 'W'].map(sideSel).join('')}<div><label class="lb">Inward (material in) side</label><select data-mli="inSide">${opt(site.inSide)}</select></div><div><label class="lb">Outward (dispatch and scrap) side</label><select data-mli="outSide">${opt(site.outSide)}</select></div></div>
+    <div class="mut" style="margin:12px 0 4px"><b>Office or other rooms already standing inside the building</b> — the layout is made around them (corner or along a wall):</div>
+    ${(ML.offices || []).length ? `<table class="mt" data-nofilter><thead><tr><th>Name</th><th>Length m (along the wall)</th><th>Depth m (into the hall)</th><th>Position</th><th></th></tr></thead><tbody>${ML.offices.map((o, i) => `<tr><td><input data-mli="office" data-i="${i}" data-f="name" value="${esc(o.name)}" style="min-width:130px"></td><td><input type="number" step=".5" min="0" data-mli="office" data-i="${i}" data-f="len" value="${o.len}" style="width:80px"></td><td><input type="number" step=".5" min="0" data-mli="office" data-i="${i}" data-f="dep" value="${o.dep}" style="width:80px"></td><td><select data-mli="office" data-i="${i}" data-f="pos">${[['NW', 'North-west corner'], ['NE', 'North-east corner'], ['SW', 'South-west corner'], ['SE', 'South-east corner'], ['N', 'Along the north wall'], ['S', 'Along the south wall'], ['E', 'Along the east wall'], ['W', 'Along the west wall']].map(q => `<option value="${q[0]}" ${o.pos === q[0] ? 'selected' : ''}>${q[1]}</option>`).join('')}</select></td><td><button class="btn d sm" type="button" data-mlof="${i}">✕</button></td></tr>`).join('')}</tbody></table>` : ''}
+    <div class="row" style="margin-top:6px"><button class="btn o sm" type="button" id="ml_addof">＋ Add office / room</button></div></div>`;
   h += `<div class="card" style="margin-top:12px"><h3>2 · Storage and service areas <small class="mut">m² — sized from your machines; change any value, or untick what you do not need</small></h3><div style="overflow:auto"><table class="mt" data-nofilter><thead><tr><th>Use</th><th>Area</th><th>Area m²</th><th>Placed</th><th>Why there</th></tr></thead><tbody>${ML.zones.map(z => { const d = ZONE_DEF.find(q => q.key === z.key), why = { rm: 'north, beside the inbound door', tool: 'north-east, near the machines', dg: 'north-east corner, away from stores and exits', scrap: 'south-west, at the RS 2 scrap door', wip: 'south-west, between machining and inspection', qc: 'south, next to the central corridor', fg: 'south-east, at the RS 3 dispatch door' }[z.key]; return `<tr><td><input type="checkbox" data-mli="zone" data-k="${z.key}" data-f="on" ${z.on !== false ? 'checked' : ''}></td><td>${esc(d.name)}</td><td><input type="number" min="0" step="1" style="width:84px" data-mli="zone" data-k="${z.key}" data-f="area" value="${z.area}"> ${z.auto === false ? '<span class="chip a">your value</span>' : '<span class="chip x">auto</span>'}</td><td>${R.best && R.best.zones.some(q => q.key === z.key) ? '✔' : z.on === false ? '—' : '✘'}</td><td class="mut">${why}</td></tr>`; }).join('')}</tbody></table></div></div>`;
   h += `<div class="card" style="margin-top:12px"><h3>3 · Machines — ${ML.rows.length}</h3><div class="mut" style="margin-bottom:6px">Length and width in metres. Sizes are never changed by the layout; a machine is only turned by 90° when it must be.</div><div style="max-height:46vh;overflow:auto"><table class="mt" data-nofilter><thead><tr><th>Code</th><th>Type</th><th>Name</th><th>Length m</th><th>Width m</th><th>Input material</th><th>Output material</th><th></th></tr></thead><tbody>${ML.rows.map((r, i) => `<tr><td><input data-mli="row" data-i="${i}" data-f="code" value="${esc(r.code)}" style="width:80px"></td><td><select data-mli="row" data-i="${i}" data-f="type">${typeOpts(r.type)}</select></td><td><input data-mli="row" data-i="${i}" data-f="name" value="${esc(r.name)}" style="min-width:130px"></td><td><input type="number" step=".05" min="0" data-mli="row" data-i="${i}" data-f="l" value="${r.l}" style="width:70px"></td><td><input type="number" step=".05" min="0" data-mli="row" data-i="${i}" data-f="w" value="${r.w}" style="width:70px"></td><td><input data-mli="row" data-i="${i}" data-f="inMat" value="${esc(r.inMat)}" style="min-width:110px" placeholder="e.g. bar Ø40"></td><td><input data-mli="row" data-i="${i}" data-f="outMat" value="${esc(r.outMat)}" style="min-width:110px" placeholder="e.g. turned part"></td><td><button class="btn d sm" type="button" data-mlrm="${i}">✕</button></td></tr>`).join('')}</tbody></table></div><div class="row" style="margin-top:8px"><button class="btn o sm" type="button" id="ml_add">＋ Add machine</button></div></div>`;
   h += `<div class="card" style="margin-top:12px"><h3>4 · Result</h3>${mlVerdict(R)}`;
@@ -1255,6 +1376,9 @@ function mlEdit(t, live) {
   if (k === 'W' || k === 'D') ML[k] = parseFloat(t.value) || 0;
   else if (k === 'title') { ML.title = t.value; return; }
   else if (k === 'opt') ML.sel = +t.value;
+  else if (k === 'side') { ML.site = mlSiteOf(); ML.site = { ...ML.site, sides: { ...ML.site.sides, [t.dataset.k]: t.value }, fromFile: false }; if (t.value === 'blocked') { if (ML.site.inSide === t.dataset.k) ML.site.inSide = 'auto'; if (ML.site.outSide === t.dataset.k) ML.site.outSide = 'auto'; } }
+  else if (k === 'inSide' || k === 'outSide') { ML.site = { ...mlSiteOf(), [k]: t.value }; }
+  else if (k === 'office') { const o = ML.offices[+t.dataset.i], f = t.dataset.f; o[f] = (f === 'len' || f === 'dep') ? (parseFloat(t.value) || 0) : t.value; }
   else if (k === 'row') { const r = ML.rows[+t.dataset.i], f = t.dataset.f; r[f] = (f === 'l' || f === 'w') ? (parseFloat(t.value) || 0) : t.value; if (f === 'type' && !live) mlAuto(); }
   else if (k === 'zone') { const z = ML.zones.find(q => q.key === t.dataset.k); if (t.dataset.f === 'on') z.on = t.checked; else { z.area = parseFloat(t.value) || 0; z.auto = false; } }
   if (!live) { if (k === 'row') mlAuto(); paintML(); }
@@ -1268,7 +1392,7 @@ async function mlCreate() {
   paint(); go('stu');
 }
 function mlTemplate() {
-  const csv = '﻿Machine code,Machine type,Machine name,Length (mm),Width (mm),Input material,Output material\r\nB-20,CNC Turning,CNC lathe NEJ-04,3700,2300,Bar Ø40,Turned part\r\nB-02,VMC,Vertical machining centre,3200,2300,Turned part,Machined part\r\nCMM-1,Inspection,CMM measuring table,2000,1500,Machined part,Inspected part\r\nPACK-1,Packing,Packing table,1900,1000,Inspected part,Finished goods\r\n';
+  const csv = '﻿Machine code,Machine type,Machine name,Length (mm),Width (mm),Input material,Output material\r\nB-20,CNC Turning,CNC lathe NEJ-04,3700,2300,Bar Ø40,Turned part\r\nB-02,VMC,Vertical machining centre,3200,2300,Turned part,Machined part\r\nCMM-1,Inspection,CMM measuring table,2000,1500,Machined part,Inspected part\r\nPACK-1,Packing,Packing table,1900,1000,Inspected part,Finished goods\r\n\r\nSite (optional),,,,\r\nBuilding width (m),30\r\nBuilding depth (m),40\r\nNorth side,Road\r\nEast side,Neighbour building\r\nSouth side,Road\r\nWest side,Neighbour building\r\nEntry side,North\r\nExit side,South\r\nOffice,8,5,NW\r\n';
   download('KMR_machine_list_template.csv', csv, 'text/csv');
 }
 
@@ -1461,10 +1585,12 @@ document.addEventListener('click', async e => {
     if (d.sv) { e.preventDefault(); STV = d.sv; paintStu(); return; }
     if (t.tagName === 'A') return;
     if (t.id === 'ml_tpl') return mlTemplate();
-    if (t.id === 'ml_blank') { ML = { name: '', rows: [], W: 0, D: 0, zones: null, sel: 0, title: 'New layout from a machine list' }; mlAuto(true); return paintML(); }
+    if (t.id === 'ml_blank') { ML = { name: '', rows: [], W: 0, D: 0, zones: null, sel: 0, title: 'New layout from a machine list', site: null, offices: [] }; mlAuto(true); return paintML(); }
     if (t.id === 'ml_add') { ML.rows.push({ code: 'M-' + (ML.rows.length + 1), type: 'cnc', name: '', l: 2, w: 1.5, inMat: '', outMat: '' }); mlAuto(); return paintML(); }
     if (d.mlrm !== undefined) { ML.rows.splice(+d.mlrm, 1); mlAuto(); return paintML(); }
     if (t.id === 'ml_create') return mlCreate();
+    if (t.id === 'ml_addof') { ML.offices = (ML.offices || []).concat([{ name: 'Office', len: 8, dep: 5, pos: 'NW' }]); return paintML(); }
+    if (d.mlof !== undefined) { ML.offices.splice(+d.mlof, 1); return paintML(); }
     if (d.arm) { armed = d.arm; paintPrj(); paintStu(); setTimeout(() => { if (armed === d.arm) { armed = null; paintPrj(); paintStu(); } }, 4000); return; }
     if (d.new) { const k = d.new.startsWith('factory') ? 'factory' : 'office'; return newProject(k, d.new === 'factory-ex' || k === 'office'); }
     if (d.open) return openProject(d.open);
@@ -1501,6 +1627,8 @@ document.addEventListener('click', async e => {
     if (t.id === 'b_mmatch') { const n = applyMaster(P.items); dirty(); paintStu(); say(n + ' of ' + P.items.length + ' machines found in the Machine master; their type was set from it.', true); return; }
     if (t.id === 'b_mpick') { const c = $('#m_pick').value; if (!c) { say('Choose a machine from the master first.'); return; } const r = MASTER.find(x => x.code === c), ty = MTYPE[String((r.data || {}).type || 'other').toLowerCase().trim()] || 'conv'; P.items.push({ id: r.code, type: ty, name: r.name || r.code, cell: (r.data || {}).cell || CELL_OF[ty], w: (masterSize(r) || { L: 2 }).L, h: (masterSize(r) || { W: 1.5 }).W, mcode: r.code }); dirty(); paintStu(); say(masterSize(r) ? 'Added ' + r.code + ' with type and size from the master.' : 'Added ' + r.code + '. The master has no length and width for it, so enter its real size in the list and in the master.', true); return; }
     if (t.id === 'b_accept') return acceptImport();
+    if (t.id === 'b_analyse') return acceptImport(true);
+    if (t.id === 'b_dxf11') return imDXF();
     if (t.id === 'b_trace') { TR = { mode: 'scale', pts: [], pxm: 0, bld: null, boxes: [] }; paintImp(); return; }
     if (d.tm) { TR.mode = d.tm; paintImp(); return; }
     if (t.id === 'tr_setscale') { const m = parseFloat($('#tr_m').value); if (!(m > 0)) { say('Type the real distance in metres.'); return; } const p = TR.pts; TR.pxm = Math.hypot(p[0][0] - p[1][0], p[0][1] - p[1][1]) / m; TR.mode = 'bld'; paintImp(); return; }
