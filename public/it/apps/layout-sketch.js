@@ -20,7 +20,7 @@
   let H = null;            // host options
   let el = null;           // root element
   let S = null;            // state
-  let tool = 'sel', sel = null, selOp = null, showGaps = false;
+  let tool = 'sel', sel = null, selOp = null, gapMode = 'sel', snapOn = true, view = 'sk';
   let vb = null;           // current viewBox [x,y,w,h] in metres
   let undo = [], drag = null, popEl = null, saveT = null, BG = null, remoteT = null, svState = '', svAt = null, sketches = [], saving = false, again = false;
 
@@ -51,8 +51,9 @@
     } catch (e) { svState = 'err:' + (e.message || e); }
     paintSv(); paintBar();
   }
-  function resetSetup() { const h = el && el.querySelector('#ls-setup'); if (h) delete h.dataset.t; }
+  function resetSetup() { if (el && el.querySelector('#s_unit')) syncTop(true); }
   function snap() { undo.push(JSON.stringify(S)); if (undo.length > 60) undo.shift(); }
+  function closePop() { /* no pop-ups any more; the side panel is used */ }
   function doUndo() { if (!undo.length) return; S = Object.assign(fresh(), JSON.parse(undo.pop())); sel = null; selOp = null; closePop(); render(); persist(); }
 
   /* ---------- units ---------- */
@@ -63,7 +64,7 @@
   const fromU = v => parseFloat(String(v).replace(',', '.')) * UN[u()];
   const niceStep = v => { const p = Math.pow(10, Math.floor(Math.log10(v))); const n = v / p; return (n < 1.5 ? 1 : n < 3.5 ? 2 : n < 7.5 ? 5 : 10) * p; };
   const step = () => niceStep(Math.max(S.L, S.W) / 200);
-  const snapv = v => Math.round(v / step()) * step();
+  const snapv = v => snapOn ? Math.round(v / step()) * step() : v;
 
   /* ---------- geometry ---------- */
   const clampObj = o => { o.w = Math.min(o.w, S.L); o.h = Math.min(o.h, S.W); o.x = Math.max(0, Math.min(S.L - o.w, o.x)); o.y = Math.max(0, Math.min(S.W - o.h, o.y)); };
@@ -115,7 +116,9 @@
     }
     return out;
   }
-  function fitLabel(o, ppm) {
+  const FC = new Map();
+  function fitLabel(o, ppm) { const k = [o.code, o.name, o.w, o.h, ppm.toFixed(3), S.unit].join('|'); if (FC.has(k)) return FC.get(k); if (FC.size > 3000) FC.clear(); const r = fitLabel0(o, ppm); FC.set(k, r); return r; }
+  function fitLabel0(o, ppm) {
     const code = o.code || '', name = o.name || '', sz = fu(o.w) + ' × ' + fu(o.h) + ' ' + u();
     const variants = [
       [code && { t: code, b: 1, max: 2 }, name && { t: name, max: 4 }, { t: sz, nowrap: 1, s: 1 }],
@@ -151,9 +154,9 @@
     opt = opt || {};
     const mx = Math.max(S.L, S.W), pad = mx * 0.07;
     const V = opt.vb || vb || [-pad, -pad, S.L + 2 * pad, S.W + 2 * pad];
-    const ppm = opt.ppm || ((opt.px || (el && el.querySelector('#ls-cv') ? el.querySelector('#ls-cv').clientWidth : 900)) / V[2]);
+    const cvEl = el && el.querySelector('#ls-cv'), ppm = opt.ppm || (opt.px ? opt.px / V[2] : (cvEl && cvEl.clientWidth ? Math.min(cvEl.clientWidth / V[2], cvEl.clientHeight / V[3]) : 900 / V[2]));
     const bad = new Set(overlaps()), fs = 11 / ppm, sw = 1.2 / ppm;
-    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${V.join(' ')}" font-family="Arial,Helvetica,sans-serif" ${opt.px ? `width="${opt.px}" height="${Math.round(opt.px * V[3] / V[2])}"` : 'width="100%" style="display:block;touch-action:none;user-select:none;background:#fff"'} id="${opt.px ? 'x' : 'ls-svg'}">`;
+    let s = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${V.join(' ')}" font-family="Arial,Helvetica,sans-serif" ${opt.px ? `width="${opt.px}" height="${Math.round(opt.px * V[3] / V[2])}"` : 'width="100%" height="100%" style="display:block;touch-action:none;user-select:none;background:#fff"'} id="${opt.px ? 'x' : 'ls-svg'}">`;
     if (opt.px) s += `<rect x="${V[0]}" y="${V[1]}" width="${V[2]}" height="${V[3]}" fill="#fff"/>`;
     if (BG && !opt.px) s += `<image href="${BG.url}" x="0" y="0" width="${S.L}" height="${S.W}" preserveAspectRatio="none" opacity="0.4"/>`;
     // grid
@@ -185,7 +188,7 @@
       });
     }
     // gap dimensions
-    if (showGaps || opt.gaps) for (const a of S.objs) {
+    if (opt.gaps || gapMode !== 'off') for (const a of (opt.gaps || gapMode === 'all' ? S.objs : (sel && byId(sel) ? [byId(sel)] : []))) {
       const g = gapsOf(a);
       for (const sd of SIDES) {
         const q = g[sd]; if (!(q.v > EPS)) continue; let x1, y1, x2, y2;
@@ -223,84 +226,100 @@
 
   /* ---------- screen ---------- */
   const css = `
-  .ls .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}.ls .row>div{display:flex;flex-direction:column;gap:3px;min-width:90px}
-  .ls label.lb{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mut)}.ls .tools{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
-  .ls .tb{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:7px 12px;font-weight:700;cursor:pointer}.ls .tb.on{background:var(--b1);color:#fff;border-color:var(--b1)}
-  .ls #ls-cv{position:relative;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff;max-height:72vh}
-  .ls .pop{position:absolute;z-index:9;background:var(--card);color:var(--ink);border:1px solid var(--b1);border-radius:12px;padding:10px;box-shadow:0 8px 28px #0004;min-width:230px;max-width:290px}
-  .ls .pop h4{margin:0 0 6px;font-size:13px}.ls .pop .g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}.ls .pop .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-  .ls .tbl{overflow:auto;max-height:60vh}.ls .tbl input,.ls .tbl select{padding:4px 6px;width:100%;min-width:62px}.ls .tbl select{min-width:110px}.ls .tbl td small{display:block;color:var(--mut);font-size:10px}
-  .ls .bar{height:10px;border-radius:5px}.ls .sec{border:1px solid var(--line);border-radius:12px;padding:12px;margin:12px 0}.ls h3{margin:0 0 8px}
-  .ls .warn{color:var(--r);font-weight:700}
+  .ls .bar1,.ls .bar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.ls .bar1 b{font-size:15px;margin-right:6px}
+  .ls .bar2 label{font-size:12px;color:var(--mut);display:flex;gap:4px;align-items:center;white-space:nowrap}.ls .bar2 input,.ls .bar2 select,.ls .bar1 select{width:auto;padding:5px 7px}.ls .bar2 input[type=number]{width:92px}
+  .ls .tb{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 11px;font-weight:700;cursor:pointer}.ls .tb.on{background:var(--b1);color:#fff;border-color:var(--b1)}.ls .tb[disabled]{opacity:.45;cursor:default}
+  .ls .seg{display:inline-flex;gap:2px;border:1px solid var(--line);border-radius:12px;padding:3px;margin:2px 0 8px}.ls .seg button{border:0;background:none;padding:6px 14px;border-radius:9px;font-weight:700;cursor:pointer;color:var(--mut)}.ls .seg button.on{background:var(--b1);color:#fff}
+  .ls .sk{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px}@media(max-width:900px){.ls .sk{grid-template-columns:1fr}}
+  .ls #ls-cv{border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff;height:calc(100vh - 300px);min-height:440px}
+  .ls #ls-side{border:1px solid var(--line);border-radius:10px;padding:12px;height:calc(100vh - 300px);min-height:440px;overflow:auto;font-size:13px}
+  .ls #ls-side h4{margin:0 0 6px;font-size:14px}.ls #ls-side .g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}.ls #ls-side label.lb{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mut)}.ls #ls-side input,.ls #ls-side select{padding:5px 7px}
+  .ls .opr{display:flex;gap:6px;align-items:center;margin:4px 0;padding:4px 6px;border:1px solid var(--line);border-radius:8px}.ls .opr.on{border-color:var(--b1);background:#7c3aed14}.ls .opr span{flex:1}
+  .ls .tbl{overflow:auto;max-height:calc(100vh - 260px)}.ls .tbl thead th{position:sticky;top:0;background:var(--card);z-index:1}.ls .tbl input{padding:3px 5px;width:100%;min-width:60px}.ls .tbl td small{display:block;color:var(--mut);font-size:10px}
+  .ls .bar{height:10px;border-radius:5px}.ls .sec{border:1px solid var(--line);border-radius:12px;padding:12px;margin:0 0 12px}.ls h3{margin:0 0 8px}.ls .row{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px}.ls .row>div{display:flex;flex-direction:column;gap:3px}.ls label.lb{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mut)}
   `;
+  const VIEWS = [['sk', 'Sketch'], ['tb', 'Table'], ['db', 'Dashboard'], ['dc', 'Documents & standards']];
   function render() {
     if (!el) return;
-    const keepFocus = document.activeElement && el.contains(document.activeElement) && /INPUT|SELECT/.test(document.activeElement.tagName) && document.activeElement.closest('#ls-setup,#ls-tbl') ? document.activeElement.id || document.activeElement.dataset.k : null;
     if (!el.querySelector('#ls-cv')) {
       el.innerHTML = `<style>${css}</style><div class="ls">
-      <div class="sec" style="position:sticky;top:var(--hh,0);z-index:5"><div class="row" id="ls-bar" style="margin:0"></div><div id="ls-sv" class="mut" style="font-size:12px"></div></div>
-      <div class="sec"><h3>1. Building (inner wall) and unit</h3><div class="row" id="ls-setup"></div>
-        <p class="mut" style="margin:0">Enter the inner length and width of the building and the unit you work in. The sketch is drawn 1:1 to those sizes; every length shown uses the unit you select.</p></div>
-      <div class="tools" id="ls-tools"></div>
-      <div id="ls-cv"></div><div class="mut" id="ls-hint" style="margin:6px 0"></div>
-      <div class="sec"><h3>Dashboard</h3><div id="ls-dash"></div></div>
-      <div class="sec"><h3>Object register (updates by itself)</h3><div class="tbl" id="ls-tbl"></div></div>
-      <div class="sec"><h3>Documents and reports</h3><div id="ls-doc"></div></div>
-      <div class="sec"><h3>Standards alignment of this screen</h3><div id="ls-std"></div></div></div>`;
+      <div class="bar1"><b id="ls-ttl">Sketch &amp; table</b><div id="ls-dyn" style="display:contents"></div><div style="flex:1"></div>
+        <button class="btn sm" data-act="pdf">⬇ Save PDF (layout + table)</button><button class="btn sm" data-act="dxf">⬇ Save CAD file (DXF)</button><button class="btn o sm" data-act="xlsx">⬇ Save Excel</button><button class="btn o sm" data-act="open">📂 Open a file…</button><input type="file" id="ls-open" hidden accept=".json,.dxf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp,.bmp,.gif,.pdf,.svg"></div>
+      <div class="bar2" id="ls-sub">
+        <label>Unit <select id="s_unit">${Object.keys(UN).map(k => `<option value="${k}">${UNAME[k]}</option>`).join('')}</select></label>
+        <label>Inner length <input id="s_L" type="number" step="any"></label><label>Inner width <input id="s_W" type="number" step="any"></label><button class="tb" id="s_apply">Apply</button>
+        <span style="width:8px"></span><span id="ls-tools"></span><span style="flex:1"></span>
+        <label>Distances <select id="ls-gm"><option value="off">none</option><option value="sel">selected object</option><option value="all">all objects</option></select></label><label><input type="checkbox" id="ls-snap" checked style="width:auto"> snap</label>
+        <button class="tb" data-act="undo">↶ Undo</button><button class="tb" data-act="fit">⛶ Fit</button></div>
+      <div id="ls-sv" class="mut" style="font-size:12px;margin-bottom:4px"></div>
+      <div class="seg" id="ls-seg"></div>
+      <div id="v-sk" class="sk"><div id="ls-cv"></div><aside id="ls-side"></aside></div>
+      <div id="v-tb" style="display:none"><div class="tbl" id="ls-tbl"></div></div>
+      <div id="v-db" style="display:none"><div class="sec"><div id="ls-dash"></div></div></div>
+      <div id="v-dc" style="display:none"><div class="sec"><h3>Documents and reports</h3><div id="ls-doc"></div></div><div class="sec"><h3>Standards alignment of this screen</h3><div id="ls-std"></div></div></div></div>`;
       bindCanvas();
     }
-    paintBar(); paintSv(); paintSetup(); paintTools(); paintCanvas(); paintDash(); paintTable(); paintDoc(); paintStd();
-    if (keepFocus) { const e = el.querySelector('#' + CSS.escape(keepFocus)) || el.querySelector(`[data-k="${keepFocus}"]`); if (e && e.focus) { e.focus(); } }
+    syncTop(); paintView();
+  }
+  function syncTop(force) {
+    const g = id => el.querySelector(id); if (!g('#s_unit')) return;
+    el.querySelector('#ls-ttl').textContent = (S.title || 'Sketch') + ' — ' + fuu(S.L) + ' × ' + fuu(S.W) + ' (1:1)';
+    if (force || document.activeElement !== g('#s_L')) g('#s_L').value = fu(S.L);
+    if (force || document.activeElement !== g('#s_W')) g('#s_W').value = fu(S.W);
+    g('#s_unit').value = u(); g('#ls-gm').value = gapMode; g('#ls-snap').checked = snapOn; paintBar(); paintSv(); paintTools();
   }
   function paintBar() {
-    const h = el.querySelector('#ls-bar'); if (!h || h.querySelector('select:focus')) return;
-    const pick = H.store ? `<div style="min-width:200px"><label class="lb">Saved sketches</label><select id="ls-pick"><option value="">${S.id ? '' : '(this one – not saved yet)'}</option>${sketches.map(x => `<option value="${x.id}" ${x.id === S.id ? 'selected' : ''}>${esc(x.title)} · ${esc(String(x.updated_at || '').slice(0, 10).split('-').reverse().join('-'))}</option>`).join('')}</select></div><div><button class="tb" data-act="newsk">＋ New sketch</button></div>` : '';
-    h.innerHTML = `${pick}<div style="flex:1"></div><div><button class="btn" data-act="pdf">⬇ Save PDF (layout + table)</button></div><div><button class="btn" data-act="dxf">⬇ Save CAD file (DXF)</button></div><div><button class="btn o" data-act="xlsx">⬇ Save Excel</button></div><div><button class="btn o" data-act="open">📂 Open a file…</button><input type="file" id="ls-open" hidden accept=".json,.dxf,.xlsx,.xls,.csv,.png,.jpg,.jpeg,.webp,.bmp,.gif,.pdf,.svg"></div>${BG ? '<div><button class="tb" data-act="nobg">✕ Remove background picture</button></div>' : ''}${H.store && S.id ? '<div><button class="tb" data-act="delsk">🗑 Delete this sketch</button></div>' : ''}`;
+    const h = el && el.querySelector('#ls-dyn'); if (!h || h.querySelector('select:focus')) return;
+    h.innerHTML = (H.store ? `<select id="ls-pick" title="Saved sketches"><option value="">${S.id ? '' : '(not saved yet)'}</option>${sketches.map(x => `<option value="${x.id}" ${x.id === S.id ? 'selected' : ''}>${esc(x.title)} · ${esc(String(x.updated_at || '').slice(0, 10).split('-').reverse().join('-'))}</option>`).join('')}</select><button class="tb" data-act="newsk">＋ New</button>` : '') + (BG ? '<button class="tb" data-act="nobg">✕ Remove background picture</button>' : '') + (H.store && S.id ? '<button class="tb" data-act="delsk">🗑 Delete sketch</button>' : '');
   }
   function paintSv() {
     const h = el && el.querySelector('#ls-sv'); if (!h) return; const hm = d => d ? d.toTimeString().slice(0, 5) : '';
     h.style.color = svState.startsWith('err') ? 'var(--r)' : '';
-    h.textContent = !H.store ? 'Saved in this browser only.' : svState === 'saving' ? 'Saving to the database…' : svState === 'wait' ? 'Changes will be saved to the database in a moment…' : svState.startsWith('err') ? 'NOT saved to the database: ' + svState.slice(4) + ' (still kept in this browser; it will retry on the next change)' : svState === 'ok' ? '✔ All changes are saved in the database' + (svAt ? ' at ' + hm(svAt) : '') + '.' : '';
-  }
-  function paintSetup() {
-    const h = el.querySelector('#ls-setup'); if (h.dataset.u === u() + S.L + S.W + S.paper && h.dataset.t) { return; }
-    h.innerHTML = `<div><label class="lb">Layout title</label><input id="s_title" value="${esc(S.title)}"></div>
-      <div><label class="lb">Plant / unit</label><input id="s_plant" value="${esc(S.plant)}" placeholder="Plant-1"></div>
-      <div><label class="lb">Unit</label><select id="s_unit">${Object.keys(UN).map(k => `<option value="${k}" ${k === u() ? 'selected' : ''}>${UNAME[k]}</option>`).join('')}</select></div>
-      <div><label class="lb">Inner length (${u()})</label><input id="s_L" type="number" step="any" value="${fu(S.L)}"></div>
-      <div><label class="lb">Inner width (${u()})</label><input id="s_W" type="number" step="any" value="${fu(S.W)}"></div>
-      <div><label class="lb">Shifts</label><input id="s_sh" type="number" min="1" max="4" value="${S.shifts}" style="max-width:70px"></div>
-      <div><button class="btn" id="s_apply">Apply size</button></div>`;
-    h.dataset.u = u() + S.L + S.W + S.paper; h.dataset.t = 1;
+    h.textContent = !H.store ? 'Saved in this browser only.' : svState === 'saving' ? 'Saving to the database…' : svState === 'wait' ? 'Changes will be saved to the database in a moment…' : svState.startsWith('err') ? 'NOT saved to the database: ' + svState.slice(4) + ' (kept in this browser; it retries on the next change)' : svState === 'ok' ? '✔ All changes are saved in the database' + (svAt ? ' at ' + hm(svAt) : '') + '.' : '';
   }
   function paintTools() {
-    const t = el.querySelector('#ls-tools'); const b = (id, txt) => `<button class="tb ${tool === id ? 'on' : ''}" data-tool="${id}">${txt}</button>`;
-    t.innerHTML = b('sel', '↖ Select / move') + b('draw', '▭ Draw shape') + b('op', '🧍 Add operator') + `<button class="tb" data-act="del" ${sel || selOp ? '' : 'disabled'}>🗑 Delete selected</button><button class="tb" data-act="undo">↶ Undo</button><button class="tb ${showGaps ? 'on' : ''}" data-act="gaps">↔ Show distances</button><button class="tb" data-act="fit">⛶ Fit view</button><button class="tb" data-act="clear">Clear all</button><button class="tb" data-act="jsonout">⬇ JSON</button><button class="tb" data-act="jsonin">⬆ JSON</button><input type="file" id="ls-file" accept=".json" hidden>`;
-    el.querySelector('#ls-hint').textContent = tool === 'draw' ? 'Drag on the floor to draw a rectangle; you will then be asked for its code and name.' : tool === 'op' ? 'Click an object to add an operator on its south side; click the operator to move it to the next side or delete it.' : 'Drag an object to move it; use the corner handles to resize; double-click to edit; wheel to zoom; drag the empty floor to pan.';
+    const t = el.querySelector('#ls-tools'); if (!t) return; const b = (id, txt) => `<button class="tb ${tool === id ? 'on' : ''}" data-tool="${id}">${txt}</button>`;
+    t.innerHTML = b('sel', '↖ Select / move') + ' ' + b('draw', '▭ Draw shape') + ' ' + b('op', '🧍 Add operator') + ` <button class="tb" data-act="del" ${sel || selOp ? '' : 'disabled'}>🗑 Delete</button>`;
   }
-  function paintCanvas() { const c = el.querySelector('#ls-cv'); const keep = popEl && c.contains(popEl) ? popEl : null; c.innerHTML = buildSVG(); if (keep) c.appendChild(keep); }
+  function paintView() {
+    const seg = el.querySelector('#ls-seg'); seg.innerHTML = VIEWS.map(v => `<button class="${view === v[0] ? 'on' : ''}" data-view="${v[0]}">${v[1]}</button>`).join('');
+    VIEWS.forEach(v => { el.querySelector('#v-' + v[0]).style.display = v[0] === view ? (v[0] === 'sk' ? '' : 'block') : 'none'; });
+    if (view === 'sk') { paintCanvas(); paintSide(); } else if (view === 'tb') paintTable(); else if (view === 'db') paintDash(); else { paintDoc(); paintStd(); }
+  }
+  function paintCanvas() { const c = el.querySelector('#ls-cv'); if (c) c.innerHTML = buildSVG(); }
+  function paintSide() {
+    const h = el.querySelector('#ls-side'); if (!h) return; const o = sel && byId(sel);
+    if (!o) { h.innerHTML = `<h4>${drag && drag.kind === 'draw' ? 'Drawing…' : 'Nothing selected'}</h4><p class="mut">${tool === 'draw' ? 'Drag on the floor to draw a rectangle. Then type its code and name here.' : tool === 'op' ? 'Click an object to put an operator on it.' : 'Click an object to see and edit it. Drag to move; use the corner handles to resize; wheel to zoom; drag empty floor to pan; arrow keys nudge (Shift = bigger steps).'}</p><p class="mut">Operator = circle with an arrow on the side where the operator stands. Red fill = overlapping objects. Distances are clear gaps to the nearest wall or object on each side.</p>${groups().length ? '<h4>Groups / lines</h4>' + groups().map(g => `<div><b style="color:${gcol(g)}">■</b> ${esc(g)} — ${S.objs.filter(x => (x.group || '—') === g).length}</div>`).join('') : ''}`; return; }
+    h.innerHTML = `<h4>${esc(o.code)} ${o.name ? '— ' + esc(o.name) : ''}</h4>
+      <div class="g2"><div><label class="lb">Object code</label><input id="sd_code" data-sf="code" value="${esc(o.code)}"></div><div><label class="lb">Object name</label><input data-sf="name" value="${esc(o.name)}"></div>
+      <div><label class="lb">Group / line</label><input data-sf="group" list="ls-gl" value="${esc(o.group)}"><datalist id="ls-gl">${groups().map(g => `<option value="${esc(g)}">`).join('')}</datalist></div><div><label class="lb">Type</label><select data-sf="kind">${KINDS.map(k => `<option ${k === o.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+      <div><label class="lb">Length (${u()})</label><input data-sf="w" type="number" step="any" value="${fu(o.w)}"></div><div><label class="lb">Width (${u()})</label><input data-sf="h" type="number" step="any" value="${fu(o.h)}"></div>
+      <div><label class="lb">Position X (${u()})</label><input data-sf="x" type="number" step="any" value="${fu(o.x)}"></div><div><label class="lb">Position Y (${u()})</label><input data-sf="y" type="number" step="any" value="${fu(o.y)}"></div></div>
+      <h4 style="margin-top:12px">Operators (${o.ops.length})</h4>${o.ops.map((sd, i) => `<div class="opr ${selOp && selOp.o === o.id && selOp.i === i ? 'on' : ''}"><span>Operator ${i + 1}: ${SIDE_NAME[sd]}</span><button class="tb" data-op-next="${i}">Next side ▸</button><button class="tb" data-op-del="${i}">✕</button></div>`).join('') || '<p class="mut" style="margin:0">No operator marked.</p>'}
+      <div style="margin-top:6px"><button class="tb" data-op-add="1">＋ Add operator</button></div>
+      <div style="margin-top:12px"><button class="btn d sm" data-act="del">Delete this object</button></div>
+      <p class="mut" style="margin:10px 0 0">Gaps: ${SIDES.map(sd => { const g = gapsOf(o)[sd]; return sd + ' ' + fu(g.v) + ' (' + esc(g.to) + ')'; }).join(' · ')}</p>`;
+  }
   function paintDash() {
-    const st = stats(), K = (v, l, c) => `<div class="kpi" style="--c:${c || 'var(--b1)'}"><b>${v}</b><span>${l}</span></div>`;
+    const st = stats(), K = (v, l, c) => `<div class="kpi" style="--c:${c || 'var(--b1)'}"><b>${v}</b><span>${l}</span></div>`, uu = UN[u()] * UN[u()];
     const mxm = Math.max.apply(null, st.by.map(b => b.mach || b.n).concat([1]));
-    el.querySelector('#ls-dash').innerHTML = `<div class="kpis">${K(S.objs.length, 'Objects drawn')}${K(st.mach, 'Machines', '#2563eb')}${K(st.man, 'Manpower per shift', '#16a34a')}${K(st.man * S.shifts, 'Manpower, all ' + S.shifts + ' shift(s)', '#0891b2')}${K(st.by.length, 'Groups / lines', '#9333ea')}${K((st.used / st.tot * 100 || 0).toFixed(1) + ' %', 'Floor occupied', '#ca8a04')}${K((st.tot / (UN[u()] * UN[u()])).toFixed(1) + ' ' + u() + '²', 'Building area')}${K(st.over, 'Overlaps', st.over ? '#dc2626' : '#16a34a')}${K(fuu(st.minGap), 'Smallest gap')}</div>
-    ${st.by.length ? `<table><thead><tr><th>S.No</th><th>Group / line</th><th>Objects</th><th>Machines</th><th>Operators</th><th>Floor area (${u()}²)</th><th style="width:30%">Machines by group</th></tr></thead><tbody>${st.by.map((b, i) => `<tr><td>${i + 1}</td><td><b style="color:${gcol(b.group)}">■</b> ${esc(b.group)}</td><td>${b.n}</td><td>${b.mach}</td><td>${b.man}</td><td>${(b.area / (UN[u()] * UN[u()])).toFixed(1)}</td><td><div class="bar" style="width:${(b.mach || b.n) / mxm * 100}%;background:${gcol(b.group)}"></div></td></tr>`).join('')}</tbody></table>` : '<p class="mut">Draw shapes to see group-wise counts.</p>'}`;
+    el.querySelector('#ls-dash').innerHTML = `<div class="kpis">${K(S.objs.length, 'Objects drawn')}${K(st.mach, 'Machines', '#2563eb')}${K(st.man, 'Manpower per shift', '#16a34a')}${K(st.man * S.shifts, 'Manpower, all ' + S.shifts + ' shift(s)', '#0891b2')}${K(st.by.length, 'Groups / lines', '#9333ea')}${K((st.used / st.tot * 100 || 0).toFixed(1) + ' %', 'Floor occupied', '#ca8a04')}${K((st.tot / uu).toLocaleString(undefined, { maximumFractionDigits: 1 }) + ' ' + u() + '²', 'Building area')}${K(st.over, 'Overlapping objects', st.over ? '#dc2626' : '#16a34a')}${K(fuu(st.minGap), 'Smallest gap')}</div>
+    <p class="mut">Shifts: <input id="d_sh" type="number" min="1" max="4" value="${S.shifts}" style="width:70px"> (manpower for all shifts = operators marked × shifts)</p>
+    ${st.by.length ? `<table><thead><tr><th>S.No</th><th>Group / line</th><th>Objects</th><th>Machines</th><th>Operators</th><th>Floor area (${u()}²)</th><th style="width:30%">Machines by group</th></tr></thead><tbody>${st.by.map((b, i) => `<tr><td>${i + 1}</td><td><b style="color:${gcol(b.group)}">■</b> ${esc(b.group)}</td><td>${b.n}</td><td>${b.mach}</td><td>${b.man}</td><td>${(b.area / uu).toFixed(1)}</td><td><div class="bar" style="width:${(b.mach || b.n) / mxm * 100}%;background:${gcol(b.group)}"></div></td></tr>`).join('')}</tbody></table>` : '<p class="mut">Draw shapes to see group-wise counts.</p>'}`;
   }
   function paintTable() {
-    const R = rows(), host = el.querySelector('#ls-tbl'), kd = host.querySelector('input:focus');
-    if (kd) return; // never rebuild while typing
-    const gc = (r, sd) => { const g = r.g[sd]; return `<td><input data-k="g${r.n}${sd}" data-gap="${r.o.id}:${sd}" type="number" step="any" value="${fu(g.v)}"><small>to ${esc(g.to)}</small></td>`; };
-    host.innerHTML = R.length ? `<table><thead><tr><th>S.No</th><th>Object code</th><th>Object name</th><th>Type</th><th>Group / line</th><th>Length (${u()})</th><th>Width (${u()})</th><th>Position X (${u()})</th><th>Position Y (${u()})</th><th>Area (${u()}²)</th><th>Operator direction</th><th>Manpower</th><th>Gap N</th><th>Gap E</th><th>Gap S</th><th>Gap W</th></tr></thead><tbody>${R.map(r => `<tr${overlaps().includes(r.o) ? ' style="background:#ff000018"' : ''}><td>${r.n}</td><td><input data-k="c${r.n}" data-f="code" data-id="${r.o.id}" value="${esc(r.code)}"></td><td><input data-k="n${r.n}" data-f="name" data-id="${r.o.id}" value="${esc(r.name)}"></td><td><select data-f="kind" data-id="${r.o.id}">${KINDS.map(k => `<option ${k === r.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></td><td><input data-k="gr${r.n}" data-f="group" data-id="${r.o.id}" value="${esc(r.o.group)}"></td><td><input data-k="l${r.n}" data-f="w" data-id="${r.o.id}" type="number" step="any" value="${fu(r.len)}"></td><td><input data-k="w${r.n}" data-f="h" data-id="${r.o.id}" type="number" step="any" value="${fu(r.wid)}"></td><td>${fu(r.x)}</td><td>${fu(r.y)}</td><td>${(r.area / (UN[u()] * UN[u()])).toFixed(2)}</td><td>${r.ops.length ? r.ops.map(sd => `<span class="chip x">${sd}</span>`).join(' ') : '—'}</td><td>${r.man}</td>${gc(r, 'N')}${gc(r, 'E')}${gc(r, 'S')}${gc(r, 'W')}</tr>`).join('')}</tbody></table>` : '<p class="mut">The table fills in as you draw.</p>';
+    const R = rows(), host = el.querySelector('#ls-tbl'), bad = new Set(overlaps()), uu = UN[u()] * UN[u()];
+    const gc = (r, sd) => { const g = r.g[sd]; return `<td><input data-gap="${r.o.id}:${sd}" type="number" step="any" value="${fu(g.v)}"><small>to ${esc(g.to)}</small></td>`; };
+    host.innerHTML = R.length ? `<table><thead><tr><th>S.No</th><th>Object code</th><th>Object name</th><th>Type</th><th>Group / line</th><th>Length (${u()})</th><th>Width (${u()})</th><th>Position X</th><th>Position Y</th><th>Area (${u()}²)</th><th>Operator direction</th><th>Manpower</th><th>Gap N</th><th>Gap E</th><th>Gap S</th><th>Gap W</th></tr></thead><tbody>${R.map(r => `<tr${bad.has(r.o) ? ' style="background:#ff000018"' : ''}><td>${r.n}</td><td><input data-f="code" data-id="${r.o.id}" value="${esc(r.code)}"></td><td><input data-f="name" data-id="${r.o.id}" value="${esc(r.name)}"></td><td>${esc(r.kind)}</td><td><input data-f="group" data-id="${r.o.id}" value="${esc(r.o.group)}"></td><td>${fu(r.len)}</td><td>${fu(r.wid)}</td><td>${fu(r.x)}</td><td>${fu(r.y)}</td><td>${(r.area / uu).toFixed(2)}</td><td>${r.ops.length ? r.ops.join(', ') : '—'}</td><td>${r.man}</td>${gc(r, 'N')}${gc(r, 'E')}${gc(r, 'S')}${gc(r, 'W')}</tr>`).join('')}</tbody></table><p class="mut">Change a gap number and the object moves. Length, width and position are edited on the Sketch screen.</p>` : '<p class="mut">The table fills in as you draw.</p>';
   }
   function paintDoc() {
-    const h = el.querySelector('#ls-doc'); if (h.querySelector('input:focus,select:focus')) return;
-    h.innerHTML = `<div class="row"><div><label class="lb">Paper size (ISO 216)</label><select id="d_paper">${Object.keys(PAPER).map(k => `<option ${k === S.paper ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
-      <div><label class="lb">Revision</label><input id="d_rev" value="${esc(S.rev)}" style="max-width:80px"></div>
-      <div style="flex:1"><label class="lb">Revision note</label><input id="d_note" value="${esc(S.revNote)}"></div>
-      <div><label class="lb">Drawn by</label><input id="d_dr" value="${esc(S.drawn || H.user || '')}"></div>
-      <div><label class="lb">Checked by</label><input id="d_ch" value="${esc(S.checked)}"></div>
-      <div><label class="lb">Approved by</label><input id="d_ap" value="${esc(S.approved)}"></div></div>
-      <div class="row"><button class="btn" data-act="pdf">⬇ Download PDF</button><button class="btn" data-act="xlsx">⬇ Download Excel</button></div>
-      <p class="mut" style="margin:0">Each download gets its own reference number. The PDF has the drawing sheet (frame, title block, scale, north arrow) followed by the register, dashboard and revision history. Customer logo is at the top left, reference number at the top right, and format number, revision, page number and “Powered By : KMR Group of Companies” are in the footer of every page.${S.hist.length ? ' Issued: ' + S.hist.slice(-6).map(x => esc(x.ref)).join(', ') + '.' : ''}</p>`;
+    const h = el.querySelector('#ls-doc'); if (!h || h.querySelector('input:focus,select:focus')) return;
+    h.innerHTML = `<div class="row"><div><label class="lb">Layout title</label><input id="s_title" value="${esc(S.title)}"></div><div><label class="lb">Plant / unit</label><input id="s_plant" value="${esc(S.plant)}" placeholder="Plant-1"></div>
+      <div><label class="lb">Paper size (ISO 216)</label><select id="d_paper">${Object.keys(PAPER).map(k => `<option ${k === S.paper ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
+      <div><label class="lb">Revision</label><input id="d_rev" value="${esc(S.rev)}" style="max-width:80px"></div><div style="flex:1"><label class="lb">Revision note</label><input id="d_note" value="${esc(S.revNote)}"></div>
+      <div><label class="lb">Drawn by</label><input id="d_dr" value="${esc(S.drawn || H.user || '')}"></div><div><label class="lb">Checked by</label><input id="d_ch" value="${esc(S.checked)}"></div><div><label class="lb">Approved by</label><input id="d_ap" value="${esc(S.approved)}"></div></div>
+      <div class="row"><button class="btn" data-act="pdf">⬇ Save PDF</button><button class="btn" data-act="dxf">⬇ Save CAD (DXF)</button><button class="btn o" data-act="xlsx">⬇ Save Excel</button><button class="tb" data-act="jsonout">⬇ Save JSON</button><button class="tb" data-act="clear">Clear all objects</button></div>
+      <p class="mut" style="margin:0">Each download gets its own reference number. The PDF has the drawing sheet (frame, title block, scale, north arrow) followed by the register, dashboard and revision history, with the customer logo top left, the reference number top right, and format number, revision, page number and “Powered By : KMR Group of Companies” in every footer.${S.hist.length ? ' Issued: ' + S.hist.slice(-6).map(x => esc(x.ref)).join(', ') + '.' : ''}</p>`;
   }
   function paintStd() {
     const R = [['ISO 128 / ISO 5457 / ISO 7200', 'Technical drawing: line types, sheet size and margins, title block'], ['ISO 216', 'A-series paper sizes'], ['ISO 9001:2015', '7.1.3 infrastructure, 7.5 documented information (reference no., revision, date)'], ['IATF 16949:2016', '7.1.3.1 plant, facility and equipment planning — layout and material flow'], ['VDA 6.3:2016', 'P6 / P4 — production resources and layout; operator station per machine'], ['ISO 45001:2018', '8.1.2 / 6.1.2 — gaps and aisles to each side recorded for safe access'], ['APQP / PPAP', 'Process flow and floor plan evidence']];
@@ -311,116 +330,95 @@
   function pt(e) { const svg = el.querySelector('#ls-svg'); const m = svg.getScreenCTM().inverse(); const p = svg.createSVGPoint(); p.x = e.clientX; p.y = e.clientY; const q = p.matrixTransform(m); return { x: q.x, y: q.y }; }
   const byId = id => S.objs.find(o => o.id === id);
   function addObj(x, y, w, h) { const o = { id: 'o' + (S.seq++), code: 'OBJ-' + (S.objs.length + 1), name: '', kind: 'Machine', group: '', x, y, w, h, ops: [] }; clampObj(o); S.objs.push(o); return o; }
+  let raf = 0; const later = fn => { if (raf) return; raf = requestAnimationFrame(() => { raf = 0; fn(); }); };
   function bindCanvas() {
     const c = el.querySelector('#ls-cv');
     c.addEventListener('pointerdown', e => {
-      if (e.target.closest('.pop')) return; const p = pt(e), t = e.target;
-      const opg = t.closest('[data-op]'), og = t.closest('[data-o]'), hh = t.dataset.h;
-      if (opg) { const [id, i] = opg.dataset.op.split(':'); selOp = { o: id, i: +i }; sel = id; openOpPop(e, byId(id), +i); render(); return; }
+      const p = pt(e), t = e.target, opg = t.closest('[data-op]'), og = t.closest('[data-o]'), hh = t.dataset.h;
+      if (opg) { const [id, i] = opg.dataset.op.split(':'); selOp = { o: id, i: +i }; sel = id; paintCanvas(); paintSide(); paintTools(); return; }
       if (tool === 'draw') { drag = { kind: 'draw', x0: snapv(p.x), y0: snapv(p.y), x1: snapv(p.x), y1: snapv(p.y) }; c.setPointerCapture(e.pointerId); return; }
-      if (tool === 'op' && og) { snap(); const o = byId(og.dataset.o); o.ops.push('S'); sel = o.id; selOp = { o: o.id, i: o.ops.length - 1 }; persist(); render(); return; }
-      if (og && hh) { snap(); const o = byId(og.dataset.o); drag = { kind: 'size', o, h: hh, p0: p, r: { x: o.x, y: o.y, w: o.w, h: o.h } }; c.setPointerCapture(e.pointerId); return; }
-      if (og) { const o = byId(og.dataset.o); if (sel !== o.id) { sel = o.id; selOp = null; closePop(); } snap(); drag = { kind: 'move', o, dx: p.x - o.x, dy: p.y - o.y, moved: false }; c.setPointerCapture(e.pointerId); render(); return; }
-      sel = null; selOp = null; closePop(); const svg = el.querySelector('#ls-svg'); drag = { kind: 'pan', cx: e.clientX, cy: e.clientY, v0: (vb || curVB()).slice(), k: svg.clientWidth }; c.setPointerCapture(e.pointerId); render();
+      if (tool === 'op' && og) { snap(); const o = byId(og.dataset.o); o.ops.push('S'); sel = o.id; selOp = { o: o.id, i: o.ops.length - 1 }; persist(); paintCanvas(); paintSide(); paintTools(); return; }
+      if (og && hh) { snap(); const o = byId(og.dataset.o); drag = { kind: 'size', o, h: hh, r: { x: o.x, y: o.y, w: o.w, h: o.h } }; c.setPointerCapture(e.pointerId); return; }
+      if (og) { const o = byId(og.dataset.o); if (sel !== o.id) { sel = o.id; selOp = null; paintSide(); paintTools(); } snap(); drag = { kind: 'move', o, dx: p.x - o.x, dy: p.y - o.y, moved: false }; c.setPointerCapture(e.pointerId); paintCanvas(); return; }
+      const hadSel = sel; sel = null; selOp = null; const cv = c; drag = { kind: 'pan', cx: e.clientX, cy: e.clientY, v0: (vb || curVB()).slice(), cw: cv.clientWidth, ch: cv.clientHeight }; c.setPointerCapture(e.pointerId); if (hadSel) { paintCanvas(); paintSide(); paintTools(); }
     });
     c.addEventListener('pointermove', e => {
-      if (!drag) return; const p = (drag.kind === 'pan') ? null : pt(e);
-      if (drag.kind === 'draw') { drag.x1 = snapv(p.x); drag.y1 = snapv(p.y); paintCanvas(); }
-      else if (drag.kind === 'move') { const o = drag.o; o.x = snapv(p.x - drag.dx); o.y = snapv(p.y - drag.dy); clampObj(o); drag.moved = true; paintCanvas(); paintTable(); paintDash(); }
-      else if (drag.kind === 'size') { const o = drag.o, r = drag.r, X = snapv(p.x), Y = snapv(p.y), h = drag.h; let x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h; if (h.includes('w')) x0 = Math.min(X, x1 - step()); if (h.includes('e')) x1 = Math.max(X, x0 + step()); if (h.includes('n')) y0 = Math.min(Y, y1 - step()); if (h.includes('s')) y1 = Math.max(Y, y0 + step()); o.x = x0; o.y = y0; o.w = x1 - x0; o.h = y1 - y0; clampObj(o); paintCanvas(); paintTable(); paintDash(); }
-      else if (drag.kind === 'pan') { const k = drag.v0[2] / drag.k; vb = [drag.v0[0] - (e.clientX - drag.cx) * k, drag.v0[1] - (e.clientY - drag.cy) * k, drag.v0[2], drag.v0[3]]; paintCanvas(); }
+      if (!drag) return; const d = drag, p = d.kind === 'pan' ? null : pt(e);
+      if (d.kind === 'draw') { d.x1 = snapv(p.x); d.y1 = snapv(p.y); later(paintCanvas); }
+      else if (d.kind === 'move') { d.o.x = snapv(p.x - d.dx); d.o.y = snapv(p.y - d.dy); clampObj(d.o); d.moved = true; later(paintCanvas); }
+      else if (d.kind === 'size') { const o = d.o, r = d.r, X = snapv(p.x), Y = snapv(p.y), h = d.h; let x0 = r.x, y0 = r.y, x1 = r.x + r.w, y1 = r.y + r.h; if (h.includes('w')) x0 = Math.min(X, x1 - step()); if (h.includes('e')) x1 = Math.max(X, x0 + step()); if (h.includes('n')) y0 = Math.min(Y, y1 - step()); if (h.includes('s')) y1 = Math.max(Y, y0 + step()); o.x = x0; o.y = y0; o.w = x1 - x0; o.h = y1 - y0; clampObj(o); later(paintCanvas); }
+      else if (d.kind === 'pan') { const k = Math.max(d.v0[2] / d.cw, d.v0[3] / d.ch); vb = [d.v0[0] - (e.clientX - d.cx) * k, d.v0[1] - (e.clientY - d.cy) * k, d.v0[2], d.v0[3]]; later(paintCanvas); }
     });
-    const end = e => {
+    const end = () => {
       if (!drag) return; const d = drag; drag = null;
-      if (d.kind === 'draw') { const x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1), w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0); if (w >= step() * 2 && h >= step() * 2) { snap(); const o = addObj(x, y, w, h); sel = o.id; render(); openObjPop(o, true); persist(); return; } render(); return; }
+      if (d.kind === 'draw') { const x = Math.min(d.x0, d.x1), y = Math.min(d.y0, d.y1), w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0); if (w >= step() * 2 && h >= step() * 2) { snap(); const o = addObj(x, y, w, h); sel = o.id; tool = 'sel'; persist(); paintCanvas(); paintSide(); paintTools(); const f = el.querySelector('#sd_code'); if (f) { f.focus(); f.select(); } return; } paintCanvas(); return; }
       if (d.kind === 'move' && !d.moved) undo.pop();
-      persist(); render();
+      if (d.kind === 'move' || d.kind === 'size') { persist(); paintCanvas(); paintSide(); }
     };
     c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
-    c.addEventListener('dblclick', e => { const og = e.target.closest('[data-o]'); if (og && !e.target.dataset.h) openObjPop(byId(og.dataset.o)); });
-    c.addEventListener('wheel', e => { e.preventDefault(); const p = pt(e), f = e.deltaY > 0 ? 1.15 : 1 / 1.15, v = vb || curVB(); vb = [p.x - (p.x - v[0]) * f, p.y - (p.y - v[1]) * f, v[2] * f, v[3] * f]; paintCanvas(); }, { passive: false });
+    c.addEventListener('wheel', e => { e.preventDefault(); const p = pt(e), f = e.deltaY > 0 ? 1.15 : 1 / 1.15, v = vb || curVB(); vb = [p.x - (p.x - v[0]) * f, p.y - (p.y - v[1]) * f, v[2] * f, v[3] * f]; later(paintCanvas); }, { passive: false });
     el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('keydown', onKey);
-    document.addEventListener('keydown', e => { if (!el || el.closest('.hide')) return; if (e.target.closest && e.target.closest('input,select,textarea')) return; if (e.key === 'Delete' || e.key === 'Backspace') { delSel(); e.preventDefault(); } if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { doUndo(); e.preventDefault(); } if (e.key === 'Escape') { closePop(); tool = 'sel'; render(); } });
+    document.addEventListener('keydown', e => {
+      if (!el || !el.offsetParent || view !== 'sk') return; if (e.target.closest && e.target.closest('input,select,textarea')) return;
+      if ((e.key === 'Delete' || e.key === 'Backspace') && (sel || selOp)) { delSel(); e.preventDefault(); }
+      else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { doUndo(); e.preventDefault(); }
+      else if (e.key === 'Escape') { tool = 'sel'; sel = selOp = null; paintCanvas(); paintSide(); paintTools(); }
+      else if (/^Arrow/.test(e.key) && sel) { const o = byId(sel), st = step() * (e.shiftKey ? 10 : 1); snap(); if (e.key === 'ArrowLeft') o.x -= st; if (e.key === 'ArrowRight') o.x += st; if (e.key === 'ArrowUp') o.y -= st; if (e.key === 'ArrowDown') o.y += st; clampObj(o); persist(); paintCanvas(); paintSide(); e.preventDefault(); }
+    });
   }
   function curVB() { const mx = Math.max(S.L, S.W), pad = mx * 0.07; return [-pad, -pad, S.L + 2 * pad, S.W + 2 * pad]; }
   function delSel() {
     if (selOp) { const o = byId(selOp.o); if (o) { snap(); o.ops.splice(selOp.i, 1); } selOp = null; }
     else if (sel) { snap(); S.objs = S.objs.filter(o => o.id !== sel); sel = null; }
-    else return; closePop(); persist(); render();
-  }
-  function closePop() { if (popEl) { popEl.remove(); popEl = null; } }
-  function placePop(e, html) {
-    closePop(); const c = el.querySelector('#ls-cv'), r = c.getBoundingClientRect(); popEl = document.createElement('div'); popEl.className = 'pop'; popEl.innerHTML = html;
-    c.appendChild(popEl); const x = Math.max(4, Math.min(r.width - popEl.offsetWidth - 4, (e && e.clientX ? e.clientX - r.left : 20) + 12)), y = Math.max(4, Math.min(Math.max(4, r.height - popEl.offsetHeight - 4), (e && e.clientY ? e.clientY - r.top : 20) + 12));
-    popEl.style.left = x + 'px'; popEl.style.top = y + 'px'; popEl.addEventListener('pointerdown', ev => ev.stopPropagation());
-    const f = popEl.querySelector('input'); if (f) { f.focus(); f.select && f.select(); }
-  }
-  function openObjPop(o, isNew) {
-    const e = (() => { const svg = el.querySelector('#ls-svg'), m = svg.getScreenCTM(); const p = svg.createSVGPoint(); p.x = o.x + o.w; p.y = o.y; const q = p.matrixTransform(m); return { clientX: q.x, clientY: q.y }; })();
-    placePop(e, `<h4>${isNew ? 'New object — enter its details' : 'Edit object'}</h4>
-      <div class="g2"><div><label class="lb">Object code</label><input id="p_code" value="${esc(o.code)}"></div><div><label class="lb">Object name</label><input id="p_name" value="${esc(o.name)}"></div>
-      <div><label class="lb">Group / line</label><input id="p_group" list="ls-gl" value="${esc(o.group)}"><datalist id="ls-gl">${groups().map(g => `<option value="${esc(g)}">`).join('')}</datalist></div>
-      <div><label class="lb">Type</label><select id="p_kind">${KINDS.map(k => `<option ${k === o.kind ? 'selected' : ''}>${k}</option>`).join('')}</select></div>
-      <div><label class="lb">Length (${u()})</label><input id="p_w" type="number" step="any" value="${fu(o.w)}"></div><div><label class="lb">Width (${u()})</label><input id="p_h" type="number" step="any" value="${fu(o.h)}"></div></div>
-      <div class="acts"><button class="btn sm" data-pop="ok" data-id="${o.id}">OK</button><button class="btn o sm" data-pop="op" data-id="${o.id}">+ Operator</button><button class="btn d sm" data-pop="del" data-id="${o.id}">Delete</button></div>`);
-    popEl.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); applyPop(o.id); } });
-  }
-  function openOpPop(e, o, i) {
-    placePop(e, `<h4>Operator of ${esc(o.code)} — standing on ${SIDE_NAME[o.ops[i]]}</h4><div class="acts"><button class="btn sm" data-pop="next" data-id="${o.id}" data-i="${i}">Move to next side ▸</button><button class="btn o sm" data-pop="add" data-id="${o.id}">+ New operator</button><button class="btn d sm" data-pop="delop" data-id="${o.id}" data-i="${i}">Delete operator</button></div>`);
-  }
-  function applyPop(id) {
-    const o = byId(id); if (!o || !popEl) return; snap();
-    const g = s => popEl.querySelector(s); o.code = g('#p_code').value.trim() || o.code; o.name = g('#p_name').value.trim(); o.group = g('#p_group').value.trim(); o.kind = g('#p_kind').value;
-    const w = fromU(g('#p_w').value), h = fromU(g('#p_h').value); if (w > 0) o.w = w; if (h > 0) o.h = h; clampObj(o); closePop(); persist(); render();
+    else return; persist(); paintCanvas(); paintSide(); paintTools();
   }
   function onClick(e) {
     const t = e.target.closest('button'); if (!t) return; const d = t.dataset;
-    if (d.tool) { tool = d.tool; closePop(); render(); return; }
-    if (d.pop) {
-      const o = byId(d.id);
-      if (d.pop === 'ok') return applyPop(d.id);
-      if (d.pop === 'del') { sel = d.id; selOp = null; return delSel(); }
-      if (d.pop === 'op' || d.pop === 'add') { applyPopSilent(o); snap(); o.ops.push('S'); selOp = { o: o.id, i: o.ops.length - 1 }; persist(); closePop(); render(); return; }
-      if (d.pop === 'next') { snap(); o.ops[+d.i] = SIDES[(SIDES.indexOf(o.ops[+d.i]) + 1) % 4]; persist(); closePop(); render(); return; }
-      if (d.pop === 'delop') { snap(); o.ops.splice(+d.i, 1); selOp = null; persist(); closePop(); render(); return; }
-    }
+    if (d.view) { view = d.view; return paintView(); }
+    if (d.tool) { tool = d.tool; paintTools(); paintSide(); return; }
+    const o = sel && byId(sel);
+    if (d.opNext !== undefined && o) { snap(); const i = +d.opNext; o.ops[i] = SIDES[(SIDES.indexOf(o.ops[i]) + 1) % 4]; selOp = { o: o.id, i }; persist(); paintCanvas(); paintSide(); return; }
+    if (d.opDel !== undefined && o) { snap(); o.ops.splice(+d.opDel, 1); selOp = null; persist(); paintCanvas(); paintSide(); return; }
+    if (d.opAdd && o) { snap(); o.ops.push('S'); selOp = { o: o.id, i: o.ops.length - 1 }; persist(); paintCanvas(); paintSide(); return; }
     if (t.id === 's_apply') return applySetup();
     switch (d.act) {
       case 'del': return delSel();
       case 'undo': return doUndo();
-      case 'gaps': showGaps = !showGaps; return render();
-      case 'fit': vb = null; return render();
-      case 'clear': if (!S.objs.length || confirm('Remove all objects from this sketch?')) { snap(); S.objs = []; sel = selOp = null; persist(); render(); } return;
+      case 'fit': vb = null; return paintCanvas();
+      case 'clear': if (!S.objs.length || confirm('Remove all objects from this sketch?')) { snap(); S.objs = []; sel = selOp = null; persist(); paintView(); } return;
       case 'dxf': return exportDXF();
       case 'open': return el.querySelector('#ls-open').click();
-      case 'nobg': BG = null; return render();
-      case 'newsk': snap(); S = fresh(); sel = selOp = null; vb = null; BG = null; undo = []; resetSetup(); persist(); return render();
-      case 'delsk': if (S.id && confirm('Delete this sketch from the database?')) { H.store.del(S.id).then(async () => { await refreshList(); S = sketches.length ? S : fresh(); if (sketches.length) await openSketch(sketches[0].id); else { sel = selOp = null; resetSetup(); } render(); H.say('Sketch deleted.', true); }).catch(e => H.say(e.message)); } return;
+      case 'nobg': BG = null; paintBar(); return paintCanvas();
+      case 'newsk': snap(); S = fresh(); sel = selOp = null; vb = null; BG = null; undo = []; persist(); syncTop(true); return paintView();
+      case 'delsk': if (S.id && confirm('Delete this sketch from the database?')) { H.store.del(S.id).then(async () => { await refreshList(); if (sketches.length) await openSketch(sketches[0].id); else { S = fresh(); sel = selOp = null; syncTop(true); paintView(); } H.say('Sketch deleted.', true); }).catch(er => H.say(er.message)); } return;
       case 'jsonout': return download(new Blob([JSON.stringify(S, null, 1)], { type: 'application/json' }), 'layout-sketch-' + stamp() + '.json');
-      case 'jsonin': return el.querySelector('#ls-file').click();
       case 'pdf': return exportPDF();
       case 'xlsx': return exportXLSX();
     }
   }
-  function applyPopSilent(o) { if (!popEl || !popEl.querySelector('#p_code')) return; o.code = popEl.querySelector('#p_code').value.trim() || o.code; o.name = popEl.querySelector('#p_name').value.trim(); o.group = popEl.querySelector('#p_group').value.trim(); o.kind = popEl.querySelector('#p_kind').value; }
   function applySetup() {
-    const nu = el.querySelector('#s_unit').value; snap(); S.title = el.querySelector('#s_title').value; S.plant = el.querySelector('#s_plant').value; S.shifts = Math.max(1, Math.min(4, parseInt(el.querySelector('#s_sh').value) || 1));
-    const wasU = S.unit; S.unit = nu; const L = fromU(el.querySelector('#s_L').value), W = fromU(el.querySelector('#s_W').value);
-    if (!(L > 0 && W > 0)) { S.unit = wasU; H.say('Enter a length and a width greater than zero.'); return; }
-    S.L = L; S.W = W; S.objs.forEach(clampObj); vb = null; persist(); delete el.querySelector('#ls-setup').dataset.t; render();
-    if (S.objs.some(o => o.x + o.w > S.L + EPS || o.y + o.h > S.W + EPS)) H.say('Some objects were pulled inside the new walls.');
+    const nu = el.querySelector('#s_unit').value; snap(); const wasU = S.unit; S.unit = nu; const L = fromU(el.querySelector('#s_L').value), W = fromU(el.querySelector('#s_W').value);
+    if (!(L > 0 && W > 0)) { S.unit = wasU; undo.pop(); H.say('Enter a length and a width greater than zero.'); syncTop(true); return; }
+    S.L = L; S.W = W; S.objs.forEach(clampObj); vb = null; persist(); syncTop(true); paintView();
   }
   function onChange(e) {
     const t = e.target, d = t.dataset;
-    if (t.id === 's_unit') { const L = fromU(el.querySelector('#s_L').value), W = fromU(el.querySelector('#s_W').value); S.unit = t.value; const h = el.querySelector('#ls-setup'); delete h.dataset.t; S.L = L > 0 ? L : S.L; S.W = W > 0 ? W : S.W; /* keeps the typed size in the new unit */ render(); return; }
-    if (t.id === 'ls-pick') { if (t.value) openSketch(t.value).catch(e => H.say(e.message)); return; }
+    if (t.id === 's_unit') { const L = fromU(el.querySelector('#s_L').value), W = fromU(el.querySelector('#s_W').value); S.unit = t.value; if (L > 0) S.L = L; if (W > 0) S.W = W; syncTop(true); paintView(); persist(); return; }
+    if (t.id === 'ls-gm') { gapMode = t.value; return paintCanvas(); }
+    if (t.id === 'ls-snap') { snapOn = t.checked; return; }
+    if (t.id === 'ls-pick') { if (t.value) openSketch(t.value).catch(er => H.say(er.message)); return; }
     if (t.id === 'ls-open') { const f = t.files[0]; t.value = ''; if (f) openAny(f); return; }
-    if (t.id === 'ls-file') { const f = t.files[0]; if (!f) return; f.text().then(x => { try { const j = JSON.parse(x); if (!j.objs) throw 0; snap(); S = Object.assign(fresh(), j); sel = selOp = null; vb = null; const h = el.querySelector('#ls-setup'); delete h.dataset.t; persist(); render(); H.say('Sketch loaded.', true); } catch (er) { H.say('That file is not a layout sketch JSON.'); } }); t.value = ''; return; }
-    const set = { d_paper: 'paper', d_rev: 'rev', d_note: 'revNote', d_dr: 'drawn', d_ch: 'checked', d_ap: 'approved' }[t.id]; if (set) { S[set] = t.value; persist(); return; }
-    if (d.gap) { const [id, sd] = d.gap.split(':'); const o = byId(id); const ok = setGap(o, sd, fromU(t.value)); if (!ok) H.say('Enter a distance of zero or more.'); render(); return; }
-    if (d.f && d.id) { const o = byId(d.id); snap(); if (d.f === 'w' || d.f === 'h') { const v = fromU(t.value); if (v > 0) o[d.f] = v; clampObj(o); } else o[d.f] = t.value.trim(); persist(); render(); }
+    if (t.id === 'd_sh') { S.shifts = Math.max(1, Math.min(4, parseInt(t.value) || 1)); persist(); return paintDash(); }
+    const set = { s_title: 'title', s_plant: 'plant', d_paper: 'paper', d_rev: 'rev', d_note: 'revNote', d_dr: 'drawn', d_ch: 'checked', d_ap: 'approved' }[t.id]; if (set) { S[set] = t.value; persist(); syncTop(); return; }
+    if (d.gap) { const [id, sd] = d.gap.split(':'); const ok = setGap(byId(id), sd, fromU(t.value)); if (!ok) H.say('Enter a distance of zero or more.'); return paintTable(); }
+    if (d.sf && sel) {
+      const o = byId(sel); snap(); const f = d.sf;
+      if (f === 'w' || f === 'h') { const v = fromU(t.value); if (v > 0) o[f] = v; } else if (f === 'x' || f === 'y') { const v = fromU(t.value); if (isFinite(v)) o[f] = v; } else o[f] = t.value.trim();
+      clampObj(o); persist(); paintCanvas(); if (['w', 'h', 'x', 'y'].includes(f)) t.value = fu(o[f]); return;
+    }
+    if (d.f && d.id) { const o = byId(d.id); snap(); o[d.f] = t.value.trim(); persist(); }
   }
-  function onKey(e) { if (e.key === 'Enter' && e.target.matches('#ls-setup input')) applySetup(); }
+  function onKey(e) { if (e.key === 'Enter' && e.target.matches('#s_L,#s_W')) applySetup(); }
 
   /* ---------- exports ---------- */
   const stamp = () => new Date().toISOString().replace(/[-:T]/g, '').slice(0, 12);
@@ -626,10 +624,12 @@
       if (pts.every(q => (Math.abs(q[0] - x0) < tol || Math.abs(q[0] - x1) < tol) && (Math.abs(q[1] - y0) < tol || Math.abs(q[1] - y1) < tol)) && x1 - x0 > 0 && y1 - y0 > 0) rects.push({ x0, y0, x1, y1, layer: e.layer });
     }
     if (!rects.length) throw new Error('No rectangles were found in this DXF, so there is nothing to turn into objects. Draw machines as closed rectangles (polylines) and save again.');
-    const area = r => (r.x1 - r.x0) * (r.y1 - r.y0); rects.sort((a, b) => area(b) - area(a));
-    let wall = rects.find(r => /wall/i.test(r.layer)), others;
-    if (!wall && rects.length > 1 && area(rects[0]) > 1.5 * area(rects[1])) wall = rects[0];
-    if (wall) others = rects.filter(r => r !== wall && !/wall/i.test(r.layer)); else { others = rects; wall = { x0: Math.min.apply(null, rects.map(r => r.x0)), y0: Math.min.apply(null, rects.map(r => r.y0)), x1: Math.max.apply(null, rects.map(r => r.x1)), y1: Math.max.apply(null, rects.map(r => r.y1)) }; }
+    const area = r => (r.x1 - r.x0) * (r.y1 - r.y0), NOT = /^(sheet|zone|annot|dim|gap|title|frame|border|grid|legend|hatch|text|opera|note)/i, WALLRE = /wall|build|boundary|outline|shell/i;
+    const wallRects = rects.filter(r => WALLRE.test(r.layer)).sort((a, b) => area(a) - area(b));
+    let wall = wallRects[0], cand = rects.filter(r => !NOT.test(r.layer) && !WALLRE.test(r.layer));
+    if (!wall) { const big = cand.slice().sort((a, b) => area(b) - area(a)); if (big.length > 1 && area(big[0]) > 1.5 * area(big[1])) { wall = big[0]; cand = big.slice(1); } else { cand = big; wall = { x0: Math.min.apply(null, cand.map(r => r.x0)), y0: Math.min.apply(null, cand.map(r => r.y0)), x1: Math.max.apply(null, cand.map(r => r.x1)), y1: Math.max.apply(null, cand.map(r => r.y1)) }; } }
+    const tolW = Math.max(wall.x1 - wall.x0, wall.y1 - wall.y0) * 0.002, others = cand.filter(r => r.x0 >= wall.x0 - tolW && r.x1 <= wall.x1 + tolW && r.y0 >= wall.y0 - tolW && r.y1 <= wall.y1 + tolW);
+    if (!others.length) throw new Error('No machines (closed rectangles) were found inside the building outline of this DXF.');
     const ext = Math.max(wall.x1 - wall.x0, wall.y1 - wall.y0); let unit = UFROM[ins];
     if (!unit) unit = ext > 500 ? 'mm' : 'm';
     const k = UN[unit], objs = others.map(r => ({ x: (r.x0 - wall.x0) * k, y: (wall.y1 - r.y1) * k, w: (r.x1 - r.x0) * k, h: (r.y1 - r.y0) * k, _r: r })).filter(a => a.w * a.h > 1e-6);
@@ -637,7 +637,7 @@
     const tx = ents.filter(e => (e.t === 'TEXT' || e.t === 'MTEXT') && !/^(DIMS|GAPS)$/i.test(e.layer));
     for (const a of objs) {
       const r = a._r, inside = tx.filter(e => { const px = e.a72 || e.t === 'MTEXT' ? (e.a72 ? e.x2 : e.x) : e.x, py = e.a72 ? e.y2 : e.y; return px >= r.x0 - 1e-6 && px <= r.x1 + 1e-6 && py >= r.y0 - 1e-6 && py <= r.y1 + 1e-6; }).map(e => ({ s: e.s.replace(/\\P/g, ' ').replace(/[{}]/g, '').replace(/\\[A-Za-z][^;]*;/g, '').trim(), y: e.a72 ? e.y2 : e.y, x: e.a72 ? e.x2 : e.x })).filter(e => e.s && !skip.test(e.s));
-      inside.sort((p1, p2) => (p2.y - p1.y) || (p1.x - p2.x)); if (inside[0]) a.code = inside[0].s; if (inside[1]) a.name = inside.slice(1).map(e => e.s).join(' '); a.kind = 'Machine'; a.group = ''; a.ops = []; delete a._r;
+      inside.sort((p1, p2) => (p2.y - p1.y) || (p1.x - p2.x)); if (inside[0]) a.code = inside[0].s; if (inside[1]) a.name = inside.slice(1).map(e => e.s).join(' '); const ly = r.layer || '', lk = /room/i.test(ly) ? 'Room' : /insp|gauge|cmm/i.test(ly) ? 'Inspection / gauge' : /pillar|column/i.test(ly) ? 'Other' : 'Machine'; a.kind = lk; a.group = /^(objects?|0|defpoints)$/i.test(ly) ? '' : ly.replace(/^MC_/i, '').replace(/_/g, ' '); a.ops = []; delete a._r;
     }
     for (const e of ents.filter(e => e.t === 'CIRCLE' && /oper/i.test(e.layer))) {
       const cx = (e.x - wall.x0) * k, cy = (wall.y1 - e.y) * k; let best = null, bd = 1e18;
