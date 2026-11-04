@@ -38,7 +38,7 @@
     return null;
   };
   /** dimension size factor: about 3 % of the drawing, and never more than about 7 % of the feature it measures */
-  K.dimK = (doc, feat) => { const g = K.autoDimK(doc), th = doc.dim.th || 2.5; return feat > 0 ? Math.min(g, nice((feat * 0.2) / th)) : g; };
+  K.dimK = (doc, feat) => { const g = K.autoDimK(doc), th = doc.dim.th || 2.5; return feat > 0 ? Math.min(g, nice((feat * 0.15) / th)) : g; };
   const baseDimStyle = K.dimStyle;
   K.dimStyle = (e, doc) => {
     const D = baseDimStyle(e, doc);
@@ -63,8 +63,8 @@
   const hatchAuto = (e, doc) => {
     if (!e || e.t !== "hatch" || e.solid || e.fixsc || !doc || !doc.dim || doc.dim.auto === false) return e;
     const S = featSize(e, doc); if (!(S > 0) || !isFinite(S)) return e;
-    const pat = K.PAT[e.pat] || K.PAT.ANSI31, d0 = (pat.f && pat.f[0] && pat.f[0].d) || 3.175, f = 1 / (K.UNITMM[doc.units] || 1);
-    const hk = Math.max(1e-3, Math.min(1e4, nice(S / (20 * d0 * f)))); let c = hatchMemo.get(e);
+    const pat = K.PAT[e.pat] || K.PAT.ANSI31, d0 = (pat.f && pat.f[0] && pat.f[0].d) || 3.175;
+    const hk = Math.max(1e-3, Math.min(1e4, nice(S / (20 * d0)))); let c = hatchMemo.get(e);
     if (!c || c.hk !== hk) { c = { hk, e: Object.assign({}, e, { sc: hk }) }; hatchMemo.set(e, c); }
     return c.e;
   };
