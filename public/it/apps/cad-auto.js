@@ -58,8 +58,23 @@
     const tot = def.p.reduce((t, v) => t + Math.abs(v), 0) * (base || 1);
     return tot > 0 ? Math.max(1e-4, Math.min(1e4, nice(S / (tot * 6)))) : 1;
   };
+  /* hatch spacing follows the size of the hatched area (about 20 lines across), whatever the unit */
+  const hatchMemo = new WeakMap();
+  const hatchAuto = (e, doc) => {
+    if (!e || e.t !== "hatch" || e.solid || e.fixsc || !doc || !doc.dim || doc.dim.auto === false) return e;
+    const S = featSize(e, doc); if (!(S > 0) || !isFinite(S)) return e;
+    const pat = K.PAT[e.pat] || K.PAT.ANSI31, d0 = (pat.f && pat.f[0] && pat.f[0].d) || 3.175, f = 1 / (K.UNITMM[doc.units] || 1);
+    const hk = Math.max(1e-3, Math.min(1e4, nice(S / (20 * d0 * f)))); let c = hatchMemo.get(e);
+    if (!c || c.hk !== hk) { c = { hk, e: Object.assign({}, e, { sc: (e.sc || 1) * hk }) }; hatchMemo.set(e, c); }
+    return c.e;
+  };
+  /* centre mark / centre line overshoot follows the object size */
+  K.markGap = (E, size) => (E.doc.dim.th || 2.5) * (E.doc.dim.auto === false ? 1 : K.dimK(E.doc, size));
+  /* new text takes a height that fits the drawing */
+  K.onAdd.push((E, e) => { if ((e.t === "text" || e.t === "mtext") && E.doc.dim.auto !== false && e.h != null && Math.abs(e.h - (E.doc.text.h || 2.5)) < 1e-9) e.h = +(e.h * K.autoDimK(E.doc)).toPrecision(6); });
   const paint0 = K.paint;
   K.paint = (P, e, doc, inh) => {
+    if (e && e.t === "hatch") e = hatchAuto(e, doc);
     const o = P && P.o;
     if (o && o._lt0 != null && e && e.t !== "insert") o.ltscale = o._lt0 * ltFactor(e.anno && K.annoEnt ? K.annoEnt(e) : e, doc, o._lt0);
     return paint0(P, e, doc, inh);

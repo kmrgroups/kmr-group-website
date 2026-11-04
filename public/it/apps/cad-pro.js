@@ -313,14 +313,14 @@
     E.begin("centre mark"); let k = 1; const used = new Set(E.doc.ents.map((e) => e.grp));
     for (;;) {
       const v = await E.getEnt("Select circle or arc to add centre mark:", { filter: (e) => e.t === "circle" || e.t === "arc" }); if (!v) break;
-      const c = v.e.c, r = v.e.r, x = r + Math.max(2.5, r * 0.15); while (used.has("*CM" + k)) k++; const g = "*CM" + k; used.add(g);
+      const c = v.e.c, r = v.e.r, x = r + Math.max(K.markGap ? K.markGap(E, 2 * r) : 2.5, r * 0.15); while (used.has("*CM" + k)) k++; const g = "*CM" + k; used.add(g);
       E.add({ t: "line", a: [c[0] - x, c[1]], b: [c[0] + x, c[1]], layer: centreLayer(E), lt: "CENTER", grp: g }); E.add({ t: "line", a: [c[0], c[1] - x], b: [c[0], c[1] + x], layer: centreLayer(E), lt: "CENTER", grp: g });
     }
   } });
   cmd("CENTERLINE", { a: ["CL", "CENTRELINE"], d: "Centre line between two lines", fn: async (E) => {
     const a = need(await E.getEnt("Select first line:", { filter: (e) => e.t === "line" })); const b = need(await E.getEnt("Select second line:", { filter: (e) => e.t === "line" }));
     let A = a.e, B = b.e; if (G.dot(G.sub(A.b, A.a), G.sub(B.b, B.a)) < 0) B = Object.assign({}, B, { a: B.b, b: B.a });
-    const s = G.mid(A.a, B.a), t = G.mid(A.b, B.b), u = G.unit(G.sub(t, s)), x = 2.5; E.add({ t: "line", a: G.sub(s, G.mul(u, x)), b: G.add(t, G.mul(u, x)), layer: centreLayer(E), lt: "CENTER" });
+    const s = G.mid(A.a, B.a), t = G.mid(A.b, B.b), u = G.unit(G.sub(t, s)), x = K.markGap ? K.markGap(E, G.dist ? G.dist(s, t) : 0) : 2.5; E.add({ t: "line", a: G.sub(s, G.mul(u, x)), b: G.add(t, G.mul(u, x)), layer: centreLayer(E), lt: "CENTER" });
   } });
   cmd("QDIM", { a: ["QD"], d: "Quick dimension: a chain of dimensions to every endpoint of the selected objects", fn: async (E) => {
     const ids = await E.getSel("Select geometry to dimension:"); if (!ids.length) return;
