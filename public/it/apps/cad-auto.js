@@ -65,7 +65,7 @@
     const S = featSize(e, doc); if (!(S > 0) || !isFinite(S)) return e;
     const pat = K.PAT[e.pat] || K.PAT.ANSI31, d0 = (pat.f && pat.f[0] && pat.f[0].d) || 3.175, f = 1 / (K.UNITMM[doc.units] || 1);
     const hk = Math.max(1e-3, Math.min(1e4, nice(S / (20 * d0 * f)))); let c = hatchMemo.get(e);
-    if (!c || c.hk !== hk) { c = { hk, e: Object.assign({}, e, { sc: (e.sc || 1) * hk }) }; hatchMemo.set(e, c); }
+    if (!c || c.hk !== hk) { c = { hk, e: Object.assign({}, e, { sc: hk }) }; hatchMemo.set(e, c); }
     return c.e;
   };
   /* centre mark / centre line overshoot follows the object size */
@@ -83,8 +83,31 @@
     const orig = K[nm]; if (!orig) continue;
     K[nm] = function () { const a = Array.from(arguments), i = nm === "canvasPainter" ? 2 : 0; a[i] = Object.assign({}, a[i] || {}); a[i]._lt0 = a[i].ltscale || 1; const P = orig.apply(this, a); P.o = a[i]; return P; };
   }
+
+  /* put every dimension at a distance from its object that fits the drawing */
+  K.fitDims = (E) => {
+    const doc = E.doc, { off: offF } = dimBase(E); let n = 0;
+    const upd = [];
+    for (const d of doc.ents) {
+      if (d.t !== "dim" || !d.loc) continue; const size = K.dimFeat(d); if (!(size > 0)) continue; const off = offF(size); let loc = null;
+      if (d.kind === "lin" && d.p1 && d.p2) {
+        if (d.dir === "v") { const mid = (d.p1[0] + d.p2[0]) / 2, sd = d.loc[0] >= mid ? 1 : -1, base = sd > 0 ? Math.max(d.p1[0], d.p2[0]) : Math.min(d.p1[0], d.p2[0]); loc = [base + sd * off, d.loc[1]]; }
+        else if (d.dir === "h") { const mid = (d.p1[1] + d.p2[1]) / 2, sd = d.loc[1] >= mid ? 1 : -1, base = sd > 0 ? Math.max(d.p1[1], d.p2[1]) : Math.min(d.p1[1], d.p2[1]); loc = [d.loc[0], base + sd * off]; }
+      } else if (d.kind === "ali" && d.p1 && d.p2) {
+        const u = G.unit(G.sub(d.p2, d.p1)); let nrm = [-u[1], u[0]]; const m = G.mid(d.p1, d.p2); if (G.dot(nrm, G.sub(d.loc, m)) < 0) nrm = [-nrm[0], -nrm[1]]; loc = G.add(m, G.mul(nrm, off));
+      } else if ((d.kind === "dia" || d.kind === "rad") && d.c) {
+        const a = Math.atan2(d.loc[1] - d.c[1], d.loc[0] - d.c[0]); loc = G.polar(d.c, a, d.r + off * (d.kind === "rad" ? 0.8 : 1));
+      }
+      if (loc) upd.push([d, loc]);
+    }
+    if (!upd.length) return 0;
+    E.tx("fit dimensions", () => { for (const [d, loc] of upd) { E.replace(d.id, Object.assign({}, E.byId(d.id), { loc })); n++; } });
+    return n;
+  };
+  cmd("DIMFIT", { a: ["DFIT"], d: "Move every dimension to a distance from its object that fits the drawing size", fn: async (E) => { const n = K.fitDims(E); E.msg(n ? `${n} dimension(s) moved to a distance that fits the drawing.` : "No dimensions to fit.", "ok"); E.redraw(); } });
   cmd("DIMAUTO", { a: ["DAUTO"], d: "Switch automatic dimension size (follows the drawing size) on or off", fn: async (E) => {
     E.tx("auto dimension size", () => { E.doc.dim = Object.assign({}, E.doc.dim, { auto: E.doc.dim.auto === false }); });
+    if (E.doc.dim.auto !== false) K.fitDims(E);
     E.msg(`Automatic dimension size ${E.doc.dim.auto === false ? "off — the Dim style sizes are used as set" : "on — dimension text and arrows follow the drawing size"}.`, "ok"); E.redraw();
   } });
 
@@ -366,7 +389,7 @@
   const rib = (K.RIBBON || []).find((t) => t.t === "Annotate");
   if (rib) {
     const dims = rib.g.find((g) => g.n === "Dimensions");
-    if (dims) dims.b.push(["DIMVALUE", "Edit value", "dimlin"], ["DIMALL", "Auto dims", "dimali"], ["DIMAUTO", "Auto size", "dimstyle"]);
+    if (dims) dims.b.push(["DIMVALUE", "Edit value", "dimlin"], ["DIMALL", "Auto dims", "dimali"], ["DIMAUTO", "Auto size", "dimstyle"], ["DIMFIT", "Fit dims", "dimali"]);
     const man = (K.RIBBON || []).find((t) => t.t === "Manage"), set = man && man.g.find((g) => g.n === "Settings");
     if (set) set.b.push(["UNITCONVERT", "Convert units", "units"], ["LAYSTD", "Std layers", "layer"]);
   }
