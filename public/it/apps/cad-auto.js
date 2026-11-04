@@ -71,16 +71,25 @@
   /* new objects are filed on their standard layer unless the user chose another layer on purpose */
   const LT_LAYER = { HIDDEN: "Hidden", HIDDEN2: "Hidden", CENTER: "Centre", CENTER2: "Centre", PHANTOM: "Section" };
   K.onAdd = K.onAdd || [];
+  const STDSET = new Set(["0", ...K.STDLAYERS.map((x) => x.name)]), LINEWORK = new Set(["Hidden", "Centre", "Section", "Construction"]);
+  const GEOM = ["line", "pline", "circle", "arc", "ellipse", "spline"];
   K.onAdd.push((E, e) => {
-    const doc = E.doc, def = e.layer === "0" || e.layer === "Outline" || !e.layer;
-    if (!def || e.stg) return;
+    const doc = E.doc, cur = e.layer || "0";
+    if (e.stg || !STDSET.has(cur)) return; // a layer the user made themselves is respected
     let to = null;
-    if (["line", "pline", "circle", "arc", "ellipse", "spline"].includes(e.t) && !(e.lt && LT_LAYER[String(e.lt).toUpperCase()])) { if (e.layer !== "Outline") { K.stdLayer(doc, "Outline"); e.layer = "Outline"; } return; }
-    if (e.t === "dim") to = "Dimensions";
+    if (GEOM.includes(e.t)) {
+      const lt = e.lt && LT_LAYER[String(e.lt).toUpperCase()];
+      if (lt) { to = lt; e.lt = null; } else if (!LINEWORK.has(cur)) to = "Outline";
+    } else if (e.t === "dim") to = "Dimensions";
     else if (["text", "mtext", "leader", "fcf", "table"].includes(e.t)) to = "Text";
     else if (e.t === "hatch" && !e.solid) to = "Hatch";
-    else if (e.lt && LT_LAYER[String(e.lt).toUpperCase()]) { to = LT_LAYER[String(e.lt).toUpperCase()]; e.lt = null; }
-    if (to) { K.stdLayer(doc, to); e.layer = to; }
+    if (to && to !== cur) { K.stdLayer(doc, to); e.layer = to; }
+  });
+  /* an opened drawing starts on the Outline layer (never on Dimensions / Text / Hatch left over from last time) */
+  K.editorHooks = K.editorHooks || [];
+  K.editorHooks.push((E) => {
+    const load = E.load;
+    E.load = (doc, info) => { try { if (doc && Array.isArray(doc.layers) && (!doc.cur || ["0", "Dimensions", "Text", "Hatch"].includes(doc.cur))) { K.stdLayer(doc, "Outline"); doc.cur = "Outline"; } } catch (er) { /* keep going */ } return load(doc, info); };
   });
 
   /* =============================== 3. automatic dimensions for new drawings =============================== */
