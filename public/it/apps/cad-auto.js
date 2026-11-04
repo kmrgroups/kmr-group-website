@@ -23,20 +23,51 @@
     busy = true; let k = 1;
     try {
       let b = null;
-      for (const e of arr) { if (SKIP.includes(e.t)) continue; const L = K.layer(doc, e.layer); if (L.on === false || L.frozen) continue; b = G.mergeBounds(b, K.bbox(e, doc)); }
+      for (const e of arr) { if (SKIP.includes(e.t)) continue; const L = K.layer(doc, e.layer); if (L.on === false || L.frozen || e.layer === "Centre" || e.layer === "Construction") continue; b = G.mergeBounds(b, K.bbox(e, doc)); }
       if (b) { const side = Math.max(b.x1 - b.x0, b.y1 - b.y0); if (side > 0 && isFinite(side)) k = nice((side * 0.03) / th); }
     } finally { busy = false; }
     memo.set(arr, { k, th, u: doc.units });
     return k;
   };
+  /** size of the thing a dimension measures (null when unknown) */
+  K.dimFeat = (d) => {
+    if (!d) return null;
+    if (d.kind === "dia" || d.kind === "rad") return d.r > 0 ? 2 * d.r : null;
+    if (d.kind === "lin" && d.p1 && d.p2) { const v = d.dir === "v" ? Math.abs(d.p2[1] - d.p1[1]) : d.dir === "h" ? Math.abs(d.p2[0] - d.p1[0]) : Math.hypot(d.p2[0] - d.p1[0], d.p2[1] - d.p1[1]); return v > 0 ? v : null; }
+    if (d.kind === "ali" && d.p1 && d.p2) { const v = Math.hypot(d.p2[0] - d.p1[0], d.p2[1] - d.p1[1]); return v > 0 ? v : null; }
+    return null;
+  };
+  /** dimension size factor: about 3 % of the drawing, and never more than about 7 % of the feature it measures */
+  K.dimK = (doc, feat) => { const g = K.autoDimK(doc), th = doc.dim.th || 2.5; return feat > 0 ? Math.min(g, nice((feat * 0.07) / th)) : g; };
   const baseDimStyle = K.dimStyle;
   K.dimStyle = (e, doc) => {
     const D = baseDimStyle(e, doc);
     if (D.auto === false || (e && e.st && e.st.scale != null)) return D;
     const root = Object.assign({}, doc.dim, (doc.dimstyles || {})[e && e.sty] || {});
-    D.scale = (root.scale || 1) * K.autoDimK(doc);
+    D.scale = (root.scale || 1) * K.dimK(doc, K.dimFeat(e));
     return D;
   };
+  /* centre / hidden / dashed lines: the pattern follows the size of each object so it is always visible and in proportion */
+  const sizeMemo = new WeakMap();
+  const featSize = (e, doc) => { let v = sizeMemo.get(e); if (v == null) { v = 0; try { const b = K.bbox(e, doc); if (b) v = Math.max(b.x1 - b.x0, b.y1 - b.y0); } catch (er) { v = 0; } sizeMemo.set(e, v); } return v; };
+  const ltFactor = (e, doc, base) => {
+    if (!doc || !doc.dim || doc.dim.auto === false) return 1;
+    const L = K.layer(doc, e.layer), name = e.lt && e.lt !== "BYLAYER" && e.lt !== "BYBLOCK" ? e.lt : L.lt, def = K.LT[name];
+    if (!def || !def.p.length) return 1;
+    const S = featSize(e, doc); if (!(S > 0) || !isFinite(S)) return 1;
+    const tot = def.p.reduce((t, v) => t + Math.abs(v), 0) * (base || 1);
+    return tot > 0 ? Math.max(1e-4, Math.min(1e4, nice(S / (tot * 6)))) : 1;
+  };
+  const paint0 = K.paint;
+  K.paint = (P, e, doc, inh) => {
+    const o = P && P.o;
+    if (o && o._lt0 != null && e && e.t !== "insert") o.ltscale = o._lt0 * ltFactor(e.anno && K.annoEnt ? K.annoEnt(e) : e, doc, o._lt0);
+    return paint0(P, e, doc, inh);
+  };
+  for (const nm of ["canvasPainter", "svgPainter"]) {
+    const orig = K[nm]; if (!orig) continue;
+    K[nm] = function () { const a = Array.from(arguments), i = nm === "canvasPainter" ? 2 : 0; a[i] = Object.assign({}, a[i] || {}); a[i]._lt0 = a[i].ltscale || 1; const P = orig.apply(this, a); P.o = a[i]; return P; };
+  }
   cmd("DIMAUTO", { a: ["DAUTO"], d: "Switch automatic dimension size (follows the drawing size) on or off", fn: async (E) => {
     E.tx("auto dimension size", () => { E.doc.dim = Object.assign({}, E.doc.dim, { auto: E.doc.dim.auto === false }); });
     E.msg(`Automatic dimension size ${E.doc.dim.auto === false ? "off — the Dim style sizes are used as set" : "on — dimension text and arrows follow the drawing size"}.`, "ok"); E.redraw();
@@ -93,7 +124,7 @@
   });
 
   /* =============================== 3. automatic dimensions for new drawings =============================== */
-  const dimBase = (E) => { const D = K.dimStyle({}, E.doc), th = D.th * (D.scale || 1); return { th, off: th * 3.2 }; };
+  const dimBase = (E) => { const th0 = E.doc.dim.th || 2.5, auto = E.doc.dim.auto !== false; return { th: th0, off: (size) => th0 * (auto ? K.dimK(E.doc, size) : 1) * (E.doc.dim.scale || 1) * 3.2 }; };
   const pl = (e) => (e.pts || []).map((p) => [p[0], p[1], p[2] || 0]);
   const lenOf = (a, b) => Math.hypot(b[0] - a[0], b[1] - a[1]);
   const orient = (a, b) => { const dx = b[0] - a[0], dy = b[1] - a[1], L = Math.hypot(dx, dy) || 1; return Math.abs(dy) <= 1e-7 * L ? "h" : Math.abs(dx) <= 1e-7 * L ? "v" : "a"; };
@@ -107,18 +138,19 @@
   };
   /** the dimensions a new object should come with */
   K.autoDimsFor = (E, e) => {
-    const { off } = dimBase(E), out = [];
+    const { off: offF } = dimBase(E), out = [];
     switch (e.t) {
       case "line": {
         if (lenOf(e.a, e.b) < 1e-9) return [];
         const m = [(e.a[0] + e.b[0]) / 2, (e.a[1] + e.b[1]) / 2], o = orient(e.a, e.b);
         const inside = o === "h" ? [m[0], m[1] + 1] : o === "v" ? [m[0] - 1, m[1]] : (() => { const u = G.unit(G.sub(e.b, e.a)); const n = [u[1], -u[0]]; return G.add(m, G.mul(n, 1)); })();
-        out.push(sideDim(e.a, e.b, inside, off)); break;
+        out.push(sideDim(e.a, e.b, inside, offF(lenOf(e.a, e.b)))); break;
       }
-      case "circle": out.push({ kind: "dia", c: e.c, r: e.r, loc: G.polar(e.c, Math.PI / 4, e.r + off) }); break;
-      case "arc": { const sw = G.sweep(e.a0, e.a1); out.push({ kind: "rad", c: e.c, r: e.r, loc: G.polar(e.c, e.a0 + sw / 2, e.r + off * 0.8) }); break; }
+      case "circle": { const off = offF(2 * e.r); out.push({ kind: "dia", c: e.c, r: e.r, loc: G.polar(e.c, Math.PI / 4, e.r + off) }); break; }
+      case "arc": { const off = offF(2 * e.r), sw = G.sweep(e.a0, e.a1); out.push({ kind: "rad", c: e.c, r: e.r, loc: G.polar(e.c, e.a0 + sw / 2, e.r + off * 0.8) }); break; }
       case "ellipse": {
         if (e.a1 != null || Math.abs(Math.sin(e.rot || 0)) > 1e-9 || Math.abs(Math.cos(e.rot || 0)) < 1 - 1e-9) break;
+        const off = offF(2 * Math.max(e.rx, e.ry));
         out.push({ kind: "lin", dir: "h", p1: [e.c[0] - e.rx, e.c[1]], p2: [e.c[0] + e.rx, e.c[1]], loc: [e.c[0], e.c[1] - e.ry - off] });
         out.push({ kind: "lin", dir: "v", p1: [e.c[0], e.c[1] - e.ry], p2: [e.c[0], e.c[1] + e.ry], loc: [e.c[0] + e.rx + off, e.c[1]] }); break;
       }
@@ -128,15 +160,16 @@
         const cen = [P.reduce((s, p) => s + p[0], 0) / n, P.reduce((s, p) => s + p[1], 0) / n];
         if (bul || segs > 12) { // rounded / long outlines: overall width and height from the extreme vertices
           let iMinX = 0, iMaxX = 0, iMinY = 0, iMaxY = 0; P.forEach((p, i) => { if (p[0] < P[iMinX][0]) iMinX = i; if (p[0] > P[iMaxX][0]) iMaxX = i; if (p[1] < P[iMinY][1]) iMinY = i; if (p[1] > P[iMaxY][1]) iMaxY = i; });
-          if (P[iMaxX][0] - P[iMinX][0] > 1e-9) out.push({ kind: "lin", dir: "h", p1: P[iMinX], p2: P[iMaxX], loc: [(P[iMinX][0] + P[iMaxX][0]) / 2, P[iMinY][1] - off] });
-          if (P[iMaxY][1] - P[iMinY][1] > 1e-9) out.push({ kind: "lin", dir: "v", p1: P[iMinY], p2: P[iMaxY], loc: [P[iMaxX][0] + off, (P[iMinY][1] + P[iMaxY][1]) / 2] });
+          const offW = offF(P[iMaxX][0] - P[iMinX][0]), offH = offF(P[iMaxY][1] - P[iMinY][1]);
+          if (P[iMaxX][0] - P[iMinX][0] > 1e-9) out.push({ kind: "lin", dir: "h", p1: P[iMinX], p2: P[iMaxX], loc: [(P[iMinX][0] + P[iMaxX][0]) / 2, P[iMinY][1] - offW] });
+          if (P[iMaxY][1] - P[iMinY][1] > 1e-9) out.push({ kind: "lin", dir: "v", p1: P[iMinY], p2: P[iMaxY], loc: [P[iMaxX][0] + offH, (P[iMinY][1] + P[iMaxY][1]) / 2] });
           break;
         }
         const sides = []; for (let i = 0; i < segs; i++) sides.push([P[i], P[(i + 1) % n]]);
         const rect = closed && n === 4 && sides.every(([a, b], i) => { const [c, d] = sides[(i + 1) % 4]; return Math.abs(G.dot(G.unit(G.sub(b, a)), G.unit(G.sub(d, c)))) < 1e-6; });
         const lens = sides.map(([a, b]) => lenOf(a, b)), equal = lens.every((l) => Math.abs(l - lens[0]) < 1e-6 * Math.max(1, lens[0]));
         const pick = rect ? [0, 1] : closed && n > 4 && equal ? [0] : sides.map((_, i) => i);
-        for (const i of pick) if (lens[i] > 1e-9) out.push(sideDim(sides[i][0], sides[i][1], cen, off));
+        for (const i of pick) if (lens[i] > 1e-9) out.push(sideDim(sides[i][0], sides[i][1], cen, offF(lens[i])));
         break;
       }
       default: break;
