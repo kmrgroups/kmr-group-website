@@ -32,7 +32,7 @@
         history.replaceState(null, "", location.pathname + location.search + "#go=ed"); fit(); await openEditor("");
         let h = null; try { h = JSON.parse(localStorage.getItem("kmr-layout-dxf") || "null"); localStorage.removeItem("kmr-layout-dxf"); } catch (e) { h = null; }
         const E = S.E;
-        if (h && h.text && E) { const r = K.readDXF(h.text); E.load(r.doc, { title: h.name || "Layout from Factory & Office Layout" }); E._scratch = true; S.cur = null; setBar(); say("Layout drawing opened from Factory & Office Layout. Use Save to keep it in the register."); }
+        if (h && h.text && E) { const r = K.readDXF(h.text); E.load(r.doc, { title: h.name || "Layout from Factory & Office Layout" }); E._scratch = true; S.cur = null; try { await E.run("LAYGAPS", { quiet: true }); } catch (er) { /* gaps are optional */ } setBar(); say("Layout drawing opened from Factory & Office Layout. Use Save to keep it in the register."); }
         return;
       }
       if (g === "ed") { fit(); await openEditor(hashId()); return; }
