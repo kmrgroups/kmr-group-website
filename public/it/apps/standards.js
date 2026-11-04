@@ -48,6 +48,7 @@ sales:[
 ['ISO','9.1.2','Customer satisfaction - monitoring','Dispatch against plan is tracked every day, per part and per customer.'],
 ['IATF','9.1.2.1','Customer satisfaction: delivery performance','Plan vs actual, pending and over-dispatched quantity show delivery performance on the dashboard.'],
 ['ISO','9.1.3','Analysis and evaluation','The sales analysis panel and dashboards give trends by customer, plant and part.'],
+['ISO','8.2.3 / 8.5.2','Product master - customer part identification','The plant-wise part list (customer, customer part number, customer part name) downloads to Excel with ABC class, High Volume and High Value from the annual plan.'],
 ['ISO','10.2','Nonconformity and corrective action','Loss reasons and short-dispatch actions are recorded against the plan.'],
 ['IATF','10.2.3','Problem solving','Short-dispatch causes and the action taken are captured for follow-up.'],
 ['VDA','P7','Customer care / customer satisfaction / service','Delivery status and unplanned demand are visible to review with the customer.'],

@@ -105,6 +105,7 @@ footer{text-align:center;color:var(--mut);font-size:12px;padding:6px 0 18px}
   <input type="month" id="month">
   <button class="btn ghost sm" id="next" style="color:#fff;border-color:#fff6">›</button>
   <span class="chip x" id="role"></span>
+  <button class="btn ghost sm" id="expParts" style="color:#fff;border-color:#fff6" title="Download every plant’s part list (customer, part number, part name) with ABC class, High Volume and High Value as an Excel file">⬇ Part list (Excel)</button>
 </header>
 <div class="tabs">
   <a class="tab on" data-t="std" href="#go=std">Standards alignment</a>
@@ -996,6 +997,58 @@ async function boot() {
 const IMP = { files: [], recs: [] };
 const newKey = p => 'new|' + KMRImport.norm(p.part_code) + '|' + p.buyer_code;
 const isay = (t, ok) => { $('#imsg').innerHTML = t ? `<div class="msg ${ok ? 'ok' : ''}">${esc(t)}</div>` : ''; };
+
+/* ======== Part list export: plant-wise parts with ABC / High Volume / High Value (real data, whole financial year) ======== */
+async function exportPartList() {
+  const b = $('#expParts'); b.disabled = true; const t0 = b.textContent; b.textContent = 'Preparing…';
+  try {
+    await loadXLSX();
+    const y = +M.slice(0, 4), fy = +M.slice(5, 7) >= 4 ? y : y - 1;
+    const ms = Array.from({ length: 12 }, (_, i) => { const k = 3 + i; return (fy + Math.floor(k / 12)) + '-' + pad(k % 12 + 1); });
+    const res = await Promise.all(ms.map(m => api.rpc('kmr_sf_month_all', { p_slug: slug, p_month: m + '-01' })));
+    const plants = (res.find(r => r && r.plants) || {}).plants || [];
+    const P = {};
+    const key = (pc, bn, c) => [pc, String(bn || '').trim().toLowerCase(), c].join('|');
+    for (const pl of plants) {                                   // every part in the Operations Master of each plant
+      let list = []; try { list = await api.rpc('kmr_sf_parts', { p_slug: pl.slug }) || []; } catch (e) { /* plant without access */ }
+      list.forEach(p => { P[key(pl.code, p.buyer_name, p.part_code)] = { plant: pl.code, cust: p.buyer_name, no: p.part_code, name: p.part_name, qty: 0, price: +p.price || 0, cur: p.currency || 'INR' }; });
+    }
+    res.forEach(r => (r.lines || []).forEach(l => {                // plan quantity of the 12 months
+      const o = P[key(l.plant_code, l.buyer_name, l.part_code)] ||= { plant: l.plant_code, cust: l.buyer_name, no: l.part_code, name: l.part_name, qty: 0, price: 0, cur: l.currency || 'INR' };
+      o.qty += +l.demand_qty || 0; if (+l.price) { o.price = +l.price; o.cur = l.currency || o.cur; }
+    }));
+    const all = Object.values(P); if (!all.length) throw new Error('No parts found. Add parts under Operations Master › Parts first.');
+    all.forEach(o => o.val = o.qty * o.price * fx(o.cur));
+    const byPlant = {}; all.forEach(o => (byPlant[o.plant] ||= []).push(o));
+    Object.values(byPlant).forEach(arr => {
+      const pr = arr.filter(o => o.val > 0).sort((a, b) => b.val - a.val), tot = pr.reduce((a, o) => a + o.val, 0); let cum = 0;
+      pr.forEach(o => { const before = tot ? cum / tot * 100 : 0; o.abc = before < CFG.ABC[0] ? 'A' : before < CFG.ABC[1] ? 'B' : 'C'; cum += o.val; });
+      const top = (f) => { const a = arr.filter(o => o[f] > 0).sort((x, y) => y[f] - x[f]), n = Math.max(1, Math.ceil(a.length * 0.2)); a.slice(0, n).forEach(o => o['h' + f] = true); };
+      top('qty'); top('val');
+      arr.forEach(o => { o.abc = o.abc || 'Not classified'; o.hv = o.hqty ? 'Yes' : 'No'; o.hval = o.hval ? 'Yes' : 'No';
+        o.cls = o.val > 0 ? (o.hv === 'Yes' && o.hval === 'Yes' ? 'High Volume + High Value' : o.hv === 'Yes' ? 'High Volume' : o.hval === 'Yes' ? 'High Value' : 'Normal') : 'No plan / no price'; });
+    });
+    const H = ['Plant', 'Customer Name', 'Customer Part Number', 'Customer Part Name', 'Annual Plan Qty (pcs)', 'Unit Price', 'Currency', 'Annual Plan Value (₹)', 'ABC Class', 'High Volume', 'High Value', 'Classification'];
+    const row = o => [o.plant, o.cust, o.no, o.name, o.qty, o.price || '', o.cur, Math.round(o.val), o.abc, o.hv, o.hval, o.cls];
+    const order = (a, b) => a.plant.localeCompare(b.plant) || (b.val - a.val) || String(a.cust).localeCompare(String(b.cust)) || String(a.no).localeCompare(String(b.no));
+    const sheet = rows => { const w = XLSX.utils.aoa_to_sheet([H, ...rows.map(row)]); w['!cols'] = [14, 28, 22, 30, 14, 12, 9, 16, 14, 12, 12, 24].map(x => ({ wch: x })); w['!freeze'] = { xSplit: 0, ySplit: 1 }; w['!autofilter'] = { ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: rows.length, c: 11 } }) }; return w; };
+    const wb = XLSX.utils.book_new(), co = (res[0] && res[0].company) || 'Company';
+    XLSX.utils.book_append_sheet(wb, sheet(all.slice().sort(order)), 'All plants');
+    Object.keys(byPlant).sort().forEach(k => XLSX.utils.book_append_sheet(wb, sheet(byPlant[k].slice().sort(order)), String(k).replace(/[\\\/?*\[\]:]/g, '-').slice(0, 31)));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([['How the classes are worked out'], [''],
+      ['Source', 'Operations Master parts of every plant + the Sales Flow plan quantities of the financial year April ' + fy + ' – March ' + (fy + 1)],
+      ['Annual Plan Value', 'plan quantity × unit price (USD and EUR parts converted at the rates set in Sales Flow)'],
+      ['ABC Class', 'by annual plan value, plant by plant: A = parts making the first ' + CFG.ABC[0] + '% of value, B = next ' + (CFG.ABC[1] - CFG.ABC[0]) + '%, C = last ' + (100 - CFG.ABC[1]) + '% (same rule as the Sales Flow dashboard)'],
+      ['High Volume', 'the top 20% of the plant’s parts by annual plan quantity'],
+      ['High Value', 'the top 20% of the plant’s parts by annual plan value'],
+      ['Not classified', 'no plan quantity or no price entered yet']]), 'Rules');
+    XLSX.writeFile(wb, co.replace(/[^\w]+/g, '_') + '_Plant_wise_Part_List_ABC_' + todayStr() + '.xlsx');
+    say(`Part list downloaded: ${all.length} parts in ${Object.keys(byPlant).length} plant(s).`, true);
+  } catch (e) { say(e.message); }
+  finally { b.disabled = false; b.textContent = t0; }
+}
+document.getElementById('expParts').addEventListener('click', exportPartList);
+
 async function loadXLSX() {
   if (window.XLSX) return;
   for (const u of ['https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js']) {
