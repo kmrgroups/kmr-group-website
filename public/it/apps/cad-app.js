@@ -37,7 +37,7 @@
     let prefs = {}; try { prefs = JSON.parse(localStorage.getItem("kcad-prefs") || "{}"); } catch (e) { prefs = {}; }
     if (!prefs.lwtMig) { prefs.lwt = true; prefs.lwtMig = 1; }
     if (prefs.crossMig !== 2) { prefs.cross = 4; prefs.pick = 8; prefs.crossMig = 2; }   // short crosshair so it never hides the drawing   // thickness shows by default
-    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, lwt: true, light: false, cross: 4, pick: 8 }, prefs);
+    E.set = Object.assign({ osnap: true, snaps: { end: 1, mid: 1, cen: 1, qua: 0, int: 1, per: 1, tan: 0, nea: 0, node: 1, ins: 1 }, ortho: false, polar: true, otrack: true, pickgroup: true, polarInc: 15, grid: true, snap: false, snapUnit: 10, gridUnit: 10, dyn: true, autodim: true, lwt: true, light: false, cross: 4, pick: 8 }, prefs);
     const savePrefs = () => { try { localStorage.setItem("kcad-prefs", JSON.stringify(E.set)); } catch (e) { /* private mode */ } };
     E.cur = { layer: "0", color: null, lt: null, lw: null };
     E.view = { cx: 0, cy: 0, s: 3, W: 800, H: 600 };
@@ -712,13 +712,14 @@
     E.pickColor = pickColor;
 
     /* ---------------- status bar ---------------- */
-    const TG = [["grid", "Grid", "F7"], ["snap", "Snap", "F9"], ["ortho", "Ortho", "F8"], ["polar", "Polar", "F10"], ["osnap", "Osnap", "F3"], ["otrack", "Otrack", "F11"], ["dyn", "Dyn", "F12"], ["lwt", "Lwt", ""], ["pickgroup", "Groups", ""], ["light", "Paper", ""]];
+    const TG = [["grid", "Grid", "F7"], ["snap", "Snap", "F9"], ["ortho", "Ortho", "F8"], ["polar", "Polar", "F10"], ["osnap", "Osnap", "F3"], ["otrack", "Otrack", "F11"], ["dyn", "Dyn", "F12"], ["lwt", "Lwt", ""], ["pickgroup", "Groups", ""], ["autodim", "AutoDim", ""], ["light", "Paper", ""]];
     const drawStatus = () => {
       $(".cx-tg").innerHTML = TG.map(([k, n, f]) => `<button data-t="${k}" class="${E.set[k] ? "on" : ""}" title="${n}${f ? " (" + f + ")" : ""}${k === "osnap" || k === "polar" || k === "snap" ? " — right-click for settings" : ""}">${n}</button>`).join("") + `<button data-t="__set" title="Drafting settings">⚙</button>`;
-      $(".cx-info").textContent = `${E.doc.units} · ${E.sel.length ? E.sel.length + " selected · " : ""}${E.doc.ents.length} objects`;
+      $(".cx-info").innerHTML = `<select class="cx-unit" title="Drawing unit — pick another one and the whole drawing is converted">${Object.keys(K.UNITNAMES || { [E.doc.units]: 1 }).map((u) => `<option value="${u}"${u === E.doc.units ? " selected" : ""}>${u}</option>`).join("")}</select>${E.sel.length ? E.sel.length + " selected · " : ""}${E.doc.ents.length} objects`;
     };
     E.drawStatus = drawStatus;
     $(".cx-tg").addEventListener("click", (ev) => { const b = ev.target.closest("button[data-t]"); if (!b) return; if (b.dataset.t === "__set") return E.run("DSETTINGS"); toggle(b.dataset.t, b.textContent); });
+    $(".cx-info").addEventListener("change", (ev) => { const sel = ev.target.closest(".cx-unit"); if (sel) E.run("UNITCONVERT", { unit: sel.value }); });
     $(".cx-tg").addEventListener("contextmenu", (ev) => { ev.preventDefault(); E.run("DSETTINGS"); });
 
     /* ---------------- side panel ---------------- */
