@@ -24,7 +24,7 @@
     try {
       let b = null;
       for (const e of arr) { if (SKIP.includes(e.t)) continue; const L = K.layer(doc, e.layer); if (L.on === false || L.frozen || e.layer === "Centre" || e.layer === "Construction") continue; b = G.mergeBounds(b, K.bbox(e, doc)); }
-      if (b) { const side = Math.max(b.x1 - b.x0, b.y1 - b.y0); if (side > 0 && isFinite(side)) k = nice((side * 0.03) / th); }
+      if (b) { const side = Math.max(b.x1 - b.x0, b.y1 - b.y0); if (side > 0 && isFinite(side)) k = nice((side * 0.04) / th); }
     } finally { busy = false; }
     memo.set(arr, { k, th, u: doc.units });
     return k;
@@ -38,7 +38,7 @@
     return null;
   };
   /** dimension size factor: about 3 % of the drawing, and never more than about 7 % of the feature it measures */
-  K.dimK = (doc, feat) => { const g = K.autoDimK(doc), th = doc.dim.th || 2.5; return feat > 0 ? Math.min(g, nice((feat * 0.07) / th)) : g; };
+  K.dimK = (doc, feat) => { const g = K.autoDimK(doc), th = doc.dim.th || 2.5; return feat > 0 ? Math.min(g, nice((feat * 0.2) / th)) : g; };
   const baseDimStyle = K.dimStyle;
   K.dimStyle = (e, doc) => {
     const D = baseDimStyle(e, doc);
