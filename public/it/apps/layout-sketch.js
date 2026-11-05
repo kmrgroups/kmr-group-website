@@ -20,7 +20,7 @@
   let H = null;            // host options
   let el = null;           // root element
   let S = null;            // state
-  let tool = 'sel', sel = null, selOp = null, gapMode = 'sel', snapOn = true, view = 'sk';
+  let tool = 'sel', sel = null, selOp = null, gapMode = 'all', snapOn = true, view = 'sk';
   let vb = null;           // current viewBox [x,y,w,h] in metres
   let undo = [], drag = null, popEl = null, saveT = null, BG = null, remoteT = null, svState = '', svAt = null, sketches = [], saving = false, again = false;
 
@@ -167,7 +167,7 @@
     // objects
     for (const o of S.objs) {
       const c = gcol(o.group), isBad = bad.has(o), isSel = sel === o.id;
-      s += `<g data-o="${o.id}" style="cursor:move"><rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${isBad ? '#ff000040' : c + '22'}" stroke="${isBad ? '#dc2626' : c}" stroke-width="${(isSel ? 2.6 : 1.4) / ppm}"/>`;
+      s += `<g data-o="${o.id}" style="cursor:move"><rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" fill="${isBad ? '#ff000040' : c + '22'}" stroke="${isBad ? '#dc2626' : c}" stroke-width="${(isSel ? 2.8 : 1.8) / ppm}"/>`;
       const f = fitLabel(o, ppm);
       if (f) {
         const cx = o.x + o.w / 2, cy = o.y + o.h / 2, th = f.L.length * 1.2 * f.f; let t = '';
@@ -184,20 +184,30 @@
       for (const sd of Object.keys(by)) by[sd].forEach((idx, j) => {
         const p = opPos(o, sd, j, by[sd].length, rr), act = selOp && selOp.o === o.id && selOp.i === idx;
         const ang = Math.atan2(p.dy, p.dx) * 180 / Math.PI;
-        s += `<g data-op="${o.id}:${idx}" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="${rr}" fill="${act ? '#7c3aed' : '#fff'}" stroke="#111827" stroke-width="${sw}"/><path d="M${p.x + p.dx * rr * 0.2} ${p.y + p.dy * rr * 0.2}l${-p.dy * rr * 0.5 + p.dx * rr * 0.9} ${p.dx * rr * 0.5 + p.dy * rr * 0.9}l${p.dy * rr} ${-p.dx * rr}z" fill="${act ? '#fff' : '#111827'}" transform="rotate(0)"/></g>`;
+        s += `<g data-op="${o.id}:${idx}" style="cursor:pointer"><circle cx="${p.x}" cy="${p.y}" r="${rr}" fill="${act ? '#7c3aed' : '#fff'}" stroke="#c026d3" stroke-width="${sw * 1.3}"/><path d="M${p.x + p.dx * rr * 0.2} ${p.y + p.dy * rr * 0.2}l${-p.dy * rr * 0.5 + p.dx * rr * 0.9} ${p.dx * rr * 0.5 + p.dy * rr * 0.9}l${p.dy * rr} ${-p.dx * rr}z" fill="${act ? '#fff' : '#c026d3'}" transform="rotate(0)"/></g>`;
       });
     }
-    // gap dimensions
-    if (opt.gaps || gapMode !== 'off') for (const a of (opt.gaps || gapMode === 'all' ? S.objs : (sel && byId(sel) ? [byId(sel)] : []))) {
-      const g = gapsOf(a);
-      for (const sd of SIDES) {
-        const q = g[sd]; if (!(q.v > EPS)) continue; let x1, y1, x2, y2;
-        if (sd === 'N' || sd === 'S') { const lo = q.o ? Math.max(a.x, q.o.x) : a.x, hi = q.o ? Math.min(a.x + a.w, q.o.x + q.o.w) : a.x + a.w; x1 = x2 = (lo + hi) / 2; y1 = sd === 'N' ? a.y : a.y + a.h; y2 = sd === 'N' ? a.y - q.v : a.y + a.h + q.v; }
-        else { const lo = q.o ? Math.max(a.y, q.o.y) : a.y, hi = q.o ? Math.min(a.y + a.h, q.o.y + q.o.h) : a.y + a.h; y1 = y2 = (lo + hi) / 2; x1 = sd === 'W' ? a.x : a.x + a.w; x2 = sd === 'W' ? a.x - q.v : a.x + a.w + q.v; }
-        const len = Math.hypot(x2 - x1, y2 - y1), txt = fu(q.v), tw = txt.length * 0.55 * fs;
-        s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#0891b2" stroke-width="${0.9 / ppm}"/>`;
-        const horiz = sd === 'W' || sd === 'E';
-        if ((horiz ? len : len) * 1 >= (horiz ? tw : fs) * 1.1) s += `<text x="${(x1 + x2) / 2}" y="${(y1 + y2) / 2 - (horiz ? 0.25 * fs : 0)}" font-size="${fs * 0.85}" fill="#0e7490" text-anchor="middle" ${horiz ? '' : `transform="rotate(-90 ${(x1 + x2) / 2} ${(y1 + y2) / 2})" dy="-${0.3 * fs}"`}>${txt}</text>`;
+    // gap dimensions: one teal line per pair, with end ticks; double-click one to change it
+    if (opt.gaps || gapMode !== 'off') {
+      const all = opt.gaps || gapMode === 'all', seen = new Set(), tk = 3 / ppm;
+      for (const a of (all ? S.objs : (sel && byId(sel) ? [byId(sel)] : []))) {
+        const g = gapsOf(a);
+        for (const sd of SIDES) {
+          const q = g[sd]; if (!(q.v > EPS)) continue;
+          if (all && q.o) { const k = [a.id, q.o.id].sort().join('|') + (sd === 'N' || sd === 'S' ? 'v' : 'h'); if (seen.has(k)) continue; seen.add(k); }
+          let x1, y1, x2, y2;
+          if (sd === 'N' || sd === 'S') { const lo = q.o ? Math.max(a.x, q.o.x) : a.x, hi = q.o ? Math.min(a.x + a.w, q.o.x + q.o.w) : a.x + a.w; x1 = x2 = (lo + hi) / 2; y1 = sd === 'N' ? a.y : a.y + a.h; y2 = sd === 'N' ? a.y - q.v : a.y + a.h + q.v; }
+          else { const lo = q.o ? Math.max(a.y, q.o.y) : a.y, hi = q.o ? Math.min(a.y + a.h, q.o.y + q.o.h) : a.y + a.h; y1 = y2 = (lo + hi) / 2; x1 = sd === 'W' ? a.x : a.x + a.w; x2 = sd === 'W' ? a.x - q.v : a.x + a.w + q.v; }
+          const len = Math.hypot(x2 - x1, y2 - y1), txt = fu(q.v), tw = txt.length * 0.55 * fs, horiz = sd === 'W' || sd === 'E', gid = a.id + ':' + sd;
+          s += `<g data-gap="${gid}" style="cursor:pointer"><line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="#0891b2" stroke-width="${1 / ppm}"/>`;
+          s += horiz ? `<line x1="${x1}" y1="${y1 - tk}" x2="${x1}" y2="${y1 + tk}" stroke="#0891b2" stroke-width="${1 / ppm}"/><line x1="${x2}" y1="${y2 - tk}" x2="${x2}" y2="${y2 + tk}" stroke="#0891b2" stroke-width="${1 / ppm}"/>` : `<line x1="${x1 - tk}" y1="${y1}" x2="${x1 + tk}" y2="${y1}" stroke="#0891b2" stroke-width="${1 / ppm}"/><line x1="${x2 - tk}" y1="${y2}" x2="${x2 + tk}" y2="${y2}" stroke="#0891b2" stroke-width="${1 / ppm}"/>`;
+          s += `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="transparent" stroke-width="${10 / ppm}"/>`;
+          if (len >= (horiz ? tw : fs) * 1.1 || (all && len * ppm >= 9)) {
+            const mx2 = (x1 + x2) / 2, my2 = (y1 + y2) / 2, fz = Math.min(fs * 0.95, Math.max(len / Math.max(txt.length * 0.6, 1), 4 / ppm));
+            s += `<text x="${mx2}" y="${my2 - (horiz ? 0.25 * fz : 0)}" font-size="${fz}" fill="#0e7490" font-weight="600" text-anchor="middle" paint-order="stroke" stroke="#fff" stroke-width="${2.2 / ppm}" ${horiz ? '' : `transform="rotate(-90 ${mx2} ${my2})" dy="-${0.3 * fz}"`}>${txt}</text>`;
+          }
+          s += '</g>';
+        }
       }
     }
     // overall dimensions
@@ -231,8 +241,8 @@
   .ls .tb{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:6px 11px;font-weight:700;cursor:pointer}.ls .tb.on{background:var(--b1);color:#fff;border-color:var(--b1)}.ls .tb[disabled]{opacity:.45;cursor:default}
   .ls .seg{display:inline-flex;gap:2px;border:1px solid var(--line);border-radius:12px;padding:3px;margin:2px 0 8px}.ls .seg button{border:0;background:none;padding:6px 14px;border-radius:9px;font-weight:700;cursor:pointer;color:var(--mut)}.ls .seg button.on{background:var(--b1);color:#fff}
   .ls .sk{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:10px}@media(max-width:900px){.ls .sk{grid-template-columns:1fr}}
-  .ls #ls-cv{border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff;height:calc(100vh - 300px);min-height:440px}
-  .ls #ls-side{border:1px solid var(--line);border-radius:10px;padding:12px;height:calc(100vh - 300px);min-height:440px;overflow:auto;font-size:13px}
+  .ls #ls-cv{position:relative;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#fff;height:calc(100vh - 250px);min-height:520px}
+  .ls #ls-side{border:1px solid var(--line);border-radius:10px;padding:12px;height:calc(100vh - 250px);min-height:520px;overflow:auto;font-size:13px}.ls .gpop{position:absolute;z-index:5;background:#fff;border:1px solid #0891b2;border-radius:10px;box-shadow:0 8px 24px #0003;padding:10px 12px;font-size:13px;width:250px}.ls .gpop b{display:block;margin-bottom:6px}.ls .gpop label{display:flex;gap:6px;align-items:center;margin:4px 0}.ls .gpop input[type=number]{width:100px;padding:4px 6px}.ls .gpop .r{display:flex;gap:6px;margin-top:8px}
   .ls #ls-side h4{margin:0 0 6px;font-size:14px}.ls #ls-side .g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}.ls #ls-side label.lb{font-size:11px;font-weight:700;text-transform:uppercase;color:var(--mut)}.ls #ls-side input,.ls #ls-side select{padding:5px 7px}
   .ls .opr{display:flex;gap:6px;align-items:center;margin:4px 0;padding:4px 6px;border:1px solid var(--line);border-radius:8px}.ls .opr.on{border-color:var(--b1);background:#7c3aed14}.ls .opr span{flex:1}
   .ls .tbl{overflow:auto;max-height:calc(100vh - 260px)}.ls .tbl thead th{position:sticky;top:0;background:var(--card);z-index:1}.ls .tbl input{padding:3px 5px;width:100%;min-width:60px}.ls .tbl td small{display:block;color:var(--mut);font-size:10px}
@@ -334,7 +344,7 @@
   function bindCanvas() {
     const c = el.querySelector('#ls-cv');
     c.addEventListener('pointerdown', e => {
-      const p = pt(e), t = e.target, opg = t.closest('[data-op]'), og = t.closest('[data-o]'), hh = t.dataset.h;
+      const p = pt(e), t = e.target; if (t.closest('[data-gap]')) return; const opg = t.closest('[data-op]'), og = t.closest('[data-o]'), hh = t.dataset.h;
       if (opg) { const [id, i] = opg.dataset.op.split(':'); selOp = { o: id, i: +i }; sel = id; paintCanvas(); paintSide(); paintTools(); return; }
       if (tool === 'draw') { drag = { kind: 'draw', x0: snapv(p.x), y0: snapv(p.y), x1: snapv(p.x), y1: snapv(p.y) }; c.setPointerCapture(e.pointerId); return; }
       if (tool === 'op' && og) { snap(); const o = byId(og.dataset.o); o.ops.push('S'); sel = o.id; selOp = { o: o.id, i: o.ops.length - 1 }; persist(); paintCanvas(); paintSide(); paintTools(); return; }
@@ -356,6 +366,7 @@
       if (d.kind === 'move' || d.kind === 'size') { persist(); paintCanvas(); paintSide(); }
     };
     c.addEventListener('pointerup', end); c.addEventListener('pointercancel', end);
+    c.addEventListener('dblclick', e => { const gp = e.target.closest && e.target.closest('[data-gap]'); if (gp) { e.preventDefault(); openGapPop(gp.dataset.gap, e); } });
     c.addEventListener('wheel', e => { e.preventDefault(); const p = pt(e), f = e.deltaY > 0 ? 1.15 : 1 / 1.15, v = vb || curVB(); vb = [p.x - (p.x - v[0]) * f, p.y - (p.y - v[1]) * f, v[2] * f, v[3] * f]; later(paintCanvas); }, { passive: false });
     el.addEventListener('click', onClick); el.addEventListener('change', onChange); el.addEventListener('keydown', onKey);
     document.addEventListener('keydown', e => {
@@ -366,7 +377,34 @@
       else if (/^Arrow/.test(e.key) && sel) { const o = byId(sel), st = step() * (e.shiftKey ? 10 : 1); snap(); if (e.key === 'ArrowLeft') o.x -= st; if (e.key === 'ArrowRight') o.x += st; if (e.key === 'ArrowUp') o.y -= st; if (e.key === 'ArrowDown') o.y += st; clampObj(o); persist(); paintCanvas(); paintSide(); e.preventDefault(); }
     });
   }
-  function curVB() { const mx = Math.max(S.L, S.W), pad = mx * 0.07; return [-pad, -pad, S.L + 2 * pad, S.W + 2 * pad]; }
+
+  /* ---------- double-click a distance: type the new value, choose which object moves ---------- */
+  const OPP = { N: 'S', S: 'N', W: 'E', E: 'W' };
+  function setGapBetween(a, side, val, moveNb) {
+    const g = gapsOf(a)[side], nb = g.o; if (!isFinite(val) || val < 0) return false;
+    if (!moveNb || !nb) return setGap(a, side, val);
+    snap();
+    if (side === 'N') nb.y = a.y - val - nb.h;
+    if (side === 'S') nb.y = a.y + a.h + val;
+    if (side === 'W') nb.x = a.x - val - nb.w;
+    if (side === 'E') nb.x = a.x + a.w + val;
+    clampObj(nb); persist(); return true;
+  }
+  function closeGapPop() { const o = el && el.querySelector('.gpop'); if (o) o.remove(); }
+  function openGapPop(gid, ev) {
+    const [id, side] = gid.split(':'), a = byId(id); if (!a) return; const g = gapsOf(a)[side], nb = g.o, c = el.querySelector('#ls-cv');
+    closeGapPop(); const r = c.getBoundingClientRect(), d = document.createElement('div'); d.className = 'gpop';
+    d.style.left = Math.max(4, Math.min(c.clientWidth - 262, ev.clientX - r.left + 8)) + 'px'; d.style.top = Math.max(4, Math.min(c.clientHeight - 170, ev.clientY - r.top + 8)) + 'px';
+    d.innerHTML = `<b>${esc(a.code)} ↔ ${esc(nb ? nb.code : 'Wall')}</b><label>Distance (${esc(u())}) <input type="number" step="any" min="0" value="${esc(fu(g.v))}"></label>`
+      + (nb ? `<label><input type="radio" name="gm" value="a" checked> Move ${esc(a.code)}</label><label><input type="radio" name="gm" value="b"> Move ${esc(nb.code)}</label>` : `<p class="mut" style="margin:4px 0">${esc(a.code)} moves; the wall stays.</p>`)
+      + `<div class="r"><button class="tb" data-gok>Apply</button><button class="tb" data-gno>Cancel</button></div>`;
+    c.appendChild(d); const inp = d.querySelector('input[type=number]'); inp.focus(); inp.select();
+    const go = () => { const v = fromU(inp.value), moveNb = !!(nb && d.querySelector('input[name=gm]:checked').value === 'b'); if (!setGapBetween(a, side, v, moveNb)) { H.say('Enter a distance of zero or more.'); return; } closeGapPop(); paintCanvas(); paintSide(); };
+    d.querySelector('[data-gok]').onclick = go; d.querySelector('[data-gno]').onclick = closeGapPop;
+    inp.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); go(); } if (e.key === 'Escape') closeGapPop(); });
+    d.addEventListener('pointerdown', e => e.stopPropagation());
+  }
+  function curVB() { const mx = Math.max(S.L, S.W), pad = mx * 0.07, pe = mx * 0.03; return [-pad, -pad, S.L + pad + pe, S.W + pad + pe]; }
   function delSel() {
     if (selOp) { const o = byId(selOp.o); if (o) { snap(); o.ops.splice(selOp.i, 1); } selOp = null; }
     else if (sel) { snap(); S.objs = S.objs.filter(o => o.id !== sel); sel = null; }
