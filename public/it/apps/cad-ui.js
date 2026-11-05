@@ -12,11 +12,11 @@
       { n: "Draw", b: [["LINE", "Line", "line"], ["PLINE", "Polyline", "pline"], ["CIRCLE", "Circle", "circle"], ["ARC", "Arc", "arc"], ["RECTANG", "Rectangle", "rect"], ["POLYGON", "Polygon", "polygon"], ["ELLIPSE", "Ellipse", "ellipse"], ["SPLINE", "Spline", "spline"], ["HATCH", "Hatch", "hatch"], ["XLINE", "Constr. line", "xline"], ["POINT", "Point", "point"]] },
       { n: "Modify", b: [["MOVE", "Move", "move"], ["COPY", "Copy", "copy"], ["ROTATE", "Rotate", "rotate"], ["SCALE", "Scale", "scale"], ["MIRROR", "Mirror", "mirror"], ["OFFSET", "Offset", "offset"], ["TRIM", "Trim", "trim"], ["EXTEND", "Extend", "extend"], ["FILLET", "Fillet", "fillet"], ["CHAMFER", "Chamfer", "chamfer"], ["ARRAY", "Array", "array"], ["STRETCH", "Stretch", "stretch"], ["BREAK", "Break", "brk"], ["JOIN", "Join", "join"], ["EXPLODE", "Explode", "explode"], ["ERASE", "Erase", "erase"]] },
       { n: "Annotation", b: [["TEXT", "Text", "text"], ["MTEXT", "Mtext", "mtext"], ["DIMLINEAR", "Linear", "dimlin"], ["DIMALIGNED", "Aligned", "dimali"], ["DIMRADIUS", "Radius", "dimrad"], ["DIMDIAMETER", "Diameter", "dimdia"], ["DIMANGULAR", "Angular", "dimang"], ["QLEADER", "Leader", "leader"]] },
-      { n: "Layers & properties", b: ["|LAYERBOX", ["LAYER", "Layers", "layer"], ["MATCHPROP", "Match", "match"], ["PROPERTIES", "Properties", "props"]] },
+      { n: "Layers & properties", b: ["|LAYERBOX", ["LAYER", "Layers", "layer"], ["MATCHPROP", "Format brush", "match"], ["PROPERTIES", "Properties", "props"]] },
       { n: "Utilities", b: [["DIST", "Measure", "measure"], ["AREA", "Area", "area"], ["LIST", "List", "list"], ["SELECTSIMILAR", "Similar", "sel"]] },
     ] },
     { t: "Annotate", g: [
-      { n: "Text", b: [["TEXT", "Single line", "text"], ["MTEXT", "Multiline", "mtext"], ["TEXTEDIT", "Edit text", "text"], ["STYLE", "Text height", "units"]] },
+      { n: "Text", b: [["TEXT", "Single line", "text"], ["MTEXT", "Multiline", "mtext"], ["TEXTEDIT", "Edit text", "text"], ["STYLE", "Text height", "units"], ["MATCHPROP", "Format brush", "match"]] },
       { n: "Dimensions", b: [["DIMLINEAR", "Linear", "dimlin"], ["DIMALIGNED", "Aligned", "dimali"], ["DIMANGULAR", "Angular", "dimang"], ["DIMRADIUS", "Radius", "dimrad"], ["DIMDIAMETER", "Diameter", "dimdia"], ["DIMORDINATE", "Ordinate", "dimlin"], ["DIMCONTINUE", "Continue", "dimlin"], ["DIMBASELINE", "Baseline", "dimlin"], ["DIMSTYLE", "Dim style", "dimstyle"]] },
       { n: "Leaders & hatch", b: [["QLEADER", "Leader", "leader"], ["HATCH", "Hatch", "hatch"], ["BOUNDARY", "Boundary", "area"]] },
       { n: "Points", b: [["DIVIDE", "Divide", "divide"], ["MEASURE", "Measure", "divide"], ["PTYPE", "Point style", "point"]] },
