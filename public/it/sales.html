@@ -430,11 +430,48 @@ function renderDaily() {
     return `<td class="${bg === 'transparent' || bg === '#94a3b833' ? wk : ''}" style="background:${bg};color:${tx}" title="${d}: planned ${fmt(p, Number.isInteger(p) ? 0 : 2)} · despatched ${fmt(a)}">${a ? fmt(a) : p ? '·' : ''}</td>`; }).join('')}</tr>`).join('');
   $('#daily').innerHTML = `<div class="row"><b>Daily despatch</b><input type="date" id="dday" min="${M}-01" max="${M}-${dim(M)}" value="${day}">
       <span class="mut">Enter what actually left the plant on this date.</span><div style="flex:1"></div>${canEdit ? '<button class="btn ghost" id="upinv" title="Read the invoice / sales report from your ERP (Excel or CSV) and fill the despatch automatically">⬆ Upload invoice data</button><button class="btn ghost" id="addu">＋ Add part not in plan</button><button class="btn" id="saved">Save day</button>' : ''}</div>
+    <div id="erpsync"></div>
     ${rows.length ? `<p class="mut" style="margin:-6px 0 10px;font-size:12px"><b>Planned this day</b> = the month’s customer demand spread over its delivery schedule: <b>Daily</b> → demand ÷ working days (Mon–Sat) · <b>Weekly</b> → demand ÷ number of that weekday in the month · <b>Specific date</b> → the full quantity on that date. Shown in whole pieces; the days always add up to the demand.</p><div class="scroll" style="max-height:40vh"><table><thead><tr><th>Customer</th><th>Part</th><th class="n" title="Month demand spread over the delivery schedule (see the note above)">Planned this day ⓘ</th><th class="n">Month despatched / demand</th><th class="n">Pending</th><th class="n">Despatched this day</th><th>Status</th></tr></thead><tbody>${body}</tbody></table></div>
     <h3 style="margin:18px 0 6px;font-size:13px">Month tracker</h3>
     <div class="legend"><span><span class="chip g">n</span> met plan</span><span><span class="chip a">n</span> less than plan</span><span><span class="chip b">n</span> unplanned day</span><span><span class="chip r">·</span> planned, nothing despatched</span><span>· = planned, upcoming</span></div>
     <div class="scroll" style="max-height:34vh"><table class="heat"><thead><tr><th class="s">S.No</th><th class="l">Part</th>${ds.map(d => `<th class="${wcls(d)}" style="text-align:center;padding:3px">${+d.slice(8)}<small>${WK[isoDow(d)]}</small></th>`).join('')}</tr></thead><tbody>${heat}</tbody></table></div>` : '<p class="mut">No parts yet. Add parts in <b>Sales plan</b>, or use <b>Add part not in plan</b> for an unplanned sale.</p>'}`;
+  paintErpSync();
 }
+/* ---------- automatic despatch from the plant's ERP (console migration 0097): status, and parts waiting for review ---------- */
+let erpInfo = null;
+async function loadErpSync() {
+  if (DEMO || ALL || !slug) return;
+  try { erpInfo = await api.rpc('kmr_sf_erp_status', { p_slug: slug }); } catch (e) { erpInfo = null; }
+  paintErpSync();
+}
+function paintErpSync() {
+  const box = $('#erpsync'); if (!box) return;
+  if (erpInfo === null && !DEMO && !ALL && slug && !paintErpSync.asked) { paintErpSync.asked = true; loadErpSync(); }
+  if (!erpInfo) { box.innerHTML = ''; return; }
+  const isAdmin = ctx && ctx.role === 'admin';
+  if (!erpInfo.connected) { box.innerHTML = isAdmin ? '<p class="mut" style="margin:0 0 10px;font-size:12px">ERP sync is off. <button class="btn ghost sm" id="erpkey">Create ERP sync key</button></p>' : ''; return; }
+  const seen = erpInfo.last_seen ? new Date(erpInfo.last_seen) : null, mins = seen ? Math.round((Date.now() - seen) / 60000) : null;
+  const late = mins === null || mins > 30;
+  const buyers = new Map(); (PARTS || []).forEach(p => { if (p.buyer_code) buyers.set(p.buyer_code, p.buyer_name); }); lines.forEach(l => { if (l.buyer_code) buyers.set(l.buyer_code, l.buyer_name); });
+  const opts = [...buyers].map(([c, n]) => `<option value="${esc(c)}">${esc(n)}</option>`).join('');
+  const rv = erpInfo.review || [];
+  const rvRows = rv.map(r => `<tr><td>${esc(r.custcode)}</td><td><b>${esc(r.part_code)}</b><br><span class="mut">${esc(r.part_name)}</span></td><td class="n">${fmt(r.qty)}</td><td>${esc(r.last_day)}</td><td class="mut">${esc(r.reason)}</td>
+    <td>${canEdit && opts ? `<select data-erpmap="${esc(r.custcode)}"><option value="">Customer is…</option>${opts}</select>` : ''}</td></tr>`).join('');
+  box.innerHTML = `<p class="mut" style="margin:0 0 10px;font-size:12px"><b>ERP sync on</b> · ${seen ? (mins < 1 ? 'last checked just now' : `last checked ${mins} min ago`) : 'waiting for the first run'}${late && seen ? ' · <span style="color:var(--red)">not heard from the plant PC for a while</span>' : ''} · a day with ERP invoices shows their total, and it replaces a typed figure.
+      ${isAdmin ? '<button class="btn ghost sm" id="erpkey">New key</button>' : ''}</p>
+    ${rv.length ? `<details style="margin:0 0 10px"><summary style="color:var(--amber);cursor:pointer"><b>${rv.length} invoiced part(s) waiting for review</b>, not counted in despatch yet</summary><div class="scroll" style="max-height:30vh"><table><thead><tr><th>ERP customer</th><th>Part</th><th class="n">Qty</th><th>Last invoice</th><th>Why</th><th></th></tr></thead><tbody>${rvRows}</tbody></table></div></details>` : ''}`;
+}
+document.addEventListener('change', async e => {
+  const t = e.target; if (!t.dataset || !t.dataset.erpmap || !t.value) return;
+  try { await api.rpc('kmr_sf_erp_map', { p_slug: slug, p_custcode: t.dataset.erpmap, p_buyer_code: t.value }); say('Saved. The waiting lines update on the next sync, within a few minutes.', true); }
+  catch (err) { say(err.message); }
+});
+document.addEventListener('click', async e => {
+  if (e.target.id !== 'erpkey') return;
+  if (!confirm('Create a new ERP sync key for this plant? Any older key stops working.')) return;
+  try { const k = await api.rpc('kmr_sf_erp_new_key', { p_slug: slug, p_label: 'ERP sync' }); prompt('Copy this key now and paste it into the installer on the plant PC. It is shown only once.', k); erpInfo = null; paintErpSync.asked = false; loadErpSync(); }
+  catch (err) { say(err.message); }
+});
 
 /* ======== events ======== */
 document.addEventListener('click', async e => {
