@@ -277,6 +277,7 @@ mom:[
 ['VF','Step 6','Optimization (AIAG-VDA FMEA)','FMEA and Control Plan review meetings record optimisation actions with responsible person and target date.'],
 ['VDA','P2','Project management','Project review meetings are minuted with decisions, owners and dates.']],
 cad:[
+['ISO','7.5.3 / 7.5.2','Control of documented information — storage and retrieval','Any drawing can be saved to the company computer or network drive in DXF, PDF, SVG, PNG or KMR file form through the computer\'s own Save window, so the controlled copy and its backups sit where the company keeps its records.'],
 ['ISO','7.5.3 / 8.5.1','Drawing consistency — same look for the same kind of information','The Format brush copies layer, colour, linetype, lineweight, text style (font, bold, italic, underline, height), dimension style and hatch pattern from one object to any number of others, so notes, dimensions and views follow one company standard.'],
 ['ISO','7.5.3 / 8.5.1','Drawing annotation — notes and text on the drawing','Text and multiline text are typed in place on the drawing (font, height, bold, italic, underline, justify, symbols such as Ø ° ±), so notes, material and tolerance remarks read the same on screen and in the printout.'],
 ['ISO','7.1.5','Monitoring and measuring resources','Drawing aids work as in standard CAD: object snap, polar and object-snap tracking, adaptive grid and snap step for very small parts, one-time snap overrides in the right-click menu. Dimensions picked from the drawing are exact, so inspection values are not re-typed.'],
