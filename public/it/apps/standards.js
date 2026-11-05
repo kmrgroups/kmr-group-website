@@ -277,6 +277,7 @@ mom:[
 ['VF','Step 6','Optimization (AIAG-VDA FMEA)','FMEA and Control Plan review meetings record optimisation actions with responsible person and target date.'],
 ['VDA','P2','Project management','Project review meetings are minuted with decisions, owners and dates.']],
 cad:[
+['ISO','7.5.3 / 8.5.1','Drawing annotation — notes and text on the drawing','Text and multiline text are typed in place on the drawing (font, height, bold, italic, underline, justify, symbols such as Ø ° ±), so notes, material and tolerance remarks read the same on screen and in the printout.'],
 ['ISO','7.1.5','Monitoring and measuring resources','Drawing aids work as in standard CAD: object snap, polar and object-snap tracking, adaptive grid and snap step for very small parts, one-time snap overrides in the right-click menu. Dimensions picked from the drawing are exact, so inspection values are not re-typed.'],
 ['ISO','7.5.2','Layers, colour, linetype and lineweight','Colour palette, linetypes (hidden, centre, dashed ...) and lineweights display as they plot, so drawings follow the company drawing standard.'],
 ['ISO','7.5.2','Dimensioning and line conventions (ISO 129-1, ISO 128-20)','Every drawn object is dimensioned automatically (AutoDim); dimension text and arrows size themselves to the drawing so they stay readable. Outline, hidden, centre, dimension, text and hatch lines each have a fixed standard layer, colour and linetype (Std layers restores them).'],

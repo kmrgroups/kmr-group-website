@@ -300,7 +300,7 @@
   K.mtextLines = (e) => {
     const lines = K.wrap(e.s, e.h, e.w), ap = e.ap || 1, row = Math.floor((ap - 1) / 3), col = (ap - 1) % 3, ls = e.h * 1.667, H = (lines.length - 1) * ls + e.h;
     const top = row === 0 ? 0 : row === 1 ? H / 2 : H, out = [];
-    lines.forEach((s, i) => { if (!s) return; const local = [0, top - e.h - i * ls], p = G.add(e.p, G.rotp(local, [0, 0], e.rot || 0)); out.push({ t: "text", p, h: e.h, s, rot: e.rot || 0, ha: col, va: 0 }); });
+    lines.forEach((s, i) => { if (!s) return; const local = [0, top - e.h - i * ls], p = G.add(e.p, G.rotp(local, [0, 0], e.rot || 0)); out.push({ t: "text", p, h: e.h, s, rot: e.rot || 0, ha: col, va: 0, fnt: e.fnt, b: e.b, i: e.i, u: e.u }); });
     return out;
   };
   /** baseline anchor of a single-line text (va → baseline) */
@@ -498,8 +498,8 @@
         case "ellipse": P.poly(G.ellipsePoints(g, 120), g.a1 == null); break;
         case "spline": P.poly(G.splinePoints(g), false); break;
         case "point": P.point(g.p, doc.pdmode, doc.pdsize); break;
-        case "text": if (g.s) P.text(K.textBase(g), g.h, g.s, g.rot || 0, g.ha === 2 ? 2 : g.ha === 1 || g.ha === 4 ? 1 : 0); break;
-        case "mtext": for (const l of K.mtextLines(g)) P.text(K.textBase(l), l.h, l.s, l.rot || 0, l.ha); break;
+        case "text": if (g.s) P.text(K.textBase(g), g.h, g.s, g.rot || 0, g.ha === 2 ? 2 : g.ha === 1 || g.ha === 4 ? 1 : 0, g); break;
+        case "mtext": for (const l of K.mtextLines(g)) P.text(K.textBase(l), l.h, l.s, l.rot || 0, l.ha, l); break;
         case "hatch": if (g.solid) P.fill(g.loops); else for (const [a, b] of K.hatchLines(g)) P.line(a, b); break;
         case "dim": sub(K.dimGeom(g, doc), { lt: "CONTINUOUS" }); P.style(st); break;
         case "leader": sub(K.leaderGeom(g, doc), { lt: "CONTINUOUS" }); P.style(st); break;
@@ -533,9 +533,11 @@
       poly(pts, closed) { if (pts.length < 2) return; ctx.beginPath(); ctx.moveTo(X(pts[0]), Y(pts[0])); for (let i = 1; i < pts.length; i++) ctx.lineTo(X(pts[i]), Y(pts[i])); if (closed) ctx.closePath(); ctx.stroke(); },
       circle(c, r) { ctx.beginPath(); ctx.arc(X(c), Y(c), Math.max(0.5, r * s), 0, TAU); ctx.stroke(); },
       arc(c, r, a0, a1) { ctx.beginPath(); ctx.arc(X(c), Y(c), Math.max(0.5, r * s), -a0, -a0 - G.sweep(a0, a1), true); ctx.stroke(); },
-      text(b, h, str, rot, ha) {
+      text(b, h, str, rot, ha, st) {
         const px = h * s / 0.716; if (px < 1.2) { if (px * str.length > 2) { ctx.save(); ctx.globalAlpha = 0.5; const w = G.textW(str, h); const e2 = G.add(b, G.rotp([ha === 1 ? w / 2 : ha === 2 ? 0 : w, 0], [0, 0], rot)), s2 = G.add(b, G.rotp([ha === 1 ? -w / 2 : ha === 2 ? -w : 0, 0], [0, 0], rot)); ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(X(s2), Y(s2)); ctx.lineTo(X(e2), Y(e2)); ctx.stroke(); ctx.restore(); } return; }
-        ctx.save(); ctx.translate(X(b), Y(b)); ctx.rotate(-rot); ctx.font = px.toFixed(2) + "px Arial, Helvetica, sans-serif"; ctx.textBaseline = "alphabetic"; ctx.textAlign = ha === 1 ? "center" : ha === 2 ? "right" : "left"; ctx.fillText(str, 0, 0); ctx.restore();
+        ctx.save(); ctx.translate(X(b), Y(b)); ctx.rotate(-rot); ctx.font = (st && st.i ? "italic " : "") + (st && st.b ? "bold " : "") + px.toFixed(2) + "px " + (st && st.fnt ? '"' + String(st.fnt).replace(/"/g, "") + '", ' : "") + "Arial, Helvetica, sans-serif"; ctx.textBaseline = "alphabetic"; ctx.textAlign = ha === 1 ? "center" : ha === 2 ? "right" : "left"; ctx.fillText(str, 0, 0);
+        if (st && st.u) { const tw = ctx.measureText(str).width, x0 = ha === 1 ? -tw / 2 : ha === 2 ? -tw : 0, uy = Math.max(1, px * 0.12); ctx.fillRect(x0, uy, tw, Math.max(1, px * 0.06)); }
+        ctx.restore();
       },
       image(src, g) {
         const im = K.imgEl(src), x = X(g.p), y = Y(g.p), w = g.w * s, h = g.h * s;
@@ -577,7 +579,7 @@
       poly(pts, closed) { if (pts.length < 2) return; out.push(`<${closed ? "polygon" : "polyline"} points="${pts.map((p) => f(p[0]) + "," + f(p[1])).join(" ")}" fill="none" ${att}/>`); },
       circle(c, r) { out.push(`<circle cx="${f(c[0])}" cy="${f(c[1])}" r="${f(r)}" fill="none" ${att}/>`); },
       arc(c, r, a0, a1) { const sw = G.sweep(a0, a1), p = G.polar(c, a0, r), q = G.polar(c, a1, r); out.push(`<path d="M${f(p[0])} ${f(p[1])}A${f(r)} ${f(r)} 0 ${sw > Math.PI ? 1 : 0} 1 ${f(q[0])} ${f(q[1])}" fill="none" ${att}/>`); },
-      text(b, h, s, rot, ha) { const e = String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); out.push(`<text transform="translate(${f(b[0])} ${f(b[1])}) rotate(${f(rot / D2R)}) scale(1 -1)" font-size="${f(h / 0.716)}" font-family="Arial, Helvetica, sans-serif" text-anchor="${ha === 1 ? "middle" : ha === 2 ? "end" : "start"}" fill="${P.fillc}" stroke="none">${e}</text>`); },
+      text(b, h, s, rot, ha, st) { const e = String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); out.push(`<text transform="translate(${f(b[0])} ${f(b[1])}) rotate(${f(rot / D2R)}) scale(1 -1)" font-size="${f(h / 0.716)}" font-family="${st && st.fnt ? String(st.fnt).replace(/[&<>"]/g, "") + ", " : ""}Arial, Helvetica, sans-serif"${st && st.b ? ' font-weight="bold"' : ""}${st && st.i ? ' font-style="italic"' : ""}${st && st.u ? ' text-decoration="underline"' : ""} text-anchor="${ha === 1 ? "middle" : ha === 2 ? "end" : "start"}" fill="${P.fillc}" stroke="none">${e}</text>`); },
       fill(loops) { out.push(`<path d="${loops.map((l) => "M" + l.map((p) => f(p[0]) + " " + f(p[1])).join("L") + "Z").join("")}" fill="${P.fillc}" fill-rule="evenodd" stroke="none"/>`); },
       image(src, g) { if (!src) return; out.push(`<image href="${String(src).replace(/"/g, "&quot;")}" x="0" y="0" width="${f(g.w)}" height="${f(g.h)}" preserveAspectRatio="none"${g.alpha != null ? ` opacity="${g.alpha}"` : ""} transform="translate(${f(g.p[0])} ${f(g.p[1])}) rotate(${f((g.rot || 0) / D2R)}) translate(0 ${f(g.h)}) scale(1 -1)"/>`); },
       point(p, mode) { const r = 1; if (!mode) out.push(`<circle cx="${f(p[0])}" cy="${f(p[1])}" r="${f(0.3)}" fill="${P.fillc}" stroke="none"/>`); else { P.line([p[0] - r, p[1] - r], [p[0] + r, p[1] + r]); P.line([p[0] - r, p[1] + r], [p[0] + r, p[1] - r]); } },
