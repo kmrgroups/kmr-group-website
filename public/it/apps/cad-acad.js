@@ -20,7 +20,7 @@
         const w = await h.createWritable(); await w.write(blob); await w.close();
         const E = K.__E; if (E) E.msg("Saved to your computer: " + h.name, "ok");
         return;
-      } catch (e) { if (e && e.name === "AbortError") return; /* anything else: use the normal download */ }
+      } catch (e) { if (e && e.name === "AbortError") return; try { const k = "kmrcad_savelog", l = JSON.parse(localStorage.getItem(k) || "[]"); l.push({ t: new Date().toISOString(), step: "export-failed", name, err: e && (e.name + ": " + e.message) }); localStorage.setItem(k, JSON.stringify(l.slice(-30))); } catch (x) {} }
     }
     return plain(name, data, type);
   };
@@ -37,21 +37,31 @@
   const toast = (msg, bad, ms) => { const cw = document.querySelector(".cx-cw"); if (!cw) { try { alert(msg); } catch (e) {} return; } const t = document.createElement("div"); t.textContent = msg; t.style.cssText = `position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;max-width:90%;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;background:${bad ? "#b91c1c" : "#15803d"};box-shadow:0 10px 30px #0008`; cw.appendChild(t); setTimeout(() => t.remove(), ms || 6000); };
   const nm = (E, ext) => String((E.info && (E.info.number || E.info.title)) || "drawing").replace(/[^\w\-. ]+/g, "_").trim() + (E.info && E.info.rev ? "_rev" + E.info.rev : "") + "." + ext;
   const body = (E, ext) => (ext === "json" ? JSON.stringify({ kcad: 1, info: E.info, doc: E.data() }) : K.writeDXF(E.doc));
-  /** returns "saved", "cancel" or "download" (browser without a Save window) */
+  /* every save attempt is noted (last 30) so a failed save can be traced: localStorage "kmrcad_savelog" */
+  const slog = (o) => { try { const k = "kmrcad_savelog", a = JSON.parse(localStorage.getItem(k) || "[]"); a.push(Object.assign({ t: new Date().toISOString() }, o)); localStorage.setItem(k, JSON.stringify(a.slice(-30))); } catch (e) {} };
+  const why = (e) => (e && (e.name + ": " + e.message)) || String(e);
+  /** returns "saved", "cancel" or "download" */
   const toDisk = async (E, pick) => {
-    if (typeof window.showSaveFilePicker !== "function") { K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("Downloaded " + nm(E, "dxf") + " — look in your Downloads folder (use Chrome or Edge to choose the folder)."); return "download"; }
+    const dl = (name, txt, msg) => { plain(name, txt, "application/octet-stream"); toast(msg, true, 15000); E.msg(msg, "er"); return "download"; };
+    if (typeof window.showSaveFilePicker !== "function") { slog({ step: "no-picker" }); return dl(nm(E, "dxf"), body(E, "dxf"), "This browser cannot choose a folder, so " + nm(E, "dxf") + " was put in your Downloads folder. Use Chrome or Edge to choose the folder."); }
     let h = !pick && E.__fh;
     if (!h) {
-      try { h = await window.showSaveFilePicker({ id: "kmrcad", startIn: "documents", suggestedName: nm(E, "dxf"), types: [{ description: "AutoCAD drawing exchange (DXF)", accept: { "application/dxf": [".dxf"] } }, { description: "KMR CAD file (full copy)", accept: { "application/json": [".json"] } }] }); }
-      catch (e) { if (e && e.name === "AbortError") return "cancel"; K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("The Save window could not open here, so the file was downloaded: " + nm(E, "dxf")); return "download"; }
-      E.__fh = h;
+      try { h = await window.showSaveFilePicker({ suggestedName: nm(E, "dxf"), types: [{ description: "AutoCAD drawing exchange (DXF)", accept: { "application/dxf": [".dxf"] } }, { description: "KMR CAD file (full copy)", accept: { "application/json": [".json"] } }] }); }
+      catch (e) { if (e && e.name === "AbortError") { slog({ step: "cancel" }); return "cancel"; } slog({ step: "picker-failed", err: why(e) }); return dl(nm(E, "dxf"), body(E, "dxf"), "The Save window could not open (" + why(e) + "). The file was put in your Downloads folder: " + nm(E, "dxf")); }
     }
-    const ext = /\.json$/i.test(h.name) ? "json" : "dxf", txt = body(E, ext);
-    let size = 0;
-    try { const w = await h.createWritable(); await w.write(new Blob([txt], { type: ext === "json" ? "application/json" : "application/dxf" })); await w.close(); size = (await h.getFile()).size; }
-    catch (e) { E.__fh = null; K.download(h.name, txt, "application/octet-stream"); toast("Windows would not let the page write in that folder, so the file was saved in your Downloads folder as " + h.name + ". Pick Documents or another folder to save there directly.", true, 12000); return "download"; }
-    if (!size) { E.__fh = null; K.download(h.name, txt, "application/octet-stream"); toast("The file stayed empty, so it was saved in your Downloads folder as " + h.name, true, 12000); return "download"; }
-    toast("Saved: " + h.name + " (" + Math.round(size / 1024) + " KB). Use the same folder you picked in the Save window.", false, 9000); return "saved";
+    const ext = /\.json$/i.test(h.name) ? "json" : "dxf"; let txt = "", size = 0, step = "build";
+    try {
+      txt = body(E, ext); step = "permission";
+      if (h.requestPermission && (await h.queryPermission({ mode: "readwrite" })) !== "granted" && (await h.requestPermission({ mode: "readwrite" })) !== "granted") throw new Error("permission to write was not given");
+      step = "open"; const w = await h.createWritable({ keepExistingData: false });
+      step = "write"; await w.write(new Blob([txt], { type: "application/octet-stream" }));
+      step = "close"; await w.close();
+      step = "check"; size = (await h.getFile()).size;
+    } catch (e) { E.__fh = null; slog({ step: "write-failed", at: step, name: h.name, err: why(e) }); return dl(h.name, txt || body(E, "dxf"), "Could not write " + h.name + " in that folder (" + why(e) + "). It was put in your Downloads folder instead."); }
+    if (!size) { E.__fh = null; slog({ step: "empty", name: h.name }); return dl(h.name, txt, "The file " + h.name + " stayed empty, so it was put in your Downloads folder."); }
+    E.__fh = h; slog({ step: "saved", name: h.name, size, pick });
+    const ok = "Saved on your computer: " + h.name + " (" + Math.max(1, Math.round(size / 1024)) + " KB). Next Ctrl+S (save) writes to this same file.";
+    toast(ok, false, 9000); E.msg(ok, "ok"); return "saved";
   };
   K.saveToDisk = toDisk;
   const QS = K.CMDS.QSAVE, qsFn = QS && QS.fn;
@@ -117,6 +127,8 @@
 
   (K.editorHooks = K.editorHooks || []).push((E) => {
     K.__E = E;
+    const run0 = E.run;
+    E.run = (s, a) => { const n = E.resolve(String(s).split(/\s+/)[0]); if (n === "SAVEAS" || n === "QSAVE") { if (E.busy()) E.cancel(); return K.CMDS[n].fn(E, a || {}); } return run0(s, a); };
     const root = document.querySelector(".cx"); if (!root) return;
     const qa = root.querySelector(".cx-qa"), cw = root.querySelector(".cx-cw");
     /* application menu */
