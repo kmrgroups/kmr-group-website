@@ -498,7 +498,7 @@
     el.innerHTML = `<b>Stage drawings · ${esc(st.part)}</b> <span>freeze rev ${esc(String(st.freezeRev))} · ${st.sheets.length} sheet${st.sheets.length > 1 ? "s" : ""} · ${esc(st.source.name || "")}</span><span style="flex:1"></span>${st.sentAt ? `<span class="mut">Sent to the SOP ${esc(new Date(st.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }))}</span>` : '<span class="mut">Not sent to the SOP yet</span>'}<button class="btn s" data-st="send">Send to SOP</button><button class="btn s o" data-st="cnc" title="CNC program and machining simulation video">CNC simulation</button><button class="btn s o" data-st="save" title="Keep this set in the drawing register">Save as drawing</button>${/^pd-sample/.test(st.pd) ? '<span class="mut">(sample part — in your workspace the SOP opens in Process Documents)</span>' : `<a class="btn s o" href="${esc(sopHref(st.pd))}" target="_blank" rel="noopener">Open the SOP ↗</a>`}`;
     el.querySelector('[data-st="send"]').onclick = () => E.run("STAGESEND");
     el.querySelector('[data-st="cnc"]').onclick = () => E.run("CNCSIM");
-    el.querySelector('[data-st="save"]').onclick = () => E.run("SAVEAS");
+    el.querySelector('[data-st="save"]').onclick = () => E.run("SAVEWS");
   };
   K.editorHooks = K.editorHooks || [];
   K.editorHooks.push((E) => { K.imgListeners.push(() => E.redraw()); });

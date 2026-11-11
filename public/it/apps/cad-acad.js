@@ -52,7 +52,10 @@
   K.saveToDisk = toDisk;
   const QS = K.CMDS.QSAVE, qsFn = QS && QS.fn;
   if (QS) QS.fn = async (E, a) => { try { await toDisk(E, false); } catch (e) { toast("Could not write the file: " + (e && e.message || e), true); } return qsFn(E, a); };
-  cmd("SAVEDISKAS", { a: ["SAVEAS2"], d: "Save a file on this computer — choose a new folder or name", norepeat: true, fn: async (E) => { await toDisk(E, true); } });
+  /* Save As = always a NEW file on this computer (folder, name and type chosen each time). The old "copy in the workspace" is SAVEWS. */
+  const SA = K.CMDS.SAVEAS, saFn = SA && SA.fn;
+  if (SA) { cmd("SAVEWS", { a: [], d: "Save a copy as a new drawing in the KMR workspace", norepeat: true, fn: saFn }); SA.d = "Save As — save a new file on this computer (choose folder, name and type)"; SA.fn = async (E) => { try { await toDisk(E, true); } catch (e) { toast("Could not write the file: " + (e && e.message || e), true); } }; }
+  cmd("SAVEDISKAS", { a: ["SAVEAS2"], d: "Save As — new file on this computer", norepeat: true, fn: async (E) => E.run("SAVEAS") });
 
   /* ---------- 3. Home tab like AutoCAD ---------- */
   const has = (c) => !!K.CMDS[c];
@@ -101,7 +104,7 @@
     ["New", "NEW", null],
     ["Open", null, [["OPEN", "Drawing", "DXF, PDF, picture or KMR CAD file from your computer"], ["IMPORT", "Import DXF", "Add a DXF into this drawing"]]],
     ["Save", "QSAVE", null],
-    ["Save As", null, [["SAVELOCAL", "Save to my computer…", "Choose the file type, then the folder and name"], ["SAVEAS", "Drawing (KMR workspace)", "Keep a copy as a new drawing in your KMR workspace"], ["DXFOUT", "AutoCAD DXF", "Opens in AutoCAD and other CAD programs"], ["JSONOUT", "KMR CAD file", "Full copy, opens again in KMR CAD"]]],
+    ["Save As", "SAVEAS", [["SAVEAS", "Save As — new file on this computer…", "Pick the folder and the file name; DXF (AutoCAD) or KMR CAD file"], ["SAVELOCAL", "Other file types (PDF, SVG, PNG)…", "Export for printing, pictures or the web"], ["SAVEWS", "Copy in the KMR workspace", "Keep a copy as a new drawing in your KMR register"]]],
     ["Export", null, [["DXFOUT", "DXF", "AutoCAD drawing exchange"], ["PLOT", "PDF", "Print window → Save as PDF"], ["SVGOUT", "SVG", "Vector picture"], ["PNGOUT", "PNG", "Picture"], ["JSONOUT", "KMR CAD file", "Full copy of this drawing"]]],
     ["Print", null, [["PLOT", "Plot / PDF", "Set the paper, scale and area, then print or save as PDF"]]],
     ["Drawing utilities", null, [["UNITS", "Units", "Drawing units and precision"], ["PURGE", "Purge", "Remove unused layers, blocks and styles"], ["OVERKILL", "Overkill", "Delete duplicate and overlapping objects"]]],
@@ -121,11 +124,11 @@
     const close = () => m.classList.remove("on");
     btn.addEventListener("click", (ev) => { ev.stopPropagation(); m.classList.toggle("on"); if (m.classList.contains("on")) show(0); });
     m.addEventListener("mouseover", (ev) => { const b = ev.target.closest(".l button"); if (b) show(+b.dataset.i); });
-    m.addEventListener("click", (ev) => { ev.stopPropagation(); const l = ev.target.closest(".l button"); if (l) { const x = MENU[+l.dataset.i]; if (x[1]) { close(); E.run(x[1]); } else show(+l.dataset.i); return; } const c = ev.target.closest("[data-c]"); if (c) { close(); E.run(c.dataset.c); } });
+    m.addEventListener("click", (ev) => { ev.stopPropagation(); const l = ev.target.closest(".l button"); if (l) { const x = MENU[+l.dataset.i]; if (x[1] && !x[2]) { close(); E.run(x[1]); } else show(+l.dataset.i); return; } const c = ev.target.closest("[data-c]"); if (c) { close(); E.run(c.dataset.c); } });
     document.addEventListener("click", close);
-    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") close(); if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && (ev.key === "S" || ev.key === "s")) { ev.preventDefault(); ev.stopImmediatePropagation(); E.run("SAVELOCAL"); } }, true);
+    document.addEventListener("keydown", (ev) => { if (ev.key === "Escape") close(); if ((ev.ctrlKey || ev.metaKey) && ev.shiftKey && (ev.key === "S" || ev.key === "s")) { ev.preventDefault(); ev.stopImmediatePropagation(); E.run("SAVEAS"); } }, true);
     /* a "save to computer" shortcut next to Save */
-    const sv = qa.querySelector('button[data-c="QSAVE"]'); if (sv) { const b = document.createElement("button"); b.dataset.c = "SAVELOCAL"; b.title = "Save a copy on this computer (Ctrl+Shift+S)"; b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/><path d="M19 15v6m0 0-2-2m2 2 2-2" stroke="#60a5fa"/></svg>`; sv.after(b); }
+    const sv = qa.querySelector('button[data-c="QSAVE"]'); if (sv) { const b = document.createElement("button"); b.dataset.c = "SAVEAS"; b.title = "Save As — new file on this computer (Ctrl+Shift+S)"; b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4h11l3 3v13H5zM8 4v5h7V4M8 20v-6h8v6"/><path d="M19 15v6m0 0-2-2m2 2 2-2" stroke="#60a5fa"/></svg>`; sv.after(b); }
     /* navigation bar */
     const nav = document.createElement("div"); nav.className = "cx-nav";
     nav.innerHTML = NAV.filter((n) => has(n[0])).map((n) => `<button type="button" data-c="${n[0]}" title="${n[1]}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="${n[2]}"/></svg></button>`).join("");
