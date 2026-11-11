@@ -21,6 +21,7 @@
   const fmtOf = (n) => (extOf(n) === "json" || extOf(n) === "kcad" ? "json" : "dxf");
   const LOSSY = ["dim", "leader", "mleader", "hatch", "mtext", "table", "fcf"];
   const body = (E, fmt) => (fmt === "json" ? JSON.stringify({ kcad: 1, info: E.info, doc: E.data() }) : K.writeDXF(E.doc));
+  const OPEN_TYPES = [{ description: "Drawings (DXF, DWG, KMR CAD)", accept: { "application/dxf": [".dxf"], "application/acad": [".dwg"], "application/json": [".json", ".kcad"] } }, { description: "PDF or picture (traced into lines)", accept: { "application/pdf": [".pdf"], "image/*": [".png", ".jpg", ".jpeg", ".bmp", ".webp"] } }];
   const PICK_TYPES = [{ description: "AutoCAD drawing exchange (DXF)", accept: { "application/dxf": [".dxf"] } }, { description: "KMR CAD drawing (keeps everything)", accept: { "application/json": [".json"] } }];
   let untitled = 0;
   const docName = (E) => (E.file && E.file.name) || (reg() ? String(reg().number || "drawing").replace(/[^\w\-. ]+/g, "_") + (reg().rev ? "_rev" + reg().rev : "") + ".dxf" : String((E.info && E.info.title && !/^scratch/i.test(E.info.title) && E.info.title) || "Drawing1").replace(/[^\w\-. ]+/g, "_").replace(/\.[a-z0-9]{2,5}$/i, "") + ".dxf");
@@ -55,10 +56,16 @@
   /** Save As: always a new file, chosen by the user. Returns true when written. */
   async function saveAs(E) {
     if (!CAN_PICK) { plain(docName(E), body(E, "dxf"), "application/dxf"); say(E, "This browser cannot choose a folder, so " + docName(E) + " was put in your Downloads folder. Use Chrome or Edge to choose the folder."); E.markSaved(); return true; }
-    let h; slog({ step: "saveas-start", name: docName(E), active: !!(navigator.userActivation && navigator.userActivation.isActive) });
+    let h; const t0 = performance.now(); slog({ step: "saveas-start", name: docName(E), active: !!(navigator.userActivation && navigator.userActivation.isActive) });
     try { h = await window.showSaveFilePicker({ suggestedName: docName(E), types: fmtOf(docName(E)) === "json" ? PICK_TYPES.slice().reverse() : PICK_TYPES }); }
     catch (e) {
-      if (e && e.name === "AbortError") { slog({ step: "saveas-cancel", err: why(e) }); if (!/abort/i.test(e.message || "") || /user/i.test(e.message || "")) return false; say(E, "The Save window closed without saving (" + why(e) + ").", true); return false; }
+      if (e && e.name === "AbortError") {
+        const ms = Math.round(performance.now() - t0); slog({ step: "saveas-cancel", ms, err: why(e) });
+        if (ms > 600) return false;   // the user pressed Cancel
+        /* closed by the browser before anyone could see it (blocked by a browser setting or an extension): save through a normal download instead */
+        plain(docName(E), body(E, fmtOf(docName(E))), "application/octet-stream"); E.markSaved();
+        say(E, "Chrome closed the Save window by itself, so " + docName(E) + " was saved through a normal download (look in Downloads, or Chrome asks where if \"Ask where to save each file\" is on).", true); return true;
+      }
       slog({ step: "picker-failed", err: why(e) }); plain(docName(E), body(E, "dxf"), "application/dxf");
       say(E, "The Save window could not open (" + why(e) + "). " + docName(E) + " was put in your Downloads folder instead.", true); return false;
     }
@@ -127,9 +134,12 @@
     if (!(await askSave(E, "opening another drawing"))) return;
     try {
       if (CAN_PICK) {
-        let hs; try { hs = await window.showOpenFilePicker({ multiple: false, types: [{ description: "Drawings (DXF, DWG, KMR CAD)", accept: { "application/dxf": [".dxf"], "application/acad": [".dwg"], "application/json": [".json", ".kcad"] } }, { description: "PDF or picture (traced into lines)", accept: { "application/pdf": [".pdf"], "image/*": [".png", ".jpg", ".jpeg", ".bmp", ".webp"] } }], excludeAcceptAllOption: false }); }
-        catch (e) { if (e && e.name === "AbortError") return; throw e; }
-        return await openHandle(E, hs[0]);
+        let hs;
+        const t0 = performance.now();
+        try { hs = await window.showOpenFilePicker({ multiple: false, types: OPEN_TYPES, excludeAcceptAllOption: false }); }
+        catch (e) { if (!(e && e.name === "AbortError")) throw e; slog({ step: "open-cancel", ms: Math.round(performance.now() - t0) }); if (performance.now() - t0 > 600) return; hs = null; }
+        if (hs) return await openHandle(E, hs[0]);
+        const f2 = await K.pickFile(".dxf,.dwg,.json,.kcad"); if (!f2) return; return loadDoc(E, await K.readDrawingFile(f2), null, f2.name);
       }
       const file = await K.pickFile(".dxf,.dwg,.json,.kcad"); if (!file) return;
       loadDoc(E, await K.readDrawingFile(file), null, file.name);
@@ -148,6 +158,11 @@
     if (!(await askSave(E, "opening " + x.name))) return;
     try { await openHandle(E, x.h); } catch (e) { await dropRecent((a && a.i) || 0); E.err(x.name + " could not be opened (moved, renamed or deleted?): " + why(e)); }
   } });
+  cmd("SAVELOG", { a: ["SAVEHISTORY"], d: "Save history — the last saves on this computer and whether they worked", norepeat: true, fn: async (E) => {
+    let l = []; try { l = JSON.parse(localStorage.getItem("kmrcad_savelog") || "[]"); } catch (e) { /* ignore */ }
+    const W = { saved: "Saved", "write-failed": "Could not write", "picker-failed": "Save window failed", "saveas-cancel": "Save window closed", "saveas-start": "Save As opened", empty: "File stayed empty", "open-cancel": "Open window closed" };
+    await E.dialog("Save history (this computer)", l.length ? `<table style="width:100%;font-size:12.5px;border-collapse:collapse">${l.slice().reverse().map((x) => `<tr style="border-bottom:1px solid #2a3446"><td style="padding:4px 6px;white-space:nowrap">${esc(new Date(x.t).toLocaleString())}</td><td style="padding:4px 6px;color:${x.step === "saved" ? "#4ade80" : /fail|empty/.test(x.step) ? "#f87171" : "#cbd5e1"}">${esc(W[x.step] || x.step)}</td><td style="padding:4px 6px">${esc(x.name || "")}${x.size ? " · " + Math.max(1, Math.round(x.size / 1024)) + " KB" : ""}${x.err ? "<br><small>" + esc(x.err) + (x.ms != null ? " (" + x.ms + " ms)" : "") + "</small>" : ""}</td></tr>`).join("")}</table>` : "<p>No saves yet on this computer.</p>", null, { width: "640px" });
+  } });
   cmd("SAVEWS", { a: ["SAVEREG"], d: "Save a copy as a new drawing in the KMR register", norepeat: true, fn: async (E) => { if (!E.opts.onOpenFile) return E.err("The KMR register is not available here."); return E.opts.onOpenFile(E, { doc: E.data(), name: (E.info && E.info.title) || "Copy" }); } });
   cmd("REGOPEN", { a: [], d: "Open a drawing from the KMR register", norepeat: true, fn: async (E) => { if (!(await askSave(E, "going to the register"))) return; E.dirty = false; location.hash = "go=list"; } });
   cmd("REGNEW", { a: [], d: "New drawing in the KMR register (number, revision, title block)", norepeat: true, fn: async (E) => { if (E.opts.onNew) return E.opts.onNew(E); E.err("The KMR register is not available here."); } });
@@ -161,7 +176,7 @@
     ["Export", null, "Export to other formats", [["DXFOUT", "DXF", "AutoCAD drawing exchange"], ["PLOT", "PDF", "Print window › Save as PDF"], ["SVGOUT", "SVG", "Vector picture"], ["PNGOUT", "PNG", "Picture"], ["JSONOUT", "KMR CAD file", "Full copy of this drawing"]]],
     ["Print", "PLOT", "Plot / print", [["PLOT", "Plot", "Paper, scale and area, then print or save as PDF (Ctrl+P)"]]],
     ["Close", "CLOSE", "Close the drawing", null],
-    ["Drawing Utilities", null, "Units, purge, clean-up", [["UNITS", "Units", "Drawing units and precision"], ["PURGE", "Purge", "Remove unused layers, blocks and styles"], ["OVERKILL", "Overkill", "Delete duplicate and overlapping objects"]]],
+    ["Drawing Utilities", null, "Units, purge, clean-up, save history", [["SAVELOG", "Save history", "The last saves on this computer and whether they worked"], ["UNITS", "Units", "Drawing units and precision"], ["PURGE", "Purge", "Remove unused layers, blocks and styles"], ["OVERKILL", "Overkill", "Delete duplicate and overlapping objects"]]],
   ];
   const CSS = `
 .cf-btn{width:34px!important;height:28px;margin-right:4px;border-radius:6px;background:linear-gradient(135deg,#dc2626,#7f1d1d)!important;color:#fff!important;font:800 15px system-ui;display:grid!important;place-items:center}

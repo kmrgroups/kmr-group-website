@@ -14,13 +14,14 @@
   K.download = async function (name, data, type) {
     const blob = data instanceof Blob ? data : new Blob([data], { type: type || "application/octet-stream" });
     if (typeof window.showSaveFilePicker === "function") {
+      const t0 = performance.now();
       try {
         const ext = (String(name).match(/\.[^.]+$/) || [""])[0].toLowerCase();
         const h = await window.showSaveFilePicker({ id: "kmrcad", startIn: "documents", suggestedName: name, types: ext ? [{ description: TYPES[ext] || ext.slice(1).toUpperCase() + " file", accept: { [blob.type || "application/octet-stream"]: [ext] } }] : undefined });
         const w = await h.createWritable(); await w.write(blob); await w.close();
         const E = K.__E; if (E) E.msg("Saved to your computer: " + h.name, "ok");
         return;
-      } catch (e) { if (e && e.name === "AbortError") return; try { const k = "kmrcad_savelog", l = JSON.parse(localStorage.getItem(k) || "[]"); l.push({ t: new Date().toISOString(), step: "export-failed", name, err: e && (e.name + ": " + e.message) }); localStorage.setItem(k, JSON.stringify(l.slice(-30))); } catch (x) {} }
+      } catch (e) { if (e && e.name === "AbortError" && performance.now() - t0 > 600) return; try { const k = "kmrcad_savelog", l = JSON.parse(localStorage.getItem(k) || "[]"); l.push({ t: new Date().toISOString(), step: "export-failed", name, err: e && (e.name + ": " + e.message) }); localStorage.setItem(k, JSON.stringify(l.slice(-30))); } catch (x) {} }
     }
     return plain(name, data, type);
   };
