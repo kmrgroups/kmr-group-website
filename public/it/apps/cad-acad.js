@@ -32,6 +32,28 @@
     if (r) await E.run(r.c);
   } });
 
+
+  /* ---------- Save (Ctrl+S / the Save button) also keeps a file on the computer ---------- */
+  const toast = (msg, bad) => { const cw = document.querySelector(".cx-cw"); if (!cw) return; const t = document.createElement("div"); t.textContent = msg; t.style.cssText = `position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;max-width:90%;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;background:${bad ? "#b91c1c" : "#15803d"};box-shadow:0 10px 30px #0008`; cw.appendChild(t); setTimeout(() => t.remove(), 5000); };
+  const nm = (E, ext) => String((E.info && (E.info.number || E.info.title)) || "drawing").replace(/[^\w\-. ]+/g, "_").trim() + (E.info && E.info.rev ? "_rev" + E.info.rev : "") + "." + ext;
+  const body = (E, ext) => (ext === "json" ? JSON.stringify({ kcad: 1, info: E.info, doc: E.data() }) : K.writeDXF(E.doc));
+  /** returns "saved", "cancel" or "download" (browser without a Save window) */
+  const toDisk = async (E, pick) => {
+    if (typeof window.showSaveFilePicker !== "function") { K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("Downloaded " + nm(E, "dxf") + " — look in your Downloads folder (use Chrome or Edge to choose the folder)."); return "download"; }
+    let h = !pick && E.__fh;
+    if (!h) {
+      try { h = await window.showSaveFilePicker({ suggestedName: nm(E, "dxf"), types: [{ description: "AutoCAD drawing exchange (DXF)", accept: { "application/dxf": [".dxf"] } }, { description: "KMR CAD file (full copy)", accept: { "application/json": [".json"] } }] }); }
+      catch (e) { if (e && e.name === "AbortError") return "cancel"; K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("The Save window could not open here, so the file was downloaded: " + nm(E, "dxf")); return "download"; }
+      E.__fh = h;
+    }
+    const ext = /\.json$/i.test(h.name) ? "json" : "dxf", w = await h.createWritable(); await w.write(new Blob([body(E, ext)], { type: ext === "json" ? "application/json" : "application/dxf" })); await w.close();
+    toast("Saved on your computer: " + h.name); return "saved";
+  };
+  K.saveToDisk = toDisk;
+  const QS = K.CMDS.QSAVE, qsFn = QS && QS.fn;
+  if (QS) QS.fn = async (E, a) => { try { await toDisk(E, false); } catch (e) { toast("Could not write the file: " + (e && e.message || e), true); } return qsFn(E, a); };
+  cmd("SAVEDISKAS", { a: ["SAVEAS2"], d: "Save a file on this computer — choose a new folder or name", norepeat: true, fn: async (E) => { await toDisk(E, true); } });
+
   /* ---------- 3. Home tab like AutoCAD ---------- */
   const has = (c) => !!K.CMDS[c];
   const grp = (n, rows) => ({ n, b: rows.filter((r) => typeof r === "string" || has(r[0])) });
