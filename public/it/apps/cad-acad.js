@@ -16,7 +16,7 @@
     if (typeof window.showSaveFilePicker === "function") {
       try {
         const ext = (String(name).match(/\.[^.]+$/) || [""])[0].toLowerCase();
-        const h = await window.showSaveFilePicker({ suggestedName: name, types: ext ? [{ description: TYPES[ext] || ext.slice(1).toUpperCase() + " file", accept: { [blob.type || "application/octet-stream"]: [ext] } }] : undefined });
+        const h = await window.showSaveFilePicker({ id: "kmrcad", startIn: "documents", suggestedName: name, types: ext ? [{ description: TYPES[ext] || ext.slice(1).toUpperCase() + " file", accept: { [blob.type || "application/octet-stream"]: [ext] } }] : undefined });
         const w = await h.createWritable(); await w.write(blob); await w.close();
         const E = K.__E; if (E) E.msg("Saved to your computer: " + h.name, "ok");
         return;
@@ -42,15 +42,15 @@
     if (typeof window.showSaveFilePicker !== "function") { K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("Downloaded " + nm(E, "dxf") + " — look in your Downloads folder (use Chrome or Edge to choose the folder)."); return "download"; }
     let h = !pick && E.__fh;
     if (!h) {
-      try { h = await window.showSaveFilePicker({ suggestedName: nm(E, "dxf"), types: [{ description: "AutoCAD drawing exchange (DXF)", accept: { "application/dxf": [".dxf"] } }, { description: "KMR CAD file (full copy)", accept: { "application/json": [".json"] } }] }); }
+      try { h = await window.showSaveFilePicker({ id: "kmrcad", startIn: "documents", suggestedName: nm(E, "dxf"), types: [{ description: "AutoCAD drawing exchange (DXF)", accept: { "application/dxf": [".dxf"] } }, { description: "KMR CAD file (full copy)", accept: { "application/json": [".json"] } }] }); }
       catch (e) { if (e && e.name === "AbortError") return "cancel"; K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("The Save window could not open here, so the file was downloaded: " + nm(E, "dxf")); return "download"; }
       E.__fh = h;
     }
     const ext = /\.json$/i.test(h.name) ? "json" : "dxf", txt = body(E, ext);
     let size = 0;
     try { const w = await h.createWritable(); await w.write(new Blob([txt], { type: ext === "json" ? "application/json" : "application/dxf" })); await w.close(); size = (await h.getFile()).size; }
-    catch (e) { E.__fh = null; K.download(nm(E, ext), txt, "application/octet-stream"); toast("Could not write to the chosen place (" + (e && e.message || e) + "). A copy was downloaded to your Downloads folder instead: " + nm(E, ext), true); return "download"; }
-    if (!size) { E.__fh = null; K.download(nm(E, ext), txt, "application/octet-stream"); toast("The chosen file stayed empty, so a copy was downloaded to your Downloads folder: " + nm(E, ext), true); return "download"; }
+    catch (e) { E.__fh = null; K.download(h.name, txt, "application/octet-stream"); toast("Windows would not let the page write in that folder, so the file was saved in your Downloads folder as " + h.name + ". Pick Documents or another folder to save there directly.", true, 12000); return "download"; }
+    if (!size) { E.__fh = null; K.download(h.name, txt, "application/octet-stream"); toast("The file stayed empty, so it was saved in your Downloads folder as " + h.name, true, 12000); return "download"; }
     toast("Saved: " + h.name + " (" + Math.round(size / 1024) + " KB). Use the same folder you picked in the Save window.", false, 9000); return "saved";
   };
   K.saveToDisk = toDisk;
