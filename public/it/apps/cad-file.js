@@ -55,10 +55,10 @@
   /** Save As: always a new file, chosen by the user. Returns true when written. */
   async function saveAs(E) {
     if (!CAN_PICK) { plain(docName(E), body(E, "dxf"), "application/dxf"); say(E, "This browser cannot choose a folder, so " + docName(E) + " was put in your Downloads folder. Use Chrome or Edge to choose the folder."); E.markSaved(); return true; }
-    let h;
+    let h; slog({ step: "saveas-start", name: docName(E), active: !!(navigator.userActivation && navigator.userActivation.isActive) });
     try { h = await window.showSaveFilePicker({ suggestedName: docName(E), types: fmtOf(docName(E)) === "json" ? PICK_TYPES.slice().reverse() : PICK_TYPES }); }
     catch (e) {
-      if (e && e.name === "AbortError") return false;
+      if (e && e.name === "AbortError") { slog({ step: "saveas-cancel", err: why(e) }); if (!/abort/i.test(e.message || "") || /user/i.test(e.message || "")) return false; say(E, "The Save window closed without saving (" + why(e) + ").", true); return false; }
       slog({ step: "picker-failed", err: why(e) }); plain(docName(E), body(E, "dxf"), "application/dxf");
       say(E, "The Save window could not open (" + why(e) + "). " + docName(E) + " was put in your Downloads folder instead.", true); return false;
     }
