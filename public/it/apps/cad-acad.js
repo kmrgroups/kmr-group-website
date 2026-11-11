@@ -34,7 +34,7 @@
 
 
   /* ---------- Save (Ctrl+S / the Save button) also keeps a file on the computer ---------- */
-  const toast = (msg, bad) => { const cw = document.querySelector(".cx-cw"); if (!cw) return; const t = document.createElement("div"); t.textContent = msg; t.style.cssText = `position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;max-width:90%;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;background:${bad ? "#b91c1c" : "#15803d"};box-shadow:0 10px 30px #0008`; cw.appendChild(t); setTimeout(() => t.remove(), 5000); };
+  const toast = (msg, bad, ms) => { const cw = document.querySelector(".cx-cw"); if (!cw) { try { alert(msg); } catch (e) {} return; } const t = document.createElement("div"); t.textContent = msg; t.style.cssText = `position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;max-width:90%;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;background:${bad ? "#b91c1c" : "#15803d"};box-shadow:0 10px 30px #0008`; cw.appendChild(t); setTimeout(() => t.remove(), ms || 6000); };
   const nm = (E, ext) => String((E.info && (E.info.number || E.info.title)) || "drawing").replace(/[^\w\-. ]+/g, "_").trim() + (E.info && E.info.rev ? "_rev" + E.info.rev : "") + "." + ext;
   const body = (E, ext) => (ext === "json" ? JSON.stringify({ kcad: 1, info: E.info, doc: E.data() }) : K.writeDXF(E.doc));
   /** returns "saved", "cancel" or "download" (browser without a Save window) */
@@ -46,8 +46,12 @@
       catch (e) { if (e && e.name === "AbortError") return "cancel"; K.download(nm(E, "dxf"), body(E, "dxf"), "application/dxf"); toast("The Save window could not open here, so the file was downloaded: " + nm(E, "dxf")); return "download"; }
       E.__fh = h;
     }
-    const ext = /\.json$/i.test(h.name) ? "json" : "dxf", w = await h.createWritable(); await w.write(new Blob([body(E, ext)], { type: ext === "json" ? "application/json" : "application/dxf" })); await w.close();
-    toast("Saved on your computer: " + h.name); return "saved";
+    const ext = /\.json$/i.test(h.name) ? "json" : "dxf", txt = body(E, ext);
+    let size = 0;
+    try { const w = await h.createWritable(); await w.write(new Blob([txt], { type: ext === "json" ? "application/json" : "application/dxf" })); await w.close(); size = (await h.getFile()).size; }
+    catch (e) { E.__fh = null; K.download(nm(E, ext), txt, "application/octet-stream"); toast("Could not write to the chosen place (" + (e && e.message || e) + "). A copy was downloaded to your Downloads folder instead: " + nm(E, ext), true); return "download"; }
+    if (!size) { E.__fh = null; K.download(nm(E, ext), txt, "application/octet-stream"); toast("The chosen file stayed empty, so a copy was downloaded to your Downloads folder: " + nm(E, ext), true); return "download"; }
+    toast("Saved: " + h.name + " (" + Math.round(size / 1024) + " KB). Use the same folder you picked in the Save window.", false, 9000); return "saved";
   };
   K.saveToDisk = toDisk;
   const QS = K.CMDS.QSAVE, qsFn = QS && QS.fn;
