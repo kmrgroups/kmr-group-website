@@ -15,7 +15,7 @@
   const reg = () => { const S = shell(); return S && S.cur ? S.cur : null; };
   const why = (e) => (e && (e.message || e.name)) || String(e);
   const slog = (o) => { try { const k = "kmrcad_savelog", a = JSON.parse(localStorage.getItem(k) || "[]"); a.push(Object.assign({ t: new Date().toISOString() }, o)); localStorage.setItem(k, JSON.stringify(a.slice(-40))); } catch (e) { /* ignore */ } };
-  const toast = (msg, bad, ms) => { const cw = document.querySelector(".cx-cw"); if (!cw) return; const t = document.createElement("div"); t.className = "cf-toast" + (bad ? " bad" : ""); t.textContent = msg; cw.appendChild(t); setTimeout(() => t.remove(), ms || 6000); };
+  const toast = (msg, bad, ms) => { const cw = document.querySelector(".cx-cw"); if (!cw) return; cw.querySelectorAll(".cf-toast").forEach((x) => x.remove()); const t = document.createElement("div"); t.className = "cf-toast" + (bad ? " bad" : ""); t.textContent = msg; cw.appendChild(t); setTimeout(() => t.remove(), ms || 6000); };
   const say = (E, msg, bad) => { toast(msg, bad, bad ? 14000 : 7000); E.msg(msg, bad ? "er" : "ok"); };
   const extOf = (n) => ((String(n).match(/\.([^.]+)$/) || [])[1] || "").toLowerCase();
   const fmtOf = (n) => (extOf(n) === "json" || extOf(n) === "kcad" ? "json" : "dxf");
@@ -54,24 +54,55 @@
   }
 
   /** Save As: always a new file, chosen by the user. Returns true when written. */
+  /* Save As works with a drawings FOLDER chosen once (kept in this browser) and a name typed in the app, like AutoCAD's Save Drawing As window.
+     It does not use Chrome's file Save window, which some Chrome set-ups close by themselves without saving. */
+  let FOLDER = null;
+  const getFolder = async () => { if (FOLDER) return FOLDER; try { FOLDER = (await kv("folder")) || null; } catch (e) { FOLDER = null; } return FOLDER; };
+  const perm = async (d, mode, ask) => { try { if ((await d.queryPermission({ mode })) === "granted") return true; return ask ? (await d.requestPermission({ mode })) === "granted" : false; } catch (e) { return false; } };
+  const cleanName = (n) => String(n || "").trim().replace(/\.(dxf|json)$/i, "").replace(/[\\/:*?"<>|]+/g, "_").trim();
   async function saveAs(E) {
-    if (!CAN_PICK) { plain(docName(E), body(E, "dxf"), "application/dxf"); say(E, "This browser cannot choose a folder, so " + docName(E) + " was put in your Downloads folder. Use Chrome or Edge to choose the folder."); E.markSaved(); return true; }
-    let h; const t0 = performance.now(); slog({ step: "saveas-start", name: docName(E), active: !!(navigator.userActivation && navigator.userActivation.isActive) });
-    try { h = await window.showSaveFilePicker({ suggestedName: docName(E), types: fmtOf(docName(E)) === "json" ? PICK_TYPES.slice().reverse() : PICK_TYPES }); }
-    catch (e) {
-      if (e && e.name === "AbortError") {
-        const ms = Math.round(performance.now() - t0); slog({ step: "saveas-cancel", ms, err: why(e) });
-        if (ms > 600) return false;   // the user pressed Cancel
-        /* closed by the browser before anyone could see it (blocked by a browser setting or an extension): save through a normal download instead */
-        plain(docName(E), body(E, fmtOf(docName(E))), "application/octet-stream"); E.markSaved();
-        say(E, "Chrome closed the Save window by itself, so " + docName(E) + " was saved through a normal download (look in Downloads, or Chrome asks where if \"Ask where to save each file\" is on).", true); return true;
-      }
-      slog({ step: "picker-failed", err: why(e) }); plain(docName(E), body(E, "dxf"), "application/dxf");
-      say(E, "The Save window could not open (" + why(e) + "). " + docName(E) + " was put in your Downloads folder instead.", true); return false;
-    }
-    const r = await writeTo(E, h);
-    if (!r.ok) { plain(h.name, body(E, fmtOf(h.name)), "application/octet-stream"); say(E, "Could not write " + h.name + " in that folder (" + r.err + "). The file was put in your Downloads folder instead — choose another folder, e.g. Documents.", true); return false; }
-    link(E, h); say(E, "Saved as " + h.name + " (" + Math.max(1, Math.round(r.size / 1024)) + " KB). Save (Ctrl+S) now writes to this file." + lossNote(E, r.fmt)); return true;
+    const base = cleanName(docName(E)), fmt0 = fmtOf(docName(E)), CAN_DIR = typeof window.showDirectoryPicker === "function";
+    await getFolder(); slog({ step: "saveas-start", name: docName(E), folder: FOLDER && FOLDER.name });
+    const html = `<div class="cx-frm cf-sa">
+      <label>Save in folder<div class="cf-row"><b id="cff"></b><button type="button" class="cx-b o" id="cfch">${CAN_DIR ? "Change folder…" : "Not available in this browser"}</button></div></label>
+      <div id="cfl" class="cf-list"></div>
+      <label>File name<input id="cfn" value="${esc(base)}" spellcheck="false"></label>
+      <label>File type<select id="cft"><option value="dxf"${fmt0 === "dxf" ? " selected" : ""}>AutoCAD drawing exchange (.dxf)</option><option value="json"${fmt0 === "json" ? " selected" : ""}>KMR CAD drawing — keeps everything editable (.json)</option></select></label>
+      <label class="cf-chk"><input type="checkbox" id="cfdl"${CAN_DIR ? "" : " checked disabled"}> Save to my Downloads folder instead</label>
+      <p class="cx-note">Choose your own folder once, for example <b>Documents › KMR Drawings</b> (Chrome does not allow the top level of Documents, Downloads or Desktop itself — make or pick a folder inside them). The folder is remembered.</p></div>`;
+    const refresh = async (box) => {
+      box.querySelector("#cff").textContent = FOLDER ? "📁 " + FOLDER.name : "— no folder chosen yet —";
+      const L = box.querySelector("#cfl"); L.innerHTML = "";
+      if (!FOLDER) return;
+      if (!(await perm(FOLDER, "read", false))) { L.innerHTML = '<div class="cf-empty">Files in this folder show after you click Save once (Chrome asks to allow it).</div>'; return; }
+      const names = []; try { for await (const [n, h] of FOLDER.entries()) if (h.kind === "file" && /\.(dxf|json)$/i.test(n)) names.push(n); } catch (e) { /* ignore */ }
+      names.sort((a, b) => a.localeCompare(b));
+      L.innerHTML = names.length ? names.map((n) => `<button type="button" data-n="${esc(n)}">${/\.json$/i.test(n) ? "🗎" : "📐"} ${esc(n)}</button>`).join("") : '<div class="cf-empty">No drawings in this folder yet.</div>';
+      L.querySelectorAll("[data-n]").forEach((b) => (b.onclick = () => { box.querySelector("#cfn").value = cleanName(b.dataset.n); box.querySelector("#cft").value = fmtOf(b.dataset.n); }));
+    };
+    const res = await E.dialog("Save Drawing As", html, async (box) => {
+      const name = cleanName(box.querySelector("#cfn").value), fmt = box.querySelector("#cft").value, full = name + "." + fmt;
+      if (!name) throw new Error("Type a file name.");
+      if (box.querySelector("#cfdl").checked || !CAN_DIR) { plain(full, body(E, fmt), "application/octet-stream"); slog({ step: "saved-download", name: full }); return { dl: full, fmt }; }
+      if (!FOLDER) throw new Error("Choose a folder first (Change folder…), or tick “Save to my Downloads folder”.");
+      if (!(await perm(FOLDER, "readwrite", true))) { slog({ step: "folder-denied", folder: FOLDER.name }); throw new Error("Chrome did not allow saving in “" + FOLDER.name + "”. Click Change folder… and pick it again, then press Allow."); }
+      const exists = await FOLDER.getFileHandle(full).then(() => true, () => false);
+      if (exists && box.dataset.ok !== full) { box.dataset.ok = full; throw new Error(full + " already exists in " + FOLDER.name + ". Click Save again to replace it."); }
+      let h; try { h = await FOLDER.getFileHandle(full, { create: true }); } catch (e) { slog({ step: "write-failed", at: "create", name: full, err: why(e) }); throw new Error("Could not create " + full + ": " + why(e)); }
+      const r = await writeTo(E, h); if (!r.ok) throw new Error("Could not write " + full + ": " + r.err);
+      return { h, r, full };
+    }, { ok: "Save", width: "560px", init: (box) => {
+      refresh(box);
+      const ch = box.querySelector("#cfch"); if (!CAN_DIR) { ch.disabled = true; return; }
+      ch.onclick = async () => {
+        const t0 = performance.now();
+        try { const d = await window.showDirectoryPicker({ id: "kmrcad-folder", mode: "readwrite", startIn: FOLDER || "documents" }); FOLDER = d; kv("folder", d).catch(() => {}); slog({ step: "folder-chosen", folder: d.name }); delete box.dataset.ok; refresh(box); }
+        catch (e) { slog({ step: "folder-cancel", ms: Math.round(performance.now() - t0), err: why(e) }); if (performance.now() - t0 < 600 && e && e.name === "AbortError") { const m = box.querySelector(".cx-dmsg") || box.querySelector(".cx-db").appendChild(Object.assign(document.createElement("div"), { className: "cx-dmsg" })); m.textContent = "Chrome closed the folder window by itself. Tick “Save to my Downloads folder” to save now."; } }
+      };
+    } });
+    if (!res) { slog({ step: "saveas-cancel" }); return false; }
+    if (res.dl) { E.markSaved(); say(E, "Saved " + res.dl + " to your Downloads folder."); return true; }
+    link(E, res.h); say(E, "Saved as " + res.full + " in " + FOLDER.name + " (" + Math.max(1, Math.round(res.r.size / 1024)) + " KB). Save (Ctrl+S) now writes to this file." + lossNote(E, res.r.fmt)); return true;
   }
 
   /** Save: register drawing → register; then the tied file (or ask where, the first time). Returns true when saved. */
@@ -160,7 +191,7 @@
   } });
   cmd("SAVELOG", { a: ["SAVEHISTORY"], d: "Save history — the last saves on this computer and whether they worked", norepeat: true, fn: async (E) => {
     let l = []; try { l = JSON.parse(localStorage.getItem("kmrcad_savelog") || "[]"); } catch (e) { /* ignore */ }
-    const W = { saved: "Saved", "write-failed": "Could not write", "picker-failed": "Save window failed", "saveas-cancel": "Save window closed", "saveas-start": "Save As opened", empty: "File stayed empty", "open-cancel": "Open window closed" };
+    const W = { saved: "Saved", "saved-download": "Saved to Downloads", "folder-chosen": "Folder chosen", "folder-denied": "Folder not allowed", "folder-cancel": "Folder window closed", "write-failed": "Could not write", "picker-failed": "Save window failed", "saveas-cancel": "Save window closed", "saveas-start": "Save As opened", empty: "File stayed empty", "open-cancel": "Open window closed" };
     await E.dialog("Save history (this computer)", l.length ? `<table style="width:100%;font-size:12.5px;border-collapse:collapse">${l.slice().reverse().map((x) => `<tr style="border-bottom:1px solid #2a3446"><td style="padding:4px 6px;white-space:nowrap">${esc(new Date(x.t).toLocaleString())}</td><td style="padding:4px 6px;color:${x.step === "saved" ? "#4ade80" : /fail|empty/.test(x.step) ? "#f87171" : "#cbd5e1"}">${esc(W[x.step] || x.step)}</td><td style="padding:4px 6px">${esc(x.name || "")}${x.size ? " · " + Math.max(1, Math.round(x.size / 1024)) + " KB" : ""}${x.err ? "<br><small>" + esc(x.err) + (x.ms != null ? " (" + x.ms + " ms)" : "") + "</small>" : ""}</td></tr>`).join("")}</table>` : "<p>No saves yet on this computer.</p>", null, { width: "640px" });
   } });
   cmd("SAVEWS", { a: ["SAVEREG"], d: "Save a copy as a new drawing in the KMR register", norepeat: true, fn: async (E) => { if (!E.opts.onOpenFile) return E.err("The KMR register is not available here."); return E.opts.onOpenFile(E, { doc: E.data(), name: (E.info && E.info.title) || "Copy" }); } });
@@ -193,6 +224,10 @@
 .cf-m .r button:hover{background:#25407a}.cf-m .r button small{display:block;color:#9fb0c8;font-size:11.5px;margin-top:2px}
 .cf-m .r .empty{background:none!important;border:0!important;color:#9fb0c8;font-size:12.5px;padding:8px 10px}
 .cf-m .ft{position:absolute;right:10px;bottom:8px;font-size:11px;color:#8193ad}
+.cf-sa{display:block!important}.cf-sa>label{display:flex!important;flex-direction:column;gap:4px;margin:0 0 10px}.cf-sa>label>input,.cf-sa>label>select{width:100%}.cf-sa .cx-note{font-size:12px;color:#9fb0c8;margin:6px 0 0}
+.cf-sa .cf-row{display:flex;align-items:center;gap:10px;margin-top:4px}.cf-sa .cf-row b{flex:1;font-size:13.5px}
+.cf-list{max-height:150px;overflow:auto;border:1px solid #2a3446;border-radius:6px;margin:6px 0 10px;padding:4px}.cf-list:empty{display:none}.cf-list button{display:block;width:100%;text-align:left;padding:4px 8px;border-radius:4px;font-size:12.5px;color:inherit}.cf-list button:hover{background:#25407a}.cf-empty{font-size:12px;color:#9fb0c8;padding:4px 6px}
+.cf-chk{display:flex!important;flex-direction:row!important;align-items:center;gap:8px}.cf-chk input{width:auto!important}
 .cf-toast{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);z-index:70;max-width:90%;padding:10px 16px;border-radius:10px;font:600 13px system-ui;color:#fff;background:#15803d;box-shadow:0 10px 30px #0008}
 .cf-toast.bad{background:#b91c1c}`;
   const st = document.createElement("style"); st.textContent = CSS; document.head.appendChild(st);
