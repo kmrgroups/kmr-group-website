@@ -37,7 +37,7 @@
     try { const pp = JSON.parse(localStorage.getItem("kmr-portal") || "null"); if (pp && (DEMO || pp.slug === slug)) b.logo = pp.logo || null; } catch (e) { /* ignore */ }
     if (!DEMO && sb && slug) {
       try { const { data } = await sb.rpc("kmr_portal_brand", { p_slug: slug }); if (data && data[0]) { b.logo = data[0].logo_url || b.logo; b.name = data[0].name || b.name; } } catch (e) { /* ignore */ }
-      try { localStorage.setItem("kmr-portal", JSON.stringify({ slug, name: b.name, logo: b.logo || null })); } catch (e) { /* ignore */ }
+      try { const old = JSON.parse(localStorage.getItem("kmr-portal") || "null") || {}; localStorage.setItem("kmr-portal", JSON.stringify({ ...old, slug, name: b.name, logo: b.logo || null })); } catch (e) { /* ignore */ }
     }
     const el = $("#clogo"); if (!el) return;
     const safe = String(b.logo || "").replace(/["<>]/g, "");

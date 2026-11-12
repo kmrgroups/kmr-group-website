@@ -6,7 +6,18 @@
   { const sc = document.createElement("script"); sc.src = "/it/apps/kmr-table.js"; sc.defer = true; document.head.append(sc); }
   { const sd = document.createElement("script"); sd.src = "/it/apps/kmr-dev.js"; document.head.append(sd); }   // developer-only "Sample data" button in the footer
   { const sr = document.createElement("script"); sr.src = "/it/apps/kmr-report.js"; document.head.append(sr); }   // report frame: customer logo, unique reference, format revision footer on every printed page
-  let portal = null; try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {}
+  /* The saved KMR Apps portal info ("kmr-portal") is rewritten by several tools without the plant list, which made the plant name vanish from the title bar and footer.
+     The plant list is therefore also kept under its own key and put back whenever the saved portal belongs to one of those plants. */
+  const loadPortal = () => {
+    let p = null; try { p = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {}
+    try {
+      let st = {}; try { st = JSON.parse(localStorage.getItem("kmr-plants") || "{}") || {}; } catch (e) {}
+      if (p && Array.isArray(p.plants) && p.plants.length) { st = { list: p.plants, all: p.all }; localStorage.setItem("kmr-plants", JSON.stringify(st)); }
+      else if (p && Array.isArray(st.list) && st.list.some((x) => x.slug === p.slug)) { p.plants = st.list; if (p.all === undefined && st.all !== undefined) p.all = st.all; }
+    } catch (e) {}
+    return p;
+  };
+  let portal = loadPortal();
   const demo = /[?&]demo=1(&|$)/.test(location.search);
   const tool = /balloon/.test(location.pathname) ? "balloon" : /pd\.html/.test(location.pathname) ? "pd" : /capacity/.test(location.pathname) ? "capacity" : /sales\.html/.test(location.pathname) ? "sales" : /calibration/.test(location.pathname) ? "calib" : /apqp\.html/.test(location.pathname) ? "apqp" : /ppap\.html/.test(location.pathname) ? "ppap" : /rmp\.html/.test(location.pathname) ? "rmp" : /mmd\.html/.test(location.pathname) ? "mmd" : /mnt\.html/.test(location.pathname) ? "mnt" : /mom\.html/.test(location.pathname) ? "mom" : /cad\.html/.test(location.pathname) ? "cad" : /hrm\.html/.test(location.pathname) ? "hrms" : /tasks\.html/.test(location.pathname) ? "tsk" : /layout\.html/.test(location.pathname) ? "layout" : /msa\.html/.test(location.pathname) ? "msa" : /spc\.html/.test(location.pathname) ? "spc" : /crm\.html/.test(location.pathname) ? "crm" : /d8\.html/.test(location.pathname) ? "d8" : /qms\.html/.test(location.pathname) ? "qms" : /aud\.html/.test(location.pathname) ? "aud" : /office\.html/.test(location.pathname) ? "off" : "";
   const css = document.createElement("style");
@@ -63,7 +74,7 @@
     /* The plant / unit being worked in, shown in the title bar of every app (same text as the plant switcher in the footer) */
     (function plantInTitle(again) {
       const esc = (t) => String(t == null ? "" : t).replace(/[<>&"]/g, "");
-      if (again) { try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {} }
+      if (again) portal = loadPortal();
       const sp = new URLSearchParams(location.search), cur = sp.get("co") || (portal && portal.slug) || "";
       const pl = portal && Array.isArray(portal.plants) ? portal.plants : [];
       let label = "", tip = "";
