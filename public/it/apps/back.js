@@ -61,14 +61,20 @@
       }
     }
     /* The plant / unit being worked in, shown in the title bar of every app (same text as the plant switcher in the footer) */
-    (function plantInTitle() {
+    (function plantInTitle(again) {
       const esc = (t) => String(t == null ? "" : t).replace(/[<>&"]/g, "");
+      if (again) { try { portal = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {} }
       const sp = new URLSearchParams(location.search), cur = sp.get("co") || (portal && portal.slug) || "";
       const pl = portal && Array.isArray(portal.plants) ? portal.plants : [];
       let label = "", tip = "";
       if (sp.get("scope") === "all") { label = "All plants"; tip = "All plants of the company, added up"; }
       else { const x = pl.find((y) => y.slug === cur); if (x) { label = (x.main ? "Main" : x.code) + " · " + String(x.name).split(" – ").pop(); tip = x.name; } }
-      if (!label) return;
+      if (plantInTitle.done) return;
+      if (!label) {   // the plant list is saved by the KMR Apps page and can arrive a moment after this tool opened: look again instead of leaving the title bar without the plant
+        if (!again) { [800, 2500, 6000].forEach((ms) => setTimeout(() => plantInTitle(true), ms)); window.addEventListener("storage", (e) => { if (e.key === "kmr-portal") plantInTitle(true); }); }
+        return;
+      }
+      plantInTitle.done = true;
       const css2 = document.createElement("style");
       css2.textContent = ".kmr-plant{display:inline-flex;align-items:center;gap:6px;margin:0 10px;padding:3px 11px;border-radius:999px;background:rgba(127,127,127,.18);border:1px solid rgba(127,127,127,.4);color:inherit;font:600 12px \"Segoe UI\",Arial,sans-serif;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}@media print{.kmr-plant{display:none}}";
       document.head.append(css2);
