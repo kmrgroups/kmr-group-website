@@ -259,7 +259,7 @@
   /* ---------- Calibration ---------- */
   KMRPA.calibration = { name: "Calibration Hub", code: "calibration", ctxFn: "kmr_cal_context", std: "calibration", load: async function (call) {
     var D = await call("kmr_cal_load"), S = std, td = todayIso(), DUE = 30, ms = function (d) { return Date.parse(d + "T00:00:00"); };
-    var I = D.instruments || [], use = I.filter(function (i) { return i.status === "In use"; }), dd = function (i) { return i.next_due ? Math.round((ms(i.next_due) - ms(td)) / 864e5) : null; };
+    var AllI = D.instruments || [], I = AllI.filter(function (i) { return i.status !== "Scrapped"; }), use = I.filter(function (i) { return i.status === "In use"; }), dd = function (i) { return i.next_due ? Math.round((ms(i.next_due) - ms(td)) / 864e5) : null; };
     var od = use.filter(function (i) { return i.next_due && dd(i) < 0; }), soon = use.filter(function (i) { var d = dd(i); return d != null && d >= 0 && d <= DUE; }), nocal = use.filter(function (i) { return !i.next_due; });
     var oot = (D.oot || []).filter(function (o) { return o.status !== "Closed"; }), rec = D.records || [], cert = rec.filter(function (r) { return r.cert_no; }).length, msa = D.msa || [];
     var grr = msa.map(function (m) { return +((m.results || {}).pctGRR); }).filter(function (x) { return isFinite(x); }), bad = grr.filter(function (g) { return g > 30; }).length;
@@ -274,7 +274,9 @@
       { id: "nc", name: "In use with no calibration date", value: nocal.length, target: 0, amber: 2, dir: "low", std: S("IATF 7.1.5.2.1", "ISO 7.1.5.2"), why: "No traceable calibration status." },
       { id: "oot", name: "Open out-of-tolerance cases", value: oot.length, target: 0, amber: 1, dir: "low", std: S("IATF 7.1.5.2.1", "ISO 7.1.5.2", "ISO 8.7"), why: "Parts measured since the last good calibration must be assessed." },
       { id: "cert", name: "Records with certificate", value: rec.length ? cert / rec.length * 100 : null, unit: "%", target: 100, tol: 10, dir: "high", std: S("IATF 7.1.5.3.2", "ISO 7.1.5.2"), why: "Traceability to national standards needs a certificate number." },
-      { id: "grr", name: "MSA studies with %GRR above 30", value: bad, target: 0, amber: 1, dir: "low", std: S("IATF 7.1.5.1.1", "AIAG MSA"), why: msa.length + " studies on record; above 30% the gauge is not acceptable." }],
+      { id: "grr", name: "MSA studies with %GRR above 30", value: bad, target: 0, amber: 1, dir: "low", std: S("IATF 7.1.5.1.1", "AIAG MSA"), why: msa.length + " studies on record; above 30% the gauge is not acceptable." },
+      { id: "scrap", name: "Gauges moved to the scrap list", value: AllI.length - I.length, std: S("ISO 7.1.5.2"), why: "Gauges found unfit and withdrawn from use, each with date and reason." },
+      { id: "cost", name: "Calibration cost this year (INR)", value: Math.round(rec.filter(function (r) { return String(r.cal_date || "").slice(0, 4) === td.slice(0, 4); }).reduce(function (a, r) { return a + (+r.cost || 0); }, 0)), std: S("ISO 7.1.5.1", "ISO 9.3.2"), why: "Spend on calibration this year, from the cost entered on each calibration." }],
       charts: [{ title: "Instruments due by month", kind: "bar", kpi: "soon", labels: Object.keys(mo), series: [{ name: "Due", values: Object.keys(mo).map(function (m) { return mo[m]; }) }] },
         { title: "Overdue by department", kind: "bar", kpi: "od", labels: dk, series: [{ name: "Overdue", values: dk.map(function (x) { return by[x].o; }) }, { name: "Total", values: dk.map(function (x) { return by[x].t; }) }] }] };
   } };
