@@ -32,10 +32,10 @@
   --ok-bg:#12352a; --warn-bg:#3a2c12; --bad-bg:#40191a; --soft:#1e2b44; color-scheme:dark;
 }
 *{box-sizing:border-box}
-html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--font-body)}
+html,body{margin:0;background:var(--bg);color:var(--text);font:clamp(15px,.9vw + 7px,19px)/1.5 var(--font-body)}
 body{min-height:100%}
 header{background:var(--surface);border-bottom:1px solid var(--line)}
-.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+.wrap{max-width:none;margin:0 auto;padding:0 clamp(14px,2.5vw,48px)}
 .top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 0}
 h1{font-size:20px;margin:0;letter-spacing:.2px}
 h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted);font-family:var(--font-num)}
@@ -106,7 +106,7 @@ ol.steps li{margin:4px 0}
   </div>
 </header>
 <main class="wrap" id="view"></main>
-<footer class="wrap small muted" style="padding:0 16px 28px">Powered By : <a href="https://www.kmr-groups.com" style="color:var(--accent)">KMR Group of Companies</a></footer>
+<footer class="wrap small muted" style="padding-bottom:28px">Powered By : <a href="https://www.kmr-groups.com" style="color:var(--accent)">KMR Group of Companies</a></footer>
 
 <script>
 /* ====================== CORE (pure functions, also unit-tested) ====================== */
@@ -403,6 +403,12 @@ VIEWS.dashboard=function(){
     <ol class="steps"><li>GSTR-1: on the portal open Returns Dashboard, GSTR-1, Prepare Online, tick <em>File Nil GSTR-1</em>, then File Statement.</li>
     <li>GSTR-3B: Prepare Online, answer <em>Yes</em> to the nil return question, Next, tick the declaration, then File with EVC (Electronic Verification Code) and enter the OTP (one-time password) sent to your mobile.</li></ol>
     <p class="small muted">A nil return is correct only if you had no sales, no purchases of any kind, and owe no tax. If you bought anything, add it under Purchases.</p></div>`:''}
+  <div class="card" id="filebox"><h2>Filing status for ${monthName(S.period)}</h2>
+    <p class="muted small">The GST portal accepts a filing only after your own OTP (one-time password) or digital signature, so no app can press the final button for you. Everything before that is prepared here. After you file, enter the ARN (Acknowledgment Reference Number) so this app shows the return as done.</p>
+    ${['g1','g3'].map(k=>{const f=((S.filed||{})[S.period]||{})[k];const nm=k==='g1'?'GSTR-1':'GSTR-3B';
+      return `<div class="stripe ${f?'ok':'warn'}"><div class="row"><strong style="min-width:90px">${nm}</strong>${f?`<span class="pill ok">Filed</span><span class="small">ARN ${h(f.arn)}${f.on?' on '+h(dmy(f.on)):''}</span><button class="tiny ghost" data-act="unfile" data-k="${k}">Undo</button>`:`<span class="pill warn">Not filed</span><input id="arn_${k}" placeholder="ARN after filing" style="max-width:240px"><button class="tiny" data-act="markfile" data-k="${k}">Mark as filed</button>`}</div></div>`}).join('')}
+    <div class="row" style="margin-top:12px"><a href="https://services.gst.gov.in/services/login" target="_blank" rel="noopener"><button type="button">Open GST portal and file now</button></a>
+    <button class="ghost" data-act="gofiles" type="button">${nil?'Nil return: see steps below':'Get return files'}</button></div></div>
   <div class="card"><h2>Checks before you file</h2><p class="muted small">Every problem marked red must be fixed. The portal rejects the return file otherwise.</p>
     ${[...checks,...g1.warnings].map(c=>`<div class="stripe ${c.level}">${h(c.text)}</div>`).join('')}</div>
   <div class="card"><h2>How filing works</h2><p class="muted small">The GST portal does not let any app file on your behalf. Every return needs your OTP or digital signature. This app prepares the numbers and the upload files. You do the last step.</p>
@@ -588,7 +594,11 @@ function exampleData(){
 /* ---------- Click handling ---------- */
 document.addEventListener('click',e=>{
   const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,i=+b.dataset.i;
-  if(a==='saveProfile'){const g=$('#s_gstin').value.trim().toUpperCase();if(!gstinValid(g)){toast('GSTIN is not valid.','bad');return}
+  if(a==='markfile'){const k=b.dataset.k,v=($('#arn_'+k).value||'').trim();if(v.length<6){toast('Enter the ARN shown on the portal after filing.','bad');return}
+    S.filed=S.filed||{};S.filed[S.period]=S.filed[S.period]||{};S.filed[S.period][k]={arn:v,on:todayIso()};save();go()}
+  else if(a==='unfile'){const k=b.dataset.k;if(S.filed&&S.filed[S.period])delete S.filed[S.period][k];save();go()}
+  else if(a==='gofiles'){location.hash=(!mySales().length&&!myPurch().length)?'dashboard':'returns'}
+  else if(a==='saveProfile'){const g=$('#s_gstin').value.trim().toUpperCase();if(!gstinValid(g)){toast('GSTIN is not valid.','bad');return}
     S.profile={gstin:g,legal:$('#s_legal').value.trim(),trade:$('#s_trade').value.trim(),gt:num($('#s_gt').value),curgt:num($('#s_cur').value),aato:$('#s_aato').value};save();renderChrome();toast('Saved')}
   else if(a==='addSale'){const l=readSaleForm();if(!l)return;if(l._edit)delete l._edit;S.sales.push(l);save();salesTable();['f_no','f_val','f_desc'].forEach(x=>$('#'+x).value='');$('#f_no').focus();$('#f_prev').textContent='';toast('Line added')}
   else if(a==='editSale'){const l=S.sales.splice(i,1)[0];save();VIEWS.sales();for(const [k,id] of Object.entries({kind:'f_kind',no:'f_no',date:'f_date',ctin:'f_ctin',cname:'f_cname',pos:'f_pos',hsn:'f_hsn',desc:'f_desc',uqc:'f_uqc',qty:'f_qty',val:'f_val',cat:'f_cat',rate:'f_rate',cess:'f_cess'}))$('#'+id).value=l[k];window.scrollTo(0,0)}
