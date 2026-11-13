@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GST Return Desk</title>
+<link rel="manifest" href="/it/gst.webmanifest">
+<link rel="icon" href="/it/gst-icon.svg" type="image/svg+xml">
+<meta name="theme-color" content="#1d4f91">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout idea: a ledger-style desk. Slim top bar, tab row, one working column of cards. */
+:root{
+  --bg:#f2f4f7; --surface:#ffffff; --line:#d6dce5; --text:#17233a; --muted:#566781;
+  --accent:#1d4f91; --accent-ink:#ffffff; --ok:#0f7a55; --warn:#9a5b06; --bad:#b3261e;
+  --ok-bg:#e4f4ec; --warn-bg:#fbf0dc; --bad-bg:#fbe6e4; --soft:#e8eef7;
+  --font-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1624; --surface:#172033; --line:#2c3a54; --text:#e6ebf4; --muted:#9db0cc;
+    --accent:#7db0f0; --accent-ink:#0b1424; --ok:#5fd3a0; --warn:#f0b863; --bad:#f4867f;
+    --ok-bg:#12352a; --warn-bg:#3a2c12; --bad-bg:#40191a; --soft:#1e2b44; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1624; --surface:#172033; --line:#2c3a54; --text:#e6ebf4; --muted:#9db0cc;
+  --accent:#7db0f0; --accent-ink:#0b1424; --ok:#5fd3a0; --warn:#f0b863; --bad:#f4867f;
+  --ok-bg:#12352a; --warn-bg:#3a2c12; --bad-bg:#40191a; --soft:#1e2b44; color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 var(--font-body)}
+body{min-height:100%}
+header{background:var(--surface);border-bottom:1px solid var(--line)}
+.wrap{max-width:1120px;margin:0 auto;padding:0 16px}
+.top{display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:14px 0}
+h1{font-size:20px;margin:0;letter-spacing:.2px}
+h1 small{display:block;font-size:12px;font-weight:400;color:var(--muted);font-family:var(--font-num)}
+h2{font-size:17px;margin:0 0 4px;text-wrap:balance}
+h3{font-size:14px;margin:0 0 8px;text-wrap:balance}
+.period{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+nav{display:flex;gap:2px;overflow-x:auto}
+nav a{padding:10px 14px;color:var(--muted);text-decoration:none;border-bottom:3px solid transparent;white-space:nowrap;font-weight:500}
+nav a[aria-current="page"]{color:var(--accent);border-color:var(--accent)}
+nav a:hover{color:var(--text)}
+main{padding:20px 0 60px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:16px;margin-bottom:16px}
+.grid{display:grid;gap:16px}
+.g2{grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.g3{grid-template-columns:repeat(auto-fit,minmax(220px,1fr))}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.num{font-family:var(--font-num);font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+input,select,textarea{font:inherit;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0;width:100%}
+input[type=checkbox]{width:auto}
+textarea{font-family:var(--font-num);font-size:12px;line-height:1.45}
+input:focus,select:focus,textarea:focus,button:focus-visible,nav a:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.form{display:grid;gap:10px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));align-items:end}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+button{font:inherit;font-weight:500;border-radius:6px;border:1px solid var(--accent);background:var(--accent);color:var(--accent-ink);padding:8px 14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent)}
+button.danger{border-color:var(--bad);color:var(--bad);background:transparent}
+button.tiny{padding:3px 8px;font-size:12px}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:7px 9px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:12px;color:var(--muted);font-weight:600;white-space:nowrap}
+td.num,th.num{text-align:right}
+.pill{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12px;font-weight:600}
+.pill.ok{background:var(--ok-bg);color:var(--ok)}
+.pill.warn{background:var(--warn-bg);color:var(--warn)}
+.pill.bad{background:var(--bad-bg);color:var(--bad)}
+.pill.info{background:var(--soft);color:var(--accent)}
+.banner{border-radius:8px;padding:12px 14px;margin-bottom:16px;border:1px solid var(--line)}
+.banner.warn{background:var(--warn-bg);border-color:var(--warn)}
+.banner.ok{background:var(--ok-bg);border-color:var(--ok)}
+.banner.bad{background:var(--bad-bg);border-color:var(--bad)}
+.stripe{border-left:4px solid var(--line);padding:8px 12px;margin:6px 0;background:var(--bg);border-radius:0 6px 6px 0}
+.stripe.ok{border-color:var(--ok)}.stripe.warn{border-color:var(--warn)}.stripe.bad{border-color:var(--bad)}
+.big{font-family:var(--font-num);font-size:22px;font-weight:500}
+ol.steps{margin:6px 0 0;padding-left:20px}
+ol.steps li{margin:4px 0}
+.kv{display:grid;grid-template-columns:1fr auto;gap:2px 16px;font-size:14px}
+.kv .num{font-weight:500}
+@media (max-width:520px){.top{padding:10px 0}}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <div class="top">
+      <h1>GST Return Desk<small id="whoami">GSTIN: not set</small></h1>
+      <div class="period">
+        <label>Return month<input type="month" id="period"></label>
+        <label>Filing type
+          <select id="freq"><option value="M">Monthly (GSTR-1 and GSTR-3B every month)</option><option value="Q">Quarterly (QRMP scheme)</option></select>
+        </label>
+      </div>
+    </div>
+    <nav id="tabs" aria-label="Sections"></nav>
+  </div>
+</header>
+<main class="wrap" id="view"></main>
+<footer class="wrap small muted" style="padding:0 16px 28px">Powered By : <a href="https://www.kmr-groups.com" style="color:var(--accent)">KMR Group of Companies</a></footer>
+
+<script>
+/* ====================== CORE (pure functions, also unit-tested) ====================== */
+//CORE-START
+const STATES={'01':'Jammu & Kashmir','02':'Himachal Pradesh','03':'Punjab','04':'Chandigarh','05':'Uttarakhand','06':'Haryana','07':'Delhi','08':'Rajasthan','09':'Uttar Pradesh','10':'Bihar','11':'Sikkim','12':'Arunachal Pradesh','13':'Nagaland','14':'Manipur','15':'Mizoram','16':'Tripura','17':'Meghalaya','18':'Assam','19':'West Bengal','20':'Jharkhand','21':'Odisha','22':'Chhattisgarh','23':'Madhya Pradesh','24':'Gujarat','25':'Daman & Diu','26':'Dadra & Nagar Haveli and Daman & Diu','27':'Maharashtra','29':'Karnataka','30':'Goa','31':'Lakshadweep','32':'Kerala','33':'Tamil Nadu','34':'Puducherry','35':'Andaman & Nicobar Islands','36':'Telangana','37':'Andhra Pradesh','38':'Ladakh','97':'Other Territory'};
+const RATES=[0.1,0.25,1,1.5,3,5,12,18,28,40];
+const B2CL_LIMIT=100000; // inter-state invoice to an unregistered buyer above this value is reported invoice-wise (B2CL)
+const r2=n=>Math.round((Number(n||0)+Number.EPSILON)*100)/100;
+const num=v=>{const x=parseFloat(v);return isFinite(x)?x:0};
+const dmy=iso=>String(iso||'').split('-').reverse().join('-');
+const sOf=g=>String(g||'').slice(0,2);
+
+function gstinValid(g){
+  g=String(g||'').toUpperCase();
+  if(!/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(g))return false;
+  if(!STATES[g.slice(0,2)])return false;
+  const C='0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';let s=0;
+  for(let i=0;i<14;i++){const v=C.indexOf(g[i])*(i%2?2:1);s+=Math.floor(v/36)+v%36}
+  return C[(36-s%36)%36]===g[14];
+}
+const inPeriod=(iso,p)=>String(iso||'').slice(0,7)===p;
+const fpOf=p=>p.slice(5,7)+p.slice(0,4);
+
+/* One entry line -> amounts. kind: INV | CN | DN. cat: TAX | NIL | EXEMPT | NONGST */
+function calcLine(l,own){
+  const intra=l.pos===own, v=r2(num(l.val)), rt=num(l.rate);
+  const o={...l,val:v,rt,intra,iamt:0,camt:0,samt:0,csamt:r2(num(l.cess))};
+  if((l.cat||'TAX')==='TAX'){
+    if(intra){o.camt=r2(v*rt/200);o.samt=r2(v*rt/200)}else o.iamt=r2(v*rt/100);
+  }else{o.rt=0;o.csamt=0}
+  o.tot=r2(v+o.iamt+o.camt+o.samt+o.csamt);
+  o.sign=l.kind==='CN'?-1:1;
+  return o;
+}
+const add=(a,b,k=1)=>{for(const f of['txval','iamt','camt','samt','csamt'])a[f]=r2((a[f]||0)+k*(b[f]||0));return a};
+const lineAmts=l=>({txval:l.val,iamt:l.iamt,camt:l.camt,samt:l.samt,csamt:l.csamt});
+const taxKeys=(o,x,intra)=>{if(intra){o.camt=x.camt;o.samt=x.samt}else o.iamt=x.iamt;if(x.csamt)o.csamt=x.csamt;return o};
+
+function seriesInfo(nos){
+  const m=new Map();
+  for(const n of nos){
+    const r=/^(.*?)(\d+)$/.exec(n);if(!r)continue;
+    const key=r[1]+'|'+r[2].length;if(!m.has(key))m.set(key,{pre:r[1],len:r[2].length,nums:[]});
+    m.get(key).nums.push(parseInt(r[2],10));
+  }
+  return[...m.values()].map(s=>{
+    s.nums.sort((a,b)=>a-b);const lo=s.nums[0],hi=s.nums[s.nums.length-1];
+    const f=x=>s.pre+String(x).padStart(s.len,'0');
+    return{from:f(lo),to:f(hi),issued:s.nums.length,span:hi-lo+1,gaps:(hi-lo+1)-s.nums.length};
+  });
+}
+
+function buildGSTR1(sales,P){
+  const own=sOf(P.gstin), lines=sales.map(l=>calcLine(l,own)), W=[];
+  const inv=new Map();
+  for(const l of lines){const k=l.kind+'|'+l.no+'|'+(l.ctin||'');if(!inv.has(k))inv.set(k,[]);inv.get(k).push(l)}
+  const out={gstin:P.gstin,fp:fpOf(P.period),gt:r2(P.gt),cur_gt:r2(P.curgt)};
+  const b2b=new Map(),cdnr=new Map(),b2cl=new Map(),b2cs=new Map(),cdnur=[],nil=new Map(),hb=new Map(),hc=new Map();
+  const S={b2b:0,b2cl:0,b2cs:0,cdnr:0,cdnur:0,nil:0,hsn:0,tx:{txval:0,iamt:0,camt:0,samt:0,csamt:0},docs:{INV:[],CN:[],DN:[]}};
+  const mkItems=g=>{const by=new Map();for(const l of g){if(l.cat!=='TAX')continue;const k=l.rt;if(!by.has(k))by.set(k,{rt:l.rt,txval:0,iamt:0,camt:0,samt:0,csamt:0});add(by.get(k),lineAmts(l))}
+    return[...by.values()].map((x,i)=>({num:i+1,itm_det:taxKeys({rt:x.rt,txval:x.txval},x,g[0].intra)}))};
+  for(const g of inv.values()){
+    const h=g[0], val=r2(g.reduce((s,l)=>s+l.tot,0)), taxed=g.filter(l=>l.cat==='TAX');
+    S.docs[h.kind].push(h.no);
+    for(const l of g){ // HSN summary (Table 12), split B2B / B2C
+      const mp=h.ctin?hb:hc, k=[l.hsn,l.uqc,l.rt].join('|');
+      if(!mp.has(k))mp.set(k,{hsn_sc:l.hsn,desc:l.desc||'',uqc:l.uqc||'NOS',qty:0,rt:l.rt,txval:0,iamt:0,camt:0,samt:0,csamt:0});
+      const e=mp.get(k);e.qty=r2(e.qty+l.sign*num(l.qty));add(e,lineAmts(l),l.sign);
+    }
+    for(const l of g){if(l.cat==='TAX')add(S.tx,lineAmts(l),l.sign)}
+    const nonTax=g.filter(l=>l.cat!=='TAX');
+    for(const l of nonTax){ // Table 8
+      const ty=(l.intra?'INTRA':'INTR')+(h.ctin?'B2B':'B2C');
+      if(!nil.has(ty))nil.set(ty,{sply_ty:ty,expt_amt:0,nil_amt:0,ngsup_amt:0});
+      const e=nil.get(ty),f=l.cat==='EXEMPT'?'expt_amt':l.cat==='NIL'?'nil_amt':'ngsup_amt';e[f]=r2(e[f]+l.sign*l.val);
+    }
+    if(!taxed.length)continue;
+    const base={pos:h.pos,rchrg:'N',inv_typ:'R'};
+    if(h.kind==='INV'){
+      if(h.ctin){
+        if(!b2b.has(h.ctin))b2b.set(h.ctin,[]);
+        b2b.get(h.ctin).push({inum:h.no,idt:dmy(h.date),val,...base,itms:mkItems(taxed)});S.b2b++;
+      }else if(!h.intra&&val>B2CL_LIMIT){
+        if(!b2cl.has(h.pos))b2cl.set(h.pos,[]);
+        b2cl.get(h.pos).push({inum:h.no,idt:dmy(h.date),val,itms:mkItems(taxed)});S.b2cl++;
+      }else addB2CS(taxed,1);
+    }else{ // credit / debit note
+      const nt={ntty:h.kind==='CN'?'C':'D',nt_num:h.no,nt_dt:dmy(h.date),val,...base,itms:mkItems(taxed)};
+      if(h.ctin){if(!cdnr.has(h.ctin))cdnr.set(h.ctin,[]);cdnr.get(h.ctin).push(nt);S.cdnr++}
+      else if(!h.intra&&val>B2CL_LIMIT){cdnur.push({typ:'B2CL',ntty:nt.ntty,nt_num:nt.nt_num,nt_dt:nt.nt_dt,val,pos:h.pos,itms:nt.itms});S.cdnur++}
+      else addB2CS(taxed,h.kind==='CN'?-1:1);
+    }
+  }
+  function addB2CS(ls,sg){for(const l of ls){
+    const k=[l.intra?'INTRA':'INTER',l.rt,l.pos].join('|');
+    if(!b2cs.has(k))b2cs.set(k,{sply_ty:l.intra?'INTRA':'INTER',rt:l.rt,typ:'OE',pos:l.pos,txval:0,iamt:0,camt:0,samt:0,csamt:0});
+    add(b2cs.get(k),lineAmts(l),sg);}}
+  if(b2b.size)out.b2b=[...b2b].map(([ctin,inv])=>({ctin,inv}));
+  if(b2cl.size)out.b2cl=[...b2cl].map(([pos,inv])=>({pos,inv}));
+  if(b2cs.size){out.b2cs=[...b2cs.values()].map(e=>{const o={sply_ty:e.sply_ty,rt:e.rt,typ:e.typ,pos:e.pos,txval:e.txval};
+      if(e.sply_ty==='INTRA'){o.camt=e.camt;o.samt=e.samt}else o.iamt=e.iamt;if(e.csamt)o.csamt=e.csamt;return o});
+    S.b2cs=out.b2cs.length;
+    for(const e of out.b2cs)if(e.txval<0)W.push({level:'bad',text:'Net B2C small value for rate '+e.rt+'% in '+STATES[e.pos]+' is negative after credit notes. Portal will reject it. Reduce the credit note or report it in the next month.'})}
+  if(cdnr.size)out.cdnr=[...cdnr].map(([ctin,nt])=>({ctin,nt}));
+  if(cdnur.length)out.cdnur=cdnur;
+  if(nil.size){out.nil={inv:[...nil.values()]};S.nil=nil.size}
+  const hs=m=>[...m.values()].map((e,i)=>{const o={num:i+1,hsn_sc:e.hsn_sc,desc:e.desc,uqc:e.uqc,qty:e.qty,rt:e.rt,txval:e.txval};
+      if(e.iamt)o.iamt=e.iamt;if(e.camt)o.camt=e.camt;if(e.samt)o.samt=e.samt;if(e.csamt)o.csamt=e.csamt;return o});
+  if(hb.size||hc.size){out.hsn={};if(hb.size)out.hsn.hsn_b2b=hs(hb);if(hc.size)out.hsn.hsn_b2c=hs(hc);S.hsn=hb.size+hc.size;
+    for(const e of [...hb.values(),...hc.values()])if(e.qty<0||e.txval<0)W.push({level:'bad',text:'HSN '+e.hsn_sc+' has a negative net quantity or value. The portal rejects the whole file. Check credit notes.'})}
+  const dd=[];
+  for(const [k,t] of [['INV',1],['DN',4],['CN',5]]){
+    const nos=[...new Set(S.docs[k])];if(!nos.length)continue;
+    const docs=seriesInfo(nos).map((s,i)=>({num:i+1,from:s.from,to:s.to,totnum:s.span,cancel:s.gaps,net_issue:s.issued}));
+    for(const s of seriesInfo(nos))if(s.gaps)W.push({level:'warn',text:s.gaps+' number(s) missing between '+s.from+' and '+s.to+'. The file reports them as cancelled in Table 13. Confirm they were really cancelled or not used.'});
+    dd.push({doc_num:t,docs});
+  }
+  if(dd.length)out.doc_issue={doc_det:dd};
+  return{json:out,summary:S,warnings:W,lines};
+}
+
+function buildGSTR3B(sales,purch,P,adj){
+  const own=sOf(P.gstin), L=sales.map(l=>calcLine(l,own)), Z=()=>({txval:0,iamt:0,camt:0,samt:0,csamt:0});
+  const osup=Z(),nilx={txval:0},nong={txval:0},rev=Z(),unreg=new Map();
+  for(const l of L){
+    if(l.cat==='TAX'){add(osup,lineAmts(l),l.sign);
+      if(!l.ctin&&!l.intra){const k=l.pos;if(!unreg.has(k))unreg.set(k,{pos:k,txval:0,iamt:0});unreg.get(k).txval=r2(unreg.get(k).txval+l.sign*l.val);unreg.get(k).iamt=r2(unreg.get(k).iamt+l.sign*l.iamt)}}
+    else if(l.cat==='NONGST')nong.txval=r2(nong.txval+l.sign*l.val);
+    else nilx.txval=r2(nilx.txval+l.sign*l.val);
+  }
+  const itc={IMPG:Z(),IMPS:Z(),ISRC:Z(),ISD:Z(),OTH:Z()},inelg=Z(),inw={GST:{inter:0,intra:0},NONGST:{inter:0,intra:0}};
+  for(const p of purch){
+    const a={txval:num(p.txval),iamt:num(p.iamt),camt:num(p.camt),samt:num(p.samt),csamt:num(p.cess)};
+    const inter=(p.sstate||sOf(p.ctin)||own)!==own;
+    if(p.type==='REG')add(itc.OTH,a);
+    else if(p.type==='BLK')add(inelg,a);
+    else if(p.type==='IMPG')add(itc.IMPG,a);
+    else if(p.type==='IMPS')add(itc.IMPS,a);
+    else if(p.type==='RCM'){add(rev,a);add(itc.ISRC,a)}
+    else if(p.type==='EXM')inw.GST[inter?'inter':'intra']=r2(inw.GST[inter?'inter':'intra']+a.txval);
+    else if(p.type==='NGS')inw.NONGST[inter?'inter':'intra']=r2(inw.NONGST[inter?'inter':'intra']+a.txval);
+  }
+  const t4=o=>({iamt:o.iamt,camt:o.camt,samt:o.samt,csamt:o.csamt});
+  const A=adj||{}, ar=k=>({iamt:num(A[k+'i']),camt:num(A[k+'c']),samt:num(A[k+'s']),csamt:num(A[k+'x'])});
+  const rul=ar('rul'),roth=ar('roth');
+  const avl=Object.values(itc).reduce((s,o)=>add(s,o),Z());
+  const net={iamt:0,camt:0,samt:0,csamt:0};for(const k of['iamt','camt','samt','csamt'])net[k]=r2(avl[k]-rul[k]-roth[k]);
+  const J={gstin:P.gstin,ret_period:fpOf(P.period),
+    sup_details:{osup_det:{...osup},osup_zero:{txval:0,iamt:0,csamt:0},osup_nil_exmp:{txval:nilx.txval},isup_rev:{...rev},osup_nongst:{txval:nong.txval}},
+    inter_sup:{unreg_details:[...unreg.values()].filter(u=>u.txval||u.iamt),comp_details:[],uin_details:[]},
+    itc_elg:{itc_avl:['IMPG','IMPS','ISRC','ISD','OTH'].map(ty=>({ty,...t4(itc[ty])})),
+      itc_rev:[{ty:'RUL',...rul},{ty:'OTH',...roth}],itc_net:net,
+      itc_inelg:[{ty:'RUL',iamt:0,camt:0,samt:0,csamt:0},{ty:'OTH',...t4(inelg)}]},
+    inward_sup:{isup_details:[{ty:'GST',inter:inw.GST.inter,intra:inw.GST.intra},{ty:'NONGST',inter:inw.NONGST.inter,intra:inw.NONGST.intra}]}};
+  const ir=ar('int'),lf={camt:num(A.lfc),samt:num(A.lfs)};
+  if(ir.iamt||ir.camt||ir.samt||ir.csamt||lf.camt||lf.samt)J.intr_ltfee={intr_details:ir,ltfee_details:lf};
+  // indicative payment (the portal does the final set-off)
+  const out={i:osup.iamt,c:osup.camt,s:osup.samt}, cr={i:net.iamt,c:net.camt,s:net.samt};
+  const cash=setoff(out,cr);
+  return{json:J,out:osup,rev,net,cash,rcCash:{i:rev.iamt,c:rev.camt,s:rev.samt,x:rev.csamt},
+    isNil:!L.length&&!purch.length};
+}
+function setoff(o,c){
+  o={...o};c={...c};
+  const use=(f,t)=>{const x=Math.min(c[f],o[t]);c[f]=r2(c[f]-x);o[t]=r2(o[t]-x)};
+  use('i','i');use('i','c');use('i','s');use('c','c');use('c','i');use('s','s');use('s','i');
+  return{i:Math.max(0,o.i),c:Math.max(0,o.c),s:Math.max(0,o.s),carry:{i:c.i,c:c.c,s:c.s}};
+}
+
+const normNo=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'').replace(/(^|[A-Z])0+(?=\d)/g,'$1');
+function parse2B(text){
+  const j=JSON.parse(text), d=(j.data&&j.data.docdata)||j.docdata||{}, rows=[];
+  for(const s of(d.b2b||[]))for(const iv of(s.inv||[])){
+    const it=iv.items||[], sum=f=>it.reduce((a,x)=>a+num(x[f]),0);
+    rows.push({ctin:s.ctin,name:s.trdnm||'',no:iv.inum,date:iv.dt,txval:it.length?sum('txval'):num(iv.txval),igst:it.length?sum('igst'):num(iv.igst),cgst:it.length?sum('cgst'):num(iv.cgst),sgst:it.length?sum('sgst'):num(iv.sgst),cess:it.length?sum('cess'):num(iv.cess),itcavl:iv.itcavl||'Y'});
+  }
+  return rows;
+}
+function reconcile(books,rows){
+  const key=(c,n)=>String(c||'').toUpperCase()+'|'+normNo(n);
+  const m2=new Map(rows.map(r=>[key(r.ctin,r.no),r])),used=new Set(),res={ok:[],diff:[],onlyBooks:[],only2B:[]};
+  for(const b of books.filter(x=>x.type==='REG'||x.type==='BLK')){
+    const k=key(b.ctin,b.no),r=m2.get(k);
+    if(!r){res.onlyBooks.push({b});continue}
+    used.add(k);
+    const d=[['IGST',num(b.iamt),r.igst],['CGST',num(b.camt),r.cgst],['SGST',num(b.samt),r.sgst],['Cess',num(b.cess),r.cess]].filter(x=>Math.abs(x[1]-x[2])>1).map(x=>x[0]+' books '+x[1]+' vs 2B '+x[2]);
+    (d.length?res.diff:res.ok).push({b,r,d});
+  }
+  for(const r of rows)if(!used.has(key(r.ctin,r.no)))res.only2B.push({r});
+  return res;
+}
+function lateFee({nil,due,filed,aato,tax,type}){
+  const days=Math.max(0,Math.round((filed-due)/864e5)), perDay=nil?20:50;
+  const cap=nil?500:(aato==='L15'?2000:aato==='M5'?5000:10000);
+  const fee=Math.min(days*perDay,cap);
+  return{days,perDay,cap,fee,cgst:r2(fee/2),sgst:r2(fee/2),interest:type==='3B'?r2(num(tax)*0.18*days/365):0};
+}
+function dueDates(period,freq,state){
+  const [y,m]=period.split('-').map(Number);
+  if(freq==='Q'){
+    const qm=Math.ceil(m/3)*3;let ny=y,nm=qm+1;if(nm>12){nm=1;ny++}
+    const d3=['22','23','24','25','26','27','29','30','31','32','33','34','35','36','37'].includes(state)?22:24;
+    return{quarterEnd:m===qm,g1:new Date(ny,nm-1,13),g3:new Date(ny,nm-1,d3)};
+  }
+  let ny=y,nm=m+1;if(nm>12){nm=1;ny++}
+  return{quarterEnd:true,g1:new Date(ny,nm-1,11),g3:new Date(ny,nm-1,20)};
+}
+function runChecks(sales,purch,P){
+  const C=[],own=sOf(P.gstin), need=P.aato==='M5'||P.aato==='H5'?(P.aato==='H5'?6:4):4;
+  const ok=(t)=>C.push({level:'ok',text:t}),bad=t=>C.push({level:'bad',text:t}),warn=t=>C.push({level:'warn',text:t});
+  gstinValid(P.gstin)?ok('Your GSTIN is valid.'):bad('Your GSTIN is missing or invalid. Fix it in Business setup.');
+  const seen=new Map();let n=0;
+  for(const l of sales){
+    n++;const tag='Sale '+l.no+': ';
+    if(l.ctin&&!gstinValid(l.ctin))bad(tag+'buyer GSTIN '+l.ctin+' is not valid.');
+    if(l.ctin&&l.ctin.toUpperCase()===P.gstin.toUpperCase())bad(tag+'buyer GSTIN is your own GSTIN.');
+    if(!l.pos)bad(tag+'place of supply is missing.');
+    if((l.cat||'TAX')==='TAX'&&!RATES.includes(num(l.rate)))bad(tag+'tax rate '+l.rate+'% is not a GST rate.');
+    if(!l.hsn)bad(tag+'HSN/SAC code is missing.');
+    else if(String(l.hsn).replace(/\D/g,'').length<need)bad(tag+'HSN '+l.hsn+' needs at least '+need+' digits for your turnover.');
+    const k=l.kind+'|'+l.no;if(seen.has(k)&&(seen.get(k).date!==l.date||seen.get(k).ctin!==l.ctin))bad(tag+'same number used with a different date or buyer.');seen.set(k,l);
+    if(P.aato==='H5'&&l.ctin&&l.kind==='INV')warn(tag+'turnover above ₹5 crore: this B2B invoice must carry an e-invoice IRN (Invoice Reference Number).');
+  }
+  if(n)ok(n+' sales line(s) in this month checked.');
+  for(const p of purch){
+    if(p.ctin&&!gstinValid(p.ctin))bad('Purchase '+p.no+': supplier GSTIN '+p.ctin+' is not valid.');
+    if(['REG','BLK','RCM'].includes(p.type)&&!num(p.txval))bad('Purchase '+p.no+': taxable value is empty.');
+  }
+  if(!sales.length&&!purch.length)ok('No entries for this month, so a nil return applies. Check you really had no sales and no purchases.');
+  return C;
+}
+//CORE-END
+
+/* ====================== APP ====================== */
+const KEY='gstdesk.v1';
+const todayIso=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
+const defaultState=()=>({profile:{gstin:'34ATYPR2021H1ZH',legal:'R Rajavelu',trade:'KMR Group of Companies',aato:'L15',gt:0,curgt:0},
+  period:'2026-10',freq:'M',sales:[],purch:[],adj:{},example:false,rows2b:null,tab:'dashboard'});
+let S=defaultState();
+try{const raw=localStorage.getItem(KEY);if(raw)S={...defaultState(),...JSON.parse(raw)}}catch(e){}
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const $=s=>document.querySelector(s);
+const h=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const inr=n=>'₹'+(Number(n)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const stateOpts=(sel)=>'<option value="">Select state</option>'+Object.entries(STATES).map(([k,v])=>`<option value="${k}"${k===sel?' selected':''}>${k} ${h(v)}</option>`).join('');
+const P=()=>({...S.profile,period:S.period});
+const mySales=()=>S.sales.filter(l=>inPeriod(l.date,S.period));
+const myPurch=()=>S.purch.filter(l=>inPeriod(l.date,S.period));
+const fmtDate=d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'});
+const monthName=p=>new Date(+p.slice(0,4),+p.slice(5,7)-1,1).toLocaleDateString('en-IN',{month:'long',year:'numeric'});
+const AATO={L15:'Up to ₹1.5 crore',M5:'Above ₹1.5 crore, up to ₹5 crore',H5:'Above ₹5 crore'};
+const TABS=[['dashboard','Dashboard'],['setup','Business setup'],['sales','Sales'],['purchases','Purchases'],['reconcile','Match with GSTR-2B'],['returns','Return files'],['fees','Late fee and interest']];
+
+function toast(msg,kind){const d=document.createElement('div');d.className='banner '+(kind||'ok');d.style.cssText='position:fixed;right:16px;bottom:16px;max-width:360px;z-index:9';d.textContent=msg;document.body.appendChild(d);setTimeout(()=>d.remove(),3800)}
+async function saveFile(name,text){
+  try{
+    const dl=(window.claude&&window.claude.use)?await window.claude.use('downloads'):null;
+    if(dl){await dl.save({filename:name,data:text});toast('Saved '+name);return}
+    const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();a.remove();toast('Saved '+name);
+  }catch(e){if(!e||e.code!=='declined')toast('Could not save the file. Use Copy instead.','warn')}
+}
+async function copyText(t){try{await navigator.clipboard.writeText(t);toast('Copied')}catch(e){toast('Copy was blocked. Select the text and copy it by hand.','warn')}}
+
+function renderChrome(){
+  $('#period').value=S.period;$('#freq').value=S.freq;
+  $('#whoami').textContent=(S.profile.gstin?'GSTIN '+S.profile.gstin:'GSTIN not set')+(S.profile.trade?' · '+S.profile.trade:'');
+  $('#tabs').innerHTML=TABS.map(([k,t])=>`<a href="#${k}"${S.tab===k?' aria-current="page"':''}>${t}</a>`).join('');
+}
+function go(){const k=location.hash.slice(1);S.tab=TABS.some(t=>t[0]===k)?k:'dashboard';renderChrome();VIEWS[S.tab]()}
+window.addEventListener('hashchange',go);
+$('#period').addEventListener('change',e=>{if(e.target.value){S.period=e.target.value;save();go()}});
+$('#freq').addEventListener('change',e=>{S.freq=e.target.value;save();go()});
+
+const VIEWS={};
+const view=html=>{$('#view').innerHTML=html};
+const exampleBanner=()=>S.example?`<div class="banner warn"><strong>Example data is loaded.</strong> These are made-up entries so you can see how the app works. Do not file them. <button class="tiny danger" data-act="clear">Clear all entries</button></div>`:'';
+
+/* ---------- Dashboard ---------- */
+VIEWS.dashboard=function(){
+  const sales=mySales(),purch=myPurch(),own=sOf(S.profile.gstin),dd=dueDates(S.period,S.freq,own);
+  const today=new Date();today.setHours(0,0,0,0);
+  const due=(d)=>{const n=Math.round((d-today)/864e5);return n<0?`<span class="pill bad">${-n} days overdue</span>`:n===0?'<span class="pill warn">Due today</span>':`<span class="pill ${n<=5?'warn':'ok'}">${n} days left</span>`};
+  const checks=runChecks(sales,purch,P()),g1=buildGSTR1(sales,P()),g3=buildGSTR3B(sales,purch,P(),S.adj);
+  const nil=!sales.length&&!purch.length;
+  const bads=checks.filter(c=>c.level==='bad').length+g1.warnings.filter(c=>c.level==='bad').length;
+  view(`${exampleBanner()}
+  <div class="grid g3">
+    <div class="card"><h3>GSTR-1 (sales details)</h3><div class="big">${fmtDate(dd.g1)}</div><div>${due(dd.g1)}</div><p class="muted small">Due date for ${monthName(S.period)}. Filing late costs a daily late fee.</p></div>
+    <div class="card"><h3>GSTR-3B (summary and tax payment)</h3><div class="big">${fmtDate(dd.g3)}</div><div>${due(dd.g3)}</div><p class="muted small">Tax must be paid by this date to avoid 18% yearly interest.</p></div>
+    <div class="card"><h3>This month's entries</h3><div class="kv"><span>Sales lines</span><span class="num">${sales.length}</span><span>Purchase bills</span><span class="num">${purch.length}</span><span>Problems to fix</span><span class="num">${bads}</span></div></div>
+  </div>
+  ${S.freq==='Q'&&!dd.quarterEnd?'<div class="banner warn">You chose quarterly filing. Returns are filed only for the last month of each quarter (March, June, September, December). For other months you pay tax by challan (PMT-06).</div>':''}
+  ${nil?`<div class="banner ok"><strong>Nil return for ${monthName(S.period)}.</strong> No sales and no purchases are entered. You do not need any file.
+    <ol class="steps"><li>GSTR-1: on the portal open Returns Dashboard, GSTR-1, Prepare Online, tick <em>File Nil GSTR-1</em>, then File Statement.</li>
+    <li>GSTR-3B: Prepare Online, answer <em>Yes</em> to the nil return question, Next, tick the declaration, then File with EVC (Electronic Verification Code) and enter the OTP (one-time password) sent to your mobile.</li></ol>
+    <p class="small muted">A nil return is correct only if you had no sales, no purchases of any kind, and owe no tax. If you bought anything, add it under Purchases.</p></div>`:''}
+  <div class="card"><h2>Checks before you file</h2><p class="muted small">Every problem marked red must be fixed. The portal rejects the return file otherwise.</p>
+    ${[...checks,...g1.warnings].map(c=>`<div class="stripe ${c.level}">${h(c.text)}</div>`).join('')}</div>
+  <div class="card"><h2>How filing works</h2><p class="muted small">The GST portal does not let any app file on your behalf. Every return needs your OTP or digital signature. This app prepares the numbers and the upload files. You do the last step.</p>
+    <ol class="steps"><li>Enter sales and purchases for the month (or leave empty for a nil return).</li><li>Fix every red check above.</li><li>Open <em>Return files</em> and save the GSTR-1 and GSTR-3B files.</li>
+    <li>On the portal: Returns Dashboard, choose the month, GSTR-1 or GSTR-3B, <em>Prepare Offline</em>, <em>Upload</em> the file, review the summary.</li>
+    <li>File with EVC and enter the OTP. Note the Acknowledgment Reference Number.</li></ol></div>`);
+};
+
+/* ---------- Setup ---------- */
+VIEWS.setup=function(){
+  const p=S.profile;
+  view(`<div class="card"><h2>Business setup</h2><p class="muted small">Saved in this browser only. Use Backup on this page to keep a copy.</p>
+  <div class="form" style="margin-top:12px">
+    <label>GSTIN (GST Identification Number)<input id="s_gstin" value="${h(p.gstin)}" maxlength="15" style="text-transform:uppercase"></label>
+    <label>Legal name<input id="s_legal" value="${h(p.legal)}"></label>
+    <label>Trade name<input id="s_trade" value="${h(p.trade)}"></label>
+    <label>Last financial year turnover (₹)<input id="s_gt" type="number" min="0" value="${p.gt}"></label>
+    <label>This year turnover so far (₹)<input id="s_cur" type="number" min="0" value="${p.curgt}"></label>
+    <label>Turnover slab (decides late fee cap and HSN digits)<select id="s_aato">${Object.entries(AATO).map(([k,v])=>`<option value="${k}"${p.aato===k?' selected':''}>${v}</option>`).join('')}</select></label>
+  </div>
+  <p id="s_msg" class="small" style="margin:10px 0"></p>
+  <div class="row"><button data-act="saveProfile">Save setup</button></div></div>
+  <div class="card"><h3>Backup and restore</h3><p class="muted small">Your entries live only in this browser. Save a backup file before you clear browser data.</p>
+  <div class="row"><button class="ghost" data-act="backup">Save backup file</button><label style="flex-direction:row;align-items:center;gap:8px">Restore from file<input type="file" id="restore" accept=".json" style="width:auto"></label><button class="ghost" data-act="example">Load example data</button><button class="danger" data-act="clear">Clear all entries</button></div></div>`);
+  const m=()=>{const g=$('#s_gstin').value.trim().toUpperCase();$('#s_msg').innerHTML=!g?'':gstinValid(g)?`<span class="pill ok">Valid GSTIN</span> State: ${h(STATES[sOf(g)])}`:'<span class="pill bad">GSTIN is not valid (check the 15 characters)</span>'};
+  $('#s_gstin').addEventListener('input',m);m();
+  $('#restore').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{S={...defaultState(),...JSON.parse(r.result)};save();toast('Backup restored');go()}catch(x){toast('That file is not a valid backup.','bad')}};r.readAsText(f)});
+};
+
+/* ---------- Sales ---------- */
+const CATS={TAX:'Taxable',NIL:'Nil rated',EXEMPT:'Exempt',NONGST:'Non-GST'};
+const KINDS={INV:'Invoice',CN:'Credit note',DN:'Debit note'};
+function salesTable(){
+  const own=sOf(S.profile.gstin),rows=S.sales.map((l,i)=>({l,i,c:calcLine(l,own)})).filter(x=>inPeriod(x.l.date,S.period)||true);
+  $('#salesTable').innerHTML=rows.length?`<table><thead><tr><th>Type</th><th>Number</th><th>Date</th><th>Buyer</th><th>State</th><th>HSN</th><th class="num">Taxable</th><th>Rate</th><th class="num">IGST</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">Cess</th><th class="num">Total</th><th></th></tr></thead><tbody>${
+    rows.map(({l,i,c})=>`<tr><td>${KINDS[l.kind]}${l.cat!=='TAX'?' <span class="pill info">'+CATS[l.cat]+'</span>':''}</td><td>${h(l.no)}</td><td>${h(dmy(l.date))}${inPeriod(l.date,S.period)?'':' <span class="pill warn">other month</span>'}</td><td>${h(l.cname||'')}<br><span class="muted small">${h(l.ctin||'Unregistered')}</span></td><td>${h(STATES[l.pos]||'')}</td><td>${h(l.hsn)}</td><td class="num">${inr(c.val)}</td><td>${c.cat==='TAX'?c.rt+'%':'-'}</td><td class="num">${inr(c.iamt)}</td><td class="num">${inr(c.camt)}</td><td class="num">${inr(c.samt)}</td><td class="num">${inr(c.csamt)}</td><td class="num">${inr(c.tot)}</td><td><button class="tiny ghost" data-act="editSale" data-i="${i}">Edit</button> <button class="tiny danger" data-act="delSale" data-i="${i}">Delete</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">No sales entered. If you made no sales in this month, leave this empty and file a nil return.</p>';
+}
+VIEWS.sales=function(){
+  view(`${exampleBanner()}<div class="card"><h2>Add a sale, credit note or debit note</h2>
+  <p class="muted small">One line per tax rate. Use the same number on several lines when an invoice has more than one rate. Tax is worked out for you: CGST and SGST (Central and State GST) when the place of supply is your state, otherwise IGST (Integrated GST).</p>
+  <form id="fs" class="form" style="margin-top:12px">
+    <label>Type<select id="f_kind">${Object.entries(KINDS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+    <label>Number<input id="f_no" required maxlength="16" placeholder="INV/2627/001"></label>
+    <label>Date<input id="f_date" type="date" required></label>
+    <label>Buyer GSTIN (blank if unregistered)<input id="f_ctin" maxlength="15" style="text-transform:uppercase"></label>
+    <label>Buyer name<input id="f_cname"></label>
+    <label>Place of supply (state)<select id="f_pos" required>${stateOpts(sOf(S.profile.gstin))}</select></label>
+    <label>HSN/SAC (Harmonised System of Nomenclature / Services Accounting Code)<input id="f_hsn" maxlength="8" inputmode="numeric"></label>
+    <label>Description<input id="f_desc"></label>
+    <label>Unit (UQC, Unit Quantity Code)<select id="f_uqc">${['NOS','KGS','MTR','LTR','PCS','SET','BOX','OTH'].map(u=>`<option>${u}</option>`).join('')}</select></label>
+    <label>Quantity<input id="f_qty" type="number" step="any" min="0" value="1"></label>
+    <label>Taxable value (₹)<input id="f_val" type="number" step="0.01" min="0" required></label>
+    <label>Kind of supply<select id="f_cat">${Object.entries(CATS).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+    <label>GST rate<select id="f_rate">${RATES.map(r=>`<option value="${r}"${r===18?' selected':''}>${r}%${r===12||r===28?' (older periods)':''}</option>`).join('')}</select></label>
+    <label>Cess amount (₹)<input id="f_cess" type="number" step="0.01" min="0" value="0"></label>
+  </form>
+  <p class="small" id="f_prev" style="margin:10px 0"></p>
+  <div class="row"><button data-act="addSale">Add line</button><button class="ghost" data-act="example">Load example data</button></div></div>
+  <div class="card"><h2>Entries</h2><div class="scroll" id="salesTable"></div></div>`);
+  const d=$('#f_date');d.value=S.period+'-01';
+  const prev=()=>{const c=calcLine({kind:$('#f_kind').value,val:$('#f_val').value,rate:$('#f_rate').value,cat:$('#f_cat').value,pos:$('#f_pos').value,cess:$('#f_cess').value},sOf(S.profile.gstin));
+    $('#f_prev').innerHTML=c.val?`Tax: IGST ${inr(c.iamt)} · CGST ${inr(c.camt)} · SGST ${inr(c.samt)} · Cess ${inr(c.csamt)} · <strong>Total ${inr(c.tot)}</strong>`:''};
+  $('#fs').addEventListener('input',prev);
+  $('#f_ctin').addEventListener('blur',e=>{const g=e.target.value.trim().toUpperCase();if(g.length===15&&STATES[sOf(g)])$('#f_pos').value=sOf(g)});
+  $('#f_cat').addEventListener('change',e=>{$('#f_rate').disabled=e.target.value!=='TAX'});
+  salesTable();
+};
+function readSaleForm(){
+  const v=id=>$('#'+id).value.trim();
+  const l={kind:v('f_kind'),no:v('f_no'),date:v('f_date'),ctin:v('f_ctin').toUpperCase(),cname:v('f_cname'),pos:v('f_pos'),hsn:v('f_hsn'),desc:v('f_desc'),uqc:v('f_uqc'),qty:v('f_qty'),val:v('f_val'),cat:v('f_cat'),rate:v('f_rate'),cess:v('f_cess')};
+  if(!l.no||!l.date||!l.pos||l.val===''){toast('Fill number, date, place of supply and taxable value.','bad');return null}
+  if(l.ctin&&!gstinValid(l.ctin)){toast('Buyer GSTIN is not valid.','bad');return null}
+  return l;
+}
+
+/* ---------- Purchases ---------- */
+const PTYPES={REG:'Normal purchase, credit allowed',BLK:'Credit not allowed (blocked)',IMPG:'Import of goods',IMPS:'Import of services',RCM:'Reverse charge (I pay the tax)',EXM:'Exempt or nil-rated purchase',NGS:'Non-GST purchase'};
+function purchTable(){
+  $('#purchTable').innerHTML=S.purch.length?`<table><thead><tr><th>Type</th><th>Supplier</th><th>Bill no.</th><th>Date</th><th class="num">Taxable</th><th class="num">IGST</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">Cess</th><th></th></tr></thead><tbody>${
+    S.purch.map((p,i)=>`<tr><td>${PTYPES[p.type]}</td><td>${h(p.sname||'')}<br><span class="muted small">${h(p.ctin||'')}</span></td><td>${h(p.no)}</td><td>${h(dmy(p.date))}${inPeriod(p.date,S.period)?'':' <span class="pill warn">other month</span>'}</td><td class="num">${inr(p.txval)}</td><td class="num">${inr(p.iamt)}</td><td class="num">${inr(p.camt)}</td><td class="num">${inr(p.samt)}</td><td class="num">${inr(p.cess)}</td><td><button class="tiny ghost" data-act="editPurch" data-i="${i}">Edit</button> <button class="tiny danger" data-act="delPurch" data-i="${i}">Delete</button></td></tr>`).join('')}</tbody></table>`:'<p class="muted">No purchases entered. If you bought nothing this month, leave this empty.</p>';
+}
+VIEWS.purchases=function(){
+  view(`${exampleBanner()}<div class="card"><h2>Add a purchase bill</h2>
+  <p class="muted small">Type the tax amounts exactly as printed on the bill. Import and reverse charge entries need the tax you paid. A nil return is valid only when there are no purchases of any kind.</p>
+  <form id="fp" class="form" style="margin-top:12px">
+    <label>Type<select id="p_type">${Object.entries(PTYPES).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')}</select></label>
+    <label>Supplier GSTIN (blank if unregistered)<input id="p_ctin" maxlength="15" style="text-transform:uppercase"></label>
+    <label>Supplier name<input id="p_sname"></label>
+    <label>Supplier state<select id="p_ss">${stateOpts(sOf(S.profile.gstin))}</select></label>
+    <label>Bill number<input id="p_no" required></label>
+    <label>Bill date<input id="p_date" type="date" required></label>
+    <label>Taxable value (₹)<input id="p_txval" type="number" step="0.01" min="0" required></label>
+    <label>IGST (₹)<input id="p_iamt" type="number" step="0.01" min="0" value="0"></label>
+    <label>CGST (₹)<input id="p_camt" type="number" step="0.01" min="0" value="0"></label>
+    <label>SGST (₹)<input id="p_samt" type="number" step="0.01" min="0" value="0"></label>
+    <label>Cess (₹)<input id="p_cess" type="number" step="0.01" min="0" value="0"></label>
+  </form>
+  <div class="row" style="margin-top:12px"><button data-act="addPurch">Add purchase</button></div></div>
+  <div class="card"><h2>Entries</h2><div class="scroll" id="purchTable"></div></div>`);
+  $('#p_date').value=S.period+'-01';
+  $('#p_ctin').addEventListener('blur',e=>{const g=e.target.value.trim().toUpperCase();if(g.length===15&&STATES[sOf(g)])$('#p_ss').value=sOf(g)});
+  purchTable();
+};
+
+/* ---------- Reconcile ---------- */
+VIEWS.reconcile=function(){
+  view(`<div class="card"><h2>Match your purchases with GSTR-2B</h2>
+  <p class="muted small">GSTR-2B is the statement of purchases your suppliers reported about you. Credit is safe to claim only when your bill appears there. Download it from the portal (Returns Dashboard, GSTR-2B, Download) and load the JSON file here.</p>
+  <div class="row"><label style="flex-direction:row;align-items:center;gap:8px">GSTR-2B file<input type="file" id="f2b" accept=".json" style="width:auto"></label><button class="ghost danger" data-act="clr2b">Remove loaded file</button></div>
+  <p class="small muted" style="margin-top:8px">The file is read in your browser. Nothing is sent anywhere.</p></div><div id="recOut"></div>`);
+  $('#f2b').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{S.rows2b=parse2B(r.result);save();recOut();toast(S.rows2b.length+' supplier invoices read.')}catch(x){toast('Could not read that file. Use the GSTR-2B JSON from the portal.','bad')}};r.readAsText(f)});
+  recOut();
+};
+function recOut(){
+  const el=$('#recOut');if(!el)return;
+  if(!S.rows2b){el.innerHTML='<div class="card"><p class="muted">No GSTR-2B file loaded yet.</p></div>';return}
+  const res=reconcile(myPurch(),S.rows2b);
+  const t=(title,cls,arr,fn,hd)=>`<div class="card"><h3>${title} <span class="pill ${cls}">${arr.length}</span></h3>${arr.length?`<div class="scroll"><table><thead><tr>${hd.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${arr.map(fn).join('')}</tbody></table></div>`:'<p class="muted small">None.</p>'}</div>`;
+  el.innerHTML=t('Matched','ok',res.ok,x=>`<tr><td>${h(x.b.ctin)}</td><td>${h(x.b.no)}</td><td class="num">${inr(x.b.txval)}</td></tr>`,['Supplier GSTIN','Bill','Taxable'])+
+   t('Amounts differ','warn',res.diff,x=>`<tr><td>${h(x.b.ctin)}</td><td>${h(x.b.no)}</td><td>${h(x.d.join('; '))}</td></tr>`,['Supplier GSTIN','Bill','Difference'])+
+   t('In your books, not in GSTR-2B (do not claim credit yet)','bad',res.onlyBooks,x=>`<tr><td>${h(x.b.ctin||'-')}</td><td>${h(x.b.no)}</td><td class="num">${inr(num(x.b.iamt)+num(x.b.camt)+num(x.b.samt))}</td></tr>`,['Supplier GSTIN','Bill','Tax at risk'])+
+   t('In GSTR-2B, not in your books (add the bill if you received the goods)','warn',res.only2B,x=>`<tr><td>${h(x.r.ctin)} ${h(x.r.name)}</td><td>${h(x.r.no)}</td><td class="num">${inr(x.r.igst+x.r.cgst+x.r.sgst)}</td></tr>`,['Supplier','Bill','Tax'])
+}
+
+/* ---------- Return files ---------- */
+VIEWS.returns=function(){
+  const sales=mySales(),purch=myPurch(),g1=buildGSTR1(sales,P()),g3=buildGSTR3B(sales,purch,P(),S.adj),bad=runChecks(sales,purch,P()).some(c=>c.level==='bad')||g1.warnings.some(w=>w.level==='bad');
+  const A=S.adj,ai=(k,t)=>`<label>${t}<input type="number" step="0.01" min="0" data-adj="${k}" value="${A[k]||''}"></label>`;
+  const j1=JSON.stringify(g1.json,null,1),j3=JSON.stringify(g3.json,null,1),fp=fpOf(S.period);
+  const hasSales=sales.length>0,x=g3.cash;
+  view(`${bad?'<div class="banner bad"><strong>Fix the red checks on the Dashboard first.</strong> A file with these errors will be rejected by the portal.</div>':''}
+  ${g3.isNil?'<div class="banner ok">No entries this month. This is a nil return, so no file is needed. See the Dashboard for the portal steps.</div>':''}
+  <div class="card"><h2>GSTR-3B summary for ${monthName(S.period)}</h2>
+  <div class="grid g2"><div class="kv"><span>Taxable outward supplies (3.1a)</span><span class="num">${inr(g3.out.txval)}</span>
+    <span>Output tax: IGST</span><span class="num">${inr(g3.out.iamt)}</span><span>Output tax: CGST</span><span class="num">${inr(g3.out.camt)}</span><span>Output tax: SGST</span><span class="num">${inr(g3.out.samt)}</span>
+    <span>Reverse charge tax (3.1d)</span><span class="num">${inr(g3.rev.iamt+g3.rev.camt+g3.rev.samt)}</span></div>
+  <div class="kv"><span>Net credit available: IGST</span><span class="num">${inr(g3.net.iamt)}</span><span>CGST</span><span class="num">${inr(g3.net.camt)}</span><span>SGST</span><span class="num">${inr(g3.net.samt)}</span>
+    <span><strong>Cash to pay (indicative)</strong></span><span class="num"><strong>${inr(x.i+x.c+x.s+g3.rev.iamt+g3.rev.camt+g3.rev.samt)}</strong></span></div></div>
+  <p class="small muted">Indicative only. The portal does the final set-off of credit against tax, and reverse charge tax is always paid in cash.</p>
+  <h3 style="margin-top:14px">Other 3B entries (optional)</h3><div class="form">${ai('rului','Credit reversed, rules 42/43: IGST')}${ai('rulc','CGST')}${ai('ruls','SGST')}${ai('rothi','Other reversal: IGST')}${ai('rothc','CGST')}${ai('roths','SGST')}${ai('inti','Interest: IGST')}${ai('intc','Interest: CGST')}${ai('ints','Interest: SGST')}${ai('lfc','Late fee: CGST')}${ai('lfs','Late fee: SGST')}</div></div>
+  <div class="card"><h2>GSTR-3B file</h2><div class="row"><button data-act="dl3b">Save file GSTR3B_${fp}.json</button><button class="ghost" data-act="cp3b">Copy</button></div>
+  <textarea readonly rows="12" style="margin-top:10px" id="j3">${h(j3)}</textarea>
+  <p class="small muted">Portal path: Returns Dashboard, ${monthName(S.period)}, GSTR-3B, Prepare Offline, Upload. Check every table on screen before you file.</p></div>
+  <div class="card"><h2>GSTR-1 file</h2>
+  ${hasSales?`<div class="kv" style="margin-bottom:10px"><span>Business invoices (B2B)</span><span class="num">${g1.summary.b2b}</span><span>Large unregistered invoices (B2CL)</span><span class="num">${g1.summary.b2cl}</span><span>Small unregistered groups (B2CS)</span><span class="num">${g1.summary.b2cs}</span><span>Credit/debit notes</span><span class="num">${g1.summary.cdnr+g1.summary.cdnur}</span><span>HSN rows</span><span class="num">${g1.summary.hsn}</span><span>Taxable value</span><span class="num">${inr(g1.summary.tx.txval)}</span></div>
+  <div class="row"><button data-act="dl1">Save file GSTR1_${fp}.json</button><button class="ghost" data-act="cp1">Copy</button></div>
+  <textarea readonly rows="12" style="margin-top:10px" id="j1">${h(j1)}</textarea>`:'<p class="muted">No sales this month. File a nil GSTR-1 on the portal (tick File Nil GSTR-1). No file needed.</p>'}
+  <p class="small muted">The government has not published one official schema for these files, so this layout follows the GST offline tool and public API formats. The portal checks the file when you upload it and shows any error. Review the summary before you file.</p></div>`);
+  document.querySelectorAll('[data-adj]').forEach(i=>i.addEventListener('change',e=>{S.adj[e.target.dataset.adj]=e.target.value;save();VIEWS.returns()}));
+  VIEWS.returns.cur={j1,j3,fp};
+};
+
+/* ---------- Fees ---------- */
+VIEWS.fees=function(){
+  const own=sOf(S.profile.gstin),dd=dueDates(S.period,S.freq,own),iso=d=>d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  view(`<div class="card"><h2>Late fee and interest</h2><p class="muted small">Late fee (Section 47) is charged per day after the due date, even on a nil return. Interest (Section 50) is 18% a year on tax paid late, and applies to GSTR-3B only.</p>
+  <div class="form" style="margin-top:12px">
+    <label>Return<select id="l_type"><option value="1">GSTR-1</option><option value="3B">GSTR-3B</option></select></label>
+    <label>Nil return?<select id="l_nil"><option value="1">Yes, nil</option><option value="0">No</option></select></label>
+    <label>Due date<input type="date" id="l_due" value="${iso(dd.g1)}"></label>
+    <label>Date you file<input type="date" id="l_filed" value="${todayIso()}"></label>
+    <label>Turnover slab<select id="l_aato">${Object.entries(AATO).map(([k,v])=>`<option value="${k}"${S.profile.aato===k?' selected':''}>${v}</option>`).join('')}</select></label>
+    <label>Tax paid late, paid in cash (₹)<input type="number" id="l_tax" min="0" value="0"></label></div>
+  <div id="l_out" style="margin-top:14px"></div></div>
+  <p class="small muted">Rates: ₹50 a day (₹25 CGST plus ₹25 SGST), or ₹20 a day for a nil return. Caps per return: ₹500 nil, ₹2,000 up to ₹1.5 crore, ₹5,000 up to ₹5 crore, ₹10,000 above. Confirm current notifications before paying.</p>`);
+  const calc=()=>{const t=$('#l_type').value,r=lateFee({type:t,nil:$('#l_nil').value==='1',due:new Date($('#l_due').value),filed:new Date($('#l_filed').value),aato:$('#l_aato').value,tax:num($('#l_tax').value)});
+    $('#l_out').innerHTML=`<div class="grid g3"><div class="card"><h3>Days late</h3><div class="big">${r.days}</div></div><div class="card"><h3>Late fee</h3><div class="big">${inr(r.fee)}</div><span class="muted small">CGST ${inr(r.cgst)} + SGST ${inr(r.sgst)} (cap ${inr(r.cap)})</span></div><div class="card"><h3>Interest</h3><div class="big">${inr(r.interest)}</div><span class="muted small">${t==='3B'?'18% a year on late cash tax':'Not charged on GSTR-1'}</span></div></div>`};
+  $('#l_type').addEventListener('change',e=>{$('#l_due').value=iso(e.target.value==='1'?dd.g1:dd.g3);calc()});
+  document.querySelectorAll('#view input,#view select').forEach(i=>i.addEventListener('input',calc));calc();
+};
+
+/* ---------- Example data ---------- */
+function exampleData(){
+  const m=S.period,own=sOf(S.profile.gstin)||'34',d=n=>m+'-'+String(n).padStart(2,'0');
+  S.sales=[
+    {kind:'INV',no:'INV/EX/001',date:d(3),ctin:'33ABCDE1234F1Z7',cname:'Example Buyer Pvt Ltd (made up)',pos:'33',hsn:'8483',desc:'Gear shaft',uqc:'NOS',qty:'100',val:'50000',cat:'TAX',rate:'18',cess:'0'},
+    {kind:'INV',no:'INV/EX/002',date:d(9),ctin:'',cname:'Walk-in customer',pos:own,hsn:'8483',desc:'Gear shaft',uqc:'NOS',qty:'4',val:'2000',cat:'TAX',rate:'18',cess:'0'},
+    {kind:'CN',no:'CN/EX/001',date:d(20),ctin:'33ABCDE1234F1Z7',cname:'Example Buyer Pvt Ltd (made up)',pos:'33',hsn:'8483',desc:'Return of 10 pieces',uqc:'NOS',qty:'10',val:'5000',cat:'TAX',rate:'18',cess:'0'}];
+  S.purch=[{type:'REG',ctin:'33ABCDE1234F1Z7',sname:'Example Supplier (made up)',sstate:'33',no:'EX-77',date:d(5),txval:'20000',iamt:'3600',camt:'0',samt:'0',cess:'0'}];
+  S.example=true;save();
+}
+
+/* ---------- Click handling ---------- */
+document.addEventListener('click',e=>{
+  const b=e.target.closest('[data-act]');if(!b)return;const a=b.dataset.act,i=+b.dataset.i;
+  if(a==='saveProfile'){const g=$('#s_gstin').value.trim().toUpperCase();if(!gstinValid(g)){toast('GSTIN is not valid.','bad');return}
+    S.profile={gstin:g,legal:$('#s_legal').value.trim(),trade:$('#s_trade').value.trim(),gt:num($('#s_gt').value),curgt:num($('#s_cur').value),aato:$('#s_aato').value};save();renderChrome();toast('Saved')}
+  else if(a==='addSale'){const l=readSaleForm();if(!l)return;if(l._edit)delete l._edit;S.sales.push(l);save();salesTable();['f_no','f_val','f_desc'].forEach(x=>$('#'+x).value='');$('#f_no').focus();$('#f_prev').textContent='';toast('Line added')}
+  else if(a==='editSale'){const l=S.sales.splice(i,1)[0];save();VIEWS.sales();for(const [k,id] of Object.entries({kind:'f_kind',no:'f_no',date:'f_date',ctin:'f_ctin',cname:'f_cname',pos:'f_pos',hsn:'f_hsn',desc:'f_desc',uqc:'f_uqc',qty:'f_qty',val:'f_val',cat:'f_cat',rate:'f_rate',cess:'f_cess'}))$('#'+id).value=l[k];window.scrollTo(0,0)}
+  else if(a==='delSale'){S.sales.splice(i,1);save();salesTable()}
+  else if(a==='addPurch'){const v=id=>$('#'+id).value.trim();const p={type:v('p_type'),ctin:v('p_ctin').toUpperCase(),sname:v('p_sname'),sstate:v('p_ss'),no:v('p_no'),date:v('p_date'),txval:v('p_txval'),iamt:v('p_iamt')||'0',camt:v('p_camt')||'0',samt:v('p_samt')||'0',cess:v('p_cess')||'0'};
+    if(!p.no||!p.date||p.txval===''){toast('Fill bill number, date and taxable value.','bad');return}
+    if(p.ctin&&!gstinValid(p.ctin)){toast('Supplier GSTIN is not valid.','bad');return}
+    S.purch.push(p);save();purchTable();['p_no','p_txval'].forEach(x=>$('#'+x).value='');toast('Purchase added')}
+  else if(a==='editPurch'){const p=S.purch.splice(i,1)[0];save();VIEWS.purchases();for(const [k,id] of Object.entries({type:'p_type',ctin:'p_ctin',sname:'p_sname',sstate:'p_ss',no:'p_no',date:'p_date',txval:'p_txval',iamt:'p_iamt',camt:'p_camt',samt:'p_samt',cess:'p_cess'}))$('#'+id).value=p[k]||'';window.scrollTo(0,0)}
+  else if(a==='delPurch'){S.purch.splice(i,1);save();purchTable()}
+  else if(a==='example'){exampleData();toast('Example data loaded');go()}
+  else if(a==='clear'){S.sales=[];S.purch=[];S.adj={};S.rows2b=null;S.example=false;save();toast('All entries cleared');go()}
+  else if(a==='backup'){saveFile('gst-desk-backup.json',JSON.stringify(S,null,1))}
+  else if(a==='clr2b'){S.rows2b=null;save();recOut()}
+  else if(a==='dl1')saveFile('GSTR1_'+VIEWS.returns.cur.fp+'.json',VIEWS.returns.cur.j1);
+  else if(a==='dl3b')saveFile('GSTR3B_'+VIEWS.returns.cur.fp+'.json',VIEWS.returns.cur.j3);
+  else if(a==='cp1')copyText(VIEWS.returns.cur.j1);
+  else if(a==='cp3b')copyText(VIEWS.returns.cur.j3);
+});
+go();
+if('serviceWorker' in navigator)navigator.serviceWorker.register('/it/gst-sw.js',{scope:'/it/'}).catch(()=>{});
+</script>
+</body>
+</html>
