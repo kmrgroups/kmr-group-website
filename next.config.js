@@ -30,6 +30,8 @@ const nextConfig = {
         // Aurum gold research app, hosted independently and served on the KMR domain.
         { source: "/it/aurum", destination: "https://aurum-gold-signals.vercel.app/it/aurum" },
         { source: "/it/aurum/:path*", destination: "https://aurum-gold-signals.vercel.app/it/aurum/:path*" },
+        // GST Return Desk: static page in public/it
+        { source: "/it/gst", destination: "/it/gst.html" },
         // biometric machines (eSSL / ZKTeco "Cloud Server Setting") always call /iclock/... on the root of the address and cannot be given a path; the Console receives them for the HRM & Payroll app
         { source: "/iclock/:path*", destination: `${CONSOLE_ORIGIN}/it/console/api/hrm/iclock/:path*` },
         // one link per customer: www.kmr-groups.com/it/app/<customer> → the KMR Apps portal page
