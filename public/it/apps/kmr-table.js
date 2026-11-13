@@ -98,7 +98,7 @@ th.kmr-th .kmr-ar{font-size:11px;color:#7C3AED;font-weight:800;min-width:9px}
     const key = keyOf(t, hr);
     const st = states.get(key) || { sort: null, f: {}, q: "" };
     states.set(key, st); t._kmr = { st, hr, key };
-    const edit = bodyRows(t, hr).some((r) => r.querySelector("input:not([type=checkbox]):not([type=hidden]),select,textarea"));
+    const edit = !t.hasAttribute("data-sortedit") && bodyRows(t, hr).some((r) => r.querySelector("input:not([type=checkbox]):not([type=hidden]),select,textarea"));
     t._kmr.edit = edit;
     // serial-number column: renumbered after sorting / filtering
     const serial = new Set();
