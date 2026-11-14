@@ -383,4 +383,19 @@
       { id: "po", name: "Open purchase orders", value: d.pos.filter(function (p) { return p.status === "open" || p.status === "part_received"; }).length, std: S("ISO 8.4.3", "VDA P5"), why: "Purchase orders with material still to be received." }],
       charts: [barOf("Items waiting to come back, by party", byParty, "Items", "open"), barOf("Rejected quantity by supplier (this year)", bySup, "Rejected", "rej")] };
   } };
+  KMRPA.inv = { name: "Sales Invoicing", code: "inv", ctxFn: "kmr_inv_context", std: "inv", load: async function (call) {
+    var d = await call("kmr_inv_load", { p_months: 12 }), S = std, td = new Date(Date.now() + 19800000).toISOString().slice(0, 10), y = +td.slice(0, 4), fs = (+td.slice(5, 7) < 4 ? y - 1 : y) + "-04-01";
+    var iss = d.invoices.filter(function (i) { return i.status === "issued"; }), fy = iss.filter(function (i) { return i.inv_date >= fs; }), byC = {};
+    var tot = function (a, k) { return a.reduce(function (s, i) { return s + +(i[k] || 0); }, 0); };
+    fy.forEach(function (i) { byC[i.buyer_name] = (byC[i.buyer_name] || 0) + +i.total; });
+    var noIrn = iss.filter(function (i) { return i.supply_type === "B2B" && i.doc_type === "INV" && !i.irn; }).length;
+    return { period: "Financial year from " + fs, kpis: [
+      { id: "n", name: "Invoices issued (year)", value: fy.length, std: S("GST Section 31", "GST Rule 46"), why: "Tax invoices issued since 1 April." },
+      { id: "val", name: "Invoice value (year, lakh)", value: +(tot(fy, "total") / 1e5).toFixed(2), unit: "lakh", std: S("ISO 9.1.3"), why: "Total invoice value including GST since 1 April." },
+      { id: "gst", name: "GST charged (year, lakh)", value: +((tot(fy, "cgst") + tot(fy, "sgst") + tot(fy, "igst")) / 1e5).toFixed(2), unit: "lakh", std: S("GST Section 31"), why: "CGST + SGST + IGST on invoices since 1 April." },
+      { id: "dr", name: "Drafts not issued", value: d.invoices.filter(function (i) { return i.status === "draft"; }).length, target: 0, amber: 3, dir: "low", std: S("ISO 7.5.3.2"), why: "Invoices saved but not yet issued." },
+      { id: "irn", name: "Invoices without IRN", value: noIrn, target: 0, amber: 3, dir: "low", std: S("GST Rule 48"), why: "Issued B2B invoices whose IRN is not yet recorded." },
+      { id: "tal", name: "Not yet sent to Tally", value: iss.filter(function (i) { return !i.tally_at; }).length, target: 0, amber: 10, dir: "low", std: S("ISO 7.5.3.2"), why: "Issued invoices not yet exported to Tally." }],
+      charts: [barOf("Invoice value by customer (this year)", byC, "Value", "val")] };
+  } };
 })();
