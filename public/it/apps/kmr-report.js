@@ -17,6 +17,7 @@
   const FORMATS = {
     sales: { allplants: { no: 1, rev: "01", date: "2026-11-02", name: "Sales Flow — all-plants dashboard (plan, actual, loss)" }, loss: { no: 2, rev: "01", date: "2026-11-02", name: "Sales Flow — sales loss and reasons" }, concl: { no: 3, rev: "01", date: "2026-11-02", name: "Sales Flow — conclusion and action plan" } },
     dwm: { sheet: { no: 1, rev: "01", date: "2026-11-02", name: "Daily Work Management — employee monthly plan, status and adherence" }, dash: { no: 2, rev: "01", date: "2026-11-02", name: "Daily Work Management — dashboard (all employees)" } },
+    calib: { due: { no: 1, rev: "01", date: "2026-11-14", name: "Calibration due list (gauges going to overdue)" } },
     dcg: { dc: { no: 1, rev: "01", date: "2026-11-14", name: "Delivery Challan" }, grn: { no: 2, rev: "01", date: "2026-11-14", name: "Goods Receipt Note" }, pending: { no: 3, rev: "01", date: "2026-11-14", name: "Pending returns (returnable challans)" }, register: { no: 4, rev: "01", date: "2026-11-14", name: "Delivery challan and GRN register" } },
     layout: { report: { no: 1, rev: "01", date: "2026-10-29", name: "Factory & Office Layout Report" } },
     capacity: { workout: { no: 2, rev: "01", date: "2026-10-23", name: "Capacity workout — takt, throughput, load balance" } },
