@@ -361,4 +361,26 @@
         { title: "Activities below target — where to act", std: S("ISO 9.3.3", "ISO 10.2", "ISO 5.1.1", "VDA P6"), html: act.length ? tb(["Employee", "Activity", "Planned to date", "Completed", "Adherence"], act.slice(0, 12).map(function (z) { return "<tr><td>" + esc(z.r.emp.name) + "</td><td>" + esc(z.x.a.activity || "") + "</td><td>" + z.x.planTo + "</td><td>" + z.x.doneTo + "</td><td>" + (z.x.doneTo / z.x.planTo * 100).toFixed(0) + "%</td></tr>"; })) : '<div class="note">Every activity due so far is at or above the target.</div>' },
         { title: "Missed and concession record", std: S("ISO 10.2", "ISO 9.3.3", "VDA P7"), html: logs.length ? tb(["Date", "Employee", "Activity", "Status", "Reason", "Approver", "Revised due", "Action ref."], logs.slice(0, 12).map(function (z) { return "<tr><td>" + (z.d < 10 ? "0" : "") + z.d + "-" + m.slice(5) + "-" + m.slice(0, 4) + "</td><td>" + esc(z.r.emp.name) + "</td><td>" + esc(z.a.activity || "") + "</td><td>" + (z.c === "X" ? "Missed" : "Concession") + "</td><td>" + esc(z.L.reason || "—") + "</td><td>" + esc(z.L.approver || "—") + "</td><td>" + esc(z.L.due || "—") + "</td><td>" + esc(z.L.ref || "—") + "</td></tr>"; })) : '<div class="note">No missed reviews or concessions this month.</div>' }] };
   } };
+  /* ---------- Delivery Challan & GRN ---------- */
+  KMRPA.dcg = { name: "Delivery Challan & GRN", code: "dcg", ctxFn: "kmr_dcg_context", std: "dcg", load: async function (call) {
+    var d = await call("kmr_dcg_load"), S = std, td = new Date(Date.now() + 19800000).toISOString().slice(0, 10), mo = td.slice(0, 7), y = +td.slice(0, 4), fs = (+td.slice(5, 7) < 4 ? y - 1 : y) + "-04-01";
+    var pend = function (l) { return Math.max(0, +l.qty - +(l.returned_qty || 0)); };
+    var open = d.dcs.filter(function (c) { return c.kind === "returnable" && (c.status === "issued" || c.status === "part_returned"); });
+    var over = open.filter(function (c) { return c.expected_return && c.expected_return < td; });
+    var grns = d.grns.filter(function (g) { return g.status === "posted"; }), gy = grns.filter(function (g) { return g.grn_date >= fs; });
+    var rec = 0, rej = 0, bySup = {}, byParty = {};
+    gy.forEach(function (g) { g.lines.forEach(function (l) { rec += +l.received_qty; rej += +l.rejected_qty; if (g.gtype === "po_receipt") { var k = g.party_name || "-"; bySup[k] = (bySup[k] || 0) + +l.rejected_qty; } }); });
+    open.forEach(function (c) { byParty[c.party_name] = (byParty[c.party_name] || 0) + c.lines.filter(function (l) { return pend(l) > 0; }).length; });
+    var outG = (d.instruments || []).filter(function (i) { return i.status === "Out for calibration"; }).length;
+    var oldest = over.reduce(function (m, c) { var n = Math.round((new Date(td) - new Date(c.expected_return)) / 864e5); return n > m ? n : m; }, 0);
+    return { period: "Live position · " + today(), kpis: [
+      { id: "open", name: "Returnable challans out", value: open.length, std: S("ISO 8.5.4", "ISO 8.5.2", "GST Rule 55"), why: "Returnable delivery challans issued and not yet fully received back." },
+      { id: "over", name: "Returns overdue", value: over.length, target: 0, amber: 2, dir: "low", std: S("ISO 8.5.4", "ISO 10.2", "GST Section 143"), why: "Returnable challans past their expected return date." },
+      { id: "age", name: "Oldest overdue return", value: oldest, unit: "days", target: 0, amber: 15, dir: "low", std: S("ISO 8.5.4", "ISO 10.2"), why: "Days past the expected return date of the oldest overdue challan." },
+      { id: "gau", name: "Gauges out for calibration", value: outG, std: S("ISO 7.1.5.1", "IATF 7.1.5.2.1"), why: "Gauges sent out on a calibration challan and not yet calibrated and received." },
+      { id: "grn", name: "GRNs this month", value: grns.filter(function (g) { return g.grn_date.slice(0, 7) === mo; }).length, std: S("ISO 8.6", "ISO 8.4.2"), why: "Goods Receipt Notes posted in the month." },
+      { id: "rej", name: "Rejection on receipt (year)", value: rec ? +(rej / rec * 100).toFixed(1) : null, unit: "%", target: 1, amber: 3, dir: "low", std: S("ISO 8.4.2", "ISO 8.7", "IATF 8.4.2.4", "VDA P5"), why: "Rejected quantity ÷ received quantity on GRNs since 1 April." },
+      { id: "po", name: "Open purchase orders", value: d.pos.filter(function (p) { return p.status === "open" || p.status === "part_received"; }).length, std: S("ISO 8.4.3", "VDA P5"), why: "Purchase orders with material still to be received." }],
+      charts: [barOf("Items waiting to come back, by party", byParty, "Items", "open"), barOf("Rejected quantity by supplier (this year)", bySup, "Rejected", "rej")] };
+  } };
 })();
