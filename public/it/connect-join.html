@@ -12,8 +12,8 @@ button.o{background:#1f3266;color:#fff}button.r{background:#c0392b;color:#fff}bu
 .t b{position:absolute;left:8px;bottom:6px;background:#000a;padding:2px 8px;border-radius:8px;font-size:12px}
 .dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:4px solid #ff3b30;border-radius:50%;pointer-events:none;animation:p 1.6s forwards}@keyframes p{to{opacity:0;transform:scale(1.8)}}
 .card{background:#13244f;border-radius:12px;padding:10px;margin:8px 0}#chat{max-height:160px;overflow:auto;font-size:14px}#chat div{margin:3px 0}.hide{display:none}.bad{color:#ff9b8f}.ok{color:#8be9a8}
-</style></head><body><div class="w">
-<h1>KMR Connect · Quick session</h1><div class="m">Video, voice, screen, chat and files. Nothing to install — works in the phone or computer browser.</div>
+</style></head><body><div class="w"><div id="bk" class="hide" style="margin-bottom:4px"><a id="bka" style="color:#f3c55a;font-weight:700;text-decoration:none;font-size:14px">← Back to KMR Apps</a></div>
+<div id="bk" class="hide" style="margin-bottom:6px"><a href="/it/connect.html" style="color:#f3c55a;font-weight:700;text-decoration:none">← Back to KMR Connect</a></div><h1>KMR Connect · Quick session</h1><div class="m">Video, voice, screen, chat and files. Nothing to install — works in the phone or computer browser.</div>
 <div id="join" class="card"><label>Your name</label><input id="nm" placeholder="Your name" autocomplete="name">
 <label>Session code</label><input id="cd" placeholder="Code, e.g. K7M2-9QXA" autocapitalize="characters" autocomplete="off">
 <button id="go">Join the session</button> <button class="o" id="new">Start a new session</button><div id="st" class="m"></div></div>
@@ -23,17 +23,38 @@ button.o{background:#1f3266;color:#fff}button.r{background:#c0392b;color:#fff}bu
 <div id="ctl"><button class="o" id="mic">Mute</button><button class="o" id="cam">Camera off</button><button class="o" id="scr">Share my screen</button><button class="o" id="rec">Record</button><label class="o" style="display:inline-block"><button class="o" id="fb" type="button">Send a file</button></label><input type="file" id="fi" class="hide"><button class="r" id="lv">Leave</button></div>
 <div class="m" id="hint">Tap on someone's shared screen to point at that place; they will see a red circle.</div><div id="st2" class="m"></div>
 <div class="card"><div id="chat"></div><div style="display:flex;gap:6px"><input id="ci" placeholder="Type a message"><button id="cs">Send</button></div></div>
+<div class="card"><b>Minutes of meeting (typed automatically)</b><div class="m">Each person\'s own voice is typed on their own phone or computer and shared with everyone here.</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select id="lg" style="padding:10px;border-radius:10px;background:#13244f;color:#fff;border:1px solid #3b4d7a;max-width:60%"></select><button id="ty">Start typing the minutes</button><button class="o" id="dm">Download minutes</button></div>
+<div class="m" id="iv"></div><div id="tr" style="max-height:220px;overflow:auto;font-size:14px;margin-top:6px"></div></div>
 <div class="card hide" id="files"><b>Files received</b><div id="fl"></div></div></div>
 </div>
-<script src="/it/apps/connect-rtc.js"></script>
+<script src="/it/apps/mom-lang.js?v=20261116b"></script><script src="/it/apps/connect-rtc.js?v=20261116b"></script>
 <script type="module">
 const R = window.CNRTC, $ = (i) => document.getElementById(i), P = new URLSearchParams(location.hash.slice(1));
 const AL = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const norm = (c) => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), pretty = (c) => c.slice(0, 4) + "-" + c.slice(4);
 const gen = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return [...a].map((x) => AL[x % AL.length]).join(""); };
+/* only a signed-in KMR user sees the way back; people who were sent the link have no such option */
+(function () { let em = "", slug = ""; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sb-.+-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); const u = v && (v.user || (v.currentSession && v.currentSession.user)); if (u && u.email) em = u.email; } } slug = (JSON.parse(localStorage.getItem("kmr-portal") || "null") || {}).slug || ""; } catch (e) { /* ignore */ }
+  if (em) { $("bka").href = slug ? "/it/app/" + encodeURIComponent(slug) : "/it/apps.html"; $("bka").onclick = (e) => { if (room && !confirm("Leave this session and go back to KMR Apps?")) e.preventDefault(); }; $("bk").classList.remove("hide"); } })();
+try { if (Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k) && localStorage.getItem(k))) $("bk").classList.remove("hide"); } catch (e) { /* guests: no back link */ }
 $("nm").value = localStorage.getItem("cnj_name") || ""; if (P.get("c")) $("cd").value = pretty(norm(P.get("c")));
 let room = null, local = null, cam = null, mic = null, share = null, rec = null, code = "", me = "";
-const tiles = new Map(); let sb = null;
+const tiles = new Map(); let sb = null; const sending = new Map(), lines = new Map(); let sr = null;
+const fmt = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+function addLine(m) { if (!m || !m.id || lines.has(m.id)) return; lines.set(m.id, m); const arr = [...lines.values()].sort((x, y) => x.at - y.at); $("tr").innerHTML = arr.map((l) => "<div><span class=\"m\">" + fmt(l.at) + "</span> <b>" + esc(l.who) + ":</b> " + esc(l.text) + "</div>").join(""); $("tr").scrollTop = 1e9; }
+const LG = window.MOMLang; if (LG) { $("lg").innerHTML = LG.list.map((l) => '<option value="' + l.tag + '">' + esc(l.name || l.tag) + "</option>").join(""); $("lg").value = (navigator.language && LG.byTag(navigator.language) ? LG.byTag(navigator.language).tag : "en-IN"); }
+$("ty").onclick = () => {
+  if (sr) { sr.stop(); sr = null; $("ty").textContent = "Start typing the minutes"; $("ty").className = ""; $("iv").textContent = ""; return; }
+  if (!LG || !LG.supported) { say("Typing the spoken words needs Chrome, Edge or Safari.", "bad"); return; }
+  sr = LG.Recorder({ langs: [$("lg").value], onfinal: (r) => { if (!r.text) return; const m = { t: "tx", id: Math.random().toString(36).slice(2), who: me, text: r.text, lang: r.lang, at: Date.now() }; addLine(m); room.data(m); }, oninterim: (r) => { $("iv").textContent = r.text ? "Hearing: " + r.text : ""; }, onerror: (e) => say(e.message, "bad") });
+  sr.start(); $("ty").textContent = "Stop typing"; $("ty").className = "r";
+};
+$("dm").onclick = () => {
+  const arr = [...lines.values()].sort((x, y) => x.at - y.at); if (!arr.length) { say("Nothing typed yet.", "bad"); return; }
+  const who = [...new Set(arr.map((l) => l.who))].join(", "), txt = "MINUTES OF MEETING\nSession: " + pretty(code) + "\nDate: " + new Date(arr[0].at).toLocaleString() + "\nSpeakers: " + who + "\n\n" + arr.map((l) => "[" + fmt(l.at) + "] " + l.who + ": " + l.text).join("\n") + "\n";
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" })); a.download = "KMR-minutes-" + code + ".txt"; a.click();
+};
 async function client() {
   if (sb) return sb; if (/[?&]demo=1/.test(location.search)) return null; const cc = window.COMPANY_CONFIG || {}; let key = cc.supabaseAnonKey, url = cc.supabaseUrl || "https://dehlcusptkzfhqvpfyjh.supabase.co";
   if (!key) { const j = await (await fetch("/it/console/api/public-config")).json(); key = j.key; if (j.url) url = j.url; }
@@ -69,8 +90,11 @@ async function start(c, name) {
       const who = (p && p.info && p.info.name) || "Guest";
       if (m.t === "chat") chat(who, m.x);
       else if (m.t === "pt") { const t = tiles.get("me"); if (t) { const d = document.createElement("div"); d.className = "dot"; d.style.left = m.x * 100 + "%"; d.style.top = m.y * 100 + "%"; t.d.append(d); setTimeout(() => d.remove(), 1700); } chat(who, "(pointed at your screen)"); }
-      else if (m.t === "fs") { names.set(m.id, { name: m.name, parts: [], n: m.n, who }); }
-      else if (m.t === "fp") { const f = names.get(m.id); if (!f) return; f.parts.push(Uint8Array.from(atob(m.d), (c) => c.charCodeAt(0))); if (f.parts.length === f.n) { const u = URL.createObjectURL(new Blob(f.parts)); $("files").classList.remove("hide"); const a = document.createElement("div"); a.innerHTML = esc(f.who) + ": <a download=\"" + esc(f.name) + "\" href=\"" + u + "\">" + esc(f.name) + "</a>"; $("fl").append(a); names.delete(m.id); } }
+      else if (m.t === "fs") { names.set(m.id, { name: m.name, parts: [], n: m.n, who, got: 0 }); say("Receiving " + m.name + " from " + who + "…"); }
+      else if (m.t === "fp") { const f = names.get(m.id); if (!f) return; f.parts[m.i] = Uint8Array.from(atob(m.d), (c) => c.charCodeAt(0)); f.got++;
+        if (f.got === f.n) { const u = URL.createObjectURL(new Blob(f.parts)); $("files").classList.remove("hide"); const a = document.createElement("div"); a.innerHTML = esc(f.who) + ": <a style=\"color:#8be9a8\" download=\"" + esc(f.name) + "\" href=\"" + u + "\">Download " + esc(f.name) + "</a>"; $("fl").append(a); names.delete(m.id); say("Received " + f.name + " — see “Files received” below.", "ok"); room.data({ t: "fa", id: m.id }); } }
+      else if (m.t === "fa") { const x = sending.get(m.id); if (x) { x.ok = true; say("Delivered: " + x.name + " ✓", "ok"); } }
+      else if (m.t === "tx") addLine(m);
     }
   });
 }
@@ -96,11 +120,18 @@ const sendChat = () => { const v = $("ci").value.trim(); if (!v) return; room.da
 $("cs").onclick = sendChat; $("ci").onkeydown = (e) => { if (e.key === "Enter") sendChat(); };
 $("fb").onclick = () => $("fi").click();
 $("fi").onchange = async () => {
-  const f = $("fi").files[0]; if (!f) return; if (f.size > 25 * 1048576) { say("Files up to 25 MB can be sent here.", "bad"); return; }
-  const buf = new Uint8Array(await f.arrayBuffer()), CH = 32768, n = Math.max(1, Math.ceil(buf.length / CH)), id = Math.random().toString(36).slice(2);
-  room.data({ t: "fs", id, name: f.name, n }); say("Sending " + f.name + "…");
-  for (let i = 0; i < n; i++) { let s = ""; const part = buf.subarray(i * CH, (i + 1) * CH); for (let j = 0; j < part.length; j += 8192) s += String.fromCharCode.apply(null, part.subarray(j, j + 8192)); room.data({ t: "fp", id, d: btoa(s) }); if (i % 8 === 7) await new Promise((r) => setTimeout(r, 40)); }
-  say("Sent " + f.name, "ok"); $("fi").value = "";
+  const f = $("fi").files[0]; $("fi").value = ""; if (!f) return; if (f.size > 25 * 1048576) { say("Files up to 25 MB can be sent here.", "bad"); return; }
+  if (![...room.peers.values()].some((p) => p.link.channel && p.link.channel.readyState === "open")) { say("Nobody is connected yet. Wait until the other person's video appears, then send again.", "bad"); return; }
+  const buf = new Uint8Array(await f.arrayBuffer()), CH = 16384, n = Math.max(1, Math.ceil(buf.length / CH)), id = Math.random().toString(36).slice(2);
+  sending.set(id, { name: f.name, ok: false });
+  let good = await room.dataWait({ t: "fs", id, name: f.name, n, size: f.size });
+  for (let i = 0; i < n && good; i++) {
+    const part = buf.subarray(i * CH, (i + 1) * CH); let s = ""; for (let j = 0; j < part.length; j += 8192) s += String.fromCharCode.apply(null, part.subarray(j, j + 8192));
+    good = await room.dataWait({ t: "fp", id, i, d: btoa(s) }); if (i % 10 === 0) say("Sending " + f.name + "… " + Math.round(i * 100 / n) + "%");
+  }
+  if (!good) { say("The file could not be sent (the connection dropped). Please try again.", "bad"); sending.delete(id); return; }
+  say("Sent " + f.name + ". Waiting for the other person's confirmation…", "ok");
+  setTimeout(() => { const x = sending.get(id); if (x && !x.ok) say(f.name + " was sent but the other person has not confirmed it. Ask them to check “Files received”.", "bad"); }, 15000);
 };
 $("rec").onclick = () => {
   if (rec) { rec.stop(); rec = null; $("rec").textContent = "Record"; $("rec").className = "o"; return; }
