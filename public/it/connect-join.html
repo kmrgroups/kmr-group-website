@@ -11,7 +11,7 @@ button.o{background:#1f3266;color:#fff}button.r{background:#c0392b;color:#fff}bu
 .t{position:relative;background:#000;border-radius:12px;overflow:hidden;aspect-ratio:16/9}.t video{width:100%;height:100%;object-fit:contain;background:#000}
 .t b{position:absolute;left:8px;bottom:6px;background:#000a;padding:2px 8px;border-radius:8px;font-size:12px}
 .dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:4px solid #ff3b30;border-radius:50%;pointer-events:none;animation:p 1.6s forwards}@keyframes p{to{opacity:0;transform:scale(1.8)}}
-.card{background:#13244f;border-radius:12px;padding:10px;margin:8px 0}#chat{max-height:160px;overflow:auto;font-size:14px}#chat div{margin:3px 0}.hide{display:none}.bad{color:#ff9b8f}.ok{color:#8be9a8}
+.card{background:#13244f;border-radius:12px;padding:10px;margin:8px 0}#chat{max-height:160px;overflow:auto;font-size:14px}#chat div{margin:3px 0}.hide{display:none}.row2{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0}.row2 select{padding:10px;border-radius:10px;background:#13244f;color:#fff;border:1px solid #3b4d7a;max-width:100%}.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:8px}.col{background:#0c1a3a;border:1px solid #2b3d6d;border-radius:10px;padding:8px}.col .tr{max-height:260px;overflow:auto;font-size:14px;margin-top:6px}.col .tr div{margin:4px 0}.mic{position:absolute;left:8px;top:8px;width:60px;height:6px;background:#0008;border-radius:4px;overflow:hidden}.mic i{display:block;height:100%;width:0;background:#34d399}.warn{background:#5b1f1f;border-radius:10px;padding:8px;margin:6px 0}.bad{color:#ff9b8f}.ok{color:#8be9a8}
 </style></head><body><div class="w"><div id="bk" class="hide" style="margin-bottom:4px"><a id="bka" style="color:#f3c55a;font-weight:700;text-decoration:none;font-size:14px">← Back to KMR Apps</a></div>
 <div id="bk" class="hide" style="margin-bottom:6px"><a href="/it/connect.html" style="color:#f3c55a;font-weight:700;text-decoration:none">← Back to KMR Connect</a></div><h1>KMR Connect · Quick session</h1><div class="m">Video, voice, screen, chat and files. Nothing to install — works in the phone or computer browser.</div>
 <div id="join" class="card"><label>Your name</label><input id="nm" placeholder="Your name" autocomplete="name">
@@ -23,9 +23,12 @@ button.o{background:#1f3266;color:#fff}button.r{background:#c0392b;color:#fff}bu
 <div id="ctl"><button class="o" id="mic">Mute</button><button class="o" id="cam">Camera off</button><button class="o" id="scr">Share my screen</button><button class="o" id="rec">Record</button><label class="o" style="display:inline-block"><button class="o" id="fb" type="button">Send a file</button></label><input type="file" id="fi" class="hide"><button class="r" id="lv">Leave</button></div>
 <div class="m" id="hint">Tap on someone's shared screen to point at that place; they will see a red circle.</div><div id="st2" class="m"></div>
 <div class="card"><div id="chat"></div><div style="display:flex;gap:6px"><input id="ci" placeholder="Type a message"><button id="cs">Send</button></div></div>
-<div class="card"><b>Minutes of meeting (typed automatically)</b><div class="m">Each person\'s own voice is typed on their own phone or computer and shared with everyone here.</div>
-<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><select id="lg" style="padding:10px;border-radius:10px;background:#13244f;color:#fff;border:1px solid #3b4d7a;max-width:60%"></select><button id="ty">Start typing the minutes</button><button class="o" id="dm">Download minutes</button></div>
-<div class="m" id="iv"></div><div id="tr" style="max-height:220px;overflow:auto;font-size:14px;margin-top:6px"></div></div>
+<div class="card"><b>Minutes of meeting — typed automatically, in every language</b>
+<div class="m">Each person's own voice is typed on their own phone or computer and shown to everyone. Choose the language(s) you speak (up to 3; it switches by itself between them), then press Start. Add screens below to read everyone's words translated into other languages.</div>
+<div class="row2"><span class="m">I speak:</span><select id="l1"></select><select id="l2"></select><select id="l3"></select><button id="ty">Start typing the minutes</button></div>
+<div class="m" id="iv"></div>
+<div class="row2"><button class="o" id="ac">+ Add a language screen</button><button class="o" id="dm">Download minutes (all screens)</button></div>
+<div id="cols" class="cols"></div></div>
 <div class="card hide" id="files"><b>Files received</b><div id="fl"></div></div></div>
 </div>
 <script src="/it/apps/mom-lang.js?v=20261116b"></script><script src="/it/apps/connect-rtc.js?v=20261116b"></script>
@@ -42,19 +45,60 @@ $("nm").value = localStorage.getItem("cnj_name") || ""; if (P.get("c")) $("cd").
 let room = null, local = null, cam = null, mic = null, share = null, rec = null, code = "", me = "";
 const tiles = new Map(); let sb = null; const sending = new Map(), lines = new Map(); let sr = null;
 const fmt = (t) => new Date(t).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
-function addLine(m) { if (!m || !m.id || lines.has(m.id)) return; lines.set(m.id, m); const arr = [...lines.values()].sort((x, y) => x.at - y.at); $("tr").innerHTML = arr.map((l) => "<div><span class=\"m\">" + fmt(l.at) + "</span> <b>" + esc(l.who) + ":</b> " + esc(l.text) + "</div>").join(""); $("tr").scrollTop = 1e9; }
-const LG = window.MOMLang; if (LG) { $("lg").innerHTML = LG.list.map((l) => '<option value="' + l.tag + '">' + esc(l.name || l.tag) + "</option>").join(""); $("lg").value = (navigator.language && LG.byTag(navigator.language) ? LG.byTag(navigator.language).tag : "en-IN"); }
+const LG = window.MOMLang, base = (t) => String(t || "").split("-")[0].toLowerCase(), cols = []; let colSeq = 0;
+const opts = (none) => (none ? '<option value="">— none —</option>' : "") + (LG ? LG.list.map((l) => '<option value="' + l.tag + '">' + esc(l.name || l.tag) + "</option>").join("") : "");
+if (LG) {
+  const mine = (navigator.language && LG.byTag(navigator.language)) ? LG.byTag(navigator.language).tag : "en-IN";
+  $("l1").innerHTML = opts(false); $("l2").innerHTML = opts(true); $("l3").innerHTML = opts(true); $("l1").value = mine; $("l2").value = ""; $("l3").value = "";
+}
+function textFor(l, lang) {   // the line as it should read on a screen of this language
+  if (lang === "orig" || base(l.lang) === base(lang)) return l.text;
+  l.tx = l.tx || {}; if (l.tx[lang] != null) return l.tx[lang];
+  if (!l.busy) l.busy = {}; if (!l.busy[lang]) { l.busy[lang] = 1; LG.translate(l.text, l.lang, lang).then((r) => { l.tx[lang] = r || l.text; render(); }).catch(() => { l.tx[lang] = l.text + " (could not translate)"; render(); }); }
+  return null;
+}
+function render() {
+  const arr = [...lines.values()].sort((x, y) => x.at - y.at);
+  cols.forEach((c) => {
+    const box = c.el.querySelector(".tr"), atEnd = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+    box.innerHTML = arr.map((l) => { const t = textFor(l, c.lang); return "<div><span class=\"m\">" + fmt(l.at) + "</span> <b>" + esc(l.who) + ":</b> " + (t == null ? '<span class="m">translating…</span>' : esc(t)) + "</div>"; }).join("");
+    if (atEnd) box.scrollTop = 1e9;
+  });
+}
+if (/[?&]demo=1/.test(location.search)) window.__cn = { add: (m) => addLine(m) };
+function addLine(m) { if (!m || !m.id || lines.has(m.id)) return; lines.set(m.id, m); render(); }
+function addCol(lang) {
+  const id = ++colSeq, el = document.createElement("div"); el.className = "col";
+  el.innerHTML = '<div class="row2"><select class="cl"><option value="orig">As spoken (original)</option>' + opts(false) + '</select><button class="o cx">Download</button><button class="o cr">✕</button></div><div class="tr"></div>';
+  const c = { id, el, lang }; cols.push(c); $("cols").append(el);
+  const sel = el.querySelector(".cl"); sel.value = lang; sel.onchange = () => { c.lang = sel.value; render(); };
+  el.querySelector(".cr").onclick = () => { cols.splice(cols.indexOf(c), 1); el.remove(); };
+  el.querySelector(".cx").onclick = () => download(c);
+  render();
+}
+function download(c) {
+  const arr = [...lines.values()].sort((x, y) => x.at - y.at); if (!arr.length) { say("Nothing typed yet.", "bad"); return; }
+  const lab = c.lang === "orig" ? "as spoken" : (LG.byTag(c.lang) || {}).name || c.lang, who = [...new Set(arr.map((l) => l.who))].join(", ");
+  const body = arr.map((l) => "[" + fmt(l.at) + "] " + l.who + ": " + (textFor(l, c.lang) || l.text)).join("\n");
+  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["MINUTES OF MEETING (" + lab + ")\nSession: " + pretty(code) + "\nDate: " + new Date(arr[0].at).toLocaleString() + "\nSpeakers: " + who + "\n\n" + body + "\n"], { type: "text/plain" }));
+  a.download = "KMR-minutes-" + code + "-" + (c.lang === "orig" ? "original" : c.lang) + ".txt"; a.click();
+}
+$("ac").onclick = () => { if (cols.length >= 4) { say("Up to 4 language screens.", "bad"); return; } addCol(((LG && LG.byTag("hi-IN")) || { tag: "en-IN" }).tag); };
+$("dm").onclick = () => { if (!cols.length) { say("Nothing typed yet.", "bad"); return; } cols.forEach((c) => download(c)); };
 $("ty").onclick = () => {
   if (sr) { sr.stop(); sr = null; $("ty").textContent = "Start typing the minutes"; $("ty").className = ""; $("iv").textContent = ""; return; }
   if (!LG || !LG.supported) { say("Typing the spoken words needs Chrome, Edge or Safari.", "bad"); return; }
-  sr = LG.Recorder({ langs: [$("lg").value], onfinal: (r) => { if (!r.text) return; const m = { t: "tx", id: Math.random().toString(36).slice(2), who: me, text: r.text, lang: r.lang, at: Date.now() }; addLine(m); room.data(m); }, oninterim: (r) => { $("iv").textContent = r.text ? "Hearing: " + r.text : ""; }, onerror: (e) => say(e.message, "bad") });
+  const langs = [...new Set([$("l1").value, $("l2").value, $("l3").value].filter(Boolean))];
+  sr = LG.Recorder({ langs, onfinal: (r) => { if (!r.text) return; const m = { t: "tx", id: Math.random().toString(36).slice(2), who: me, text: r.text, lang: r.lang || langs[0], at: Date.now() }; addLine(m); room.data(m); }, oninterim: (r) => { $("iv").textContent = r.text ? "Hearing: " + r.text : ""; }, onerror: (e) => say(e.message, "bad") });
   sr.start(); $("ty").textContent = "Stop typing"; $("ty").className = "r";
 };
-$("dm").onclick = () => {
-  const arr = [...lines.values()].sort((x, y) => x.at - y.at); if (!arr.length) { say("Nothing typed yet.", "bad"); return; }
-  const who = [...new Set(arr.map((l) => l.who))].join(", "), txt = "MINUTES OF MEETING\nSession: " + pretty(code) + "\nDate: " + new Date(arr[0].at).toLocaleString() + "\nSpeakers: " + who + "\n\n" + arr.map((l) => "[" + fmt(l.at) + "] " + l.who + ": " + l.text).join("\n") + "\n";
-  const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([txt], { type: "text/plain" })); a.download = "KMR-minutes-" + code + ".txt"; a.click();
-};
+function meter(stream, tileEl) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext, ac = new AC(), an = ac.createAnalyser(); an.fftSize = 256; ac.createMediaStreamSource(stream).connect(an);
+    const d = document.createElement("div"); d.className = "mic"; d.innerHTML = "<i></i>"; tileEl.append(d); const bar = d.firstChild, buf = new Uint8Array(an.frequencyBinCount);
+    setInterval(() => { an.getByteTimeDomainData(buf); let mx = 0; for (const v of buf) mx = Math.max(mx, Math.abs(v - 128)); bar.style.width = Math.min(100, mx * 1.6) + "%"; }, 150);
+  } catch (e) { /* no meter */ }
+}
 async function client() {
   if (sb) return sb; if (/[?&]demo=1/.test(location.search)) return null; const cc = window.COMPANY_CONFIG || {}; let key = cc.supabaseAnonKey, url = cc.supabaseUrl || "https://dehlcusptkzfhqvpfyjh.supabase.co";
   if (!key) { const j = await (await fetch("/it/console/api/public-config")).json(); key = j.key; if (j.url) url = j.url; }
@@ -66,12 +110,12 @@ function tile(id, name, stream, mine) {
     d.onclick = (e) => { if (mine) return; const r = d.getBoundingClientRect(); room.data({ t: "pt", x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }); };
     $("vg").append(d); t = { d, v, name }; tiles.set(id, t);
   }
-  t.d.querySelector("b").textContent = name + (mine ? " (you)" : ""); t.name = name; if (stream && t.v.srcObject !== stream) { t.v.srcObject = stream; t.v.play().catch(() => { }); } return t;
+  t.d.querySelector("b").textContent = name + (mine ? " (you)" : ""); t.name = name; if (stream && t.v.srcObject !== stream) { t.v.srcObject = stream; t.v.play().catch(() => { if (!document.getElementById("snd")) { const b = document.createElement("button"); b.id = "snd"; b.className = "r"; b.textContent = "Sound is blocked — tap here to hear"; b.onclick = () => { tiles.forEach((x) => x.v.play().catch(() => { })); b.remove(); }; $("vg").before(b); } }); } return t;
 }
 const say = (m, k) => { $("st2").textContent = m; $("st2").className = "m " + (k || ""); };
 const chat = (who, txt) => { const d = document.createElement("div"); d.innerHTML = "<b>" + esc(who) + ":</b> " + esc(txt); $("chat").append(d); $("chat").scrollTop = 1e9; };
 async function media() {
-  for (const c of [{ audio: true, video: { facingMode: "user", width: { ideal: 640 } } }, { audio: true }]) { try { return await navigator.mediaDevices.getUserMedia(c); } catch (e) { /* try next */ } }
+  for (const c of [{ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: { facingMode: "user", width: { ideal: 640 } } }, { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } }]) { try { return await navigator.mediaDevices.getUserMedia(c); } catch (e) { /* try next */ } }
   return new MediaStream();
 }
 async function start(c, name) {
@@ -79,6 +123,8 @@ async function start(c, name) {
   local = await media(); cam = local.getVideoTracks()[0] || null; mic = local.getAudioTracks()[0] || null; if (!cam) $("cam").disabled = true; if (!mic) $("mic").disabled = true;
   if (!navigator.mediaDevices.getDisplayMedia) { $("scr").disabled = true; $("scr").textContent = "Screen share: not on this phone"; }
   tile("me", me, local, true);
+  if (!mic) { const w = document.createElement("div"); w.className = "warn"; w.innerHTML = "Your microphone is not allowed, so others cannot hear you. Allow the microphone for this site (tap the lock icon near the address), then <b><a href=\"#\" id=\"rl\" style=\"color:#fff\">reload</a></b>."; $("vg").before(w); const r = w.querySelector("#rl"); r.onclick = (e) => { e.preventDefault(); location.reload(); }; } else meter(new MediaStream([mic]), tiles.get("me").d);
+  addCol("orig"); addCol("en-IN");
   const names = new Map();
   room = R.Room({
     sb: await client(), key: "q-" + code, stream: local, user: { name: me },
