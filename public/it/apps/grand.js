@@ -50,6 +50,9 @@
             </table>
             ${o.staff ? "" : `<p style="font-size:12px;color:var(--muted)">Invoices and payments are KMR’s tax records: you can download them; only KMR can flush or restore them.</p>`}
             <div class="gm-btns">${btn("gmAdmDl", "Download JSON")}${upl("gmAdmUp", "Upload JSON")}${btn("gmAdmFl", "Flush admin data", { red: 1 })}</div></div>
+          <div class="card" style="--c:#0369A1"><div style="font-size:26px;line-height:1">📁</div><h3>Year-wise Backup &amp; Restore</h3>
+            <p>Every app’s real data filed as <b>App › Financial year › JSON + Excel</b> (dashboard, analysis and raw data), plus one overall JSON. Upload that JSON to put every record back in its app and year — nothing is deleted.</p>
+            <div class="gm-btns">${btn("gmYb", "Open year-wise backup")}</div></div>
         </div>
         <style>.gm{width:100%;border-collapse:collapse;font-size:13px;margin:4px 0 10px}.gm td{padding:5px 0;border-bottom:1px solid var(--line,#E5E7EB)}
           .gm small{color:var(--muted)}.gm-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}</style>`;
@@ -62,6 +65,7 @@
       $("gmAdmDl").onclick = () => this.download(ctx, "admin", $("gmAdmDl"));
       $("gmAdmUp").onchange = (e) => this.upload(ctx, "admin", e.target.files[0], e.target);
       $("gmAdmFl").onclick = () => this.confirmAdmin(ctx);
+      $("gmYb").onclick = () => window.KMR_YB ? window.KMR_YB.open(ctx, { back: "grand" }) : alert("Year-wise backup is not available yet.");
       window.scrollTo(0, 0);
     },
 

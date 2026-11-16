@@ -58,12 +58,14 @@
             <p style="font-size:12.5px;color:var(--muted);min-height:18px">${esc(det || "No data")}</p>
             <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:auto">
               <button class="btn ghost" data-dl="${a.app}" style="height:38px">Download JSON</button>
+              <button class="btn ghost" data-yb="${a.app}" style="height:38px" title="Backup by financial year: JSON + Excel">Year-wise backup</button>
               <label class="btn ghost" style="height:38px;cursor:pointer">Upload JSON<input type="file" accept=".json,application/json" data-up="${a.app}" hidden></label>
               <button class="btn ghost" data-flush="${a.app}" style="height:38px;color:#B00E28" ${a.records ? "" : "disabled"}>Flush all data</button>
             </div></div>`;
         }).join("")}</div>
         <p class="sub" style="margin-top:18px">Flush always downloads a JSON backup first, then removes the data. Upload that file here to bring everything back.</p>`;
       ctx.main.querySelectorAll("[data-dl]").forEach((b) => (b.onclick = () => this.download(ctx, b.dataset.dl, b)));
+      ctx.main.querySelectorAll("[data-yb]").forEach((b) => (b.onclick = () => window.KMR_YB ? window.KMR_YB.open(ctx, { app: b.dataset.yb, back: "data" }) : alert("Year-wise backup is not available yet.")));
       ctx.main.querySelectorAll("[data-up]").forEach((i) => (i.onchange = (e) => this.upload(ctx, i.dataset.up, e.target.files[0], i)));
       ctx.main.querySelectorAll("[data-flush]").forEach((b) => (b.onclick = () => this.confirmFlush(ctx, b.dataset.flush, list.find((x) => x.app === b.dataset.flush))));
       window.scrollTo(0, 0);
