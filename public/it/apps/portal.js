@@ -421,6 +421,7 @@
     else if (HASH === "plants" && plants.length > 1 && plants[0].is_all) plantsView();
     else if (HASH === "grand" && isAdmin) grandView();
     else if (HASH === "data" && isAdmin) dataView();
+    else if (HASH === "yearbackup" && isAdmin && window.KMR_YB) { setView("yearbackup"); window.KMR_YB.open(ctxOf(), { back: "grand" }); }
     else if (/^ops(\/|$)/.test(HASH) && ops) opsView(HASH.split("/")[1] || "");
   }
 

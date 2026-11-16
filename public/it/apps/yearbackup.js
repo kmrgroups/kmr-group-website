@@ -220,28 +220,30 @@
       }).filter((a) => a.total > 0 && (!opts.app || a.app === opts.app));
       shell(ctx, `<div class="cards" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
           <div class="card" style="--c:#1E7B4A"><h3>Backup</h3>
-            <p>Tick the apps and years, then download one ZIP: <b>App › Year › JSON + Excel</b>, with the overall JSON inside — and the overall JSON is also saved as its own file.</p>
+            <p>Tick the apps and years, then choose: <b>one JSON</b> with all the data, or a <b>ZIP</b> filed as <b>App › Year › JSON + Excel</b> (the overall JSON is inside it and also saved as its own file).</p>
             ${apps.length ? `<div id="ybMx"></div>
-            <label style="display:flex;gap:8px;margin:10px 0 4px"><input type="checkbox" id="ybXl" checked> <span>Excel workbooks (Dashboard, Analysis, Raw data) — a large company takes a few minutes</span></label>
-            <div class="gm-btns"><button class="btn" id="ybGo" style="height:38px">Download backup</button></div>` : `<p class="msg">There is no real data to back up yet.</p>`}</div>
+            <div class="gm-btns" style="margin-top:10px"><button class="btn" id="ybJson" style="height:38px">All data — one JSON file</button>
+              <button class="btn ghost" id="ybGo" style="height:38px">App › Year files — ZIP (JSON + Excel)</button></div>
+            <label style="display:flex;gap:8px;margin:10px 0 0;font-size:13px"><input type="checkbox" id="ybXl" checked> <span>Include Excel workbooks (Dashboard, Analysis, Raw data) in the ZIP — a large company takes a few minutes</span></label>` : `<p class="msg">There is no real data to back up yet.</p>`}</div>
           <div class="card" style="--c:#4F46E5"><h3>Restore from JSON</h3>
             <p>Upload the <b>overall JSON</b> (or one app-year JSON from the ZIP). You see what is inside, then one click puts every record back in its app and year. Records are <b>added or updated — nothing is deleted</b>.</p>
             <div class="gm-btns"><label class="btn ghost" style="height:38px;cursor:pointer">Upload JSON<input type="file" id="ybUp" accept=".json,application/json" hidden></label></div>
             <div id="ybRs" style="margin-top:12px"></div></div></div>${progressHtml}`, back);
       if (apps.length) {
         const mx = matrix(ctx.main.querySelector("#ybMx"), apps, opts.app);
-        ctx.main.querySelector("#ybGo").onclick = (e) => this.backup(ctx, plan, apps, mx, ctx.main.querySelector("#ybXl").checked, e.target, back);
+        ctx.main.querySelector("#ybGo").onclick = (e) => this.backup(ctx, plan, apps, mx, ctx.main.querySelector("#ybXl").checked, e.target, back, "zip");
+        ctx.main.querySelector("#ybJson").onclick = (e) => this.backup(ctx, plan, apps, mx, false, e.target, back, "json");
       }
       ctx.main.querySelector("#ybUp").onchange = (e) => this.read(ctx, e.target.files[0], e.target, back);
     },
 
-    async backup(ctx, plan, apps, mx, withXl, btn, back) {
+    async backup(ctx, plan, apps, mx, withXl, btn, back, mode) {
       const selA = new Set(mx.apps()), selF = mx.fys(), chosen = apps.filter((a) => selA.has(a.app));
       if (!chosen.length || !selF.size) { alert("Tick at least one app and one year."); return; }
       const t0 = btn.textContent; btn.disabled = true; btn.textContent = "Working…";
       const P = progress(ctx), when = new Date().toLocaleString("en-IN"), company = ctx.slug;
       try {
-        await libs(withXl);
+        if (mode === "zip") await libs(withXl);
         const data = {};                       // app → fy → table → rows
         const jobs = chosen.flatMap((a) => a.tables.map((t) => ({ a, t }))).filter(({ t }) => Object.keys(t.fy || {}).some((f) => selF.has(f)));
         const rowsAll = jobs.reduce((s, j) => s + Number(j.t.rows), 0); let done = 0;
@@ -267,7 +269,7 @@
           }
         }
         /* files */
-        const zip = new window.JSZip(), parts = [], exported = new Date().toISOString();
+        const zip = mode === "zip" ? new window.JSZip() : null, parts = [], exported = new Date().toISOString();
         parts.push(`{"format":"kmr-year-backup","version":1,"company":${JSON.stringify(company)},"exported_at":${JSON.stringify(exported)},"fy_basis":"Apr-Mar","apps":{`);
         let firstApp = true, files = 0; const apList = chosen.filter((a) => data[a.app]);
         for (const a of apList) {
@@ -280,8 +282,8 @@
             parts.push(`${firstY ? "" : ","}${JSON.stringify(fy)}:{"tables":${tj}}`); firstY = false;
             const dir = `${folder(NAME[a.app] || a.app)}/${fy === "Masters" ? "Masters (no year)" : fy}/`;
             const base = `${company}-${a.app}-${fy}`;
-            zip.file(dir + base + ".json", `{"format":"kmr-year-app","version":1,"company":${JSON.stringify(company)},"app":${JSON.stringify(a.app)},"fy":${JSON.stringify(fy)},"exported_at":${JSON.stringify(exported)},"tables":${tj}}`); files++;
-            if (withXl) {
+            if (mode === "zip") { zip.file(dir + base + ".json", `{"format":"kmr-year-app","version":1,"company":${JSON.stringify(company)},"app":${JSON.stringify(a.app)},"fy":${JSON.stringify(fy)},"exported_at":${JSON.stringify(exported)},"tables":${tj}}`); files++; }
+            if (mode === "zip" && withXl) {
               P.say(`Excel: ${NAME[a.app] || a.app} › ${fy}`);
               zip.file(dir + base + "-dashboard-and-data.xlsx", await makeXlsx({ appName: NAME[a.app] || a.app, fy, company, when }, ordered)); files++;
             }
@@ -292,6 +294,7 @@
         parts.push("}}");
         const overall = new Blob(parts, { type: "application/json" });
         const oname = `${company}-overall-backup-${stamp()}.json`;
+        if (mode === "json") { saveBlob(overall, oname); P.pct(100); P.say(`Done — all data of ${company} in one JSON: ${oname} (${(overall.size / 1048576).toFixed(1)} MB).`); btn.disabled = false; btn.textContent = t0; return; }
         zip.file(oname, overall);
         zip.file("READ ME.txt", `KMR year-wise backup — ${company}\nTaken ${when}\n\nFolders: App › Financial year (April–March) › files.\nEach app-year folder has a JSON file (every record) and an Excel workbook (Dashboard, Analysis, Raw data).\nMasters (no year) holds settings and number counters.\n${oname} is the overall JSON: Grand Master › Year-wise Backup & Restore › Upload JSON puts every record back in its app and year (add + update, nothing deleted).\n`);
         P.say("Packing the ZIP…");
