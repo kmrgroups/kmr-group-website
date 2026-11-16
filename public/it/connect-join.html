@@ -12,8 +12,8 @@ button.o{background:#1f3266;color:#fff}button.r{background:#c0392b;color:#fff}bu
 .t b{position:absolute;left:8px;bottom:6px;background:#000a;padding:2px 8px;border-radius:8px;font-size:12px}
 .dot{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border:4px solid #ff3b30;border-radius:50%;pointer-events:none;animation:p 1.6s forwards}@keyframes p{to{opacity:0;transform:scale(1.8)}}
 .card{background:#13244f;border-radius:12px;padding:10px;margin:8px 0}#chat{max-height:160px;overflow:auto;font-size:14px}#chat div{margin:3px 0}.hide{display:none}.bad{color:#ff9b8f}.ok{color:#8be9a8}
-</style></head><body><div class="w">
-<h1>KMR Connect · Quick session</h1><div class="m">Video, voice, screen, chat and files. Nothing to install — works in the phone or computer browser.</div>
+</style></head><body><div class="w"><div id="bk" class="hide" style="margin-bottom:4px"><a id="bka" style="color:#f3c55a;font-weight:700;text-decoration:none;font-size:14px">← Back to KMR Apps</a></div>
+<div id="bk" class="hide" style="margin-bottom:6px"><a href="/it/connect.html" style="color:#f3c55a;font-weight:700;text-decoration:none">← Back to KMR Connect</a></div><h1>KMR Connect · Quick session</h1><div class="m">Video, voice, screen, chat and files. Nothing to install — works in the phone or computer browser.</div>
 <div id="join" class="card"><label>Your name</label><input id="nm" placeholder="Your name" autocomplete="name">
 <label>Session code</label><input id="cd" placeholder="Code, e.g. K7M2-9QXA" autocapitalize="characters" autocomplete="off">
 <button id="go">Join the session</button> <button class="o" id="new">Start a new session</button><div id="st" class="m"></div></div>
@@ -34,6 +34,10 @@ const R = window.CNRTC, $ = (i) => document.getElementById(i), P = new URLSearch
 const AL = "ABCDEFGHJKMNPQRSTUVWXYZ23456789", esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const norm = (c) => String(c || "").toUpperCase().replace(/[^A-Z0-9]/g, ""), pretty = (c) => c.slice(0, 4) + "-" + c.slice(4);
 const gen = () => { const a = crypto.getRandomValues(new Uint8Array(8)); return [...a].map((x) => AL[x % AL.length]).join(""); };
+/* only a signed-in KMR user sees the way back; people who were sent the link have no such option */
+(function () { let em = "", slug = ""; try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sb-.+-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); const u = v && (v.user || (v.currentSession && v.currentSession.user)); if (u && u.email) em = u.email; } } slug = (JSON.parse(localStorage.getItem("kmr-portal") || "null") || {}).slug || ""; } catch (e) { /* ignore */ }
+  if (em) { $("bka").href = slug ? "/it/app/" + encodeURIComponent(slug) : "/it/apps.html"; $("bka").onclick = (e) => { if (room && !confirm("Leave this session and go back to KMR Apps?")) e.preventDefault(); }; $("bk").classList.remove("hide"); } })();
+try { if (Object.keys(localStorage).some((k) => /^sb-.*-auth-token$/.test(k) && localStorage.getItem(k))) $("bk").classList.remove("hide"); } catch (e) { /* guests: no back link */ }
 $("nm").value = localStorage.getItem("cnj_name") || ""; if (P.get("c")) $("cd").value = pretty(norm(P.get("c")));
 let room = null, local = null, cam = null, mic = null, share = null, rec = null, code = "", me = "";
 const tiles = new Map(); let sb = null; const sending = new Map(), lines = new Map(); let sr = null;
