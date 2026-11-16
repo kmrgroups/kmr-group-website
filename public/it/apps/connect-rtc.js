@@ -107,6 +107,15 @@
     return {
       id: sig.id, peers,
       data(obj) { const s = JSON.stringify(obj); peers.forEach((p) => p.link.send(s)); },
+      async dataWait(obj) {   // like data(), but waits while the connection is busy, so large files are not dropped
+        const s = JSON.stringify(obj); let ok = true;
+        for (const p of [...peers.values()]) {
+          const ch = p.link.channel; if (!ch || ch.readyState !== "open") { ok = false; continue; }
+          for (let i = 0; ch.bufferedAmount > 262144 && ch.readyState === "open" && i < 600; i++) await new Promise((r) => setTimeout(r, 50));
+          try { if (!p.link.send(s)) ok = false; } catch (e) { ok = false; }
+        }
+        return ok;
+      },
       setTrack(kind, track) { peers.forEach((p) => p.link.swapTrack(kind, track)); },
       leave() { try { sig.send({ t: "bye" }); } catch (e) { /* ignore */ } clearInterval(hello); [...peers.keys()].forEach(drop); setTimeout(() => sig.close(), 300); }
     };
