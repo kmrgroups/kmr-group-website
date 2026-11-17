@@ -415,6 +415,7 @@ capacity:[
 pd:[
 ['ISO','9.3.2','Management review inputs','The Presentation screen shows the PFMEA action status, severity 9–10 items and Control Plan coverage with action plans.'],
 ['CP','Control Plan (prototype, pre-launch, production)','Control Plan content','Control Plan is generated from the process flow and FMEA.'],
+['IATF','7.5.3 Control of documented information','Customer-specific print formats','Esbee Precision Industries workspace only: Control Plan (F-02-02), Process FMEA (F-01-18) and Process Flow Chart (F-02-33) print in the Esbee layout with format number, revision and document number in header and footer. All other customers keep the standard layout.'],
 ['VF','7 steps; Action Priority (AP)','Process FMEA','PFMEA with severity, occurrence, detection and Action Priority.'],
 ['F4','RPN method','Process FMEA','PFMEA with RPN is available where the customer still asks for the 4th edition.'],
 ['SPC','Charts; Cp / Cpk / Ppk','Statistical process control','Control charts and capability indices are calculated from entered readings.'],
