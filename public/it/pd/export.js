@@ -19,7 +19,16 @@ const val=(c,v)=>{ if(v==null||v==="") return ""; if(c.type==="date") return /^\
    BLOCKS
    ====================================================================== */
 const dmy=v=>/^\d{4}-\d{2}-\d{2}$/.test(String(v||""))?String(v).split("-").reverse().join("-"):v;
-function infoFor(id){ const h=A().S.plan.header; return (UI.INFO[id]||UI.INFO._).map(k=>[UI.HL[k]||k, k==="phase"?(h.phase||"Production"):dmy(h[k]??"")]); }
+/* Esbee-only formats: switched on per workspace (settings.docFormat === "esbee"); every other customer keeps the standard layout. */
+const ESB={cp:{fmt:"F-02-02",rev:"01",title:"CONTROL PLAN"},pfmea:{fmt:"F-01-18",rev:"01",title:"POTENTIAL FAILURE MODE AND EFFECTS ANALYSIS (PROCESS FMEA)"},pfd:{fmt:"F-02-33",rev:"00",title:"PROCESS FLOW CHART"}};
+const esb=id=>(A().S.settings&&A().S.settings.docFormat==="esbee")?ESB[id]||null:null;
+function infoFor(id){ const S=A().S, h=S.plan.header, e=esb(id);
+  if(e){ const dn=(S.docs[id]&&S.docs[id].docNo)||"", pr=h.partNo+(h.drawingRev?" / "+h.drawingRev:""), P=(a,b)=>[a,b==null?"":String(b)];
+    const sign=[P("Prepared by",h.preparedBy),P("Checked by",h.reviewedBy),P("Approved by",h.approvedBy)];
+    if(id==="cp") return [P("Format No.",e.fmt+" / Rev "+e.rev),P("Control plan number",dn),P("Control plan type",h.phase||"Production"),P("Part number / revision",pr),P("Part name / description",h.partName),P("Customer name & approval date",h.customer),P("Core team",h.coreTeam),P("Date (original)",dmy(h.origDate)),P("Revision date",dmy(h.revDate))].concat(sign);
+    if(id==="pfmea") return [P("Format No.",e.fmt+" / Rev "+e.rev),P("FMEA number",dn),P("Process responsibility",h.keyContact),P("Part name",h.partName),P("Part number / revision",pr),P("Customer name",h.customer),P("Core team",h.coreTeam),P("Key date",dmy(h.origDate)),P("Revision date",dmy(h.revDate))].concat(sign);
+    return [P("Format No.",e.fmt+" / Rev "+e.rev),P("Process flow chart no.",dn),P("Part number / revision",pr),P("Part name",h.partName),P("Customer name",h.customer),P("Core team",h.coreTeam),P("Date (original)",dmy(h.origDate)),P("Revision date",dmy(h.revDate))].concat(sign); }
+  return (UI.INFO[id]||UI.INFO._).map(k=>[UI.HL[k]||k, k==="phase"?(h.phase||"Production"):dmy(h[k]??"")]); }
 function tableBlock(cols, rows, groups, extra={}){
   const colsX = cols;
   return Object.assign({kind:"table", cols:colsX.map(c=>({label:c.label,w:c.w||8,k:c.k,flow:!!c.flow,ap:!!c.ap,read:c.type==="read",cls:c.k==="cls"})), groups,
@@ -99,7 +108,7 @@ async function pdf(ids){
     const d=D.DOCS.find(x=>x.id===id), dd=S.docs[id], fmt=paperFor(id), ori=id==="sop"?"portrait":"landscape";
     if(!doc) doc=new jsPDF({orientation:ori,unit:"mm",format:fmt}); else doc.addPage(fmt,ori);
     const start=doc.getNumberOfPages();
-    const meta={title:d.title+(id==="pfmea"?" ("+window.PDFmea.STD[(S.docs.pfmea.std)||"vda"]+")":""), docNo:dd.docNo||"", rev:dd.rev||"00", date:dmy(h.revDate||""), info:infoFor(id), company:co};
+    const E=esb(id), meta={title:E?E.title:d.title+(id==="pfmea"?" ("+window.PDFmea.STD[(S.docs.pfmea.std)||"vda"]+")":""), docNo:(E?E.fmt+" / ":"")+(dd.docNo||""), rev:dd.rev||"00", date:dmy(h.revDate||""), info:infoFor(id), company:co};
     const PW=()=>doc.internal.pageSize.getWidth(), PH=()=>doc.internal.pageSize.getHeight();
     const hdr=()=>{ const p=doc.getCurrentPageInfo().pageNumber; if(drawn.has(p)) return topOf(); drawn.add(p); return drawHeader(doc, meta, logo); };
     const topOf=()=>headerHeight(meta)+8+3;
@@ -203,7 +212,7 @@ async function xlsx(ids){
     const widest = Math.max(12, ...blocks.filter(b=>b.kind==="table").map(b=>b.cols.length));
     const N = widest; // grid columns in this sheet
     const ws=wb.addWorksheet(`${d.code}`.slice(0,31), {pageSetup:{orientation:"landscape",paperSize:paperFor(id)==="a3"?8:9,fitToPage:true,fitToWidth:1,fitToHeight:0,margins:{left:0.3,right:0.3,top:0.4,bottom:0.5,header:0.2,footer:0.2}}, views:[{showGridLines:false}]});
-    ws.headerFooter.oddFooter=`&L${xs(co)} · ${xs(d.title)}&CPrinted &D&RPage &P of &N`;
+    ws.headerFooter.oddFooter=`&L${xs(co)} · ${xs(esb(id)?esb(id).title+" · "+esb(id).fmt+" Rev "+esb(id).rev+" · "+(dd.docNo||""):d.title)}&CPrinted &D&RPage &P of &N`;
     // column widths from the widest table
     const main=blocks.find(b=>b.kind==="table"&&b.cols.length===N); const tot=main?main.cols.reduce((a,c)=>a+c.w,0):N*8;
     for(let c=1;c<=N;c++) ws.getColumn(c).width = main ? Math.max(5, Math.round(main.cols[c-1].w/tot*(N>20?360:N>12?270:215))) : 14;
@@ -211,7 +220,7 @@ async function xlsx(ids){
     // title band
     const lc=Math.max(2,Math.round(N*0.18)), rc=Math.max(3,Math.round(N*0.25));
     ws.mergeCells(r,1,r+2,lc); ws.mergeCells(r,lc+1,r+1,N-rc); ws.mergeCells(r+2,lc+1,r+2,N-rc);
-    const t=ws.getCell(r,lc+1); t.value=d.title.toUpperCase(); t.font={bold:true,size:16,color:{argb:"FF15233B"}}; t.alignment={horizontal:"center",vertical:"middle"};
+    const t=ws.getCell(r,lc+1); t.value=(esb(id)?esb(id).title:d.title).toUpperCase(); t.font={bold:true,size:16,color:{argb:"FF15233B"}}; t.alignment={horizontal:"center",vertical:"middle"};
     const st=ws.getCell(r+2,lc+1); st.value=co; st.font={size:10,color:{argb:"FF5B6778"}}; st.alignment={horizontal:"center"};
     [["Doc. no.",dd.docNo||""],["Revision",dd.rev||"00"],["Date",dmy(h.revDate||"")]].forEach((p,i)=>{ const half=Math.max(1,Math.floor(rc/3)); ws.mergeCells(r+i,N-rc+1,r+i,N-rc+half); ws.mergeCells(r+i,N-rc+half+1,r+i,N);
       const a=ws.getCell(r+i,N-rc+1), b=ws.getCell(r+i,N-rc+half+1); a.value=p[0]; a.font={size:9,color:{argb:"FF5B6778"}}; b.value=p[1]; b.font={bold:true,size:10}; });

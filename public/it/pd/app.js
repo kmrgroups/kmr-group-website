@@ -562,6 +562,7 @@ async function pane(t){
       <label class="fld">Frequency – other characteristics<input data-s="freqNormal" value="${esc(st.freqNormal||"1 pc / 2 hrs")}"></label>
       <label class="fld">Time slots in patrol / self inspection<input data-s="patrolSlots" type="number" min="4" max="12" value="${esc(st.patrolSlots||8)}"></label>
       <label class="fld">PFMEA action owner (default)<input data-s="pfmeaOwner" value="${esc(st.pfmeaOwner||"Process Engineering")}"></label>
+      <label class="fld">Control plan, PFMEA and process flow print format<select data-s="docFormat"><option value=""${st.docFormat!=="esbee"?" selected":""}>Standard (all other customers)</option><option value="esbee"${st.docFormat==="esbee"?" selected":""}>Esbee Precision Industries (F-02-02, F-01-18, F-02-33)</option></select></label>
       <label class="fld">PFMEA format for new projects<select data-s="fmeaStd"><option value="vda"${st.fmeaStd!=="aiag4"?" selected":""}>AIAG-VDA (2019)</option><option value="aiag4"${st.fmeaStd==="aiag4"?" selected":""}>AIAG FMEA 4th edition (2008)</option></select></label>
       <label class="fld">4th edition: act when RPN is at or above<input data-s="fmeaRpn" type="number" min="1" max="1000" value="${esc(st.fmeaRpn||100)}"></label>
       <label class="fld" style="grid-column:1/-1">Reaction plan – normal characteristics<textarea data-s="reactNormal" rows="2">${esc(st.reactNormal||"Stop; segregate & 100% inspect parts since last OK check; correct offset / tool; re-approve setup; record in rejection register")}</textarea></label>
