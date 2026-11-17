@@ -172,7 +172,7 @@
     const stage = (files) => {
       files = [...files].filter((f) => !/^(\.|thumbs\.db$|desktop\.ini$)/i.test(f.name));
       if (!files.length) return;
-      const rows = files.map((f) => { const g = guess(f), dup = have.has(f.name + "|" + f.size); return { f, part: g || (dup ? "" : f.name.replace(/\.[^.]+$/, "").slice(0, 80)), known: !!g, dup, rev: revOf(f.name), kind: /\.(stp|step|igs|iges)$/i.test(f.name) ? "model" : "drawing", on: !dup }; });
+      const rows = files.map((f) => { const cv = f.name.indexOf("__") > 0, g = cv ? f.name.slice(0, f.name.indexOf("__")).trim() : guess(f), dup = have.has(f.name + "|" + f.size), ttl = cv ? f.name.slice(f.name.indexOf("__") + 2).replace(/\.[^.]+$/, "") : ""; return { f, title: ttl, part: g || (dup ? "" : f.name.replace(/\.[^.]+$/, "").slice(0, 80)), known: !!g, dup, rev: revOf(ttl || f.name), kind: /\.(stp|step|igs|iges)$/i.test(f.name) ? "model" : "drawing", on: !dup }; });
       const dl = `<datalist id="dlParts">${parts.map((p) => `<option value="${esc(p.code)}">${esc(p.name || "")}</option>`).join("")}</datalist>`;
       const total = files.reduce((a, f) => a + f.size, 0);
       prev.innerHTML = `${dl}<p style="margin:6px 0;color:#64748B;font-size:13px">${files.length} file(s), ${size(total)}. Check the <b>part number</b> for each one — it must be a part in your Parts list. Orange rows are not in your Parts list — they are saved under the name shown (you can change it). Files already uploaded are unticked.</p>
@@ -186,7 +186,7 @@
         go.disabled = true; let ok = 0; const bad = [];
         for (const r of todo) {
           msg.style.color = "#64748B"; msg.textContent = `Uploading ${ok + bad.length + 1} of ${todo.length}: ${r.f.name}…`;
-          try { const rf = r.f._get ? await r.f._get() : r.f; for (let t = 1; ; t++) { try { await api.upload(o, d.customer_id, rf, { part_no: r.part, rev: r.rev, kind: r.kind }); break; } catch (e2) { if (t >= 4 || !/load failed|network|fetch|timeout/i.test(e2.message || "")) throw e2; msg.textContent = `Connection dropped — retrying ${r.f.name} (${t}/3)…`; await new Promise((z) => setTimeout(z, 1500 * t)); } } ok++; } catch (e) { bad.push(r.f.name + " — " + (e.message || e)); }
+          try { const rf = r.f._get ? await r.f._get() : r.f; for (let t = 1; ; t++) { try { await api.upload(o, d.customer_id, rf, { part_no: r.part, rev: r.rev, kind: r.kind, title: r.title }); break; } catch (e2) { if (t >= 4 || !/load failed|network|fetch|timeout/i.test(e2.message || "")) throw e2; msg.textContent = `Connection dropped — retrying ${r.f.name} (${t}/3)…`; await new Promise((z) => setTimeout(z, 1500 * t)); } } ok++; } catch (e) { bad.push(r.f.name + " — " + (e.message || e)); }
         }
         if (!bad.length) return api.library(host, o);
         msg.style.color = "#B00E28"; msg.innerHTML = `${ok} uploaded. <b>${bad.length} failed:</b><br>${bad.map(esc).join("<br>")}`; go.disabled = false;
