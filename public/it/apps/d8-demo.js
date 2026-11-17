@@ -127,7 +127,6 @@
         .sort((u, v) => (u.x.status === "done") - (v.x.status === "done") || String(u.x.due_on || "9").localeCompare(String(v.x.due_on || "9"))).map(({ x, r }) => Object.assign(actOut(x), { report_no: r.no, report_title: r.title, part_no: r.part_no, overdue: x.status === "open" && !!x.due_on && x.due_on < t }));
     },
     kmr_scrap_load() { return []; },
-    kmr_d8_draw_list() { return { customer_id: "demo", items: [] }; },
     kmr_d8_dashboard() {
       const t = td(), open = S.reps.filter((r) => r.status === "open"), by = (f) => S.reps.filter((r) => r.opened_on >= day(-365)).reduce((o, r) => { const k = f(r); if (k) o[k] = (o[k] || 0) + 1; return o; }, {}), cl = S.reps.filter((r) => r.status === "closed" && r.closed_on >= day(-180));
       const bs = {}; open.forEach((r) => { const c = current(r); if (c) bs[c] = (bs[c] || 0) + 1; }); const oa = S.acts.filter((a) => a.status === "open" && rep(a.report_id).status === "open");

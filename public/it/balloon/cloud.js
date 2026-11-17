@@ -141,6 +141,7 @@ if (!CFG.supabaseUrl || !CFG.supabaseAnonKey || !window.supabase) {
   return;
 }
 const sb = window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey);
+window.KMR_SB = sb;
 const C = { user:null, memberships:[], org:null, role:null, platform:false, reportId:null, filePath:null, dirty:false, loading:false };
 BI.onChange = () => { if (!C.loading && C.org) { C.dirty = true; updateSaveBtn(); } };
 

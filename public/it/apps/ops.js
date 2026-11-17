@@ -332,7 +332,7 @@
         ${dups.length ? `<div class="card" id="opsDup" style="border-color:#D97706;background:#FFF7E6;margin-bottom:12px"><b>⚠ ${dups.length} possible duplicate ${dups.length > 1 ? "groups" : "group"} found (${dupIds.size} machines)</b><div style="margin:4px 0 8px">These machines look like the same machine entered more than once. For each group, press <b>Keep</b> on the one that is right (the others in the group are deleted), <b>Delete</b> on a single wrong one, or <b>Both are different</b> to hide the warning. Before deleting, check that no cycle time or process plan uses the code you remove.</div>${dups.map((g, gi) => `<div style="background:#fff;border:1px solid #F0C36D;border-radius:10px;margin-bottom:8px;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr style="text-align:left"><th style="padding:6px 10px">Machine code</th><th>Name</th><th>Type</th><th>Make / model</th><th>Asset no.</th><th>Serial no.</th><th>Why flagged</th><th></th></tr></thead><tbody>${g.rows.map((r) => `<tr style="border-top:1px solid #F5E2B8"><td style="padding:6px 10px"><b>${esc(r.code)}</b></td><td>${esc(r.name)}</td><td>${esc((r.data || {}).type || "")}</td><td>${esc([(r.data || {}).make, (r.data || {}).model].filter(Boolean).join(" "))}</td><td>${esc((r.data || {}).asset_no || "")}</td><td>${esc((r.data || {}).serial_no || "")}</td><td>${esc(dupWhy(r))}</td><td style="text-align:right;white-space:nowrap;padding-right:8px">${edit ? `<button class="btn ghost" data-dk="${gi}:${r.id}" style="height:30px">Keep</button> <button class="btn ghost" data-dd="${r.id}" style="height:30px;color:#B00E28">Delete</button>` : ""}</td></tr>`).join("")}</tbody></table>${edit ? `<div style="padding:4px 10px 8px"><button class="btn ghost" data-dn="${gi}" style="height:30px">Both are different — hide this warning</button></div>` : ""}</div>`).join("")}</div>` : ""}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
           <input id="opsQ" placeholder="Search…" style="height:42px;border-radius:12px;border:1px solid #D3DBE6;padding:0 14px;min-width:240px;flex:1">
-          ${edit ? `<button class="btn" id="opsAdd" style="height:42px">+ Add</button><label class="btn ghost" style="height:42px;cursor:pointer">Import CSV<input type="file" id="opsImp" accept=".csv,text/csv" hidden></label>` : ""}
+          ${K.kind === "parts" && window.KMRDrawings ? `<button class="btn ghost" id="opsDrawLib" style="height:42px">📐 Drawing library</button>` : ""}${edit ? `<button class="btn" id="opsAdd" style="height:42px">+ Add</button><label class="btn ghost" style="height:42px;cursor:pointer">Import CSV<input type="file" id="opsImp" accept=".csv,text/csv" hidden></label>` : ""}
           ${edit && K.std ? `<button class="btn ghost" id="opsStd" style="height:42px">Add standard ${esc(K.label.toLowerCase())}</button>` : ""}
           <button class="btn ghost" id="opsExp" style="height:42px">Export CSV</button>
           ${ctx.role === "admin" && ctx.dev ? `<span style="flex:1"></span>${rows.some((r) => r.sample)
@@ -340,18 +340,21 @@
             : ctx.sampleOk === false ? "" : `<button class="btn ghost" id="opsKLoad" style="height:42px">Load sample ${esc(K.label.toLowerCase())}</button>`}` : ""}
         </div>
         <div class="card" style="padding:0;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:14px">
-          <thead><tr style="background:#F5F7FB;text-align:left">${shown.map((c) => `<th style="padding:10px 12px;white-space:nowrap">${esc(c[1])}</th>`).join("")}${K.file ? '<th style="padding:10px 12px">File</th>' : ""}<th></th></tr></thead>
+          <thead><tr style="background:#F5F7FB;text-align:left">${shown.map((c) => `<th style="padding:10px 12px;white-space:nowrap">${esc(c[1])}</th>`).join("")}${K.file ? '<th style="padding:10px 12px">File</th>' : ""}${K.kind === "parts" && window.KMRDrawings ? '<th style="padding:10px 12px">Drawings</th>' : ""}<th></th></tr></thead>
           <tbody id="opsBody"></tbody></table></div>`;
       const body = ctx.main.querySelector("#opsBody");
       const cname = {};
       if (K.fields.some((f) => f.k === "customer") && K.kind !== "customers") { const cr = await ctx.sb.rpc("kmr_ops_list", { p_slug: ctx.slug, p_kind: "customers" }); const cl = Array.isArray(cr.data) ? cr.data : ((cr.data && cr.data.records) || []); cl.forEach((x) => { cname[x.code] = x.name; }); }
       const val = (r, k) => (k === "code" ? r.code : k === "name" ? r.name : k === "customer" ? (cname[(r.data || {}).customer] || (r.data || {}).customer) : (r.data || {})[k]);
+      let dcount = {}; if (K.kind === "parts" && window.KMRDrawings) { try { dcount = await KMRDrawings.counts({ sb: ctx.sb, slug: ctx.slug }); } catch (e) { /* no access */ } }
       const draw = (q) => {
         const f = rows.filter((r) => !q || JSON.stringify([r.code, r.name, r.data, val(r, "customer")]).toLowerCase().includes(q.toLowerCase()));
         body.innerHTML = f.map((r) => `<tr style="border-top:1px solid var(--line)${r.active === false ? ";opacity:.5" : ""}${dupIds.has(r.id) ? ";background:#FFF1CC" : ""}">${shown.map((c) => `<td style="padding:9px 12px">${c[0] === "code" ? `<b>${esc(val(r, c[0]))}</b>${r.sample ? ' <span class="pill">Sample</span>' : ""}${dupIds.has(r.id) ? ' <span class="pill" style="background:#D97706;color:#fff">Duplicate?</span>' : ""}` : esc(val(r, c[0]) ?? "")}</td>`).join("")}
           ${K.file ? `<td style="padding:9px 12px">${r.data && r.data.file_path ? `<button class="btn ghost" data-file="${esc(r.data.file_path)}" style="height:32px">Open</button>` : '<small style="color:var(--muted)">—</small>'}</td>` : ""}
+          ${K.kind === "parts" && window.KMRDrawings ? `<td style="padding:9px 12px"><button class="btn ghost" data-dr="${r.id}" style="height:32px">📐 ${dcount[window.KMRDrawings.key(r.code)] || 0}</button></td>` : ""}
           <td style="padding:9px 12px;text-align:right"><button class="btn ghost" data-id="${r.id}" style="height:32px">${edit ? "Edit" : "View"}</button></td></tr>`).join("") || `<tr><td colspan="9" style="padding:18px;color:var(--muted)">${rows.length ? "No match." : "No records yet."}</td></tr>`;
         body.querySelectorAll("[data-id]").forEach((b) => (b.onclick = () => this.edit(ctx, K, rows.find((r) => r.id === b.dataset.id))));
+        body.querySelectorAll("[data-dr]").forEach((b) => (b.onclick = () => this.edit(ctx, K, rows.find((r) => r.id === b.dataset.dr))));
         body.querySelectorAll("[data-file]").forEach((b) => (b.onclick = async () => { const s = await ctx.sb.storage.from("kmr-docs").createSignedUrl(b.dataset.file, 300); if (s.data) window.open(s.data.signedUrl, "_blank"); }));
       };
       draw("");
@@ -391,6 +394,12 @@
         const cs = cols(K); const lines = [cs.map((c) => csvCell(c[1])).join(",")].concat(rows.map((r) => cs.map((c) => csvCell(val(r, c[0]))).join(",")));
         const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob(["\ufeff" + lines.join("\r\n")], { type: "text/csv" })); a.download = `${K.kind}.csv`; a.click();
       };
+      const dlb = ctx.main.querySelector("#opsDrawLib");
+      if (dlb) dlb.onclick = () => {
+        ctx.main.innerHTML = '<p><button class="btn ghost" id="dlBack" style="height:36px">← ' + esc(K.label) + '</button></p><div id="dlHost"></div>';
+        ctx.main.querySelector("#dlBack").onclick = () => this.list(ctx, K.kind);
+        KMRDrawings.library(ctx.main.querySelector("#dlHost"), { sb: ctx.sb, slug: ctx.slug, parts: rows.map((r) => ({ code: r.code, name: r.name })) });
+      };
       if (edit) {
         ctx.main.querySelector("#opsAdd").onclick = () => this.edit(ctx, K, null);
         ctx.main.querySelector("#opsImp").onchange = async (e) => {
@@ -423,7 +432,13 @@
           <label style="display:flex;gap:8px;align-items:center;grid-column:1/-1;margin:4px 0 10px"><input type="checkbox" id="of_active" ${r.active !== false ? "checked" : ""} ${edit ? "" : "disabled"}> In use (untick to keep the record but hide it from new work)</label>
         </div>${r.sample && edit ? '<p style="font-size:13px;color:var(--muted);margin:0 0 8px">This is a sample record. Once you save it, it becomes your own record and <b>Flush sample data</b> leaves it alone.</p>' : ""}<span class="msg" id="ofM"></span>`,
         edit ? `<button class="btn" id="ofSave">Save</button>${isNew ? "" : '<button class="btn ghost" id="ofDel" style="color:#B00E28">Delete</button>'}` : "");
-      const dlg = document.querySelector(".veil .dlg"); if (dlg) dlg.style.maxWidth = "760px";   // two-column master forms need room
+      const dlg = document.querySelector(".veil .dlg"); if (dlg) dlg.style.maxWidth = "760px";
+      if (K.kind === "parts" && !isNew && window.KMRDrawings && dlg) {   // customer drawings are kept here once and opened from every app
+        const hd = document.createElement("div"); hd.style.cssText = "border-top:1px solid var(--line);margin-top:10px;padding-top:10px";
+        hd.innerHTML = '<b>📐 Customer drawings</b> <small style="color:var(--muted)">saved once here · PPAP, Process Documents, Balloon Inspector and 8D open the same file</small><div id="ofDraw" style="margin-top:6px"></div>';
+        const mm = dlg.querySelector("#ofM"); (mm ? mm.parentNode : dlg).insertBefore(hd, mm || null);
+        KMRDrawings.panel(hd.querySelector("#ofDraw"), { sb: ctx.sb, slug: ctx.slug, part: r.code, name: r.name });
+      }   // two-column master forms need room
       if (!edit) return;
       const $ = (s) => document.querySelector(s);
       K.fields.filter((f) => f.showIf).forEach((f) => { const src = $("#of_" + f.showIf.k); if (src) src.oninput = src.onchange = () => { $("#ofw_" + f.k).style.display = same(src.value, f.showIf.v) ? "" : "none"; }; });
