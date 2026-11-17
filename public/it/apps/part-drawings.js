@@ -98,12 +98,12 @@
   };
 
   /* ---------- small window helper ---------- */
-  function win(title, sub) {
+  function win(title, sub, onClose) {
     const v = document.createElement("div");
     v.style.cssText = "position:fixed;inset:0;background:#0009;z-index:99999;display:flex;align-items:center;justify-content:center;padding:12px";
     v.innerHTML = `<div style="background:#fff;border-radius:14px;width:min(860px,100%);max-height:88vh;overflow:auto;padding:18px;${css}"><div style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><h3 style="margin:0">${esc(title)}</h3>${sub ? `<div style="color:#64748B;font-size:13px">${esc(sub)}</div>` : ""}</div><button style="${ghost}" data-x>Close</button></div><div data-b style="margin-top:12px"></div></div>`;
     document.body.appendChild(v);
-    const close = () => v.remove(); v.querySelector("[data-x]").onclick = close; v.addEventListener("mousedown", (e) => { if (e.target === v) close(); });
+    const close = () => { v.remove(); if (onClose) onClose(); }; v.querySelector("[data-x]").onclick = close; v.addEventListener("mousedown", (e) => { if (e.target === v) close(); });
     return { body: v.querySelector("[data-b]"), close };
   }
 
@@ -118,7 +118,7 @@
 
   /* ---------- choose a drawing and get it back as a File (Balloon Inspector) ---------- */
   api.pick = async function (o, cb) {
-    const w = win("Customer drawings", o.part ? "Part " + o.part : "All parts");
+    let done = false; const w = win("Customer drawings", o.part ? "Part " + o.part : "All parts", () => { if (!done && o.onCancel) o.onCancel(); });
     w.body.innerHTML = '<span style="color:#64748B">Loading…</span>';
     let d; try { d = await api.list(o, o.part || null); } catch (e) { w.body.innerHTML = `<span style="color:#B00E28">${esc(e.message)}</span>`; return; }
     const items = (d.items || []).filter((i) => /\.(pdf|png|jpe?g|tiff?)$/i.test(i.file_name || ""));
@@ -127,7 +127,7 @@
     const draw = (q) => {
       const f = items.filter((i) => !q || (i.part_no + " " + i.title + " " + i.file_name + " " + i.rev).toLowerCase().includes(q.toLowerCase())).slice(0, 200);
       w.body.querySelector("#pkL").innerHTML = f.map((i) => `<div style="display:flex;gap:8px;align-items:center;border-top:1px solid #E2E8F0;padding:6px 0"><div style="flex:1"><b>${esc(i.part_no)}</b> ${i.rev ? "rev " + esc(i.rev) : ""} · ${esc(i.title || i.file_name)}<div style="font-size:11px;color:#64748B">${esc(i.file_name)} · ${size(i.size_bytes)}</div></div><button data-i="${i.id}" style="${btn("padding:5px 11px")}">Use this drawing</button></div>`).join("") || '<p style="color:#64748B">Nothing matches.</p>';
-      w.body.querySelectorAll("[data-i]").forEach((b) => (b.onclick = async () => { b.disabled = true; b.textContent = "Loading…"; try { const it = items.find((x) => x.id === b.dataset.i); const f = await api.file(o, it); w.close(); cb(f, it); } catch (e) { b.disabled = false; b.textContent = "Use this drawing"; alert(e.message || e); } }));
+      w.body.querySelectorAll("[data-i]").forEach((b) => (b.onclick = async () => { b.disabled = true; b.textContent = "Loading…"; try { const it = items.find((x) => x.id === b.dataset.i); const f = await api.file(o, it); done = true; w.close(); cb(f, it); } catch (e) { b.disabled = false; b.textContent = "Use this drawing"; alert(e.message || e); } }));
     };
     draw(""); w.body.querySelector("#pkQ").oninput = (e) => draw(e.target.value);
   };
@@ -151,7 +151,7 @@
     const list = host.querySelector("#dlList");
     const drawList = (q) => {
       const f = items.filter((i) => !q || (i.part_no + " " + i.title + " " + i.file_name).toLowerCase().includes(q.toLowerCase()));
-      list.innerHTML = `<table style="width:100%;border-collapse:collapse;min-width:560px"><thead><tr style="text-align:left;color:#64748B;font-size:12px"><th style="padding:5px 6px">Part number</th><th style="padding:5px 6px">Rev</th><th style="padding:5px 6px">Title</th><th style="padding:5px 6px">Type</th><th style="padding:5px 6px">Size</th><th></th></tr></thead><tbody>${f.map((i) => `<tr style="border-top:1px solid #E2E8F0"><td style="padding:6px"><b>${esc(i.part_no)}</b></td><td style="padding:6px">${esc(i.rev || "—")}</td><td style="padding:6px">${esc(i.title || i.file_name)}</td><td style="padding:6px">${esc(kname(i.kind))}</td><td style="padding:6px;color:#64748B">${size(i.size_bytes)}</td><td style="padding:6px;text-align:right;white-space:nowrap"><button data-o="${i.id}" style="${btn("padding:5px 11px")}">Open</button>${can ? ` <button data-d="${i.id}" style="${ghost};color:#B00E28">Delete</button>` : ""}</td></tr>`).join("") || `<tr><td colspan="6" style="padding:14px;color:#64748B">${items.length ? "Nothing matches." : "No drawings yet."}</td></tr>`}</tbody></table>`;
+      list.innerHTML = f.map((i) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><div style="flex:1 1 200px;min-width:0"><b>${esc(i.part_no)}</b> ${i.rev ? "· rev " + esc(i.rev) : ""}<div style="font-size:13px;word-break:break-all">${esc(i.title || i.file_name)}</div><div style="font-size:11px;color:#64748B">${esc(kname(i.kind))} · ${size(i.size_bytes)}</div></div><div style="white-space:nowrap"><button data-o="${i.id}" style="${btn("padding:6px 12px")}">View</button>${can ? ` <button data-d="${i.id}" style="${ghost};color:#B00E28">Delete</button>` : ""}</div></div>`).join("") || `<p style="color:#64748B">${items.length ? "Nothing matches." : "No drawings yet."}</p>`;
       list.querySelectorAll("[data-o]").forEach((b) => (b.onclick = () => api.open(o, items.find((x) => x.id === b.dataset.o))));
       list.querySelectorAll("[data-d]").forEach((b) => (b.onclick = async () => {
         if (b.dataset.arm !== "1") { b.dataset.arm = "1"; b.textContent = "Click again to delete"; setTimeout(() => { b.dataset.arm = ""; b.textContent = "Delete"; }, 4000); return; }
@@ -168,8 +168,7 @@
       const dl = `<datalist id="dlParts">${parts.map((p) => `<option value="${esc(p.code)}">${esc(p.name || "")}</option>`).join("")}</datalist>`;
       const total = files.reduce((a, f) => a + f.size, 0);
       prev.innerHTML = `${dl}<p style="margin:6px 0;color:#64748B;font-size:13px">${files.length} file(s), ${size(total)}. Check the <b>part number</b> for each one — it must be a part in your Parts list. Rows with no part number are skipped.</p>
-        <div style="max-height:46vh;overflow:auto"><table style="width:100%;border-collapse:collapse;min-width:640px"><thead><tr style="text-align:left;color:#64748B;font-size:12px"><th></th><th style="padding:4px 6px">File</th><th style="padding:4px 6px">Part number</th><th style="padding:4px 6px;width:70px">Rev</th><th style="padding:4px 6px">Type</th></tr></thead><tbody>
-        ${rows.map((r, i) => `<tr style="border-top:1px solid #E2E8F0"><td style="padding:4px"><input type="checkbox" data-on="${i}" ${r.part ? "checked" : ""}></td><td style="padding:4px 6px;font-size:13px">${esc(r.f.webkitRelativePath || r.f.name)}<div style="font-size:11px;color:#64748B">${size(r.f.size)}</div></td><td style="padding:4px"><input data-p="${i}" list="dlParts" value="${esc(r.part)}" style="${inp};width:100%;${r.part ? "" : "border-color:#D97706"}"></td><td style="padding:4px"><input data-r="${i}" value="${esc(r.rev)}" style="${inp};width:60px"></td><td style="padding:4px"><select data-k="${i}" style="${inp}">${KINDS.map((k) => `<option value="${k[0]}" ${k[0] === r.kind ? "selected" : ""}>${k[1]}</option>`).join("")}</select></td></tr>`).join("")}</tbody></table></div>
+        <div style="max-height:60vh;overflow:auto">${rows.map((r, i) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-on="${i}" ${r.part ? "checked" : ""} style="margin-top:3px"><span style="font-size:13px;word-break:break-all">${esc(r.f.webkitRelativePath || r.f.name)}<span style="display:block;font-size:11px;color:#64748B">${size(r.f.size)}</span></span></label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><input data-p="${i}" list="dlParts" value="${esc(r.part)}" placeholder="Part number" style="${inp};flex:2 1 160px;${r.part ? "" : "border-color:#D97706"}"><input data-r="${i}" value="${esc(r.rev)}" placeholder="Rev" style="${inp};flex:0 1 70px"><select data-k="${i}" style="${inp};flex:1 1 120px">${KINDS.map((k) => `<option value="${k[0]}" ${k[0] === r.kind ? "selected" : ""}>${k[1]}</option>`).join("")}</select></div></div>`).join("")}</div>
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button id="dlGo" style="${btn()}">Upload selected</button><button id="dlNo" style="${ghost}">Cancel</button><span id="dlMsg" style="font-size:13px;color:#64748B"></span></div>`;
       const sync = () => rows.forEach((r, i) => { r.part = prev.querySelector(`[data-p="${i}"]`).value.trim(); r.rev = prev.querySelector(`[data-r="${i}"]`).value.trim(); r.kind = prev.querySelector(`[data-k="${i}"]`).value; r.on = prev.querySelector(`[data-on="${i}"]`).checked; });
       prev.querySelector("#dlNo").onclick = () => { prev.innerHTML = ""; };
