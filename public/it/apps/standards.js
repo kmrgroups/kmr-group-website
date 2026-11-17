@@ -144,6 +144,7 @@ apqp:[
 ['ISO','8.3.2 / 8.3.4','Planning and controls of design and development','Stages, reviews and verification/validation points are recorded.'],
 ['VDA','P2 / P3 / P4','Project management; planning of product and process development; realisation','Phase status and deliverables give the audit trail from nomination to series.']],
 ppap:[
+['PPAP','Element 1','Design records','The customer drawing is opened from the submission header; it is the one kept against the part number in Operations Master.'],
 ['PPAP','18 elements','Design records to Part Submission Warrant','Each submission lists the 18 elements with status and the evidence file/reference.'],
 ['PPAP','Submission levels 1-5','Level of evidence submitted to the customer','The level is chosen per submission and the required elements follow it.'],
 ['PPAP','Part Submission Warrant (PSW)','Warrant and customer decision','The PSW is produced from the submission and the customer decision is recorded.'],
@@ -215,8 +216,8 @@ crm:[
 ['VDA','P4','Supplier management','Supplier quotes are kept per part and supplier, with the price, the terms and the date received.'],
 ['VDA','P7','Customer care, customer satisfaction, service','RFQs from customers are answered from one register with due dates; late RFQs and overdue follow-ups are shown on the dashboard.']],
 d8:[
-['ISO','7.5.3','Control of documented information','Customer drawings are kept in a private store of the company workspace, grouped by customer and part number. Anyone with 8D access can open them; only administrators and editors can add, rename or delete, so the drawing used for an 8D is the controlled one.'],
-['IATF','8.3.3.1; 8.5.1.1','Product design input; control plan','The customer drawing is on hand when an 8D or a control plan is reviewed, so the characteristic that failed can be checked against the drawing requirement.'],
+['ISO','7.5.3','Control of documented information','The 8D report header has a Drawings button that opens the customer drawing kept against the part number in Operations Master (not stored inside the 8D).'],
+['IATF','8.3.3.1; 8.5.1.1','Product design input; control plan','The customer drawing is one click from the 8D, so the characteristic that failed can be checked against the drawing requirement.'],
 ['IATF','10.2.3; 7.3.2.3','Problem solving; lessons learned and visual standards','D7 keeps a Q-Alert (one-point lesson with root cause, interim and permanent action, and a training record of who has read it), the list of similar systems checked, and the eye sequence chart of visual-inspection defects. All three are edited on screen, printed with the standard report frame, and stay with the 8D.'],
 ['ISO','7.2; 7.3','Competence; awareness','The Q-Alert training record lists each person and the date they were told, as evidence that the people doing the work are aware of the problem and the new rule.'],
 ['IATF','9.1.1.1; 10.2.3','Monitoring of manufacturing process; problem solving','Scrap register: daily in-process, visual and setting rejections by part and defect, with monthly totals and top defects, printed in the standard report frame. Repeating defects are the starting point for an 8D.'],
@@ -419,6 +420,7 @@ capacity:[
 ['ISO','8.5.1','Control of production provision','Work is shared between the machines of a process by speed (auto load balancing); the Loading Plan checks the customer date with finite machine loading and shows the throughput time.'],
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Overloaded processes list the ways out (extra machine, cycle time, hours, OEE, days) with the numbers.']],
 pd:[
+['ISO','7.5.3','Control of documented information','The project header shows a Drawings button that opens the customer drawing kept against the part number in Operations Master.'],
 ['ISO','9.3.2','Management review inputs','The Presentation screen shows the PFMEA action status, severity 9–10 items and Control Plan coverage with action plans.'],
 ['CP','Control Plan (prototype, pre-launch, production)','Control Plan content','Control Plan is generated from the process flow and FMEA.'],
 ['IATF','7.5.3 Control of documented information','Customer-specific print formats','Esbee Precision Industries workspace only: Control Plan (F-02-02), Process FMEA (F-01-18) and Process Flow Chart (F-02-33) print in the Esbee layout with format number, revision and document number in header and footer. All other customers keep the standard layout.'],
@@ -442,6 +444,7 @@ pd:[
 ['ISO','7.5.3 / 8.5.6','Documented information; control of changes','The freeze history keeps every revision with its reason, and each stage drawing records the freeze revision it was made from.'],
 ['APQP','Phase 3','Process design - released process route','The frozen operation-wise list of characteristics is the released input for the SOP, the Control Plan and the stage drawings.']],
 balloon:[
+['IATF','8.2.3.1.2; 7.5.3.2.2','Customer drawing from the part master','"Saved drawing" opens the customer drawing kept against the part number in Operations Master, so ballooning starts from the controlled drawing and revision.'],
 ['ISO','9.3.2','Management review inputs','The Presentation section shows characteristics, special characteristics, low-confidence readings, missing tolerances and results with action plans.'],
 ['PPAP','Element 9','Dimensional results','Ballooned drawing and inspection results list every dimension.'],
 ['PPAP','Element 1','Design records','The drawing is the reference for every ballooned characteristic.'],
@@ -451,6 +454,8 @@ balloon:[
 ['MSA','Gauge selection (10:1 rule)','Measurement system suitability','Each dimension is given the best master gauge automatically: right type and range, least count within 10 % of the tolerance, most economical first. If no master gauge suits, a suitable new gauge is allotted and marked to purchase; the choice can be changed by hand.'],
 ['IATF','7.1.5.1.1','Measurement systems analysis','The gauge chosen here follows into the Control Plan, SOP and stage drawings, so the same gauge is named everywhere.']],
 ops:[
+['ISO','7.5.3','Control of documented information — customer drawings','Customer drawings are uploaded once against the part number (one file or a whole folder), kept in a private store of the company workspace, and opened from PPAP, Process Documents, Balloon Inspector and 8D. Only editors and administrators can add, rename or delete; everyone with access can open.'],
+['IATF','7.5.3.2.2','Engineering specifications','The customer drawing and its revision are held with the part, so every app works from the same controlled drawing.'],
 ['ISO','7.1.3 / 7.1.5','Infrastructure; monitoring and measuring resources','Machines and gauges are listed in one master.'],
 ['ISO','7.5.2 / 7.5.3','Documented information','Parts, BOM, routing and tools are controlled in one place.'],
 ['ISO','8.4.1','Externally provided products and services','Customers, suppliers and raw materials are kept as masters.'],

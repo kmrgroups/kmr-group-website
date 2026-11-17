@@ -49,9 +49,9 @@
   function closeDoc() { const d = $("#doc"); if (d) d.remove(); document.body.classList.remove("pv"); }
 
   /* ================= router ================= */
-  const SECS = ["std", "dash", "list", "rep", "acts", "scrap", "draw", "setup"];
+  const SECS = ["std", "dash", "list", "rep", "acts", "scrap", "setup"];
   async function route() {
-    closeM(); closeDoc(); const hp = hashParts(); const g0 = ["std", "dash", "list", "acts", "scrap", "draw", "setup"].includes(hp.go) ? hp.go : "std";
+    closeM(); closeDoc(); const hp = hashParts(); const g0 = ["std", "dash", "list", "acts", "scrap", "setup"].includes(hp.go) ? hp.go : "std";
     const sec = g0 === "list" && (hp.id || hp.new) ? "rep" : g0;
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.t === g0)); SECS.forEach((s) => $("#" + s).classList.toggle("hide", s !== sec)); say("");
     try {
@@ -61,38 +61,10 @@
       else if (sec === "rep") await drawRep(hp);
       else if (sec === "acts") await drawActs();
       else if (sec === "scrap") await drawScrap();
-      else if (sec === "draw") await drawDraw();
       else if (sec === "setup") await drawSetup();
     } catch (e) { say(e.message); }
   }
   window.addEventListener("hashchange", route);
-
-  /* ================= Customer drawings (private files; view, rename, delete, add) ================= */
-  const fsize = (n) => (n == null ? "" : n > 1048576 ? (n / 1048576).toFixed(1) + " MB" : Math.max(1, Math.round(n / 1024)) + " KB");
-  async function drawDraw() {
-    const el = $("#draw"), can = canEdit(), f = S.df || (S.df = { q: "", g: "" });
-    const D = await call("kmr_d8_draw_list"), items = D.items || [], grps = [...new Set(items.map((x) => x.grp || "—"))].sort();
-    const show = items.filter((x) => (!f.g || (x.grp || "—") === f.g) && (!f.q || (x.title + " " + (x.part_no || "") + " " + (x.grp || "")).toLowerCase().includes(f.q.toLowerCase())));
-    el.innerHTML = `<div class="guide">Customer drawings, kept privately in your workspace. Click <b>Open</b> to view a drawing. Group and part number can be changed so each drawing is easy to find.</div>
-      <div class="row"><div class="grow"><input id="dw_q" placeholder="Search drawing, part number or customer…" value="${esc(f.q)}"></div><select id="dw_g" style="width:auto"><option value="">All customers / groups (${items.length})</option>${grps.map((g) => `<option value="${esc(g)}"${g === f.g ? " selected" : ""}>${esc(g)} (${items.filter((x) => (x.grp || "—") === g).length})</option>`).join("")}</select></div>
-      ${can ? `<div class="card noprint"><h3>Add drawings</h3><div class="row"><label class="btn o s" style="margin:0">Choose files<input id="dw_files" type="file" multiple accept=".pdf,image/*" hidden></label><label class="btn o s" style="margin:0">Choose a whole folder<input id="dw_dir" type="file" webkitdirectory multiple hidden></label><span class="mut" id="dw_st">PDF or image. A folder keeps its sub-folder name as the group.</span></div></div>` : ""}
-      <div id="dw_body">${show.length ? `<table class="tb2"><thead><tr><th>Group / customer</th><th>Part no.</th><th>Drawing</th><th>Size</th><th></th></tr></thead><tbody>${show.map((x) => `<tr data-d="${x.id}"><td><input data-df="grp" value="${esc(x.grp)}" ${can ? "" : "disabled"}></td><td><input data-df="part_no" value="${esc(x.part_no || "")}" ${can ? "" : "disabled"}></td><td><input data-df="title" value="${esc(x.title)}" ${can ? "" : "disabled"}></td><td class="mut">${fsize(x.size_bytes)}</td><td style="white-space:nowrap"><button class="btn s" data-dopen="${esc(x.path)}">Open</button>${can ? ` <button class="btn o s" data-dsave="${x.id}">Save</button> <button class="btn o s" data-ddel="${x.id}" title="Delete" style="color:var(--r)">✕</button>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No drawings yet.${can ? "<br>Use <b>Choose a whole folder</b> to add them all at once." : ""}</div>`}</div>`;
-    let tm; $("#dw_q").oninput = (e) => { f.q = e.target.value; clearTimeout(tm); tm = setTimeout(() => guard(drawDraw), 300); };
-    $("#dw_g").onchange = (e) => { f.g = e.target.value; guard(drawDraw); };
-    el.querySelectorAll("[data-dopen]").forEach((b) => (b.onclick = () => guard(async () => { const w = window.open("", "_blank"); const { data, error } = await QP.sb.storage.from("kmr-draw").createSignedUrl(b.dataset.dopen, 300); if (error || !data) { if (w) w.close(); throw new Error((error && error.message) || "Could not open the drawing."); } if (w) w.location.href = data.signedUrl; })));
-    el.querySelectorAll("[data-dsave]").forEach((b) => (b.onclick = () => guard(async () => { const tr = b.closest("tr"), v = (k) => tr.querySelector('[data-df="' + k + '"]').value; await call("kmr_d8_draw_save", { p_id: b.dataset.dsave, p: { grp: v("grp"), part_no: v("part_no"), title: v("title") } }); say("Saved.", true); await drawDraw(); })));
-    el.querySelectorAll("[data-ddel]").forEach((b) => (b.onclick = () => guard(async () => { if (!confirm("Delete this drawing? This cannot be undone.")) return; const path = await call("kmr_d8_draw_delete", { p_id: b.dataset.ddel }); try { await QP.sb.storage.from("kmr-draw").remove([path]); } catch (e) { /* ignore */ } say("Deleted.", true); await drawDraw(); })));
-    const up = (inp) => { if (!inp) return; inp.onchange = () => guard(async () => {
-      const list = [...inp.files].filter((x) => /\.(pdf|png|jpe?g|webp|tif?f)$/i.test(x.name) || /^image\//.test(x.type)); inp.value = ""; if (!list.length) return say("Choose PDF or image files.");
-      const have = new Set(items.map((x) => x.file_name + "|" + (x.size_bytes || 0))); let ok = 0, skip = 0, bad = 0; const st = $("#dw_st");
-      for (let i = 0; i < list.length; i++) { const fl = list[i]; st.textContent = "Uploading " + (i + 1) + " of " + list.length + "…";
-        if (have.has(fl.name + "|" + fl.size)) { skip++; continue; }
-        try { const rp = (fl.webkitRelativePath || "").split("/"), grp = rp.length > 2 ? rp.slice(1, -1).join(" / ") : rp.length === 2 ? rp[0] : "", safe = fl.name.replace(/[^A-Za-z0-9._-]+/g, "_").slice(-80), path = `customers/${D.customer_id}/draw/${Date.now().toString(36)}${i}-${safe}`;
-          const r = await QP.sb.storage.from("kmr-draw").upload(path, fl, { contentType: fl.type || "application/pdf", upsert: false }); if (r.error) throw r.error;
-          await call("kmr_d8_draw_add", { p: { path, grp, title: fl.name.replace(/\.[^.]+$/, ""), file_name: fl.name, mime: fl.type, size_bytes: fl.size } }); ok++; } catch (e) { bad++; } }
-      say(ok + " added" + (skip ? ", " + skip + " already there" : "") + (bad ? ", " + bad + " failed (too large or no permission)" : "") + ".", !bad); await drawDraw(); }); };
-    up($("#dw_files")); up($("#dw_dir"));
-  }
 
   /* ================= Scrap register ================= */
   async function drawScrap() {
@@ -216,7 +188,8 @@
     paintTop(); paintActs(); paintStatus();
   }
   function paintTop() {
-    const r = S.rep; $("#rp_steps").innerHTML = STEPS.map((s) => `<div class="sp ${r.steps[s[0]] ? "done" : r.current === s[0] ? "cur" : ""}" data-sp="${s[0]}"><b>${s[0]}${r.steps[s[0]] ? " ✓" : ""}</b><small>${esc(s[1].split(" ").slice(0, 2).join(" "))}</small></div>`).join("");
+    const r = S.rep; if (window.KMRDrawings && $("#rp_drw") && r.part_no && $("#rp_drw").dataset.p !== r.part_no) { $("#rp_drw").dataset.p = r.part_no; KMRDrawings.chip($("#rp_drw"), { sb: QP.sb, slug: QP.slug, part: r.part_no, name: r.part_name || "" }); }
+    $("#rp_steps").innerHTML = STEPS.map((s) => `<div class="sp ${r.steps[s[0]] ? "done" : r.current === s[0] ? "cur" : ""}" data-sp="${s[0]}"><b>${s[0]}${r.steps[s[0]] ? " ✓" : ""}</b><small>${esc(s[1].split(" ").slice(0, 2).join(" "))}</small></div>`).join("");
     $("#rp_steps").querySelectorAll("[data-sp]").forEach((e) => (e.onclick = () => { const d = $('details[data-s="' + e.dataset.sp + '"]'); if (d) { d.open = true; d.scrollIntoView({ behavior: "smooth", block: "start" }); } }));
     const cs = $("#rp_chip"); if (cs) cs.innerHTML = r.status === "closed" ? chip("Closed " + fmt(r.closed_on), "g") : chip("Open · " + (r.current || ""), "b");
   }
@@ -307,6 +280,7 @@
       <div><label>Customer or who raised it</label><input id="h_cu" value="${esc(r.complainant || "")}"></div><div><label>Their reference</label><input id="h_cr" value="${esc(r.complaint_ref || "")}"></div><div><label>Part no.</label><input id="h_pn" value="${esc(r.part_no || "")}"></div><div><label>Part name</label><input id="h_pa" value="${esc(r.part_name || "")}"></div>
       <div><label>Lot / batch no.</label><input id="h_lo" value="${esc(r.lot_no || "")}"></div><div><label>Quantity affected</label><input id="h_qt" inputmode="decimal" value="${r.qty_affected == null ? "" : esc(r.qty_affected)}"></div><div><label>Opened on</label><input id="h_op" type="date" value="${esc(r.opened_on || "")}"></div><div><label>Due date</label><input id="h_du" type="date" value="${esc(r.due_on || "")}"></div>
       <div><label>Owner</label><select id="h_ow">${ownerOpts(r.owner)}</select></div><div class="w"><label>Notes</label><textarea id="h_no" rows="1">${esc(r.notes || "")}</textarea></div></div></fieldset>
+      <div id="rp_drw" style="margin-top:8px"></div>
       <div class="stepper" id="rp_steps" style="margin-top:12px"></div>
       ${stp("D0", `<div class="sg">${TA("d0.symptom", "Symptom: what was seen", d0.symptom, 3)}${CK("d0.era_needed", "An emergency response was needed (protect the customer today)", d0.era_needed)}${TA("d0.era", "Emergency response taken", d0.era, 2)}</div>`)}
       ${stp("D1", `<div class="sg">${T("d1.leader", "Team leader", d1.leader)}${T("d1.champion", "Sponsor / champion", d1.champion)}</div><div class="lbl" style="margin-top:10px">Team members (at least two)</div>${listBlock("d1.members", d1.members, ro)}`)}

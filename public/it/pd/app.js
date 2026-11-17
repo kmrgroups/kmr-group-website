@@ -173,6 +173,7 @@ function refreshChip(){
   const c=$("projChip"), st=$("projStatus");
   if(!S.prj){ c.hidden=true; st.hidden=true; $("bSave").hidden=true; $("bExport").hidden=true; return; }
   const h=S.plan.header; c.hidden=false; st.hidden=false; c.innerHTML=`<b>${esc(h.partNo||"—")}</b> ${esc(h.partName||"")} ${h.drawingRev?"· Rev "+esc(h.drawingRev):""}`;
+  if(window.KMRDrawings&&sb&&h.partNo){ const dh=document.createElement("span"); dh.style.marginLeft="8px"; c.appendChild(dh); KMRDrawings.chip(dh,{sb,part:h.partNo,name:(h.partName||"")+(h.drawingNo?" · drawing "+h.drawingNo:"")}); }
   st.textContent=({received:"Received",generated:"Generated",in_review:"In review",approved:"Approved"})[S.prj.status]||S.prj.status; st.className="status "+S.prj.status;
   $("bSave").hidden=!S.canEdit; $("bExport").hidden=false; saveState();
 }
