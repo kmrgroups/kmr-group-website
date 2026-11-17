@@ -41,6 +41,28 @@
     },
   };
 
+
+  /* ---------- read a .zip on the device (no upload of the zip itself): list its files, inflate each only when it is uploaded ---------- */
+  api.zip = async function (zf) {
+    const u8 = new Uint8Array(await zf.slice(Math.max(0, zf.size - 66000)).arrayBuffer()), dv = new DataView(u8.buffer);
+    let e = -1; for (let i = u8.length - 22; i >= 0; i--) if (dv.getUint32(i, true) === 0x06054b50) { e = i; break; }
+    if (e < 0) throw new Error("This is not a valid zip file.");
+    const n = dv.getUint16(e + 10, true), cdSize = dv.getUint32(e + 12, true), cdOff = dv.getUint32(e + 16, true);
+    const cd = new DataView(await zf.slice(cdOff, cdOff + cdSize).arrayBuffer()), dec = new TextDecoder(), out = []; let p = 0;
+    for (let i = 0; i < n && cd.getUint32(p, true) === 0x02014b50; i++) {
+      const method = cd.getUint16(p + 10, true), csize = cd.getUint32(p + 20, true), usize = cd.getUint32(p + 24, true), nl = cd.getUint16(p + 28, true), el = cd.getUint16(p + 30, true), cl = cd.getUint16(p + 32, true), off = cd.getUint32(p + 42, true);
+      const name = dec.decode(new Uint8Array(cd.buffer, p + 46, nl)); p += 46 + nl + el + cl;
+      if (name.endsWith("/") || /(^|\/)(__MACOSX|\.[^/]*$|thumbs\.db$)/i.test(name)) continue;
+      const base = name.split("/").pop();
+      out.push({ name: base, webkitRelativePath: name, size: usize, type: /\.pdf$/i.test(base) ? "application/pdf" : "", _get: async () => {
+        const lh = new DataView(await zf.slice(off, off + 30).arrayBuffer()), start = off + 30 + lh.getUint16(26, true) + lh.getUint16(28, true), raw = zf.slice(start, start + csize);
+        const blob = method === 0 ? raw : await new Response(raw.stream().pipeThrough(new DecompressionStream("deflate-raw"))).blob();
+        return new File([blob], base, { type: /\.pdf$/i.test(base) ? "application/pdf" : blob.type });
+      } });
+    }
+    return out;
+  };
+
   /* ---------- one part: list + upload ---------- */
   api.panel = async function (host, o) {
     host.innerHTML = `<div style="${css}"><span style="color:#64748B">Loading drawings…</span></div>`;
@@ -115,14 +137,14 @@
     host.innerHTML = `<div style="${css}">Loading…</div>`;
     let d, counts; try { d = await api.list(o); counts = await api.counts(o); } catch (e) { host.innerHTML = `<div style="${css};color:#B00E28">${esc(e.message)}</div>`; return; }
     const can = !!d.can_edit, items = d.items || [], parts = o.parts || [];
-    const pk = parts.map((p) => ({ code: p.code, k: key(p.code), name: p.name })).filter((p) => p.k.length >= 3).sort((a, b) => b.k.length - a.k.length);
+    const pk = parts.flatMap((p) => [{ code: p.code, k: key(p.code) }, ...(p.dn && key(p.dn) !== key(p.code) ? [{ code: p.code, k: key(p.dn) }] : [])]).filter((p) => p.k.length >= 5).sort((a, b) => b.k.length - a.k.length);
     const guess = (f) => { const path = key((f.webkitRelativePath || "") + " " + f.name), h = pk.find((p) => path.includes(p.k)); return h ? h.code : ""; };
     const revOf = (n) => { const m = n.match(/(?:rev(?:ision)?|[-_ ]r)[ ._-]?([A-Za-z0-9]{1,3})(?=[^A-Za-z0-9]|$)/i); return m ? m[1].toUpperCase() : ""; };
     host.innerHTML = `<div style="${css}">
       <h2 style="margin:0 0 4px">📐 Customer drawings</h2>
       <p style="color:#64748B;margin:0 0 12px">${items.length} drawing${items.length === 1 ? "" : "s"} saved for ${Object.keys(counts).length} part${Object.keys(counts).length === 1 ? "" : "s"}. Upload once here — PPAP, Process Documents, Balloon Inspector, 8D and the other apps open the same file.</p>
       ${can ? `<div style="border:1px solid #E2E8F0;border-radius:12px;padding:12px;margin-bottom:14px"><b>Add drawings</b>
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><label style="${btn()}">Choose files<input type="file" id="dlF" multiple hidden></label><label style="${btn("background:#334155")}">Choose a whole folder<input type="file" id="dlD" webkitdirectory multiple hidden></label></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0"><label style="${btn()}">Choose files<input type="file" id="dlF" multiple hidden></label><label style="${btn("background:#334155")}">Choose a whole folder<input type="file" id="dlD" webkitdirectory multiple hidden></label><label style="${btn("background:#0F766E")}">Choose a .zip file<input type="file" id="dlZ" accept=".zip,application/zip" hidden></label></div>
         <div id="dlPrev"></div></div>` : ""}
       <input id="dlQ" placeholder="Search by part number, title or file…" style="${inp};width:100%;margin-bottom:8px">
       <div id="dlList" style="overflow:auto"></div></div>`;
@@ -157,7 +179,7 @@
         go.disabled = true; let ok = 0; const bad = [];
         for (const r of todo) {
           msg.style.color = "#64748B"; msg.textContent = `Uploading ${ok + bad.length + 1} of ${todo.length}: ${r.f.name}…`;
-          try { await api.upload(o, d.customer_id, r.f, { part_no: r.part, rev: r.rev, kind: r.kind }); ok++; } catch (e) { bad.push(r.f.name + " — " + (e.message || e)); }
+          try { const rf = r.f._get ? await r.f._get() : r.f; await api.upload(o, d.customer_id, rf, { part_no: r.part, rev: r.rev, kind: r.kind }); ok++; } catch (e) { bad.push(r.f.name + " — " + (e.message || e)); }
         }
         if (!bad.length) return api.library(host, o);
         msg.style.color = "#B00E28"; msg.innerHTML = `${ok} uploaded. <b>${bad.length} failed:</b><br>${bad.map(esc).join("<br>")}`; go.disabled = false;
@@ -165,6 +187,7 @@
     };
     host.querySelector("#dlF").onchange = (e) => stage(e.target.files);
     host.querySelector("#dlD").onchange = (e) => stage(e.target.files);
+    host.querySelector("#dlZ").onchange = async (e) => { const f = e.target.files[0]; if (!f) return; prev.innerHTML = '<p style="color:#64748B">Reading the zip…</p>'; try { stage(await api.zip(f)); } catch (er) { prev.innerHTML = `<p style="color:#B00E28">${esc(er.message || er)}</p>`; } };
   };
 
   window.KMRDrawings = api;
