@@ -49,9 +49,9 @@
   function closeDoc() { const d = $("#doc"); if (d) d.remove(); document.body.classList.remove("pv"); }
 
   /* ================= router ================= */
-  const SECS = ["std", "dash", "list", "rep", "acts", "setup"];
+  const SECS = ["std", "dash", "list", "rep", "acts", "scrap", "setup"];
   async function route() {
-    closeM(); closeDoc(); const hp = hashParts(); const g0 = ["std", "dash", "list", "acts", "setup"].includes(hp.go) ? hp.go : "std";
+    closeM(); closeDoc(); const hp = hashParts(); const g0 = ["std", "dash", "list", "acts", "scrap", "setup"].includes(hp.go) ? hp.go : "std";
     const sec = g0 === "list" && (hp.id || hp.new) ? "rep" : g0;
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.t === g0)); SECS.forEach((s) => $("#" + s).classList.toggle("hide", s !== sec)); say("");
     try {
@@ -60,10 +60,29 @@
       else if (sec === "list") await drawList();
       else if (sec === "rep") await drawRep(hp);
       else if (sec === "acts") await drawActs();
+      else if (sec === "scrap") await drawScrap();
       else if (sec === "setup") await drawSetup();
     } catch (e) { say(e.message); }
   }
   window.addEventListener("hashchange", route);
+
+  /* ================= Scrap register ================= */
+  async function drawScrap() {
+    const all = await call("kmr_scrap_load"), el = $("#scrap"), f = S.sf || (S.sf = { c: "", m: "" });
+    const rows = all.filter((r) => (!f.c || r.c === f.c) && (!f.m || String(r.d).slice(5, 7) === f.m)), n = (v) => Number(v || 0), tot = rows.reduce((s, r) => s + n(r.q), 0);
+    const grp = (k) => { const m = {}; rows.forEach((r) => (m[r[k] || "Not stated"] = (m[r[k] || "Not stated"] || 0) + n(r.q))); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+    const bars = (e, nmax) => { const mx = Math.max(1, ...e.map((x) => x[1])); return e.slice(0, nmax).map(([k, v]) => `<div class="bl"><span>${esc(k)}</span><i style="width:${Math.max(3, (v / mx) * 100)}%"></i><b>${v}</b></div>`).join("") || '<div class="mut">No records.</div>'; };
+    const cs = [...new Set(all.map((r) => r.c))].sort(), MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const byM = Array(12).fill(0); rows.forEach((r) => (byM[Number(String(r.d).slice(5, 7)) - 1] += n(r.q))); const mx = Math.max(1, ...byM);
+    const parts = grp("p");
+    el.innerHTML = `<div class="guide">Daily scrap from the shop-floor sheets: what was scrapped, which defect, and at which stage. Click a part to see its 8D candidates in the register. Production quantities are not entered, so PPM (parts per million) is not shown.</div>
+      <div class="seg noprint" style="align-items:center"><select id="sc_c" style="padding:8px;border-radius:10px"><option value="">All customers</option>${cs.map((c) => `<option ${c === f.c ? "selected" : ""}>${esc(c)}</option>`).join("")}</select><select id="sc_m" style="padding:8px;border-radius:10px"><option value="">All months</option>${MN.map((m, i) => `<option value="${String(i + 1).padStart(2, "0")}" ${f.m === String(i + 1).padStart(2, "0") ? "selected" : ""}>${m}</option>`).join("")}</select><button class="btn" id="sc_p" ${rows.length ? "" : "disabled"}>Print / PDF</button></div>
+      <div class="kpis"><div class="kpi" style="--c:var(--r)"><b>${tot}</b><span>scrap pieces</span></div><div class="kpi" style="--c:var(--b1)"><b>${rows.length}</b><span>daily records</span></div><div class="kpi" style="--c:var(--a)"><b>${parts.length}</b><span>parts with scrap</span></div></div>
+      <div class="card"><h3>Scrap pieces by month</h3><div class="trend">${byM.map((v, i) => `<div title="${MN[i]}: ${v}"><small>${v || ""}</small><i style="height:${(v / mx) * 70}%"></i><small>${MN[i]}</small></div>`).join("")}</div></div>
+      <div class="two"><div class="card"><h3>Top defects</h3><div class="bars">${bars(grp("df"), 10)}</div></div><div class="card"><h3>By part</h3><div class="bars">${bars(parts, 10)}</div><h3 style="margin-top:12px">By stage</h3><div class="bars">${bars(grp("sec"), 8)}</div></div></div>`;
+    $("#sc_c").onchange = (e) => { f.c = e.target.value; drawScrap(); }; $("#sc_m").onchange = (e) => { f.m = e.target.value; drawScrap(); };
+    if ($("#sc_p")) $("#sc_p").onclick = () => showDoc(D8Docs.scrap(rows, [f.c, f.m && MN[Number(f.m) - 1]].filter(Boolean).join(", "), tot));
+  }
 
   /* ================= Dashboard ================= */
   async function drawDash() {

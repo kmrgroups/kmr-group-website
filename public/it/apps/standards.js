@@ -215,6 +215,8 @@ crm:[
 ['VDA','P4','Supplier management','Supplier quotes are kept per part and supplier, with the price, the terms and the date received.'],
 ['VDA','P7','Customer care, customer satisfaction, service','RFQs from customers are answered from one register with due dates; late RFQs and overdue follow-ups are shown on the dashboard.']],
 d8:[
+['IATF','9.1.1.1; 10.2.3','Monitoring of manufacturing process; problem solving','Scrap register: daily in-process, visual and setting rejections by part and defect, with monthly totals and top defects, printed in the standard report frame. Repeating defects are the starting point for an 8D.'],
+['ISO','8.7.2','Records of nonconforming outputs','Each scrap record keeps the date, part, stage, defect and number of pieces.'],
 ['ISO','9.2.2 (a)','IQA schedule and records of results','The IQA schedule shows every process by month for the financial year and flags any process with no audit. Each answered question keeps the actual finding, an evidence reference number and attached files; a report cannot be issued without them. The nonconformity summary shows process against clause group with a short written summary.'],
 ['ISO','10.2.1','Nonconformity and corrective action','Every complaint or rejection is one numbered 8D with its own record: what happened, the interim action, the root cause, the corrective action, and the check that it worked. A step is ticked only when its proof is written.'],
 ['ISO','10.2.2','Retained information on nonconformities','The nature of the problem, the actions taken and their results are kept with the person and date in an activity log that cannot be edited; a closed 8D is locked.'],

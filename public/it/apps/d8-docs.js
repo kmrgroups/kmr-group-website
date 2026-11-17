@@ -75,6 +75,20 @@
     return A.wrap("land", A.title("8D REGISTER", "Customer complaints and internal problems") + A.head([[["Filter", esc(filt || "All")], ["8Ds", String(list.length)], ["Open", String(list.filter((r) => r.status === "open").length)]]]) +
       `<table><colgroup>${[11, 27, 12, 10, 7, 8, 8, 8, 9].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th>8D no.</th><th>Problem</th><th>Source</th><th>Part no.</th><th class="c">Severity</th><th class="c">Opened</th><th class="c">Due</th><th class="c">Step / status</th><th>Owner</th></tr></thead><tbody>${rows || '<tr><td colspan="9">No 8D reports.</td></tr>'}</tbody></table>`);
   }
+  function scrap(rows, filt, tot) {
+    set("scrap", "");
+    const n = (v) => Number(v || 0), cols = [14, 30, 30, 8, 8, 10];
+    const by = (k) => { const m = {}; rows.forEach((r) => { m[r[k] || "—"] = (m[r[k] || "—"] || 0) + n(r.q); }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+    const MN = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"], parts = {};
+    rows.forEach((r) => { const k = r.c + "|" + r.p; (parts[k] = parts[k] || { c: r.c, p: r.p, m: Array(12).fill(0), t: 0 }); parts[k].m[Number(String(r.d).slice(5, 7)) - 1] += n(r.q); parts[k].t += n(r.q); });
+    const pl = Object.values(parts).sort((a, b) => a.c.localeCompare(b.c) || b.t - a.t);
+    const mt = Array(12).fill(0); rows.forEach((r) => (mt[Number(String(r.d).slice(5, 7)) - 1] += n(r.q)));
+    const yr = (rows[0] && String(rows[0].d).slice(0, 4)) || String(new Date().getFullYear());
+    return A.wrap("land", A.title("INTERNAL SCRAP REGISTER " + yr, "Esbee Precision Industries — in-process, visual and setting rejections") + A.head([[["Filter", esc(filt || "All customers")], ["Scrap pieces", String(tot)], ["Records", String(rows.length)]]]) +
+      `<div class="sub">Scrap pieces by month and part</div><table><thead><tr><th>Customer</th><th>Part</th>${MN.map((m) => `<th class="c">${m}</th>`).join("")}<th class="c">Total</th></tr></thead><tbody>${pl.map((x) => `<tr>${cell(esc(x.c))}${cell(esc(x.p))}${x.m.map((v) => cell(v || "", "c")).join("")}${cell("<b>" + x.t + "</b>", "c")}</tr>`).join("")}<tr><th colspan="2">Total</th>${mt.map((v) => `<th class="c">${v || ""}</th>`).join("")}<th class="c">${tot}</th></tr></tbody></table>` +
+      `<div class="two" style="display:flex;gap:14px;margin-top:8px"><div style="flex:1"><div class="sub">Top defects</div><table><thead><tr><th>Defect</th><th class="c">Pieces</th></tr></thead><tbody>${by("df").slice(0, 12).map((x) => `<tr>${cell(esc(x[0]))}${cell(x[1], "c")}</tr>`).join("")}</tbody></table></div><div style="flex:1"><div class="sub">By stage</div><table><thead><tr><th>Stage</th><th class="c">Pieces</th></tr></thead><tbody>${by("sec").map((x) => `<tr>${cell(esc(x[0] === "—" ? "Not stated in sheet" : x[0]))}${cell(x[1], "c")}</tr>`).join("")}</tbody></table></div></div>` +
+      `<div class="note" style="font-size:11px">Production quantities are not recorded in the source sheets, so parts per million (PPM) is not shown.</div>`);
+  }
   function actions(list, filt) {
     set("actions", "");
     const K = { ICA: "Containment", PCA: "Corrective", PREVENT: "Prevention" };
@@ -82,5 +96,5 @@
     return A.wrap("land", A.title("8D ACTION LIST", "Actions of all 8D reports") + A.head([[["Filter", esc(filt || "All")], ["Actions", String(list.length)], ["Late", String(list.filter((a) => a.overdue).length)]]]) +
       `<table><colgroup>${[12, 11, 41, 15, 9, 12].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th>8D no.</th><th>Kind</th><th>Action</th><th>Owner</th><th class="c">Due</th><th class="c">Status</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No actions.</td></tr>'}</tbody></table>`);
   }
-  window.D8Docs = { report, register, actions };
+  window.D8Docs = { report, register, actions, scrap };
 })();
