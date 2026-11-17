@@ -398,7 +398,7 @@
       if (dlb) dlb.onclick = () => {
         ctx.main.innerHTML = '<p><button class="btn ghost" id="dlBack" style="height:36px">← ' + esc(K.label) + '</button></p><div id="dlHost"></div>';
         ctx.main.querySelector("#dlBack").onclick = () => this.list(ctx, K.kind);
-        KMRDrawings.library(ctx.main.querySelector("#dlHost"), { sb: ctx.sb, slug: ctx.slug, parts: rows.map((r) => ({ code: r.code, name: r.name })) });
+        KMRDrawings.library(ctx.main.querySelector("#dlHost"), { sb: ctx.sb, slug: ctx.slug, parts: rows.map((r) => ({ code: r.code, name: r.name, dn: (r.data || {}).drawing_no })) });
       };
       if (edit) {
         ctx.main.querySelector("#opsAdd").onclick = () => this.edit(ctx, K, null);
