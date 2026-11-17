@@ -137,8 +137,16 @@
     host.innerHTML = `<div style="${css}">Loading…</div>`;
     let d, counts; try { d = await api.list(o); counts = await api.counts(o); } catch (e) { host.innerHTML = `<div style="${css};color:#B00E28">${esc(e.message)}</div>`; return; }
     const can = !!d.can_edit, items = d.items || [], parts = o.parts || [];
-    const pk = parts.flatMap((p) => [{ code: p.code, k: key(p.code) }, ...(p.dn && key(p.dn) !== key(p.code) ? [{ code: p.code, k: key(p.dn) }] : [])]).filter((p) => p.k.length >= 5).sort((a, b) => b.k.length - a.k.length);
-    const guess = (f) => { const path = key((f.webkitRelativePath || "") + " " + f.name), h = pk.find((p) => path.includes(p.k)); return h ? h.code : ""; };
+    const nk = (x) => key(x).replace(/o/g, "0");   // drawings often write the letter O for the digit 0 (RSD5H0 / RSD5HO)
+    const pk = parts.flatMap((p) => [{ code: p.code, k: nk(p.code) }, ...(p.dn && nk(p.dn) !== nk(p.code) ? [{ code: p.code, k: nk(p.dn) }] : [])]).filter((p) => p.k.length >= 5).sort((a, b) => b.k.length - a.k.length);
+    const HINT = [[/IC STUD/i, /STUD/i], [/SREC|SLIP RING/i, /SLIP RING|COLLECTOR/i], [/DES DRAWING/i, /SHIELD|DES\b/i], [/SEG/i, /SHIELD|DRIVE SHAFT|DES\b/i], [/BUSH/i, /BUSH/i], [/ADVIK/i, /PUMP|ROTOR|BRACKET|CONNECTOR|COVER|HOUSING/i]];
+    const guess = (f) => {
+      const rel = f.webkitRelativePath || f.name, path = nk(rel), h = pk.find((p) => path.includes(p.k)); if (h) return h.code;
+      const stem = f.name.replace(/\.[^.]+$/, ""), m = stem.match(/^(\d{3,4})(?:[^0-9].*)?$/); if (!m) return "";   // short names like 204.pdf, 433 Drawing.pdf: last digits of the part number
+      const hint = (HINT.find((x) => x[0].test(rel)) || [])[1], c = parts.filter((p) => nk(p.code).endsWith(m[1]) && key(p.code).length >= 8 && (!hint || hint.test(p.name || "")));
+      return c.length ? c[0].code : "";
+    };
+    const have = new Set(items.map((i) => i.file_name + "|" + i.size_bytes));
     const revOf = (n) => { const m = n.match(/(?:rev(?:ision)?|[-_ ]r)[ ._-]?([A-Za-z0-9]{1,3})(?=[^A-Za-z0-9]|$)/i); return m ? m[1].toUpperCase() : ""; };
     host.innerHTML = `<div style="${css}">
       <h2 style="margin:0 0 4px">📐 Customer drawings</h2>
@@ -164,11 +172,11 @@
     const stage = (files) => {
       files = [...files].filter((f) => !/^(\.|thumbs\.db$|desktop\.ini$)/i.test(f.name));
       if (!files.length) return;
-      const rows = files.map((f) => ({ f, part: guess(f), rev: revOf(f.name), kind: /\.(stp|step|igs|iges)$/i.test(f.name) ? "model" : "drawing", on: true }));
+      const rows = files.map((f) => { const g = guess(f), dup = have.has(f.name + "|" + f.size); return { f, part: g || (dup ? "" : f.name.replace(/\.[^.]+$/, "").slice(0, 80)), known: !!g, dup, rev: revOf(f.name), kind: /\.(stp|step|igs|iges)$/i.test(f.name) ? "model" : "drawing", on: !dup }; });
       const dl = `<datalist id="dlParts">${parts.map((p) => `<option value="${esc(p.code)}">${esc(p.name || "")}</option>`).join("")}</datalist>`;
       const total = files.reduce((a, f) => a + f.size, 0);
-      prev.innerHTML = `${dl}<p style="margin:6px 0;color:#64748B;font-size:13px">${files.length} file(s), ${size(total)}. Check the <b>part number</b> for each one — it must be a part in your Parts list. Rows with no part number are skipped.</p>
-        <div style="max-height:60vh;overflow:auto">${rows.map((r, i) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-on="${i}" ${r.part ? "checked" : ""} style="margin-top:3px"><span style="font-size:13px;word-break:break-all">${esc(r.f.webkitRelativePath || r.f.name)}<span style="display:block;font-size:11px;color:#64748B">${size(r.f.size)}</span></span></label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><input data-p="${i}" list="dlParts" value="${esc(r.part)}" placeholder="Part number" style="${inp};flex:2 1 160px;${r.part ? "" : "border-color:#D97706"}"><input data-r="${i}" value="${esc(r.rev)}" placeholder="Rev" style="${inp};flex:0 1 70px"><select data-k="${i}" style="${inp};flex:1 1 120px">${KINDS.map((k) => `<option value="${k[0]}" ${k[0] === r.kind ? "selected" : ""}>${k[1]}</option>`).join("")}</select></div></div>`).join("")}</div>
+      prev.innerHTML = `${dl}<p style="margin:6px 0;color:#64748B;font-size:13px">${files.length} file(s), ${size(total)}. Check the <b>part number</b> for each one — it must be a part in your Parts list. Orange rows are not in your Parts list — they are saved under the name shown (you can change it). Files already uploaded are unticked.</p>
+        <div style="max-height:60vh;overflow:auto">${rows.map((r, i) => `<div style="border:1px solid #E2E8F0;border-radius:10px;padding:8px 10px;margin-bottom:8px;background:#fff"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-on="${i}" ${r.on ? "checked" : ""} style="margin-top:3px"><span style="font-size:13px;word-break:break-all">${esc(r.f.webkitRelativePath || r.f.name)}<span style="display:block;font-size:11px;color:#64748B">${size(r.f.size)}</span></span></label><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><input data-p="${i}" list="dlParts" value="${esc(r.part)}" placeholder="Part number" style="${inp};flex:2 1 160px;${r.known || r.dup ? "" : "border-color:#D97706"}"><input data-r="${i}" value="${esc(r.rev)}" placeholder="Rev" style="${inp};flex:0 1 70px"><select data-k="${i}" style="${inp};flex:1 1 120px">${KINDS.map((k) => `<option value="${k[0]}" ${k[0] === r.kind ? "selected" : ""}>${k[1]}</option>`).join("")}</select></div></div>`).join("")}</div>
         <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button id="dlGo" style="${btn()}">Upload selected</button><button id="dlNo" style="${ghost}">Cancel</button><span id="dlMsg" style="font-size:13px;color:#64748B"></span></div>`;
       const sync = () => rows.forEach((r, i) => { r.part = prev.querySelector(`[data-p="${i}"]`).value.trim(); r.rev = prev.querySelector(`[data-r="${i}"]`).value.trim(); r.kind = prev.querySelector(`[data-k="${i}"]`).value; r.on = prev.querySelector(`[data-on="${i}"]`).checked; });
       prev.querySelector("#dlNo").onclick = () => { prev.innerHTML = ""; };
@@ -178,7 +186,7 @@
         go.disabled = true; let ok = 0; const bad = [];
         for (const r of todo) {
           msg.style.color = "#64748B"; msg.textContent = `Uploading ${ok + bad.length + 1} of ${todo.length}: ${r.f.name}…`;
-          try { const rf = r.f._get ? await r.f._get() : r.f; await api.upload(o, d.customer_id, rf, { part_no: r.part, rev: r.rev, kind: r.kind }); ok++; } catch (e) { bad.push(r.f.name + " — " + (e.message || e)); }
+          try { const rf = r.f._get ? await r.f._get() : r.f; for (let t = 1; ; t++) { try { await api.upload(o, d.customer_id, rf, { part_no: r.part, rev: r.rev, kind: r.kind }); break; } catch (e2) { if (t >= 4 || !/load failed|network|fetch|timeout/i.test(e2.message || "")) throw e2; msg.textContent = `Connection dropped — retrying ${r.f.name} (${t}/3)…`; await new Promise((z) => setTimeout(z, 1500 * t)); } } ok++; } catch (e) { bad.push(r.f.name + " — " + (e.message || e)); }
         }
         if (!bad.length) return api.library(host, o);
         msg.style.color = "#B00E28"; msg.innerHTML = `${ok} uploaded. <b>${bad.length} failed:</b><br>${bad.map(esc).join("<br>")}`; go.disabled = false;
