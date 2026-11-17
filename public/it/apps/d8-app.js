@@ -104,7 +104,7 @@
     $("#l_so").onchange = (e) => { f.source = e.target.value; guard(load); };
     el.querySelectorAll("[data-st]").forEach((b) => (b.onclick = () => { f.status = b.dataset.st; el.querySelectorAll("[data-st]").forEach((x) => x.classList.toggle("on", x === b)); guard(load); }));
     if (can) $("#l_new").onclick = () => go("go=list&new=1");
-    $("#l_pr").onclick = () => showDoc(D8Docs.register(S.list || [], [f.status, f.source].filter((x) => x && x !== "all").join(", ")));
+    $("#l_pr").onclick = () => showDoc(D8Docs.register(S.list || [], [f.status, f.source].filter((x) => x && x !== "all").join(", "), { format: (S.L && S.L.settings && S.L.settings.print_format) || "" }));
     await load();
   }
 

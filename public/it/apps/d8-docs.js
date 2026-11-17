@@ -55,7 +55,21 @@
     return A.wrap("port", h);
   }
 
-  function register(list, filt) {
+  /* Esbee Precision Industries' own complaint list (their form F-03-27): one table per customer, Sl No. restarting for each,
+     with the 8D reference and the D-2 / D-14 / D-60 dates. Used only when the company's print format is "esbee" (set by KMR staff). */
+  function registerEsbee(list, filt) {
+    if (window.KMRReport) KMRReport.set({ key: "register", doc: "", inForm: true, format: "F-03-27", rev: "00", date: "2026-11-17" });
+    const by = {}; list.slice().sort((a, b) => String(a.opened_on).localeCompare(String(b.opened_on)) || String(a.no).localeCompare(String(b.no))).forEach((r) => { const k = (r.esbee && r.esbee.customer_group) || r.complainant || "Other"; (by[k] = by[k] || []).push(r); });
+    const yr = (list.map((r) => String(r.opened_on || "").slice(0, 4)).sort().pop()) || String(new Date().getFullYear());
+    const dm = (s) => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(s || ""); return m ? m[3] + "-" + m[2] + "-" + m[1].slice(2) : ""; };
+    const qty = (r) => (r.esbee && r.esbee.complaint_qty_text) || (r.qty_affected == null ? "" : String(Number(r.qty_affected)));
+    const part = (r) => esc([r.part_no, r.part_name].filter(Boolean).join(" / "));
+    const cols = [4, 7, 8, 14, 22, 5, 7, 6, 6, 6, 6, 7, 7, 6, 5];
+    const tbl = Object.keys(by).map((k) => `<div class="blk" style="margin-top:8px"><b>${esc(k)}</b><table><colgroup>${cols.map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th rowspan="2">Sl No.</th><th rowspan="2">Complaint Date</th><th rowspan="2">Customer</th><th rowspan="2">Part No. / Part Name</th><th rowspan="2">Nature of Complaint</th><th rowspan="2">Complaint Qty</th><th rowspan="2">Customer NC reference</th><th colspan="4" class="c">8D details</th><th rowspan="2">Status</th><th rowspan="2">Closed Date</th><th rowspan="2">Repeated complaint Y/N</th><th rowspan="2">Sign</th></tr><tr><th>Ref</th><th>D-2</th><th>D-14</th><th>D-60</th></tr></thead><tbody>${by[k].map((r, i) => { const e = r.esbee || {}; return `<tr>${cell(String(i + 1), "c")}${cell(dm(r.opened_on), "c")}${cell(esc(e.customer_group || r.complainant))}${cell(part(r))}${cell(esc(r.title))}${cell(esc(qty(r)), "c")}${cell(esc(e.nc_ref || r.complaint_ref || "Nil"), "c")}${cell(esc(e.ref_8d || r.no), "c")}${cell(dm(e.d2), "c")}${cell(dm(e.d14), "c")}${cell(dm(e.d60), "c")}${cell(r.status === "closed" ? "Completed" : "Open", "c")}${cell(r.status === "closed" ? dm(r.closed_on) : "", "c")}${cell(esc(e.repeated || ""), "c")}${cell("")}</tr>`; }).join("")}</tbody></table></div>`).join("");
+    return A.wrap("land", A.title("LIST OF CUSTOMER COMPLAINTS-" + yr, "Esbee Precision Industries") + A.head([[["Filter", esc(filt || "All")], ["Complaints", String(list.length)], ["Open", String(list.filter((r) => r.status === "open").length)]]]) + (tbl || "<p>No complaints.</p>"));
+  }
+  function register(list, filt, o) {
+    if (o && o.format === "esbee") return registerEsbee(list, filt);
     set("register", "");
     const rows = list.map((r) => `<tr>${cell("<b>" + esc(r.no) + "</b>")}${cell(esc(r.title))}${cell(esc(r.source))}${cell(esc(r.part_no))}${cell(esc(r.severity), "c")}${cell(dmy(r.opened_on), "c")}${cell(dmy(r.due_on), "c")}${cell(r.status === "closed" ? "Closed " + dmy(r.closed_on) : esc(r.current || "") , "c")}${cell(esc(r.owner))}</tr>`).join("");
     return A.wrap("land", A.title("8D REGISTER", "Customer complaints and internal problems") + A.head([[["Filter", esc(filt || "All")], ["8Ds", String(list.length)], ["Open", String(list.filter((r) => r.status === "open").length)]]]) +
