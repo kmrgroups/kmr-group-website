@@ -256,7 +256,7 @@ body.readonly #bAdd,body.readonly #bText,body.readonly #bAI,body.readonly #bRenu
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="balloon/app.js"></script>
 <script src="balloon/reader.js"></script>
-<script src="balloon/cloud.js"></script><script src="/it/apps/part-drawings.js"></script><script>
+<script src="balloon/cloud.js"></script><script src="/it/apps/part-drawings.js?v=20261117c"></script><script>
 document.getElementById("bSaved").onclick=function(){
   if(!window.KMR_SB){alert("Sign in first to use the saved drawings.");return;}
   KMRDrawings.pick({sb:window.KMR_SB,part:(BI.S.header.partNo||"").trim()},function(f,it){
