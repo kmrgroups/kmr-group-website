@@ -96,5 +96,19 @@
     return A.wrap("land", A.title("8D ACTION LIST", "Actions of all 8D reports") + A.head([[["Filter", esc(filt || "All")], ["Actions", String(list.length)], ["Late", String(list.filter((a) => a.overdue).length)]]]) +
       `<table><colgroup>${[12, 11, 41, 15, 9, 12].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th>8D no.</th><th>Kind</th><th>Action</th><th>Owner</th><th class="c">Due</th><th class="c">Status</th></tr></thead><tbody>${rows || '<tr><td colspan="6">No actions.</td></tr>'}</tbody></table>`);
   }
-  window.D8Docs = { report, register, actions, scrap };
+  function qalert(rep) {
+    set("qalert", rep.no); const s = rep.sections || {}, d7 = s.d7 || {}, q = d7.qalert || {}, tr = (d7.qatrain || []).filter((x) => x && (x.name || x.date));
+    return A.wrap("port", A.title("Q ALERT · ONE POINT LESSON", "Quality is everyone's responsibility and we all follow the same rules") +
+      A.head([[["8D no.", "<b>" + esc(rep.no) + "</b>"], ["Tracking no.", esc(q.tracking_no || rep.complaint_ref)], ["Classification", esc(q.classification || rep.severity)]], [["Part no.", esc(q.part_no || rep.part_no)], ["Part name", esc(q.part_name || rep.part_name)], ["Customer", esc(q.customer || rep.complainant)]], [["Complaint date", esc(q.date)], ["Quantity", esc(q.qty)], ["Released · effective from", dmy(q.released) + " · " + dmy(q.effective)]]]) +
+      kv([["Customer complaint / problem", nl(q.complaint || rep.title)], ["Primary root cause", nl(q.root_cause)], ["Interim corrective action (short term)", nl(q.ica)], ["Permanent corrective action (long term)", nl(q.pca)]]) +
+      `<div class="sub">Training record</div><table><colgroup><col style="width:6%"><col style="width:20%"><col style="width:44%"><col style="width:30%"></colgroup><thead><tr><th class="c">#</th><th class="c">Date</th><th>Name of team member</th><th>Signature</th></tr></thead><tbody>${tr.map((x, i) => `<tr>${cell(i + 1, "c")}${cell(esc(x.date), "c")}${cell(esc(x.name))}<td></td></tr>`).join("") || '<tr><td colspan="4">No one recorded yet.</td></tr>'}</tbody></table>` +
+      kv([["Prepared by", esc(q.prepared)], ["Approved by (Quality)", esc(q.appr_q)], ["Approved by (Production)", esc(q.appr_p)]]));
+  }
+  function eye(rep) {
+    set("eye", rep.no); const d7 = (rep.sections || {}).d7 || {}, e = d7.eyeinfo || {}, l = (d7.eye || []).filter((x) => x && x.defect);
+    return A.wrap("port", A.title(esc(e.title || "EYE SEQUENCE CHART"), "Visual inspection: defects to look for, in the order of the check") +
+      A.head([[["8D no.", "<b>" + esc(rep.no) + "</b>"], ["Document no.", esc(e.doc)], ["Revision · date", esc(e.rev) + " · " + esc(e.rev_date)]], [["Part no.", esc(rep.part_no)], ["Prepared by", esc(e.prepared)], ["Approved by", esc(e.approved)]]]) +
+      `<table><colgroup>${[6, 50, 22, 8, 14].map((w) => `<col style="width:${w}%">`).join("")}</colgroup><thead><tr><th class="c">#</th><th>Defect to look for</th><th>Criticality</th><th class="c">Freq.</th><th>Responsibility</th></tr></thead><tbody>${l.map((x, i) => `<tr>${cell(i + 1, "c")}${cell(esc(x.defect))}${cell(esc(x.crit))}${cell(esc(x.freq), "c")}${cell(esc(x.resp))}</tr>`).join("") || '<tr><td colspan="5">No defects listed.</td></tr>'}</tbody></table>`);
+  }
+  window.D8Docs = { report, register, actions, scrap, qalert, eye };
 })();
