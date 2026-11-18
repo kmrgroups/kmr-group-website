@@ -41,9 +41,9 @@ tr.cur td{background:#fef9c3}.sg{display:flex;justify-content:space-between;gap:
 @media print{.sc{max-height:none;overflow:visible;border:0}.lt{min-width:0}}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Material Movement</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="scan" href="#go=scan">Scan</a><a class="tab" data-t="issue" href="#go=issue">Issue raw material</a><a class="tab" data-t="rs" href="#go=rs">Route sheets</a><a class="tab" data-t="sup" href="#go=sup">Supplier DC / GRN</a><a class="tab" data-t="wip" href="#go=wip">WIP map &amp; alerts</a><a class="tab" data-t="dash" href="#go=dash">Dashboards</a><a class="tab" data-t="rej" href="#go=rej">Rejection &amp; rework</a><a class="tab" data-t="loss" href="#go=loss">Loss hours</a><a class="tab" data-t="trace" href="#go=trace">Traceability</a><a class="tab" data-t="erp" href="#go=erp">ERP production history</a></div>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboards</a><a class="tab" data-t="scan" href="#go=scan">Production entry</a><a class="tab" data-t="issue" href="#go=issue">Issue raw material</a><a class="tab" data-t="rs" href="#go=rs">Route sheets</a><a class="tab" data-t="sup" href="#go=sup">Supplier DC / GRN</a><a class="tab" data-t="rej" href="#go=rej">Rejection &amp; rework</a><a class="tab" data-t="wip" href="#go=wip">WIP map &amp; alerts</a><a class="tab" data-t="loss" href="#go=loss">Loss hours</a><a class="tab" data-t="trace" href="#go=trace">Traceability</a><a class="tab" data-t="flow" href="#go=flow">Process flow check</a><a class="tab" data-t="erp" href="#go=erp">ERP production history</a></div>
 <main><div class="panel"><div id="msg"></div>
-<section id="std"></section><section id="scan" class="hide"></section><section id="issue" class="hide"></section><section id="rs" class="hide"></section><section id="sup" class="hide"></section><section id="wip" class="hide"></section><section id="dash" class="hide"></section><section id="rej" class="hide"></section><section id="loss" class="hide"></section><section id="trace" class="hide"></section><section id="erp" class="hide"></section></div></main>
+<section id="std"></section><section id="scan" class="hide"></section><section id="issue" class="hide"></section><section id="rs" class="hide"></section><section id="sup" class="hide"></section><section id="wip" class="hide"></section><section id="dash" class="hide"></section><section id="rej" class="hide"></section><section id="loss" class="hide"></section><section id="trace" class="hide"></section><section id="flow" class="hide"></section><section id="erp" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
 <script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{wip:"mmd.wip-map-throughput-alerts",dash:"mmd.dashboards-pareto",sup:"mmd.supplier-dc-grn",loss:"mmd.loss-hours-d-codes",trace:"mmd.traceability-iatf-records"},names:{"mmd.wip-map-throughput-alerts":"WIP map & throughput alerts","mmd.dashboards-pareto":"Dashboards & Pareto","mmd.supplier-dc-grn":"Supplier DC & GRN","mmd.loss-hours-d-codes":"Loss hours (D codes)","mmd.traceability-iatf-records":"Traceability & IATF records"}};</script><script src="/it/apps/qp-core.js"></script>
 <script src="/it/apps/qr.js"></script><script src="/it/apps/mmd-print.js"></script><script src="/it/apps/mmd-dash.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/mmd-demo.js"><\/script>')}</script>
@@ -71,9 +71,9 @@ async function route(){
   let go=hashGo();
   if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='std';history.replaceState(null,'',location.pathname+location.search+'#go=std')}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
-  ['std','scan','issue','rs','sup','wip','dash','rej','loss','trace','erp'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  ['std','scan','issue','rs','sup','wip','dash','rej','loss','trace','flow','erp'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
   if(go==='std'){KMRStd.draw($('#std'),'mmd');return}
-  try{await loadM();if(go!=='trace'&&go!=='issue'||!S.x)await loadX();({scan:drawScan,issue:drawIssue,rs:drawRs,sup:drawSup,wip:drawWip,dash:drawDash,rej:drawRej,loss:drawLoss,trace:drawTrace,erp:drawErp})[go]()}catch(e){say(e.message)}
+  try{await loadM();if(go!=='trace'&&go!=='issue'||!S.x)await loadX();({scan:drawScan,issue:drawIssue,rs:drawRs,sup:drawSup,wip:drawWip,dash:drawDash,rej:drawRej,loss:drawLoss,trace:drawTrace,flow:drawFlow,erp:drawErp})[go]()}catch(e){say(e.message)}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});
 window.addEventListener('hashchange',route);
@@ -101,6 +101,29 @@ function addLine(id,kind){
 const readLines=(id)=>[...document.querySelectorAll('#'+id+' .ln')].map(r=>{const g=(f)=>r.querySelector('[data-f='+f+']').value.trim(),c=g('code'),dn=((S.m.defect_codes||[]).find(x=>x.code===c)||{}).name;return {code:c,reason:dn||'',qty:+g('qty')||0,spec:g('spec'),actual:g('actual')}}).filter(l=>l.qty>0||l.code||l.spec||l.actual);
 function wireLines(){document.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{addLine(b.dataset.add,b.dataset.k)})}
 function sum(){const el=$('#tot');if(!el)return;const ok=+($('#fOk')||{}).value||0,r=readLines('rejL').reduce((a,l)=>a+l.qty,0),w=readLines('rewL').reduce((a,l)=>a+l.qty,0),bal=+el.dataset.bal;const t=ok+r+w;el.innerHTML=`Entered <b>${N(t)}</b> of <b>${N(bal)}</b> pcs on this tag${t>bal?' <span class="late">— more than the tag holds</span>':t<bal?` · <b>${N(bal-t)}</b> pcs stay on the tag to be entered later`:''}`}
+
+
+/* ---------- PROCESS FLOW CHECK: every part needs its route, cycle times, machines, BOM and raw material before production starts ---------- */
+function drawFlow(){
+  const m=S.m,parts=m.parts||[],bomOf={};(m.bom||[]).forEach(b=>{(bomOf[b.part_no]=bomOf[b.part_no]||[]).push(b)});
+  const rows=parts.map(p=>{
+    const r=(m.routes||{})[p.code]||[],n=r.length,ct=r.filter(o=>+o.ct_sec>0).length,mc=r.filter(o=>o.type==='supplier'||(o.machine||'').trim()).length,b=bomOf[p.code]||[],
+      real=b.filter(x=>+x.blank_kg>1&&+x.finished_kg>0).length,miss=[];
+    if(!n)miss.push('process route');else{if(ct<n)miss.push('cycle time ('+(n-ct)+' of '+n+')');if(mc<n)miss.push('machine ('+(n-mc)+' of '+n+')')}
+    if(!b.length)miss.push('BOM / raw material');else if(!real)miss.push('real blank / finished weight');
+    if(!(p.drawing_no||'').trim())miss.push('drawing');
+    return {p,n,ct,mc,bom:b.length,real,miss};
+  }).sort((a,b)=>b.miss.length-a.miss.length||String(a.p.code).localeCompare(String(b.p.code)));
+  const ok=rows.filter(x=>!x.miss.length).length,k=(v,l,c)=>`<div class="kpi" style="--c:${c}"><b>${v}</b><span>${l}</span></div>`;
+  const q=(store('flowq')||'').toLowerCase(),f=store('flowf')||'all';
+  const show=rows.filter(x=>(f==='all'||(f==='ready'?!x.miss.length:x.miss.length))&&(!q||(x.p.code+' '+x.p.name+' '+(x.p.customer||'')).toLowerCase().includes(q)));
+  $('#flow').innerHTML=`<div class="guide">Production can start for a part only when its <b>process route, cycle time, machine, BOM (raw material and weights)</b> and drawing are complete. Everything here is read from the <b>Operations Master</b> (Parts, Cycle times, Machines, BOM); fix a gap there once and every app uses it. Dashboards (OEE, efficiency, utilisation) are worked out from these cycle times.</div>
+  <div class="kpis">${k(parts.length,'parts','var(--b1)')}${k(ok,'ready for production','var(--g)')}${k(parts.length-ok,'with gaps','var(--r)')}${k(parts.filter(p=>!((m.routes||{})[p.code]||[]).length).length,'without any process route','var(--a)')}</div>
+  <div class="row"><input id="fq" placeholder="Search part, name or customer" value="${esc(store('flowq')||'')}" style="max-width:320px"><select id="ff"><option value="all"${f==='all'?' selected':''}>All parts</option><option value="gap"${f==='gap'?' selected':''}>Only parts with gaps</option><option value="ready"${f==='ready'?' selected':''}>Only ready parts</option></select><span class="mut">${show.length} rows</span></div>
+  <div class="sc"><table class="lt"><thead><tr><th class="n">S.NO</th><th>Part</th><th>Name</th><th>Customer</th><th class="n">Operations</th><th class="n">With cycle time</th><th class="n">With machine</th><th class="n">BOM lines</th><th>Status</th><th>What is missing (fill in Operations Master)</th></tr></thead><tbody>${show.map((x,i)=>`<tr><td class="n">${i+1}</td><td><b>${esc(x.p.code)}</b></td><td>${esc(x.p.name||'')}</td><td>${esc(x.p.customer||'')}</td><td class="n">${x.n}</td><td class="n">${x.ct}</td><td class="n">${x.mc}</td><td class="n">${x.bom}</td><td>${x.miss.length?'<span class="chip" style="--c:var(--r)">Gaps</span>':'<span class="chip" style="--c:var(--g)">Ready</span>'}</td><td>${esc(x.miss.join(', '))}</td></tr>`).join('')||'<tr><td colspan="10" class="mut">Nothing to show.</td></tr>'}</tbody></table></div>`;
+  $('#fq').oninput=()=>{store('flowq',$('#fq').value);const c=$('#fq').selectionStart;drawFlow();$('#fq').focus();$('#fq').setSelectionRange(c,c)};
+  $('#ff').onchange=()=>{store('flowf',$('#ff').value);drawFlow()};
+}
 
 /* ---------- 1. SCAN ---------- */
 function drawScan(){
