@@ -1,0 +1,299 @@
+# KMR Machine Gateway
+# Reads piece counters and run/idle/alarm status from the machines on this network and sends them to the
+# Material Movement app (Production entry > Machine capture). Which machine tag to read is set in the app
+# (Machine tag map) - this program picks the list up by itself, nothing is typed here.
+#
+# Protocols: opcua (Siemens Sinumerik / S7-1500 / most controllers), s7 (Siemens S7 PLC), focas (Fanuc CNC),
+#            mtconnect (Mazak, Okuma, Haas and others), modbus (PLCs, IoT boxes, meters), mqtt, http (IoT devices), sim (test).
+# Needs Python 3.8+ . Missing helper packages are installed automatically the first time they are needed.
+import json, os, re, socket, struct, subprocess, sys, time, threading, traceback, zlib
+import urllib.request, urllib.error, urllib.parse
+from datetime import datetime, timezone
+
+URL = "__URL__"
+KEY = "__KEY__"
+NAME = "__NAME__"
+INTERVAL = 5          # seconds between machine reads
+HEARTBEAT = 60        # a machine with no change is still reported this often
+MAP_EVERY = 120       # seconds between reloading the tag map from the app
+
+HOME = os.path.join(os.environ.get("LOCALAPPDATA") or os.path.expanduser("~"), "KMR", "MachineGateway")
+os.makedirs(HOME, exist_ok=True)
+LOG = os.path.join(HOME, "gateway.log")
+QUEUE = os.path.join(HOME, "queue.json")
+
+
+def log(*a):
+    line = datetime.now().strftime("%Y-%m-%d %H:%M:%S ") + " ".join(str(x) for x in a)
+    try:
+        if os.path.exists(LOG) and os.path.getsize(LOG) > 2_000_000:
+            os.replace(LOG, LOG + ".old")
+        with open(LOG, "a", encoding="utf-8") as f:
+            f.write(line + "\n")
+    except Exception:
+        pass
+    if sys.stdout:
+        try: print(line)
+        except Exception: pass
+
+
+def ensure(mod, pip=None):
+    try:
+        return __import__(mod, fromlist=["x"])
+    except ImportError:
+        log("installing", pip or mod)
+        subprocess.call([sys.executable, "-m", "pip", "install", "--user", "--quiet", "--break-system-packages", pip or mod],
+                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return __import__(mod, fromlist=["x"])
+
+
+def num(v):
+    if v is None: return None
+    if isinstance(v, bool): return 1.0 if v else 0.0
+    try: return float(v)
+    except Exception:
+        try: return float(re.sub(r"[^0-9.+-eE]", "", str(v)))
+        except Exception: return None
+
+
+def norm_state(v):
+    s = str(v).strip().lower()
+    if s in ("run", "running", "active", "auto", "cutting", "1", "true", "on", "start"): return "run"
+    if s in ("alarm", "emergency", "emergency_stop", "fault", "error"): return "alarm"
+    if s in ("off", "unavailable", "offline"): return "off"
+    if s in ("0", "false", "idle", "ready", "stopped", "stop", "standby", "interrupted", "feed_hold", "manual", "hold"): return "idle"
+    n = num(s)
+    return ("run" if n else "idle") if n is not None else "idle"
+
+
+def dotted(obj, path):
+    for p in [x for x in (path or "").split(".") if x]:
+        obj = obj[int(p)] if isinstance(obj, list) else obj[p]
+    return obj
+
+
+class Readers:
+    """One reader per protocol. Each takes the address text from the tag map and returns a value (or raises)."""
+    def __init__(self):
+        self.c = {}
+        self.mq = {}
+
+    # ---- OPC UA: address  opc.tcp://host:4840|ns=2;s=Channel1.Parts
+    def r_opcua(self, a):
+        ep, node = a.split("|", 1)
+        cl = self.c.get(("ua", ep))
+        if cl is None:
+            ensure("asyncua"); from asyncua.sync import Client
+            cl = Client(ep, timeout=4); cl.connect(); self.c[("ua", ep)] = cl
+        try:
+            return cl.get_node(node.strip()).read_value()
+        except Exception:
+            self.c.pop(("ua", ep), None)
+            try: cl.disconnect()
+            except Exception: pass
+            raise
+
+    # ---- Siemens S7 PLC: address  192.168.0.10|DB10|4|dint   (types int word dint dword real; bit: 4.1|bool)  optional ip@rack/slot
+    def r_s7(self, a):
+        host, db, off, typ = [x.strip() for x in a.split("|")]
+        ip, _, rs = host.partition("@"); rack, slot = (rs.split("/") + ["1"])[:2] if rs else ("0", "1")
+        snap7 = ensure("snap7", "python-snap7"); from snap7 import util
+        cl = self.c.get(("s7", host))
+        if cl is None or not cl.get_connected():
+            cl = snap7.client.Client(); cl.connect(ip, int(rack or 0), int(slot or 1)); self.c[("s7", host)] = cl
+        dbn = int(re.sub(r"\D", "", db)); byte = int(str(off).split(".")[0]); typ = typ.lower()
+        size = {"bool": 1, "int": 2, "word": 2, "dint": 4, "dword": 4, "real": 4}[typ]
+        try:
+            d = cl.db_read(dbn, byte, size)
+        except Exception:
+            self.c.pop(("s7", host), None); raise
+        if typ == "bool": return util.get_bool(d, 0, int(str(off).split(".")[1]) if "." in str(off) else 0)
+        return {"int": util.get_int, "word": util.get_word, "dint": util.get_dint, "dword": util.get_dword, "real": util.get_real}[typ](d, 0)
+
+    # ---- Modbus TCP: address  192.168.0.20:502|hr|100|u32   (hr, ir, co, di; u16 i16 u32 u32le f32; optional |unit)
+    def r_modbus(self, a):
+        p = [x.strip() for x in a.split("|")]
+        host, fn, reg, typ = p[:4]; unit = int(p[4]) if len(p) > 4 else 1
+        ip, _, port = host.partition(":")
+        mb = ensure("pymodbus"); from pymodbus.client import ModbusTcpClient
+        cl = self.c.get(("mb", host))
+        if cl is None:
+            cl = ModbusTcpClient(ip, port=int(port or 502), timeout=4); cl.connect(); self.c[("mb", host)] = cl
+        words = 2 if typ in ("u32", "u32le", "f32", "i32") else 1; addr = int(reg)
+        call = {"hr": cl.read_holding_registers, "ir": cl.read_input_registers, "co": cl.read_coils, "di": cl.read_discrete_inputs}[fn]
+        rr = None
+        for kw in ({"slave": unit}, {"device_id": unit}, {"unit": unit}, {}):
+            try:
+                rr = call(addr, count=words, **kw); break
+            except TypeError:
+                continue
+            except Exception:
+                self.c.pop(("mb", host), None); raise
+        if rr is None or rr.isError():
+            self.c.pop(("mb", host), None); raise IOError("modbus read failed")
+        if fn in ("co", "di"): return 1 if rr.bits[0] else 0
+        r = rr.registers
+        if typ == "u16": return r[0]
+        if typ == "i16": return struct.unpack(">h", struct.pack(">H", r[0]))[0]
+        hi, lo = (r[1], r[0]) if typ == "u32le" else (r[0], r[1])
+        raw = struct.pack(">HH", hi, lo)
+        return struct.unpack(">f", raw)[0] if typ == "f32" else struct.unpack(">i", raw)[0] if typ == "i32" else struct.unpack(">I", raw)[0]
+
+    # ---- MTConnect agent (Mazak, Okuma, Haas, DMG...): address  http://host:5000|PartCount   (data item id or name)
+    def r_mtconnect(self, a):
+        base, item = a.split("|", 1)
+        import xml.etree.ElementTree as ET
+        root = ET.fromstring(urllib.request.urlopen(base.rstrip("/") + "/current", timeout=5).read())
+        for el in root.iter():
+            if el.get("dataItemId") == item.strip() or el.get("name") == item.strip():
+                return (el.text or "").strip()
+        raise KeyError("data item " + item + " not found")
+
+    # ---- Fanuc CNC (FOCAS2 over Ethernet): address  192.168.0.50:8193|total   | parts | status | param:6712 | macro:900
+    # needs the Fanuc library Fwlib64.dll (Fwlib32.dll for 32-bit Python) from Fanuc on this PC and the CNC's Ethernet function.
+    def r_focas(self, a):
+        import ctypes
+        host, what = [x.strip() for x in a.split("|")]
+        ip, _, port = host.partition(":"); port = int(port or 8193)
+        lib = self.c.get("fwlib")
+        if lib is None:
+            lib = ctypes.WinDLL("Fwlib64.dll" if struct.calcsize("P") == 8 else "Fwlib32.dll"); self.c["fwlib"] = lib
+        h = self.c.get(("fo", host))
+        if h is None:
+            h = ctypes.c_ushort(0)
+            if lib.cnc_allclibhndl3(ip.encode(), port, 6, ctypes.byref(h)) != 0:
+                raise IOError("cannot connect to the Fanuc CNC at " + host)
+            self.c[("fo", host)] = h
+        buf = ctypes.create_string_buffer(64)
+        try:
+            if what == "status":
+                if lib.cnc_statinfo(h, buf) != 0: raise IOError("cnc_statinfo failed")
+                run = struct.unpack_from("<h", buf.raw, 6)[0]; emg = struct.unpack_from("<h", buf.raw, 14)[0]; alm = struct.unpack_from("<h", buf.raw, 20)[0]
+                return "alarm" if (alm or emg) else "run" if run == 3 else "idle"
+            if what.startswith("macro:"):
+                if lib.cnc_rdmacro(h, int(what[6:]), 10, buf) != 0: raise IOError("cnc_rdmacro failed")
+                val, dec = struct.unpack_from("<ih", buf.raw, 4)
+                return val / (10 ** dec)
+            number = {"parts": 6711, "total": 6712}.get(what) or int(what.split(":")[1])
+            if lib.cnc_rdparam(h, number, 0, 8, buf) != 0: raise IOError("cnc_rdparam failed")
+            return struct.unpack_from("<i", buf.raw, 4)[0]
+        except Exception:
+            self.c.pop(("fo", host), None)
+            try: lib.cnc_freelibhndl(h)
+            except Exception: pass
+            raise
+
+    # ---- MQTT (IoT boxes that publish):  address  broker:1883|factory/m12/parts|value   (last part = key inside a JSON message)
+    def r_mqtt(self, a):
+        host, topic, *key = [x.strip() for x in a.split("|")]
+        if host not in self.mq:
+            mqtt = ensure("paho.mqtt.client", "paho-mqtt"); import paho.mqtt.client as mqtt
+            try: cl = mqtt.Client(mqtt.CallbackAPIVersion.VERSION1)
+            except AttributeError: cl = mqtt.Client()
+            store = {}
+            cl.on_connect = lambda c, u, f, rc, *x: [c.subscribe(t) for t in list(store.get("_topics", []))]
+            cl.on_message = lambda c, u, m: store.__setitem__(m.topic, m.payload.decode("utf-8", "ignore"))
+            ip, _, port = host.partition(":"); cl.connect(ip, int(port or 1883), 30); cl.loop_start()
+            self.mq[host] = (cl, store)
+        cl, store = self.mq[host]
+        if topic not in store.setdefault("_topics", []):
+            store["_topics"].append(topic); cl.subscribe(topic)
+        if topic not in store: raise KeyError("no message yet on " + topic)
+        v = store[topic]
+        if key and key[0]:
+            return dotted(json.loads(v), key[0])
+        return v
+
+    # ---- HTTP / REST device returning JSON:  address  http://192.168.0.60/api/status|counters.parts
+    def r_http(self, a):
+        u, _, path = a.partition("|")
+        return dotted(json.loads(urllib.request.urlopen(u, timeout=5).read()), path.strip())
+
+    # ---- test without a machine: address = pieces per minute
+    def r_sim(self, a):
+        return int(time.time() / 60.0 * float(a or 10))
+
+
+def http(method, body=None):
+    req = urllib.request.Request(URL, data=json.dumps(body).encode() if body is not None else None, method=method,
+                                 headers={"content-type": "application/json", "x-device-key": KEY})
+    return json.loads(urllib.request.urlopen(req, timeout=20).read())
+
+
+def load_queue():
+    try:
+        with open(QUEUE, encoding="utf-8") as f: return json.load(f)
+    except Exception: return []
+
+
+def save_queue(q):
+    try:
+        with open(QUEUE, "w", encoding="utf-8") as f: json.dump(q[-20000:], f)
+    except Exception: pass
+
+
+def autostart():
+    if os.name != "nt" or os.environ.get("KMR_NO_STARTUP"): return
+    try:
+        import winreg
+        exe = sys.executable
+        if exe.lower().endswith("python.exe"): exe = exe[:-10] + "pythonw.exe"
+        cmd = '"%s" "%s"' % (exe, os.path.abspath(__file__))
+        k = winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, r"Software\Microsoft\Windows\CurrentVersion\Run", 0, winreg.KEY_SET_VALUE)
+        winreg.SetValueEx(k, "KMRMachineGateway", 0, winreg.REG_SZ, cmd); winreg.CloseKey(k)
+    except Exception as e:
+        log("could not set start with Windows:", e)
+
+
+def main():
+    lock = socket.socket()
+    try: lock.bind(("127.0.0.1", 47100 + zlib.crc32(KEY.encode()) % 800))
+    except OSError:
+        log("already running"); return
+    autostart()
+    log("gateway", NAME, "started")
+    rd = Readers(); tags = {}; last_map = 0; last_sent = {}; q = load_queue()
+    while True:
+        try:
+            if time.time() - last_map > MAP_EVERY:
+                try:
+                    res = http("GET"); tags = {}
+                    for m in res.get("map", []):
+                        tags.setdefault(m["machine"], {})[m["kind"]] = m
+                    last_map = time.time(); log("tag map loaded:", len(tags), "machines", ("; unknown in app: " + ",".join(res.get("unknown_machines", []))) if res.get("unknown_machines") else "")
+                except Exception as e:
+                    log("cannot reach the app:", e)
+            now = time.time()
+            for machine, kinds in tags.items():
+                row = {"machine": machine}; sig = []
+                for kind, m in kinds.items():
+                    try:
+                        v = getattr(rd, "r_" + m["protocol"])(m["address"])
+                        scale = float(m.get("scale") or 1)
+                        if kind == "good": row["good_total"] = num(v) * scale
+                        elif kind == "reject": row["rej_total"] = num(v) * scale
+                        elif kind == "cycle": row["cycle_s"] = num(v) * scale
+                        elif kind == "state": row["state"] = norm_state(v)
+                    except Exception as e:
+                        log(machine, kind, m["protocol"], "read failed:", str(e)[:120])
+                if len(row) == 1: continue
+                sig = (row.get("good_total"), row.get("rej_total"), row.get("state"))
+                prev = last_sent.get(machine)
+                if prev is None or prev[0] != sig or now - prev[1] >= HEARTBEAT:
+                    row["at"] = datetime.now(timezone.utc).isoformat()
+                    q.append(row); last_sent[machine] = (sig, now)
+            if q:
+                try:
+                    for i in range(0, len(q), 500):
+                        http("POST", {"rows": q[i:i + 500]})
+                    q = []
+                except Exception as e:
+                    log("send failed, will retry:", str(e)[:120])
+                save_queue(q)
+        except Exception:
+            log(traceback.format_exc())
+        time.sleep(INTERVAL)
+
+
+if __name__ == "__main__":
+    main()

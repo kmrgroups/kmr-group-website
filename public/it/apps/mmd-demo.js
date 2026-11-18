@@ -219,6 +219,12 @@
     kmr_mmd_tag(a) { const t = byNo(a.p_no); if (!t) err("No tag with the number “" + (a.p_no || "") + "”."); return tagJson(t); },
     kmr_mmd_dc_get(a) { const d = dcs.find((x) => x.dc_no === String(a.p_no || "").trim().toUpperCase()); if (!d) err("No DC with the number “" + (a.p_no || "") + "”."); const rs = T(rsL, d.rs_id); return { dc: d, rs, progress: progress(rs), grns: grns.filter((g) => g.dc_id === d.id && g.ok_qty + g.rej_qty > 0) }; },
     kmr_mmd_issue(a) { const r = issue(a.p); return tagJson(T(tags, r.tag_id)); },
+    kmr_mmd_feed_load() {
+      const w = tags.filter((t) => t.status === "open" && t.loc === "op" && ["RM", "OK"].includes(t.kind) && t.bal > 0).map((t) => { const rs = T(rsL, t.rs_id), o = rs.ops[t.seq - 1] || {}; return { tag_no: t.tag_no, rs_no: rs.rs_no, part_code: rs.part_code, part_name: rs.part_name, seq: t.seq, bal: t.bal, op_name: o.name, machine: String(o.machine || "").toUpperCase(), op_type: o.type, kind: t.kind, created_at: t.created_at }; });
+      const live = machines.slice(0, 4).map((m, i) => ({ machine: m.code, state: ["run", "run", "idle", "alarm"][i], last_at: iso(nowMs() - 60000), good: [120, 85, 0, 0][i], rej: [2, 0, 0, 0][i], upto: 1 }));
+      return { can_edit: true, gateways: [{ id: "g1", name: "Demo gateway", location: "Shop floor", enabled: true, last_seen: iso(nowMs() - 30000), rows_total: 1840, push_key: "demo0000" }], map: [], live, waiting: w };
+    },
+    kmr_mmd_entry_feed(a) { return entry(a.p); }, kmr_mmd_gw_save() { return { ok: true }; }, kmr_mmd_map_save() { return { ok: true }; },
     kmr_mmd_entry(a) { return entry(a.p); }, kmr_mmd_rework(a) { return rework(a.p); }, kmr_mmd_dc_create(a) { return dc(a.p); }, kmr_mmd_grn(a) { return grn(a.p); },
     kmr_mmd_dispatch(a) { return dispatch(a.p); }, kmr_mmd_dispose(a) { return dispose(a); }, kmr_mmd_void(a) { return voidEntry(a); },
     kmr_mmd_rs_cancel(a) {
