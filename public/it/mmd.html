@@ -125,23 +125,94 @@ function drawFlow(){
   $('#ff').onchange=()=>{store('flowf',$('#ff').value);drawFlow()};
 }
 
-/* ---------- 1. SCAN ---------- */
-function drawScan(){
+/* ---------- 1. PRODUCTION ENTRY: three ways in - manual by stage, QR scan, machine capture. Every entry makes its QR tags; nothing is typed twice ---------- */
+const PMODES=[['man','1. Manual entry','stage by stage'],['qr','2. QR scan','scan the tag'],['mc','3. Machine capture','counts from the machine over LAN / Wi-Fi']];
+async function drawScan(){
+  const mode=store('pm')||'qr';
+  $('#scan').innerHTML=`<div class="guide">Three ways to enter production. All three make the same QR tags and <b>nothing is typed twice</b> — the tag already carries the part, route sheet, operation and heat code. <b>Rejection and rework</b> are entered with reason, specification and actual quantity, and their tags print automatically.</div>
+  <div class="row">${PMODES.map(m=>`<button class="btn${m[0]===mode?'':' o'}" data-pm="${m[0]}" style="text-align:left">${m[1]}<small style="display:block;font-weight:400">${m[2]}</small></button>`).join('')}</div><div id="act"></div><div id="pmb"></div>`;
+  document.querySelectorAll('[data-pm]').forEach(b=>b.onclick=()=>{store('pm',b.dataset.pm);window.__feed=null;window.__act=0;drawScan()});
+  if(mode==='man')await drawMan();else if(mode==='mc')await drawMc();else drawQr();
+}
+function lastTbl(){
+  const x=S.x;
+  return `<b>Last entries</b><div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Entry</th><th>Part</th><th>Operation</th><th class="n">OK</th><th class="n">Rej</th><th class="n">Rew</th><th>By</th><th>New tags</th>${ed()?'<th></th>':''}</tr></thead><tbody>${x.entries.slice(0,15).map(e=>`<tr${e.status==='void'?' style="opacity:.5;text-decoration:line-through"':''}><td>${dt(e.entry_at)}</td><td>${{process:'Process',rework:'Rework',dc:'DC',grn:'GRN',dispatch:'Dispatch'}[e.kind]}</td><td>${esc(e.part_code)}<div class="mut">${esc(e.rs_no)}</div></td><td>${esc(e.op_name||'—')}<div class="mut">${esc(e.machine||'')}</div></td><td class="n">${N(e.ok_qty)}</td><td class="n">${N(e.rej_qty)}</td><td class="n">${N(e.rew_qty)}</td><td>${esc(e.operator||'—')}</td><td class="mut">${esc(e.out_tags||'')}</td>${ed()?`<td>${e.status==='ok'&&e.kind!=='dispatch'?`<button class="btn s o" data-void="${e.id}">Void</button>`:''}</td>`:''}</tr>`).join('')||'<tr><td colspan="10" class="mut">No entries yet. Issue raw material to start a route sheet.</td></tr>'}</tbody></table></div>`;
+}
+const wireVoid=()=>document.querySelectorAll('[data-void]').forEach(b=>b.onclick=()=>voidDlg(b.dataset.void));
+const kpiBar=()=>{
   const x=S.x,open_=x.rs.filter(r=>r.status==='open'),k=(n,l,c)=>`<div class="kpi" style="--c:${c}"><b>${n}</b><span>${l}</span></div>`;
   const wip=x.tags.filter(t=>t.status==='open'&&['op','rework'].includes(t.loc)).reduce((a,t)=>a+t.bal,0),sup=x.dcs.filter(d=>['open','part'].includes(d.status)).reduce((a,d)=>a+d.qty-d.received_qty,0),
     rej=x.tags.filter(t=>t.kind==='REJ'&&!t.dispo&&t.status!=='void').reduce((a,t)=>a+t.bal,0),rew=x.tags.filter(t=>t.kind==='REW'&&t.status==='open').reduce((a,t)=>a+t.bal,0),fg=x.tags.filter(t=>t.loc==='fg'&&t.status==='open').reduce((a,t)=>a+t.bal,0);
-  $('#scan').innerHTML=`<div class="kpis">${k(open_.length,'open route sheets','var(--b1)')}${k(N(wip),'pcs on the shop floor','var(--b2)')}${k(N(sup),'pcs at suppliers','var(--a)')}${k(N(rew),'pcs waiting rework','var(--a)')}${k(N(rej),'rejected, no decision yet','var(--r)')}${k(N(fg),'pcs in finished goods','var(--g)')}</div>
-  <label class="lbl">Scan a tag or DC QR (or type its number) — the matching screen opens</label>
-  <form class="scan" id="sf"><input id="sc" autocomplete="off" autocapitalize="characters" placeholder="TG-2610-00012  /  DC-2610-0003  /  RS-2610-0001" autofocus><button class="btn" type="submit">Open</button>${('BarcodeDetector' in window)?'<button class="btn o" type="button" id="cam">📷 Camera</button>':''}</form>
-  <div id="act"></div>
-  <b>Last entries</b><div style="overflow-x:auto"><table><thead><tr><th>When</th><th>Entry</th><th>Part</th><th>Operation</th><th class="n">OK</th><th class="n">Rej</th><th class="n">Rew</th><th>By</th><th>New tags</th>${ed()?'<th></th>':''}</tr></thead><tbody>${x.entries.slice(0,15).map(e=>`<tr${e.status==='void'?' style="opacity:.5;text-decoration:line-through"':''}><td>${dt(e.entry_at)}</td><td>${{process:'Process',rework:'Rework',dc:'DC',grn:'GRN',dispatch:'Dispatch'}[e.kind]}</td><td>${esc(e.part_code)}<div class="mut">${esc(e.rs_no)}</div></td><td>${esc(e.op_name||'—')}<div class="mut">${esc(e.machine||'')}</div></td><td class="n">${N(e.ok_qty)}</td><td class="n">${N(e.rej_qty)}</td><td class="n">${N(e.rew_qty)}</td><td>${esc(e.operator||'—')}</td><td class="mut">${esc(e.out_tags||'')}</td>${ed()?`<td>${e.status==='ok'&&e.kind!=='dispatch'?`<button class="btn s o" data-void="${e.id}">Void</button>`:''}</td>`:''}</tr>`).join('')||'<tr><td colspan="10" class="mut">No entries yet. Issue raw material to start a route sheet.</td></tr>'}</tbody></table></div>`;
-  if(hasF('mmd.wip-map-throughput-alerts')&&window.MMDDash){const n=MMDDash.stuck(S.m,x);if(n)$('#scan').insertAdjacentHTML('afterbegin',`<div class="msg"><b>${n} lot${n>1?'s are':' is'} not moving.</b> <a href="#go=wip">See the WIP map &amp; alerts</a></div>`)}
+  return `<div class="kpis">${k(open_.length,'open route sheets','var(--b1)')}${k(N(wip),'pcs on the shop floor','var(--b2)')}${k(N(sup),'pcs at suppliers','var(--a)')}${k(N(rew),'pcs waiting rework','var(--a)')}${k(N(rej),'rejected, no decision yet','var(--r)')}${k(N(fg),'pcs in finished goods','var(--g)')}</div>`;
+};
+/* mode 2: QR scan */
+function drawQr(){
+  $('#pmb').innerHTML=kpiBar()+`<label class="lbl">Scan a tag or DC QR (or type its number) — the matching screen opens</label>
+  <form class="scan" id="sf"><input id="sc" autocomplete="off" autocapitalize="characters" placeholder="TG-2610-00012  /  DC-2610-0003  /  RS-2610-0001" autofocus><button class="btn" type="submit">Open</button>${('BarcodeDetector' in window)?'<button class="btn o" type="button" id="cam">📷 Camera</button>':''}</form>`+lastTbl();
+  if(hasF('mmd.wip-map-throughput-alerts')&&window.MMDDash){const n=MMDDash.stuck(S.m,S.x);if(n)$('#pmb').insertAdjacentHTML('afterbegin',`<div class="msg"><b>${n} lot${n>1?'s are':' is'} not moving.</b> <a href="#go=wip">See the WIP map &amp; alerts</a></div>`)}
   $('#sf').onsubmit=(ev)=>{ev.preventDefault();const v=$('#sc').value;$('#sc').value='';if(v.trim())openCode(v)};
   if($('#cam'))$('#cam').onclick=startCam;
-  document.querySelectorAll('[data-void]').forEach(b=>b.onclick=()=>voidDlg(b.dataset.void));
+  wireVoid();
   if(!window.__act)$('#sc').focus();
 }
-async function openCode(code){
+/* mode 1: manual entry, stage by stage - the lots waiting at each operation, one press to enter */
+async function drawMan(){
+  const f=S.f=await call('kmr_mmd_feed_load'),w=f.waiting||[],q=(store('pmq')||'').toLowerCase(),sg=store('pms')||'',mc=store('pmm')||'';
+  const stages=[...new Set(w.map(x=>x.op_name||'—'))].sort(),machines=[...new Set(w.map(x=>x.machine||'—'))].sort();
+  const show=w.filter(x=>(!sg||(x.op_name||'—')===sg)&&(!mc||(x.machine||'—')===mc)&&(!q||(x.tag_no+' '+x.part_code+' '+(x.part_name||'')+' '+x.rs_no).toLowerCase().includes(q)));
+  $('#pmb').innerHTML=kpiBar()+`<div class="guide"><b>Manual entry:</b> every lot waiting at a stage is listed here. Press <b>Enter</b> on your lot — part, operation, machine and quantity come from its tag. Type only the OK quantity, rejection and rework, with the operator name.</div>
+  <div class="row"><input id="pq" placeholder="Search tag, part or route sheet" value="${esc(store('pmq')||'')}" style="max-width:280px"><select id="ps"><option value="">All stages</option>${stages.map(x=>`<option${x===sg?' selected':''}>${esc(x)}</option>`).join('')}</select><select id="pm_"><option value="">All machines</option>${machines.map(x=>`<option${x===mc?' selected':''}>${esc(x)}</option>`).join('')}</select><span class="mut">${show.length} lots waiting</span></div>
+  <div class="sc"><table class="lt"><thead><tr><th class="n">S.NO</th><th>Tag</th><th>Part</th><th>Route sheet</th><th>Stage (operation)</th><th>Machine</th><th class="n">Waiting pcs</th><th>Waiting since</th><th></th></tr></thead><tbody>${show.map((x,i)=>`<tr><td class="n">${i+1}</td><td><b>${esc(x.tag_no)}</b></td><td>${esc(x.part_code)}<div class="mut">${esc(x.part_name||'')}</div></td><td>${esc(x.rs_no)}</td><td>${x.seq}. ${esc(x.op_name||'')}${x.op_type==='supplier'?' <span class="chip a">supplier</span>':''}</td><td>${esc(x.machine||'—')}</td><td class="n">${N(x.bal)}</td><td>${dt(x.created_at)}</td><td>${ed()?`<button class="btn s g" data-open="${esc(x.tag_no)}">${x.op_type==='supplier'?'Send to supplier':'Enter'}</button>`:''}</td></tr>`).join('')||'<tr><td colspan="9" class="mut">No lot is waiting. Start one in <a href="#go=issue">Issue raw material</a>.</td></tr>'}</tbody></table></div>`+lastTbl();
+  $('#pq').oninput=()=>{store('pmq',$('#pq').value);const c=$('#pq').selectionStart;drawMan().then(()=>{$('#pq').focus();$('#pq').setSelectionRange(c,c)})};
+  $('#ps').onchange=()=>{store('pms',$('#ps').value);drawMan()};$('#pm_').onchange=()=>{store('pmm',$('#pm_').value);drawMan()};
+  document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openCode(b.dataset.open));wireVoid();
+}
+/* mode 3: machine capture - counts arrive from the gateway program over LAN / Wi-Fi; the operator only confirms and adds rejection reasons */
+const ST={run:['Running','g'],idle:['Idle','a'],alarm:['Alarm','r'],off:['Off','x']};
+const PROTO={opcua:'OPC UA (Siemens Sinumerik, S7-1500, most controllers)',s7:'Siemens S7 PLC (S7-300/400/1200/1500)',focas:'Fanuc CNC (FOCAS over Ethernet)',mtconnect:'MTConnect (Mazak, Okuma, Haas, DMG and others)',modbus:'Modbus TCP (PLCs, IoT boxes, energy / counter meters)',mqtt:'MQTT (IoT devices that publish)',http:'HTTP / REST device (JSON)',sim:'Test (simulated counts, no machine)'};
+const HINT={opcua:'opc.tcp://192.168.0.10:4840|ns=2;s=Channel1.PartCount',s7:'192.168.0.11|DB10|4|dint   (types: int word dint dword real; S7-300: 192.168.0.11@0/2|…)',focas:'192.168.0.50:8193|total   (or parts, status, param:6712, macro:900)',mtconnect:'http://192.168.0.60:5000|PartCount   (data item id or name)',modbus:'192.168.0.20:502|hr|100|u32   (hr, ir, co, di · u16 i16 u32 u32le f32)',mqtt:'192.168.0.5:1883|plant/m12/parts|count   (last part = key inside a JSON message)',http:'http://192.168.0.70/api/status|counters.parts',sim:'30   (pieces per minute)'};
+const KIND={good:'Good (OK) piece counter — total',reject:'Rejected piece counter — total',state:'Run / idle / alarm status',cycle:'Last cycle time (seconds)'};
+const ago=(t)=>{if(!t)return 'never';const m=Math.round((Date.now()-new Date(t))/60000);return m<1?'just now':m<60?m+' min ago':m<1440?Math.round(m/60)+' h ago':Math.round(m/1440)+' days ago'};
+async function drawMc(){
+  const f=S.f=await call('kmr_mmd_feed_load'),gws=f.gateways||[],map=f.map||[],live=f.live||[],w=f.waiting||[],can=f.can_edit&&ed();
+  const liveRows=live.map(l=>{
+    const st=ST[l.state]||['No status','x'],stale=(Date.now()-new Date(l.last_at))>10*60000,cand=w.filter(x=>x.machine===String(l.machine).toUpperCase()&&x.op_type!=='supplier');
+    return `<tr><td><b>${esc(l.machine)}</b></td><td><span class="chip ${stale?'x':st[1]}">${stale?'No signal':st[0]}</span>${l.alarm?`<div class="mut">${esc(l.alarm)}</div>`:''}</td><td class="n"><b>${N(l.good)}</b></td><td class="n">${N(l.rej)}</td><td>${ago(l.last_at)}</td><td>${cand.length?(cand.length>1?`<select data-ct="${esc(l.machine)}">${cand.map(c=>`<option value="${esc(c.tag_no)}">${esc(c.tag_no)} · ${esc(c.part_code)} · ${N(c.bal)} pcs</option>`).join('')}</select>`:`${esc(cand[0].tag_no)} · ${esc(cand[0].part_code)} · ${N(cand[0].bal)} pcs`):'<span class="mut">no lot waiting at this machine</span>'}</td><td>${can&&cand.length&&(+l.good>0||+l.rej>0)?`<button class="btn s g" data-ce="${esc(l.machine)}" data-g="${l.good}" data-r="${l.rej}">Enter these pieces</button>`:''}</td></tr>`;
+  }).join('');
+  const mOpt=opt(S.m.machines,'');
+  $('#pmb').innerHTML=kpiBar()+`<div class="guide"><b>Machine capture:</b> a small gateway program on a PC in the shop reads the piece counter and status of each machine over LAN / Wi-Fi and sends them here. You only press <b>Enter these pieces</b>, check the quantity and add the <b>reason</b> for any rejected piece — the QR tags print as usual and the counted pieces are used once.</div>
+  <h3>Live machines</h3><div class="sc"><table class="lt"><thead><tr><th>Machine</th><th>Status</th><th class="n">Counted OK, not yet entered</th><th class="n">Counted rejected</th><th>Last signal</th><th>Lot waiting at this machine</th><th></th></tr></thead><tbody>${liveRows||'<tr><td colspan="7" class="mut">No machine has sent data yet. Set up the gateway and the machine tags below.</td></tr>'}</tbody></table></div>
+  <h3>1. Gateway (the program on the shop-floor PC)</h3><div class="sc"><table class="lt"><thead><tr><th>Gateway</th><th>Location</th><th>Last signal</th><th class="n">Rows received</th>${can?'<th>Key</th><th></th>':''}</tr></thead><tbody>${gws.map(g=>`<tr><td><b>${esc(g.name)}</b></td><td>${esc(g.location||'—')}</td><td><span class="chip ${g.last_seen&&(Date.now()-new Date(g.last_seen))<10*60000?'g':'x'}">${ago(g.last_seen)}</span></td><td class="n">${N(g.rows_total)}</td>${can?`<td><code>${esc((g.push_key||'').slice(0,8))}…</code></td><td><button class="btn s" data-gd="${g.id}">Download program</button> <button class="btn s o" data-gx="${g.id}">Remove</button></td>`:''}</tr>`).join('')||'<tr><td colspan="6" class="mut">No gateway yet.</td></tr>'}</tbody></table></div>
+  ${can?`<div class="row"><input id="gn" placeholder="Gateway name, e.g. Shop-floor PC Unit-2" style="max-width:300px"><input id="gl" placeholder="Location (optional)" style="max-width:200px"><button class="btn" id="ga">Add gateway</button></div><p class="note">Download the program, copy it to the shop PC (it must reach the machines on the LAN and the internet) and run it once with Python. It starts with Windows, installs what it needs, reads the tag list below by itself, and keeps data if the internet drops.</p>`:''}
+  <h3>2. Machine tag map — what to read on each machine</h3><div class="sc"><table class="lt"><thead><tr><th>Machine</th><th>What</th><th>Connection</th><th>Address in the machine</th><th class="n">Multiply by</th>${can?'<th></th>':''}</tr></thead><tbody>${map.map(r=>`<tr><td><b>${esc(r.machine_code)}</b></td><td>${esc(KIND[r.kind]||r.kind)}</td><td>${esc((PROTO[r.protocol]||r.protocol).split(' (')[0])}</td><td><code>${esc(r.address||'')}</code></td><td class="n">${esc(r.scale)}</td>${can?`<td><button class="btn s o" data-md="${esc(r.machine_code)}|${esc(r.kind)}">Delete</button></td>`:''}</tr>`).join('')||'<tr><td colspan="6" class="mut">No machine tag yet.</td></tr>'}</tbody></table></div>
+  ${can?`<div class="frm"><div><label>Machine</label><select id="mmM">${mOpt}</select></div><div><label>What to read</label><select id="mmK">${Object.keys(KIND).map(k=>`<option value="${k}">${KIND[k]}</option>`).join('')}</select></div><div><label>Connection</label><select id="mmP">${Object.keys(PROTO).map(k=>`<option value="${k}">${PROTO[k]}</option>`).join('')}</select></div><div style="grid-column:span 2"><label>Address in the machine</label><input id="mmA"></div><div><label>Multiply by</label><input id="mmS" type="number" value="1" step="any"></div></div><p class="note" id="mmH"></p><div class="row"><button class="btn" id="mmAdd">Save machine tag</button></div>`:''}
+  <details class="box"><summary><b>Which connection for which machine?</b></summary><table class="lt" style="min-width:0"><tbody><tr><td><b>Fanuc CNC</b></td><td>Fanuc → FOCAS (needs the Fanuc Fwlib library on the gateway PC and the CNC Ethernet option), or MTConnect / OPC UA if the machine has it.</td></tr><tr><td><b>Siemens CNC (Sinumerik)</b></td><td>OPC UA. <b>Siemens PLC</b>: S7 direct, or OPC UA on S7-1200/1500.</td></tr><tr><td><b>Mazak, Okuma, Haas, DMG, Mitsubishi, Heidenhain, others</b></td><td>MTConnect or OPC UA (most current controllers offer one of them).</td></tr><tr><td><b>Any PLC + IoT device</b></td><td>Modbus TCP, MQTT or REST. A box that can send JSON can also post straight to the app: <code>POST https://www.kmr-groups.com/it/console/api/mmd/feed</code> with header <code>x-device-key</code> and body <code>{"rows":[{"machine":"EPI-27","good_total":1520,"state":"run"}]}</code>.</td></tr></tbody></table></details>`+lastTbl();
+  wireVoid();
+  document.querySelectorAll('[data-ce]').forEach(b=>b.onclick=()=>{const m=b.dataset.ce,sel=document.querySelector('[data-ct="'+m+'"]'),w1=(S.f.waiting||[]).filter(x=>x.machine===m.toUpperCase()&&x.op_type!=='supplier'),tag=sel?sel.value:(w1[0]||{}).tag_no;feedEnter(m,tag,+b.dataset.g,+b.dataset.r)});
+  if(can){
+    const hint=()=>{$('#mmH').textContent='Address format: '+HINT[$('#mmP').value]};$('#mmP').onchange=hint;hint();
+    $('#ga').onclick=async()=>{try{await call('kmr_mmd_gw_save',{p:{name:idv('gn'),location:idv('gl')}});say('Gateway added.',1);drawMc()}catch(e){say(e.message)}};
+    $('#mmAdd').onclick=async()=>{try{await call('kmr_mmd_map_save',{p_rows:[{machine_code:idv('mmM'),kind:idv('mmK'),protocol:idv('mmP'),address:idv('mmA'),scale:idv('mmS')}]});say('Machine tag saved. The gateway picks it up within 2 minutes.',1);drawMc()}catch(e){say(e.message)}};
+    document.querySelectorAll('[data-md]').forEach(b=>b.onclick=async()=>{const [m,k]=b.dataset.md.split('|');try{await call('kmr_mmd_map_save',{p_rows:[{machine_code:m,kind:k,delete:true}]});drawMc()}catch(e){say(e.message)}});
+    document.querySelectorAll('[data-gx]').forEach(b=>b.onclick=async()=>{if(!confirm('Remove this gateway? It will stop sending data.'))return;try{await call('kmr_mmd_gw_save',{p:{id:b.dataset.gx,delete:true}});drawMc()}catch(e){say(e.message)}});
+    document.querySelectorAll('[data-gd]').forEach(b=>b.onclick=async()=>{const g=gws.find(x=>x.id===b.dataset.gd);try{const t=await (await fetch('/it/apps/mmd-gateway.py.txt',{cache:'no-store'})).text();
+      const clean=(v)=>String(v||'').replace(/["\\\r\n]/g,'');const out=t.replace('__URL__','https://www.kmr-groups.com/it/console/api/mmd/feed').replace('__KEY__',clean(g.push_key)).replace('__NAME__',clean(g.name));
+      const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([out],{type:'text/x-python'}));a.download='KMR_Machine_Gateway_'+clean(g.name).replace(/\W+/g,'_')+'.py';document.body.appendChild(a);a.click();a.remove();say('Program downloaded. Copy it to the shop-floor PC and run it once.',1)}catch(e){say(e.message)}});
+  }
+}
+/* the counted pieces fill the entry form; saving takes them over once (kmr_mmd_entry_feed) */
+async function feedEnter(machine,tag,good,rej){
+  if(!tag){say('No lot is waiting at '+machine+'. Issue raw material or finish the previous stage first.');return}
+  await openCode(tag,true);window.__feed={machine:String(machine).toUpperCase()};
+  const bal=+((document.querySelector('#tot')||{}).dataset||{}).bal||0;
+  if($('#fMc')){const o=[...$('#fMc').options].find(x=>x.value.toUpperCase()===window.__feed.machine);if(o)$('#fMc').value=o.value}
+  const ok=Math.min(good,bal);if($('#fOk'))$('#fOk').value=ok||'';
+  if(rej>0&&$('#rejL')){addLine('rejL','rej');const q=document.querySelector('#rejL .ln [data-f=qty]');if(q)q.value=Math.min(rej,Math.max(0,bal-ok))}
+  sum();
+  $('#act').insertAdjacentHTML('afterbegin',`<div class="msg"><b>${esc(machine)} counted ${N(good)} OK${rej?' and '+N(rej)+' rejected':''}.</b> Check the quantity${rej?', choose the reason for the rejected pieces':''} and press Save. ${good>bal?'This tag has only '+N(bal)+' pcs, the rest stays for the next lot.':''}</div>`);
+}
+async function openCode(code,keep){
+  if(!keep)window.__feed=null;
   code=String(code).trim().toUpperCase();say('');
   try{
     if(/^DC-/.test(code)){await dcScreen(code)}
@@ -201,7 +272,7 @@ function disposeForm(tj){
   return `<div class="card"><h3>Decide what happens to these rejected parts</h3><div class="frm"><div><label>Disposition *</label><select id="fDp">${DISPO.map(d=>`<option>${d}</option>`).join('')}</select></div><div style="grid-column:span 2"><label>Note (customer / authority reference is needed for a concession)</label><input id="fNote"></div></div><div class="row" style="margin-top:10px"><button class="btn g" id="go">Save decision</button><button class="btn o" id="cx">Cancel</button></div></div>`;
 }
 function wireForm(tj){
-  const t=tj.tag,o=tj.op||{},go=$('#go'),cx=$('#cx');if(cx)cx.onclick=()=>{window.__act=0;$('#act').innerHTML='';$('#sc').focus()};if(!go)return;
+  const t=tj.tag,o=tj.op||{},go=$('#go'),cx=$('#cx');if(cx)cx.onclick=()=>{window.__act=0;window.__feed=null;$('#act').innerHTML='';if($('#sc'))$('#sc').focus()};if(!go)return;
   if($('#fOk'))$('#fOk').oninput=sum;sum();
   go.onclick=async()=>{
     go.disabled=true;say('');
@@ -210,7 +281,7 @@ function wireForm(tj){
         saveCommon();const r=await call('kmr_mmd_dc_create',{p:Object.assign({tag_no:t.tag_no,supplier_code:idv('fSup'),qty:idv('fQty'),vehicle:idv('fVeh'),expected_date:idv('fExp'),note:idv('fNote')},cmn())});
         const g=await call('kmr_mmd_dc_get',{p_no:r.dc_no});window.__act=0;showDoc('Delivery challan '+r.dc_no,P.dc(g.dc,co(),g.rs,t.tag_no,(S.m.suppliers||[]).find(s=>s.code===g.dc.supplier_code)),()=>route());
       }else if(['RM','OK'].includes(t.kind)&&t.loc==='op'){
-        saveCommon();const res=await call('kmr_mmd_entry',{p:Object.assign({tag_no:t.tag_no,machine:idv('fMc'),ok:idv('fOk'),rej_lines:readLines('rejL'),rew_lines:readLines('rewL'),note:idv('fNote')},cmn())});window.__act=0;resultDoc('Tags for entry on '+t.tag_no,res);
+        saveCommon();const fd=!!(window.__feed&&String(idv('fMc')).toUpperCase()===window.__feed.machine);const res=await call(fd?'kmr_mmd_entry_feed':'kmr_mmd_entry',{p:Object.assign({tag_no:t.tag_no,machine:idv('fMc'),ok:idv('fOk'),rej_lines:readLines('rejL'),rew_lines:readLines('rewL'),note:idv('fNote'),feed:fd},cmn())});window.__act=0;window.__feed=null;resultDoc('Tags for entry on '+t.tag_no,res);
       }else if(t.kind==='REW'){
         saveCommon();const res=await call('kmr_mmd_rework',{p:Object.assign({tag_no:t.tag_no,machine:idv('fMc'),ok:idv('fOk'),rej_lines:readLines('rejL'),note:idv('fNote')},cmn())});window.__act=0;resultDoc('Rework result — '+t.tag_no,res);
       }else if(t.kind==='OK'&&t.loc==='fg'){

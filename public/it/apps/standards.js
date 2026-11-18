@@ -177,7 +177,12 @@ mmd:[
 ['ISO','8.7','Control of nonconforming outputs','Rejection and rework quantities are recorded by reason.'],
 ['IATF','8.7.1','Control of nonconforming product','Loss and rejection codes support segregation and disposition records.'],
 ['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Loss codes and WIP give process yield and loss by stage.'],
-['VDA','P6','Process / service','Material flow, handling and nonconforming product are shown on screen.']],
+['VDA','P6','Process / service','Material flow, handling and nonconforming product are shown on screen.'],
+['IATF','8.5.2.1','Identification and traceability (supplemental)','Every production entry makes its own QR tag (part, route sheet, operation, heat code, quantity); the entry is made by manual stage-wise entry, QR scan or machine capture, and all three give the same tags and traceability.'],
+['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Piece counts and run, idle and alarm status are read from the machines over the network (Fanuc, Siemens, OPC UA, MTConnect, Modbus, MQTT) and used once in the production entry; a counted piece cannot be entered twice.'],
+['IATF','8.7.1','Control of nonconforming product','Stage-wise rejection and rework are entered with reason, specification and actual; machine-counted rejected pieces cannot be saved without a reason, and rejection and rework tags are printed.'],
+['ISO','7.1.5.1','Monitoring and measuring resources','The machine tag map records which machine signal is read for each counter, so the source of every counted quantity is known.'],
+['ISO','8.1','Operational planning and control','Process flow check lists, for every part, the missing route, cycle time, machine, BOM weight and drawing before production starts.']],
 mnt:[
 ['IATF','8.5.1.5','Total productive maintenance','Breakdowns, preventive maintenance plan, MTBF and MTTR are tracked.'],
 ['ISO','7.1.3','Infrastructure','Machine history cards show the condition and upkeep of equipment.'],
