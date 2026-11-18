@@ -191,37 +191,79 @@ if __name__ == "__main__":
             worker()
 `;
 
-  function bridgeScript(o) {
-    return `#!/usr/bin/env python3
-"""KMR HRM bridge - reads the attendance punches from a biometric machine by its IP address and sends them to KMR HRM & Payroll.
-Machine: ${o.name || "(machine)"} (${o.ip})
-Works with machines that speak the ZKTeco protocol (ZKTeco, eSSL, Realtime and most look-alikes) on their network port (usually 4370).
-Double-click this file (kmr_bridge.pyw) on a PC that is on the same network as the machine and stays switched on.
-No window opens: a small KMR icon appears near the clock (system tray). Green = punches are being sent, red = a problem (hover to read it).
-Right-click the icon: Send now, Start with Windows, Open log, Quit. The first run installs what it needs and sets itself to start with Windows.
-It checks every ${o.every || 5} minutes. Nothing is lost when the PC or the internet is off: every run sends the punches again from the last one confirmed, and punches already received are ignored.
-Other ways:  python kmr_bridge.pyw --once   (read once and stop)      python kmr_bridge.pyw --console   (run in a window, no tray icon)"""
-import sys, time, json, os, datetime, threading, subprocess, socket, zlib
+  /* The same program that runs at Esbee Unit-2: reads the machine by its IP, can also read an eSSL eBioServer database on the PC (o.ebio),
+     sends names + punches (unknown IDs become employees in the HRM), tray menu with close password, re-pull from a date, Windows start-up and a watchdog task. */
+  const BRIDGE_TPL = `#!/usr/bin/env python3
+"""KMR HRM bridge - __MACHINE__.
+Reads punches from the machine (__IP__)__DBDOC__
+and sends them to KMR HRM & Payroll. Punches the HRM already has are ignored, so re-sending is always safe.
+Tray icon (near the clock): green = ok, red = problem. Right-click:
+  Send now | Re-pull data from a date... | Start with Windows (password to switch off) |
+  Change close password | Open log | Quit (password)
+Never stops: a Windows task runs  kmr_bridge.pyw --watchdog  every 5 minutes and starts the bridge if it is not running.
+Other: --once (send once and stop)   --console (no tray)   --pull YYYY-MM-DD (re-pull from that date and stop)"""
+import sys, time, json, os, datetime, threading, subprocess, socket, zlib, hashlib, secrets, tempfile
 
-IP, PORT, COMM_KEY = "${o.ip || "192.168.1.201"}", ${o.port || 4370}, ${o.commkey || 0}
-URL, KEY = "${o.url}", "${o.key || "PASTE-THE-KEY-FROM-THE-MACHINE-SCREEN"}"
-EVERY_MIN = ${o.every || 5}
-NAME = "KMR bridge ${String(o.name || o.ip || "").replace(/[^A-Za-z0-9 ._-]/g, "")}".strip()
+IP, PORT, COMM_KEY = "__IP__", __PORT__, __COMMKEY__
+URL, KEY = "__URL__", "__KEY__"
+EVERY_MIN = __EVERY__
+NAME = "__NAME__"
 LOCKKEY = IP + str(PORT)
+BACKFILL_FROM = "__BACKFILL__"
+DB_DEVICES = __DBDEVICES__          # eBioServer DeviceId -> machine (empty = this machine only)
+SQLCMD = r"C:\\Program Files\\Microsoft SQL Server\\Client SDK\\ODBC\\170\\Tools\\Binn\\SQLCMD.EXE"
+SQL_SERVER, SQL_DB = r"__SQLSERVER__", "__SQLDB__"
 PKGS = (("requests", "requests"), ("zk", "pyzk"))
 HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(HERE, "kmr_bridge_state.json")
 LOGF = os.path.join(HERE, "kmr_bridge.log")
+FLAG = os.path.join(HERE, "stopped.flag")
 VERIFY = {0: "password", 1: "finger", 2: "card", 3: "password", 4: "card", 15: "face", 25: "palm"}
 DIRECTION = {0: "in", 1: "out", 4: "in", 5: "out"}
 NL = chr(10)
+NOWIN = 0x08000000 if os.name == "nt" else 0
 STATUS = {"text": "Starting...", "ok": True}
 WAKE = threading.Event()
+RUN_LOCK = threading.Lock()
+PULL = {"since": None}
+RUN_KEY = "Software" + chr(92) + "Microsoft" + chr(92) + "Windows" + chr(92) + "CurrentVersion" + chr(92) + "Run"
 
-def run_once():
-    import requests
+# ---------------------------------------------------------------- state / log
+def log(msg):
+    line = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S ") + str(msg)
+    try:
+        if os.path.exists(LOGF) and os.path.getsize(LOGF) > 400000:
+            keep = open(LOGF, encoding="utf-8", errors="ignore").read().split(NL)[-500:]
+            open(LOGF, "w", encoding="utf-8").write(NL.join(keep) + NL)
+        with open(LOGF, "a", encoding="utf-8") as f:
+            f.write(line + NL)
+    except Exception:
+        pass
+    if sys.stdout:
+        print(line)
+
+def load_state():
+    try:
+        return json.load(open(STATE))
+    except Exception:
+        return {}
+
+def save_state(**kw):
+    st = load_state()
+    st.update(kw)
+    json.dump(st, open(STATE, "w"))
+
+def need(mod, pkg):
+    try:
+        __import__(mod)
+    except ImportError:
+        log("Installing " + pkg + " (first run only)...")
+        subprocess.check_call([sys.executable, "-m", "pip", "install", "--quiet", pkg], creationflags=NOWIN)
+
+# ---------------------------------------------------------------- reading punches
+def read_machine(since):
+    """punches from the machine itself (MC1). since = 'YYYY-MM-DD HH:MM:SS'"""
     from zk import ZK
-    since = load_state().get("last", "1970-01-01 00:00:00")
     conn = ZK(IP, port=PORT, timeout=15, password=COMM_KEY, force_udp=False, ommit_ping=True).connect()
     try:
         rows = [a for a in conn.get_attendance() if a.timestamp.strftime("%Y-%m-%d %H:%M:%S") >= since]
@@ -231,20 +273,420 @@ def run_once():
             users = []
     finally:
         conn.disconnect()
-    if users:
+    pun = [{"bio_id": str(a.user_id), "time": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"), "verify": VERIFY.get(a.status, "other"), "direction": DIRECTION.get(a.punch)} for a in rows]
+    return pun, users
+
+def read_db(where):
+    """punches from the eBioServer database. returns (punches, max DeviceLogId)"""
+    ids = ",".join(str(i) for i in DB_DEVICES)
+    q = ("SET NOCOUNT ON; SELECT DeviceLogId, DeviceId, EmployeeCode, CONVERT(varchar(19), LogDate, 120), VerificationType, Direction "
+         "FROM DeviceLogs WHERE DeviceId IN (" + ids + ") AND " + where + " ORDER BY DeviceLogId")
+    exe = SQLCMD if os.path.exists(SQLCMD) else "sqlcmd"
+    r = subprocess.run([exe, "-S", SQL_SERVER, "-E", "-d", SQL_DB, "-h", "-1", "-W", "-s", "|", "-b", "-Q", q],
+                       capture_output=True, text=True, creationflags=NOWIN, timeout=300)
+    if r.returncode != 0:
+        raise RuntimeError("database read failed: " + (r.stdout or r.stderr or "").strip()[:150])
+    pun, top = [], 0
+    for line in r.stdout.splitlines():
+        p = line.strip().split("|")
+        if len(p) != 6 or not p[0].isdigit() or not p[2] or p[2].upper() == "NULL":
+            continue
+        top = max(top, int(p[0]))
+        dev = int(p[1])
         try:
-            requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"users": users}), timeout=60)
+            ver = int(p[4])
+        except ValueError:
+            ver = -1
+        d = p[5].upper() if dev == 1 else ""          # MC2 has no real in/out direction
+        pun.append({"bio_id": p[2], "time": p[3], "verify": VERIFY.get(ver, "other"), "direction": {"IN": "in", "OUT": "out"}.get(d)})
+    return pun, top
+
+def post(payload):
+    import requests
+    r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps(payload), timeout=60)
+    r.raise_for_status()
+    try:
+        j = r.json()
+        return j.get("result", j) if isinstance(j, dict) else {}
+    except Exception:
+        return {}
+
+def read_db_users():
+    """employee code -> name from the eBioServer Employees table"""
+    q = "SET NOCOUNT ON; SELECT EmployeeCode, EmployeeName FROM Employees WHERE EmployeeName IS NOT NULL AND LTRIM(RTRIM(EmployeeName)) <> ''"
+    exe = SQLCMD if os.path.exists(SQLCMD) else "sqlcmd"
+    r = subprocess.run([exe, "-S", SQL_SERVER, "-E", "-d", SQL_DB, "-h", "-1", "-W", "-s", "|", "-b", "-Q", q],
+                       capture_output=True, text=True, creationflags=NOWIN, timeout=120)
+    if r.returncode != 0:
+        raise RuntimeError("employee read failed: " + (r.stdout or r.stderr or "").strip()[:150])
+    names = {}
+    for line in r.stdout.splitlines():
+        p = line.strip().split("|", 1)
+        if len(p) == 2 and p[0] and p[0].upper() != "NULL" and p[1].strip():
+            names[p[0]] = p[1].strip()
+    return names
+
+def sync_names(machine_users):
+    """send every employee name (database first, machine names override) so the HRM creates missing employees and fills names"""
+    names = {}
+    if DB_DEVICES:
+        try:
+            names.update(read_db_users())
+        except Exception as e:
+            log("Could not read employee names from the database: " + str(e)[:100])
+    for u in machine_users:
+        names[u["bio_id"]] = u["name"]
+    if not names:
+        return {}
+    users = [{"bio_id": k, "name": v} for k, v in names.items()]
+    info = {"users": len(users), "new": [], "filled": 0}
+    for i in range(0, len(users), 500):
+        res = post({"users": users[i:i + 500]})
+        info["new"] += res.get("new_employees") or []
+        info["filled"] += int((res.get("names") or {}).get("names_filled") or 0)
+    return info
+
+def send(punches):
+    seen, out = set(), []
+    for p in punches:
+        k = (p["bio_id"], p["time"])
+        if k not in seen:
+            seen.add(k)
+            out.append(p)
+    unknown = set()
+    for i in range(0, len(out), 2000):
+        res = post({"punches": out[i:i + 2000]})
+        unknown.update(str(x) for x in (res.get("unknown_ids") or []))
+    return len(out), unknown
+
+# ---------------------------------------------------------------- one run
+def run_once(since_date=None):
+    """normal run (since_date None): machine since last + database since last id. re-pull: everything from since_date."""
+    st = load_state()
+    punches, errors = [], []
+    users, new_last, new_id = [], None, None
+    if since_date:
+        m_since, where = since_date + " 00:00:00", "LogDate >= '" + since_date + "'"
+    else:
+        m_since = st.get("last", BACKFILL_FROM + " 00:00:00")
+        where = ("DeviceLogId > " + str(int(st["last_id"]))) if "last_id" in st else ("LogDate >= '" + BACKFILL_FROM + "'")
+    try:
+        mp, users = read_machine(m_since)
+        punches += mp
+        if mp:
+            new_last = max(p["time"] for p in mp)
+    except Exception as e:
+        errors.append("machine: " + str(e)[:80])
+    if DB_DEVICES:
+        try:
+            dp, top = read_db(where)
+            punches += dp
+            new_id = top or None
+        except Exception as e:
+            errors.append("database: " + str(e)[:80])
+    if len(errors) >= (2 if DB_DEVICES else 1):
+        raise RuntimeError("; ".join(errors))
+    try:
+        ni = sync_names(users)                          # names + new employees first, so punches always find their employee
+        if ni and (ni["new"] or ni["filled"]):
+            log("Names synced: " + str(len(ni["new"])) + " new employee(s) created, " + str(ni["filled"]) + " name(s) filled")
+    except Exception as e:
+        log("Name sync failed (will retry): " + str(e)[:100])
+    n, unknown = send(punches)                          # raises if the HRM did not accept: state is then left unchanged
+    if unknown:
+        log("HRM does not know these employee ids yet: " + ", ".join(sorted(unknown)[:20]))
+    upd = {}
+    if new_last and (since_date is None or new_last > st.get("last", "")):
+        upd["last"] = new_last
+    if new_id and (since_date is None or new_id > int(st.get("last_id", 0))):
+        upd["last_id"] = new_id
+    if upd:
+        save_state(**upd)
+    return n, errors
+
+def cycle():
+    with RUN_LOCK:
+        since, PULL["since"] = PULL["since"], None
+        try:
+            n, errs = run_once(since)
+            tag = "re-pull from " + since + ": " if since else ""
+            STATUS.update(ok=not errs, text=("OK " if not errs else "Partly OK ") + datetime.datetime.now().strftime("%d %b %H:%M") + " - " + tag + str(n) + " punch(es) sent" + ((" (" + "; ".join(errs) + ")") if errs else ""))
+            log(tag + str(n) + " punch(es) sent" + ((" - " + "; ".join(errs)) if errs else ""))
+        except Exception as e:
+            if since:
+                PULL["since"] = since                    # retry the re-pull next time
+            STATUS.update(ok=False, text="Problem: " + str(e)[:120] + " - will try again")
+            log("Could not read/send: " + str(e) + " - will try again")
+
+def worker(icon=None):
+    while True:
+        try:
+            cycle()
+            if icon:
+                icon_update(icon)
+        except Exception as e:
+            log("Unexpected error: " + str(e))
+        if "--once" in sys.argv:
+            return
+        WAKE.wait(EVERY_MIN * 60)
+        WAKE.clear()
+
+# ---------------------------------------------------------------- dialogs and password
+def dialog_main(kind, outfile, text, initial):
+    """runs in its own small process so the tray never freezes: kind = ask | secret | info"""
+    import tkinter as tk
+    from tkinter import simpledialog, messagebox
+    root = tk.Tk()
+    root.withdraw()
+    root.attributes("-topmost", True)
+    res = ""
+    if kind == "info":
+        messagebox.showinfo(NAME, text, parent=root)
+    else:
+        res = simpledialog.askstring(NAME, text, initialvalue=initial, show="*" if kind == "secret" else None, parent=root) or ""
+    open(outfile, "w", encoding="utf-8").write(res)
+    root.destroy()
+
+def ask(kind, text, initial=""):
+    fd, tmp = tempfile.mkstemp(suffix=".txt")
+    os.close(fd)
+    try:
+        subprocess.run([sys.executable, os.path.abspath(__file__), "--dialog", kind, tmp, text, initial], timeout=600, creationflags=NOWIN)
+        return open(tmp, encoding="utf-8").read()
+    except Exception:
+        return ""
+    finally:
+        try:
+            os.remove(tmp)
         except Exception:
             pass
-    punches = [{"bio_id": str(a.user_id), "time": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"), "verify": VERIFY.get(a.status, "other"), "direction": DIRECTION.get(a.punch)} for a in rows]
-    for i in range(0, len(punches), 2000):
-        r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
-        r.raise_for_status()
-    if punches:
-        save_state(last=max(p["time"] for p in punches))
-    return len(punches)
 
-`+PY_COMMON;
+def _hash(pw, salt):
+    return hashlib.sha256((salt + pw).encode("utf-8")).hexdigest()
+
+def set_password():
+    a = ask("secret", "Set a close password for the KMR bridge.")
+    if not a:
+        return False
+    b = ask("secret", "Type the same password again to confirm.")
+    if a != b:
+        ask("info", "The two passwords did not match. Nothing was changed.")
+        return False
+    salt = secrets.token_hex(16)
+    save_state(pw2_salt=salt, pw2_hash=_hash(a, salt))
+    log("Close password set")
+    return True
+
+def check_password(why):
+    st = load_state()
+    if "pw2_hash" not in st:
+        return set_password()
+    pw = ask("secret", why + " Enter the close password.")
+    if pw and secrets.compare_digest(_hash(pw, st["pw2_salt"]), st["pw2_hash"]):
+        return True
+    if pw:
+        ask("info", "Wrong password.")
+        log("Wrong close password entered")
+    return False
+
+# ---------------------------------------------------------------- start with Windows
+def autostart_cmd():
+    exe = sys.executable
+    if exe.lower().endswith("python.exe"):
+        exe = exe[:-10] + "pythonw.exe"
+    return '"%s" "%s"' % (exe, os.path.abspath(__file__))
+
+def autostart_get():
+    if os.name != "nt":
+        return False
+    try:
+        import winreg
+        with winreg.OpenKey(winreg.HKEY_CURRENT_USER, RUN_KEY) as k:
+            return winreg.QueryValueEx(k, NAME)[0] == autostart_cmd()
+    except Exception:
+        return False
+
+def autostart_set(on):
+    if os.name != "nt":
+        return
+    import winreg
+    with winreg.CreateKeyEx(winreg.HKEY_CURRENT_USER, RUN_KEY, 0, winreg.KEY_SET_VALUE) as k:
+        if on:
+            winreg.SetValueEx(k, NAME, 0, winreg.REG_SZ, autostart_cmd())
+        else:
+            try:
+                winreg.DeleteValue(k, NAME)
+            except FileNotFoundError:
+                pass
+    save_state(autostart=bool(on))
+
+def ensure_watchdog():
+    """a Windows task runs this file with --watchdog every 5 minutes: it starts the bridge again if it is not running"""
+    if os.name != "nt" or load_state().get("watchdog") == autostart_cmd():
+        return
+    try:
+        exe = sys.executable
+        if exe.lower().endswith("python.exe"):
+            exe = exe[:-10] + "pythonw.exe"
+        tr = '"%s" "%s" --watchdog' % (exe, os.path.abspath(__file__))
+        r = subprocess.run(["schtasks", "/Create", "/F", "/TN", NAME + " watchdog", "/TR", tr, "/SC", "MINUTE", "/MO", "5"],
+                           capture_output=True, text=True, creationflags=NOWIN, timeout=60)
+        if r.returncode == 0:
+            save_state(watchdog=autostart_cmd())
+            log("Watchdog task created")
+        else:
+            log("Could not create the watchdog task: " + (r.stdout or r.stderr or "").strip()[:120])
+    except Exception as e:
+        log("Could not create the watchdog task: " + str(e)[:100])
+
+# ---------------------------------------------------------------- tray
+def make_image(ok):
+    from PIL import Image, ImageDraw
+    img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
+    d = ImageDraw.Draw(img)
+    d.ellipse((3, 3, 61, 61), fill=(22, 163, 74, 255) if ok else (220, 38, 38, 255))
+    for a, b in (((22, 17), (22, 47)), ((23, 33), (42, 17)), ((26, 31), (43, 47))):
+        d.line([a, b], fill="white", width=6)
+    return img
+
+def icon_update(icon):
+    try:
+        icon.icon = make_image(STATUS["ok"])
+        icon.title = (NAME + ": " + STATUS["text"])[:120]
+        icon.update_menu()
+    except Exception:
+        pass
+
+def run_tray():
+    import pystray
+    def send_now(icon, item):
+        WAKE.set()
+    def repull(icon, item):
+        default = datetime.date.today().replace(day=1).isoformat()
+        v = ask("ask", "Re-pull and re-send all punches from which date? (YYYY-MM-DD)", default).strip()
+        if not v:
+            return
+        try:
+            datetime.date.fromisoformat(v)
+        except ValueError:
+            ask("info", "That is not a valid date. Use YYYY-MM-DD, for example " + default)
+            return
+        PULL["since"] = v
+        log("Re-pull requested from " + v)
+        STATUS.update(ok=True, text="Re-pulling from " + v + "...")
+        icon_update(icon)
+        WAKE.set()
+    def toggle(icon, item):
+        if autostart_get():
+            if check_password("Switching off Start with Windows."):
+                autostart_set(False)
+        else:
+            autostart_set(True)
+    def change_pw(icon, item):
+        if "pw2_hash" in load_state() and not check_password("Changing the password."):
+            return
+        set_password()
+    def open_log(icon, item):
+        try:
+            os.startfile(LOGF)
+        except Exception:
+            pass
+    def show_location(icon, item):
+        try:
+            subprocess.Popen(["explorer.exe", "/select," + os.path.abspath(__file__)])
+        except Exception:
+            pass
+    def quit_it(icon, item):
+        if check_password("Stopping the KMR bridge means punches will not reach the HRM."):
+            open(FLAG, "w").write(datetime.datetime.now().isoformat())
+            log("Bridge stopped from the tray menu with the close password")
+            icon.stop()
+    menu = pystray.Menu(
+        pystray.MenuItem(lambda item: STATUS["text"], None, enabled=False),
+        pystray.MenuItem("Send now", send_now, default=True),
+        pystray.MenuItem("Re-pull data from a date...", repull),
+        pystray.MenuItem("Start with Windows", toggle, checked=lambda item: autostart_get()),
+        pystray.MenuItem("Change close password", change_pw),
+        pystray.MenuItem("Open log", open_log),
+        pystray.MenuItem("Show bridge file location", show_location),
+        pystray.MenuItem("Quit", quit_it))
+    icon = pystray.Icon(NAME, make_image(True), NAME + ": starting", menu)
+    threading.Thread(target=worker, args=(icon,), daemon=True).start()
+    if "pw2_hash" not in load_state():
+        threading.Thread(target=set_password, daemon=True).start()   # first run: ask for the close password
+    icon.run()
+
+# ---------------------------------------------------------------- entry
+def lock_port():
+    return 47000 + zlib.crc32(LOCKKEY.encode()) % 1000
+
+if __name__ == "__main__":
+    if "--dialog" in sys.argv:
+        i = sys.argv.index("--dialog")
+        dialog_main(sys.argv[i + 1], sys.argv[i + 2], sys.argv[i + 3], sys.argv[i + 4] if len(sys.argv) > 4 + i else "")
+        sys.exit(0)
+    if "--watchdog" in sys.argv:
+        if os.path.exists(FLAG):
+            sys.exit(0)                                   # stopped on purpose with the password
+        s = socket.socket()
+        try:
+            s.bind(("127.0.0.1", lock_port()))
+            s.close()
+        except OSError:
+            sys.exit(0)                                   # running: nothing to do
+        exe = sys.executable
+        if exe.lower().endswith("python.exe"):
+            exe = exe[:-10] + "pythonw.exe"
+        subprocess.Popen([exe, os.path.abspath(__file__)], creationflags=NOWIN | 0x00000008 | 0x00000200, close_fds=True, cwd=HERE)
+        sys.exit(0)
+    lock = socket.socket()
+    try:
+        lock.bind(("127.0.0.1", lock_port()))
+    except OSError:
+        sys.exit(0)                                       # already running: do nothing
+    try:
+        os.remove(FLAG)
+    except OSError:
+        pass
+    try:
+        for _m, _p in PKGS:
+            need(_m, _p)
+        if "--once" not in sys.argv and "--console" not in sys.argv and "--pull" not in sys.argv:
+            need("PIL", "pillow"); need("pystray", "pystray")
+    except Exception as e:
+        log("Could not install what is needed: " + str(e))
+    if "--pull" in sys.argv:
+        PULL["since"] = sys.argv[sys.argv.index("--pull") + 1]
+        sys.argv.append("--once")
+        worker()
+    elif "--once" in sys.argv or "--console" in sys.argv:
+        worker()
+    else:
+        if load_state().get("autostart", True) and not autostart_get():
+            try:
+                autostart_set(True)
+            except Exception as e:
+                log("Could not set start with Windows: " + str(e))
+        ensure_watchdog()
+        try:
+            run_tray()
+        except Exception as e:
+            log("No tray icon (" + str(e) + "); running without it")
+            worker()
+`;
+  function bridgeScript(o) {
+    const py = (s) => String(s == null ? "" : s).replace(/[\\"\r\n]/g, "");
+    const eb = o.ebio && o.ebio.devices && Object.keys(o.ebio.devices).length ? o.ebio : null;
+    const now = new Date(), backfill = o.backfill || (now.getFullYear() + "-" + String(now.getMonth() + 1).padStart(2, "0") + "-01");
+    const dbdev = eb ? "{" + Object.keys(eb.devices).map((k) => (parseInt(k, 10) || 0) + ': "' + py(eb.devices[k]) + '"').join(", ") + "}" : "{}";
+    const name = String(o.name || o.ip || "machine").replace(/[^A-Za-z0-9 ._-]/g, "").trim() || "machine";
+    const map = {
+      "__MACHINE__": py(o.name || "machine"), "__IP__": py(o.ip || "192.168.1.201"), "__PORT__": String(parseInt(o.port, 10) || 4370), "__COMMKEY__": String(parseInt(o.commkey, 10) || 0),
+      "__URL__": py(o.url), "__KEY__": py(o.key || "PASTE-THE-KEY-FROM-THE-MACHINE-SCREEN"), "__EVERY__": String(parseInt(o.every, 10) || 5), "__NAME__": "KMR bridge " + name,
+      "__BACKFILL__": py(backfill), "__DBDEVICES__": dbdev, "__SQLSERVER__": String(eb && eb.server || ".\\SQLEXPRESS").replace(/["\r\n]/g, ""), "__SQLDB__": py(eb && eb.db || "eBioServerNew"),
+      "__DBDOC__": eb ? " AND from the eBioServer database on this PC,\n" : ",\n",
+    };
+    return BRIDGE_TPL.replace(/__[A-Z]+__/g, (t) => (t in map ? map[t] : t));
   }
 
   /* Realtime machines (RS9w ...) used with Realtime's "Attendance Tracker" program on a PC: that program can copy every punch into a MySQL or SQL Server table
