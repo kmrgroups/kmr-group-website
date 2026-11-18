@@ -225,8 +225,17 @@ def run_once():
     conn = ZK(IP, port=PORT, timeout=15, password=COMM_KEY, force_udp=False, ommit_ping=True).connect()
     try:
         rows = [a for a in conn.get_attendance() if a.timestamp.strftime("%Y-%m-%d %H:%M:%S") >= since]
+        try:
+            users = [{"bio_id": str(u.user_id), "name": (u.name or "").strip()} for u in conn.get_users() if (u.name or "").strip()]
+        except Exception:
+            users = []
     finally:
         conn.disconnect()
+    if users:
+        try:
+            requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"users": users}), timeout=60)
+        except Exception:
+            pass
     punches = [{"bio_id": str(a.user_id), "time": a.timestamp.strftime("%Y-%m-%d %H:%M:%S"), "verify": VERIFY.get(a.status, "other"), "direction": DIRECTION.get(a.punch)} for a in rows]
     for i in range(0, len(punches), 2000):
         r = requests.post(URL, headers={"x-device-key": KEY, "Content-Type": "application/json"}, data=json.dumps({"punches": punches[i:i + 2000]}), timeout=60)
