@@ -225,6 +225,7 @@
       return { can_edit: true, gateways: [{ id: "g1", name: "Demo gateway", location: "Shop floor", enabled: true, last_seen: iso(nowMs() - 30000), rows_total: 1840, push_key: "demo0000" }], map: [], live, waiting: w };
     },
     kmr_mmd_entry_feed(a) { return entry(a.p); }, kmr_mmd_gw_save() { return { ok: true }; }, kmr_mmd_map_save() { return { ok: true }; },
+    kmr_mmd_issue_info() { return { rmp_bom: [], stock: { "RM-EN8-65": { on_hand: 4200, safety: 500 } }, heats: { "RM-EN8-65": [{ heat: "H-24012", cert: "MTC-7781", at: iso(nowMs()) }] } }; },
     kmr_mmd_entry(a) { return entry(a.p); }, kmr_mmd_rework(a) { return rework(a.p); }, kmr_mmd_dc_create(a) { return dc(a.p); }, kmr_mmd_grn(a) { return grn(a.p); },
     kmr_mmd_dispatch(a) { return dispatch(a.p); }, kmr_mmd_dispose(a) { return dispose(a); }, kmr_mmd_void(a) { return voidEntry(a); },
     kmr_mmd_rs_cancel(a) {
