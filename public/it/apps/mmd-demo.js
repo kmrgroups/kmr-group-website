@@ -226,6 +226,15 @@
     },
     kmr_mmd_entry_feed(a) { return entry(a.p); }, kmr_mmd_gw_save() { return { ok: true }; }, kmr_mmd_map_save() { return { ok: true }; },
     kmr_mmd_issue_info() { return { rmp_bom: [], stock: { "RM-EN8-65": { on_hand: 4200, safety: 500 } }, heats: { "RM-EN8-65": [{ heat: "H-24012", cert: "MTC-7781", at: iso(nowMs()) }] } }; },
+    kmr_mmd_tp_load() {
+      return { can_edit: true, demand_month: "", demand: { "DP-1101": 40000, "DP-1102": 24000 },
+        tools: [{ code: "T1", name: "CNMG 120408 turning insert", type: "Insert", rate: "180", supplier: "Demo Tools", std_life: 400, on_hand: 20, min_qty: 10, lead_days: 7 }, { code: "T2", name: "Ø8.5 carbide drill", type: "Drill", rate: "2400", supplier: "Demo Tools", std_life: 6000, on_hand: 2, min_qty: 2, lead_days: 14 }],
+        plan: [{ id: "p1", part_code: "DP-1101", op_no: "10", tool_code: "T1", qty_per_set: 1 }, { id: "p2", part_code: "DP-1102", op_no: "30", tool_code: "T2", qty_per_set: 1 }],
+        fits: [{ id: "f1", machine: "CNC-T01", tool_code: "T1", part_code: "DP-1101", op_no: "10", fitted_at: iso(nowMs() - 3 * DAY), fitted_by: "Murugan", removed_at: null, pcs: 360 }, { id: "f2", machine: "VMC-M01", tool_code: "T2", part_code: "DP-1102", op_no: "30", fitted_at: iso(nowMs() - 9 * DAY), removed_at: null, pcs: 2100 }, { id: "f3", machine: "CNC-T01", tool_code: "T1", fitted_at: iso(nowMs() - 20 * DAY), removed_at: iso(nowMs() - 12 * DAY), reason: "wear", minutes: 8, pcs: 380 }],
+        cons: [{ code: "C1", name: "Soluble cutting oil", category: "Consumables", rate: "210", supplier: "Demo Oils", on_hand: 40, min_qty: 20, lead_days: 5, unit: "litre", used30: 55 }],
+        cuse: [{ id: "u1", code: "C1", part_code: "", machine_code: "", per_1000: 1.5, per_month: 20 }], issues: [{ code: "C1", qty: 10, machine: "CNC-T01", operator: "Murugan", at: iso(nowMs() - DAY) }] };
+    },
+    kmr_mmd_catalog() { return []; }, kmr_mmd_tool_save() { return { ok: true }; }, kmr_mmd_toolplan_save() { return { ok: true }; }, kmr_mmd_tool_fit() { return { ok: true, pcs: 100 }; }, kmr_mmd_cons_save() { return { ok: true }; }, kmr_mmd_consuse_save() { return { ok: true }; }, kmr_mmd_cons_issue() { return { ok: true }; },
     kmr_mmd_entry(a) { return entry(a.p); }, kmr_mmd_rework(a) { return rework(a.p); }, kmr_mmd_dc_create(a) { return dc(a.p); }, kmr_mmd_grn(a) { return grn(a.p); },
     kmr_mmd_dispatch(a) { return dispatch(a.p); }, kmr_mmd_dispose(a) { return dispose(a); }, kmr_mmd_void(a) { return voidEntry(a); },
     kmr_mmd_rs_cancel(a) {

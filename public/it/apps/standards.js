@@ -182,7 +182,11 @@ mmd:[
 ['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Piece counts and run, idle and alarm status are read from the machines over the network (Fanuc, Siemens, OPC UA, MTConnect, Modbus, MQTT) and used once in the production entry; a counted piece cannot be entered twice.'],
 ['IATF','8.7.1','Control of nonconforming product','Stage-wise rejection and rework are entered with reason, specification and actual; machine-counted rejected pieces cannot be saved without a reason, and rejection and rework tags are printed.'],
 ['ISO','7.1.5.1','Monitoring and measuring resources','The machine tag map records which machine signal is read for each counter, so the source of every counted quantity is known.'],
-['ISO','8.1','Operational planning and control','Process flow check lists, for every part, the missing route, cycle time, machine, BOM weight and drawing before production starts.']],
+['ISO','8.1','Operational planning and control','Process flow check lists, for every part, the missing route, cycle time, machine, BOM weight and drawing before production starts.'],
+['IATF','8.5.1.6','Management of production tooling','Tool plan lists the tools each operation uses, the standard tool life, the stock and the tools to order; tools fitted on a machine are monitored by pieces made against standard life, and every change is recorded with its reason.'],
+['IATF','8.5.1.5','Total productive maintenance','Tool-change time is booked as loss hours (planned change D10, breakage D09) per machine, so idle time from tooling is analysed with the other losses.'],
+['ISO','7.1.3','Infrastructure','Consumables plan works out the quantity needed from planned production, compares it with stock and shows what to order, so supplies for the process are available.'],
+['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Tool cost per piece and tool life achieved against standard are shown per tool and per machine.']],
 mnt:[
 ['IATF','8.5.1.5','Total productive maintenance','Breakdowns, preventive maintenance plan, MTBF and MTTR are tracked.'],
 ['ISO','7.1.3','Infrastructure','Machine history cards show the condition and upkeep of equipment.'],
