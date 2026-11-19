@@ -186,7 +186,11 @@ mmd:[
 ['IATF','8.5.1.6','Management of production tooling','Tool plan lists the tools each operation uses, the standard tool life, the stock and the tools to order; tools fitted on a machine are monitored by pieces made against standard life, and every change is recorded with its reason.'],
 ['IATF','8.5.1.5','Total productive maintenance','Tool-change time is booked as loss hours (planned change D10, breakage D09) per machine, so idle time from tooling is analysed with the other losses.'],
 ['ISO','7.1.3','Infrastructure','Consumables plan works out the quantity needed from planned production, compares it with stock and shows what to order, so supplies for the process are available.'],
-['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Tool cost per piece and tool life achieved against standard are shown per tool and per machine.']],
+['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Tool cost per piece and tool life achieved against standard are shown per tool and per machine.',
+['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Dashboards and the Presentation show parts ready for production (route, cycle time, machine, BOM weight, drawing), machine running, idle and alarm hours measured from the machines, and the share of entries taken from machine counts.'],
+['IATF','8.5.1.6','Management of production tooling','Tool changes, breakages, tool life achieved against the standard, tools due for change and tools below safety stock are shown as KPIs, with the idle time of tool changes booked as loss hours.'],
+['ISO','7.1.3','Infrastructure','Consumables below safety stock are shown as a KPI from the Consumables plan.'],
+['ISO','8.4','Externally provided processes','Outsourced lots returned on time and delivery challans overdue at suppliers are shown as KPIs, each with its target.']]],
 mnt:[
 ['IATF','8.5.1.5','Total productive maintenance','Breakdowns, preventive maintenance plan, MTBF and MTTR are tracked.'],
 ['ISO','7.1.3','Infrastructure','Machine history cards show the condition and upkeep of equipment.'],
