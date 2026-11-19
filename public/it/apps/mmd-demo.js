@@ -235,6 +235,7 @@
         cuse: [{ id: "u1", code: "C1", part_code: "", machine_code: "", per_1000: 1.5, per_month: 20 }], issues: [{ code: "C1", qty: 10, machine: "CNC-T01", operator: "Murugan", at: iso(nowMs() - DAY) }] };
     },
     kmr_mmd_catalog() { return []; }, kmr_mmd_tool_save() { return { ok: true }; }, kmr_mmd_toolplan_save() { return { ok: true }; }, kmr_mmd_tool_fit() { return { ok: true, pcs: 100 }; }, kmr_mmd_cons_save() { return { ok: true }; }, kmr_mmd_consuse_save() { return { ok: true }; }, kmr_mmd_cons_issue() { return { ok: true }; },
+    kmr_mmd_kpi() { return { machine_time: [{ machine: "CNC-T01", run: 120, idle: 30, alarm: 4 }, { machine: "VMC-M01", run: 95, idle: 50, alarm: 0 }], entries: { total: 40, machine: 12 }, tools: { changes: 6, breakages: 1, change_min: 74, life_pct: 92, by_machine: [{ machine: "CNC-T01", changes: 4, minutes: 50 }], on_machines: 2, due: 1, low_stock: 0, listed: 2 }, cons: { listed: 1, low_stock: 1 }, dc: { sent: 5, overdue: 1, closed: 3, on_time: 2 } }; },
     kmr_mmd_entry(a) { return entry(a.p); }, kmr_mmd_rework(a) { return rework(a.p); }, kmr_mmd_dc_create(a) { return dc(a.p); }, kmr_mmd_grn(a) { return grn(a.p); },
     kmr_mmd_dispatch(a) { return dispatch(a.p); }, kmr_mmd_dispose(a) { return dispose(a); }, kmr_mmd_void(a) { return voidEntry(a); },
     kmr_mmd_rs_cancel(a) {

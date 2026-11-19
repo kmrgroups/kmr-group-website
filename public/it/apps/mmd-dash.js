@@ -103,5 +103,29 @@
     <div class="pg">${pareto("Part wise", q((d) => d.part_code), "pcs")}${pareto("Defect wise", q((d) => d.reason), "pcs")}${pareto("Process wise", q((d) => d.op_name), "pcs")}${pareto("Machine wise", q((d) => d.machine), "pcs")}${pareto("Operator wise", q((d) => d.operator), "pcs")}${pareto("Loss hours by D code", lossBy((l) => l.d_code + " — " + l.d_name), "h", "All machines")}</div>
     <div class="card"><h3>Daily rejection + rework rate</h3>${dk.length ? `<div style="display:flex;gap:3px;align-items:flex-end;height:90px">${dk.map((d) => { const r = day[d], t = r.ok + r.rej + r.rew, a = r.rej / Math.max(1, t), b = r.rew / Math.max(1, t); return `<div title="${d}: rejection ${(a * 100).toFixed(1)}%, rework ${(b * 100).toFixed(1)}%" style="flex:1;display:flex;flex-direction:column;justify-content:flex-end;min-width:6px;max-width:30px"><div style="height:${b / mxr * 80}px;background:var(--a)"></div><div style="height:${a / mxr * 80}px;background:var(--r)"></div></div>`; }).join("")}</div><div class="mut" style="font-size:11px">${esc(dk[0])} → ${esc(dk[dk.length - 1])} · red = rejection, amber = rework (share of pieces made that day)</div>` : '<p class="note">No entries in this period.</p>'}</div>`;
   }
-  window.MMDDash = { wip: wipHtml, dash, plant, stuck: (m, x) => wip(m, x).items.filter((i) => i.st === "stuck").length };
+
+  /* ---------- data readiness: how many parts have route, cycle time, machine, BOM weight and drawing ---------- */
+  function ready(m) {
+    const parts = m.parts || [], bom = {}; (m.bom || []).forEach((b) => { (bom[b.part_no] = bom[b.part_no] || []).push(b); });
+    let ok = 0, route = 0, ct = 0, mc = 0, wt = 0;
+    parts.forEach((p) => {
+      const r = (m.routes || {})[p.code] || [], n = r.length, c = n && r.every((o) => +o.ct_sec > 0), mm = n && r.every((o) => o.type === "supplier" || (o.machine || "").trim()), b = bom[p.code] || [], w = b.some((x) => +x.blank_kg > 1 && +x.finished_kg > 0), d = (p.drawing_no || "").trim();
+      if (n) route++; if (c) ct++; if (mm) mc++; if (w) wt++; if (n && c && mm && w && d) ok++;
+    });
+    return { parts: parts.length, ok, route, ct, mc, wt };
+  }
+  /* ---------- extra dashboards from machine capture, tooling, consumables and supplier processes ---------- */
+  function extra(m, K, days) {
+    K = K || {}; const R = ready(m), T = K.tools || {}, E = K.entries || {}, DC = K.dc || {}, C = K.cons || {}, MT = K.machine_time || [];
+    const k = (v, l, c, s) => `<div class="kpi" style="--c:var(--${c})"><b>${v}</b><span>${l}${s ? `<br><i>${s}</i>` : ""}</span></div>`;
+    const p = (a, b) => (b ? Math.round((a / b) * 1000) / 10 + "%" : "—");
+    const rows = MT.map((r) => { const t = (+r.run || 0) + (+r.idle || 0) + (+r.alarm || 0); return `<tr><td><b>${esc(r.machine)}</b></td><td class="n">${N(r.run, 1)}</td><td class="n">${N(r.idle, 1)}</td><td class="n">${N(r.alarm, 1)}</td><td class="n">${t ? Math.round((r.run / t) * 100) + "%" : "—"}</td></tr>`; }).join("");
+    const tm = (T.by_machine || []).map((r) => `<tr><td><b>${esc(r.machine)}</b></td><td class="n">${N(r.changes)}</td><td class="n">${N(Math.round(r.minutes))}</td></tr>`).join("");
+    return `<h3 style="margin-top:18px">Process data readiness <span class="mut" style="font-weight:400">(from Operations Master — the base of every KPI above)</span></h3>
+    <div class="kpis">${k(p(R.ok, R.parts), "parts ready for production", R.ok === R.parts && R.parts ? "g" : "r", R.ok + " of " + R.parts)}${k(p(R.route, R.parts), "parts with a process route", "b")}${k(p(R.ct, R.parts), "parts with every cycle time", "b")}${k(p(R.mc, R.parts), "parts with every machine", "b")}${k(p(R.wt, R.parts), "parts with real BOM weights", "b")}</div>
+    <h3>Machine time measured from the machines — last ${days} days</h3><div class="sc"><table class="lt"><thead><tr><th>Machine</th><th class="n">Running (h)</th><th class="n">Idle (h)</th><th class="n">Alarm (h)</th><th class="n">Running share</th></tr></thead><tbody>${rows || '<tr><td colspan="5" class="mut">No machine status received yet. Connect machines in Production entry › Machine capture.</td></tr>'}</tbody></table></div>
+    <div class="kpis">${k(p(E.machine || 0, E.total || 0), "production entries made from machine counts", "b", (E.machine || 0) + " of " + (E.total || 0) + " entries")}${k(N(T.changes || 0), "tool changes", "a", (T.breakages || 0) + " breakages")}${k(N(Math.round(T.change_min || 0)) + " min", "idle time from tool changes", "a")}${k(T.life_pct != null ? N(T.life_pct, 0) + "%" : "—", "tool life achieved vs standard", "b")}${k(N(T.due || 0), "tools due for change now", (T.due || 0) ? "r" : "g", (T.on_machines || 0) + " on machines")}${k(N(T.low_stock || 0), "tools below safety stock", (T.low_stock || 0) ? "r" : "g", (T.listed || 0) + " in the plan")}${k(N(C.low_stock || 0), "consumables below safety stock", (C.low_stock || 0) ? "r" : "g", (C.listed || 0) + " in the plan")}${k(p(DC.on_time || 0, DC.closed || 0), "outsourced lots back on time", "b", (DC.closed || 0) + " completed")}${k(N(DC.overdue || 0), "challans overdue at suppliers", (DC.overdue || 0) ? "r" : "g", (DC.sent || 0) + " sent in the period")}</div>
+    ${tm ? `<div class="card"><h3>Tool changes by machine</h3><table class="lt" style="min-width:0"><thead><tr><th>Machine</th><th class="n">Changes</th><th class="n">Change time (min)</th></tr></thead><tbody>${tm}</tbody></table></div>` : ""}`;
+  }
+  window.MMDDash = { wip: wipHtml, dash, extra, ready, plant, stuck: (m, x) => wip(m, x).items.filter((i) => i.st === "stuck").length };
 })();
