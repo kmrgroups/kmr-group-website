@@ -89,7 +89,20 @@ a { color: var(--focus); }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
 /* ---------- App shell ---------- */
-.app { display: grid; grid-template-columns: 248px 1fr; min-height: 100%; }
+.app { display: block; min-height: 100%; }
+.side { display: none !important; }
+.apptabs { position: sticky; top: 0; z-index: 25; background: var(--card, #fff); border-bottom: 1px solid var(--line); }
+.apptabs .brand-row { display: flex; align-items: center; gap: 10px; padding: 8px 20px 0; }
+.apptabs .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--nav-bg); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 12px; overflow: hidden; }
+.apptabs .logo img { width: 100%; height: 100%; object-fit: contain; background: #fff; }
+.apptabs .brand-text { display: flex; flex-direction: column; line-height: 1.2; font-size: 13px; }.apptabs .brand-text small { color: var(--muted); }
+.apptabs .grow { flex: 1; }
+.apptabs .tabs { display: flex; gap: 4px; padding: 6px 16px 0; flex-wrap: wrap; align-items: flex-end; }
+.apptabs .tab { text-decoration: none; display: inline-flex; gap: 6px; align-items: center; padding: 9px 14px; font-weight: 600; font-size: 13px; color: var(--muted); border-radius: 10px 10px 0 0; white-space: nowrap; cursor: pointer; }
+.apptabs .tab.on { color: var(--ink); background: var(--bg); box-shadow: inset 0 -3px 0 var(--brass); }
+.apptabs .tabs2 { flex-basis: 100%; display: flex; gap: 4px; flex-wrap: wrap; padding: 4px 0 6px; border-top: 1px solid var(--line); }
+.apptabs .tabs2 .tab { font-weight: 500; padding: 6px 12px; border-radius: 8px; }
+.apptabs .badge { background: var(--red, #b42318); color: #fff; border-radius: 99px; padding: 0 6px; font-size: 11px; }
 .side { background: var(--nav-bg); color: var(--nav-text); position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column; overflow-y: auto; }
 .brand { display: flex; gap: 12px; align-items: center; padding: 20px 18px 18px; border-bottom: 1px solid rgba(255,255,255,.08); }
 .logo { width: 40px; height: 40px; border-radius: 8px; flex: none; display: grid; place-items: center; background: #fff; color: #0E2240; font: 700 15px/1 var(--serif); overflow: hidden; border: 1px solid rgba(168,132,74,.6); }
@@ -113,7 +126,7 @@ html.kmr-platform .side-foot .powered-line { display: none; }
 .dot.on { background: #3CC486; } .dot.busy { background: #F0B54A; } .dot.err { background: #FF6B5E; }
 
 .main { min-width: 0; display: flex; flex-direction: column; }
-.topbar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+.topbar { position: sticky; top: 74px; z-index: 20; background: color-mix(in srgb, var(--bg) 88%, transparent); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
 .topbar-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; padding: 12px 28px; }
 .page-title { flex: 1 1 260px; min-width: 0; }
 .page-title h1 { font-size: 1.35rem; }
@@ -378,7 +391,6 @@ details.dsp ul { margin: 8px 0 0; padding-left: 18px; font-size: 13px; } details
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1180px) {
-  .app { grid-template-columns: 72px 1fr; }
   .brand { justify-content: center; padding: 16px 8px; }
   .brand-text, .nav-group, .nav .lbl-t, .side-foot .hide-rail { display: none; }
   .nav :is(button,a) { justify-content: center; padding: 11px 0; }
@@ -570,8 +582,9 @@ window.CAPACITY_CLOUD_CONFIG = /[?&]demo=1(&|$)/.test(location.search) ? {} : { 
 </head>
 <body>
 <div class="app">
-  <aside class="side" id="side" aria-label="Navigation"></aside>
+  <aside class="side" id="side" aria-label="Navigation" hidden></aside>
   <div class="main">
+    <nav id="tabs" class="apptabs" aria-label="Main"></nav>
     <header class="topbar" id="topbar"></header>
     <main class="content">
       <div class="print-head" id="printHead"></div>
@@ -1741,24 +1754,24 @@ const ICONS = {
 const icon = (n, cls) => `<svg class="${cls || ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${ICONS[n] || ''}"/></svg>`;
 
 const PAGES = [
-  { id: 'standards', group: 'Start here', label: 'Standards alignment', title: 'Standards alignment', desc: 'The standards and clauses this app supports.' },
-  { id: 'answer', group: 'Start here', label: 'Can we make it?', title: 'Can we make it?', desc: 'Do we have the capacity, is it fully loaded, can we meet the demand, and will the loading plan deliver on time — with the action plan.' },
-  { id: 'demand', group: 'Start here', label: 'Demand & Stock', title: 'Demand & Stock', desc: 'Customer quantity, due date and stock for every part, on one screen. Loads from Sales Flow automatically.' },
-  { id: 'loading', group: 'Start here', label: 'Loading Plan', title: 'Machine Loading Plan', desc: 'Day-by-day machine loading with the load balanced between machines, expected finish and throughput time for every part.' },
-  { id: 'pmaster', group: 'Start here', label: 'Process Master', title: 'Process Master', desc: 'Part by part: the processes in order, the machines that can run each process, and the cycle time on each machine.' },
-  { id: 'settings', group: 'Setup', label: 'Settings', title: 'Settings', desc: window.KMR_PLATFORM ? 'Appearance and data backup for this plan. Company details and users are managed in KMR Apps › Administration.' : 'Company, cloud connection, users & access, branding and backup.' },
-  { id: 'present', group: 'Start here', label: 'Presentation', title: 'Presentation', desc: 'KPIs against the standards, with action plans and status.' },
-  { id: 'help', group: 'Setup', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' },
-  { id: 'quick', group: 'Classic screens', label: 'Process workout', title: 'Process Workout', desc: 'Process-by-process workout: pieces per hour, days needed, takt time and throughput.' },
-  { id: 'overview', group: 'Classic screens', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
-  { id: 'bulletin', group: 'Classic screens', label: 'Verdict & Actions', title: 'Verdict & Action Bulletin', desc: 'Can we make the sales plan? Can we deliver on time? Every problem, how to overcome it, and what to do first.' },
-  { id: 'plan', group: 'Classic screens', label: 'Monthly Plan', title: 'Monthly Plan', desc: 'Enter this month’s quantity and customer due date for each part.' },
-  { id: 'stock', group: 'Classic screens', label: 'Stock & Balance', title: 'Stock & Balance', desc: 'Stock on hand at every stage, taken off the sales quantity — what is still to be made at every process (Dynamic capacity).' },
-  { id: 'capacity', group: 'Classic screens', label: 'Capacity Plan', title: 'Capacity Plan', desc: 'Required vs available days per machine — same as the Excel “Capacity Plan” sheet.' },
-  { id: 'workout', group: 'Classic screens', label: 'Capacity Workout', title: 'Capacity Workout', desc: 'Operation-level calculation — same as the Excel “Capacity-workout” sheet.' },
-  { id: 'schedule', group: 'Classic screens', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
-  { id: 'balance', group: 'Classic screens', label: 'Load Balancer', title: 'Load Balancer', desc: 'Move or split work from overloaded machines to machines with spare days.' },
-  { id: 'masters', group: 'Classic screens', label: 'Masters (read-only)', title: 'Machines & Routings', desc: window.KMR_PLATFORM ? 'Read from KMR Apps › Operations Master (machines, cycle times, plant standards) and the holiday calendar of HRM & Payroll.' : 'Machines, parts, operations and cycle times.' }
+  { id: 'standards', group: 'Main', label: 'Standards alignment', title: 'Standards alignment', desc: 'The standards and clauses this app supports.' },
+  { id: 'answer', group: 'Main', label: 'Dashboard', title: 'Can we make it?', desc: 'Do we have the capacity, is it fully loaded, can we meet the demand, and will the loading plan deliver on time — with the action plan.' },
+  { id: 'demand', group: 'Main', label: 'Entry: demand & stock', title: 'Demand & Stock', desc: 'Customer quantity, due date and stock for every part, on one screen. Loads from Sales Flow automatically.' },
+  { id: 'loading', group: 'Main', label: 'Loading plan', title: 'Machine Loading Plan', desc: 'Day-by-day machine loading with the load balanced between machines, expected finish and throughput time for every part.' },
+  { id: 'pmaster', group: 'Main', label: 'Entry: process master', title: 'Process Master', desc: 'Part by part: the processes in order, the machines that can run each process, and the cycle time on each machine.' },
+  { id: 'settings', group: 'More', label: 'Settings', title: 'Settings', desc: window.KMR_PLATFORM ? 'Appearance and data backup for this plan. Company details and users are managed in KMR Apps › Administration.' : 'Company, cloud connection, users & access, branding and backup.' },
+  { id: 'present', group: 'Main', label: 'Presentation', title: 'Presentation', desc: 'KPIs against the standards, with action plans and status.' },
+  { id: 'help', group: 'More', label: 'Help & Formulas', title: 'Help & Formulas', desc: 'How the planner works, step by step, and every formula it uses.' },
+  { id: 'quick', group: 'Main', label: 'Part & process wise', title: 'Process Workout', desc: 'Process-by-process workout: pieces per hour, days needed, takt time and throughput.' },
+  { id: 'overview', group: 'More', label: 'Overview', title: 'Plant Overview', desc: 'Where capacity stands this month and what needs attention.' },
+  { id: 'bulletin', group: 'More', label: 'Verdict & Actions', title: 'Verdict & Action Bulletin', desc: 'Can we make the sales plan? Can we deliver on time? Every problem, how to overcome it, and what to do first.' },
+  { id: 'plan', group: 'More', label: 'Monthly Plan', title: 'Monthly Plan', desc: 'Enter this month’s quantity and customer due date for each part.' },
+  { id: 'stock', group: 'More', label: 'Stock & Balance', title: 'Stock & Balance', desc: 'Stock on hand at every stage, taken off the sales quantity — what is still to be made at every process (Dynamic capacity).' },
+  { id: 'capacity', group: 'Main', label: 'Machine wise', title: 'Capacity Plan', desc: 'Required vs available days per machine — same as the Excel “Capacity Plan” sheet.' },
+  { id: 'workout', group: 'More', label: 'Capacity Workout', title: 'Capacity Workout', desc: 'Operation-level calculation — same as the Excel “Capacity-workout” sheet.' },
+  { id: 'schedule', group: 'More', label: 'Loading Schedule', title: 'Machine Loading Schedule', desc: 'Day-by-day machine loading against customer due dates.' },
+  { id: 'balance', group: 'More', label: 'Load Balancer', title: 'Load Balancer', desc: 'Move or split work from overloaded machines to machines with spare days.' },
+  { id: 'masters', group: 'More', label: 'Masters (read-only)', title: 'Machines & Routings', desc: window.KMR_PLATFORM ? 'Read from KMR Apps › Operations Master (machines, cycle times, plant standards) and the holiday calendar of HRM & Payroll.' : 'Machines, parts, operations and cycle times.' }
 ];
 
 /* ---------- features the customer bought (Operations: quote / invoice) ---------- */
@@ -2220,18 +2233,18 @@ function renderShell() {
   const logo = s.logo ? `<img src="${h(s.logo)}" alt="">` : h(initials);
   const crit = (model.totals.counts.critical || 0) + (model.totals.counts.sunday || 0);
   const lateN = model.totals.lateOps;
-  let group = '';
-  const moreOpen = ui.moreOpen || PAGES.some(x => x.group === 'Classic screens' && x.id === ui.page);
-  const nav = visiblePages().filter(p => p.group !== 'Classic screens' || moreOpen).map(p => {
-    let g = '';
-    if (p.group !== group) { group = p.group; g = `<div class="nav-group">${h(group)}</div>`; }
+  const moreOpen = ui.moreOpen || PAGES.some(x => x.group === 'More' && x.id === ui.page);
+  const tabOf = p => {
     const badge = p.id === 'capacity' && crit ? `<span class="badge" title="${crit} machines over capacity">${crit}</span>` : (p.id === 'schedule' && lateN ? `<span class="badge" title="${lateN} late operations">${lateN}</span>` : '');
-    return `${g}<a href="${pageHref(p.id)}" data-nav="${p.id}" class="${p.id === ui.page ? 'active' : ''}" title="${h(p.label)}${isLocked(p.id) ? ' — not in your plan' : ''}" ${p.id === ui.page ? 'aria-current="page"' : ''}>${icon(p.id)}<span class="lbl-t">${h(p.label)}</span>${isLocked(p.id) ? '<span class="badge" aria-label="Locked">🔒</span>' : badge}</a>`;
-  }).join('');
-  $('#side').innerHTML = `
-    <div class="brand"><div class="logo">${logo}</div><div class="brand-text"><div class="brand-name">${h(s.companyName)}</div><div class="brand-sub">${h(s.subtitle || 'Capacity Planner')}</div></div></div>
-    <nav class="nav" aria-label="Main">${nav}${moreOpen && ui.page && !PAGES.some(x => x.group === 'Classic screens' && x.id === ui.page) ? '' : ''}${PAGES.some(x => x.group === 'Classic screens' && x.id === ui.page) ? '' : `<button class="nav-more" data-act="toggleMore" aria-expanded="${moreOpen}">${moreOpen ? 'Hide classic screens' : 'Show classic screens (older, detailed)'}</button>`}</nav>
-    <div class="side-foot">${cloudActive() ? `<div class="me-line hide-rail" title="${h((Cloud.session() || {}).email)}">${h((Cloud.session() || {}).email)}<span class="role-chip">${h(roleLabel())}</span></div>` : ''}<div class="sync-pill hide-rail" id="syncPill">${syncPillHtml()}</div>${cloudActive() ? `<button class="side-out" data-act="signOut" title="Sign out">${icon('logout')}<span class="lbl-t">Sign out</span></button>` : ''}${window.KMR_PLATFORM ? "" : `<div class="hide-rail">Powered by <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></div>`}</div>`;
+    return `<a href="${pageHref(p.id)}" data-nav="${p.id}" class="tab ${p.id === ui.page ? 'on' : ''}" title="${h(p.title)}${isLocked(p.id) ? ' — not in your plan' : ''}" ${p.id === ui.page ? 'aria-current="page"' : ''}>${h(p.label)}${isLocked(p.id) ? ' 🔒' : badge}</a>`;
+  };
+  const vp = visiblePages();
+  const nav = vp.filter(p => p.group === 'Main').map(tabOf).join('')
+    + `<button class="tab" data-act="toggleMore" aria-expanded="${moreOpen}" style="border:0;background:none;font:inherit">${moreOpen ? 'Hide more ▴' : 'More screens ▾'}</button>`
+    + (moreOpen ? `<div class="tabs2">${vp.filter(p => p.group === 'More').map(tabOf).join('')}</div>` : '');
+  const tabsHtml = `<div class="tabs" role="tablist">${nav}</div>`;
+  $('#side').innerHTML = '';
+  $('#tabs').innerHTML = `<div class="brand-row"><div class="logo">${logo}</div><div class="brand-text"><b>${h(s.companyName)}</b><small>${h(s.subtitle || 'Capacity Planner')}</small></div><span class="grow"></span><div class="sync-pill" id="syncPill">${syncPillHtml()}</div>${cloudActive() ? `<button class="side-out" data-act="signOut" title="Sign out" style="width:auto;color:var(--ink);border-color:var(--line)">${icon('logout')}<span class="lbl-t">Sign out</span></button>` : ''}</div>${tabsHtml}`;
 
   const y = state.year, years = []; for (let i = y - 3; i <= y + 4; i++) years.push(i);
   const sc = state.scenario, sun = model.sundaysAvailable;
@@ -2336,7 +2349,8 @@ function applyTheme() {
   if (t === 'system') document.documentElement.removeAttribute('data-theme'); else document.documentElement.setAttribute('data-theme', t);
 }
 function pageAllowed(id) { return id !== 'settings' || can('admin'); }
-function visiblePages() { return PAGES.filter(p => pageAllowed(p.id)); }
+const MAIN_ORDER = ['standards', 'answer', 'quick', 'capacity', 'loading', 'demand', 'pmaster', 'present'];
+function visiblePages() { return PAGES.filter(p => pageAllowed(p.id)).sort((a, b) => { const x = MAIN_ORDER.indexOf(a.id), y = MAIN_ORDER.indexOf(b.id); return (x < 0 ? 99 : x) - (y < 0 ? 99 : y); }); }
 /* Every menu item is a real link: right-click › Open in new tab / window opens that exact screen (#page or #page/tab) */
 const pageHref = (id, sub) => location.pathname + location.search + '#' + id + (sub ? '/' + sub : '');
 function syncHash() { try { history.replaceState(null, '', pageHref(ui.page, ui.page === 'masters' ? ui.mastersTab : ui.page === 'settings' ? ui.settingsTab : '')); } catch (e) { /* ignore */ } }
