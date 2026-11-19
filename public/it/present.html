@@ -12,7 +12,7 @@ input,select,textarea,button{font:inherit;color:inherit}.chip.x{background:#ffff
 <title>Presentation · KMR Apps</title>
 <meta name="theme-color" content="#1e3a8a">
 </head><body>
-<header><span class="clogo" id="clogo" hidden></span><div><h1 id="ttl">Presentation</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<header><span class="clogo" id="clogo" hidden></span><div><h1 id="ttl">Presentation</h1><small id="co">Loading…</small></div><div style="flex:1"></div><a id="kmrHome" class="chip x" style="color:#fff;text-decoration:none;font-weight:700">← KMR Apps</a><span class="chip x" id="role"></span></header>
 <nav class="tabs" id="ptabs"></nav>
 <main><div class="panel"><div id="msg"></div><section id="pres"></section></div></main>
 <script src="/it/apps/qp-core.js"></script><script src="/it/apps/kmr-present.js"></script><script src="/it/apps/kmr-present-apps.js"></script>
@@ -29,6 +29,7 @@ input,select,textarea,button{font:inherit;color:inherit}.chip.x{background:#ffff
     const tabs=(saved&&saved.tabs&&saved.tabs.length)?saved.tabs:[{t:"",label:"← Back to "+P.name}];
     nav.innerHTML=tabs.map(x=>'<a class="tab" href="'+base.split("#")[0]+(x.t?'#go='+encodeURIComponent(x.t):'')+'">'+String(x.label).replace(/[<>&]/g,"")+'</a>').join("")+'<a class="tab on" href="#">Presentation</a>';
   })();
+  (function(){let p=null;try{p=JSON.parse(localStorage.getItem("kmr-portal")||"null")}catch(e){}const sl=(p&&p.slug)||new URLSearchParams(location.search).get("co")||"";document.getElementById("kmrHome").href=sl?"/it/app/"+encodeURIComponent(sl):"/it/index.html"})();
   document.getElementById("ttl").textContent="Presentation · "+P.name; document.title="Presentation · "+P.name+" · KMR Apps";
   await QP.init(P.code,P.ctxFn); if(!QP.ctx)return;
   for(const u of (P.deps||[])) await new Promise((res,rej)=>{const s=document.createElement('script');s.src=u;s.onload=res;s.onerror=()=>rej(new Error('Could not load '+u));document.head.append(s)});
