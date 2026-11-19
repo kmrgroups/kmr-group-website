@@ -216,6 +216,13 @@
           rew_open: tags.filter((t) => t.rs_id === s.id && t.kind === "REW" && t.status === "open").reduce((a, t) => a + t.bal, 0) })),
         tags: tags.filter((t) => t.status !== "void").map(tagRow), dcs: dcs.map(dcRow), entries: ents.slice().sort((a, b) => b.entry_at.localeCompare(a.entry_at)).map(entRow), defects: defs.filter((d) => !d.void), loss: loss.filter((l) => l.status === "ok"), today: isoD(nowMs()), now: iso(nowMs()) };
     },
+    kmr_mmd_stage_map() {
+      return { today: iso(nowMs()).slice(0, 10), lots: rsL.map((s) => ({ id: s.id, rs_no: s.rs_no, part_code: s.part_code, part_name: s.part_name, customer_name: s.customer_name, heat_code: s.heat_code, rm_material: s.rm_material, qty: s.qty, status: s.status, due_date: s.due_date, created_at: s.created_at,
+        ops: s.ops.map((o, i) => { const q = i + 1, ee = ents.filter((e) => e.rs_id === s.id && e.status === "ok" && e.kind === "process" && e.seq === q), sm = (f) => ee.reduce((a, e) => a + (+e[f] || 0), 0);
+          return { seq: q, name: o.name, machine: o.machine, type: o.type, wait: tags.filter((t) => t.rs_id === s.id && t.status === "open" && ["RM", "OK"].includes(t.kind) && t.loc === "op" && t.seq === q).reduce((a, t) => a + t.bal, 0), supplier: dcs.filter((d) => d.rs_id === s.id && ["open", "part"].includes(d.status) && d.seq === q).reduce((a, d) => a + d.qty - d.received_qty, 0), ok: sm("ok_qty"), rej: sm("rej_qty"), rew: sm("rew_qty"), rew_open: tags.filter((t) => t.rs_id === s.id && t.status === "open" && t.kind === "REW" && t.seq === q).reduce((a, t) => a + t.bal, 0) }; }),
+        fg: tags.filter((t) => t.rs_id === s.id && t.loc === "fg" && t.status !== "void").reduce((a, t) => a + t.qty, 0), dispatched: tags.filter((t) => t.rs_id === s.id && t.loc === "dispatched" && t.status !== "void").reduce((a, t) => a + t.qty, 0),
+        rej_wait: tags.filter((t) => t.rs_id === s.id && t.kind === "REJ" && t.status === "open" && !t.dispo).reduce((a, t) => a + t.bal, 0), rej_total: defs.filter((q) => q.rs_id === s.id && q.kind === "rej" && !q.void).reduce((a, q) => a + q.qty, 0), rew_total: defs.filter((q) => q.rs_id === s.id && q.kind === "rew" && !q.void).reduce((a, q) => a + q.qty, 0) })) };
+    },
     kmr_mmd_tag(a) { const t = byNo(a.p_no); if (!t) err("No tag with the number “" + (a.p_no || "") + "”."); return tagJson(t); },
     kmr_mmd_dc_get(a) { const d = dcs.find((x) => x.dc_no === String(a.p_no || "").trim().toUpperCase()); if (!d) err("No DC with the number “" + (a.p_no || "") + "”."); const rs = T(rsL, d.rs_id); return { dc: d, rs, progress: progress(rs), grns: grns.filter((g) => g.dc_id === d.id && g.ok_qty + g.rej_qty > 0) }; },
     kmr_mmd_issue(a) { const r = issue(a.p); return tagJson(T(tags, r.tag_id)); },

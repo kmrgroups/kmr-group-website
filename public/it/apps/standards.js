@@ -182,6 +182,7 @@ mmd:[
 ['IATF','8.5.1.5','Total productive maintenance','Idle and downtime hours with their reasons are kept for every machine and day, so lost time can be analysed against the machine.'],
 ['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Pieces produced, scrap and machine efficiency per part and process are available for the period chosen, as evidence for process performance.'],
 ['ISO','8.5.2','Identification and traceability','Material, WIP and outsourced lots are tracked with their identification.'],
+['IATF','8.5.2.1','Identification and traceability (supplemental)','The Part & stage tracker shows, for every part and stage, the pieces waiting, at a supplier, OK, in rework and rejected, with the route sheet (lot) and heat number they belong to.'],
 ['IATF','8.5.2.1','Identification and traceability (supplemental)','Receipt, issue and WIP records allow tracing a lot through the process.'],
 ['ISO','8.4','Externally provided processes','Supplier delivery challans and goods receipt are recorded.'],
 ['ISO','8.7','Control of nonconforming outputs','Rejection and rework quantities are recorded by reason.'],
