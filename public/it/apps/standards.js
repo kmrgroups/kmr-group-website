@@ -187,6 +187,7 @@ mmd:[
 ['ISO','8.7','Control of nonconforming outputs','Rejection and rework quantities are recorded by reason.'],
 ['IATF','8.7.1','Control of nonconforming product','Loss and rejection codes support segregation and disposition records.'],
 ['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Loss codes and WIP give process yield and loss by stage.'],
+['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Dashboards show OEE, availability, performance, quality, machine utilisation and efficiency overall, machine wise and month wise, plus operator efficiency, so performance trends and gaps can be reviewed against targets.'],
 ['VDA','P6','Process / service','Material flow, handling and nonconforming product are shown on screen.'],
 ['IATF','8.5.2.1','Identification and traceability (supplemental)','Every production entry makes its own QR tag (part, route sheet, operation, heat code, quantity); the entry is made by manual stage-wise entry, QR scan or machine capture, and all three give the same tags and traceability.'],
 ['IATF','9.1.1.1','Monitoring and measurement of manufacturing processes','Piece counts and run, idle and alarm status are read from the machines over the network (Fanuc, Siemens, OPC UA, MTConnect, Modbus, MQTT) and used once in the production entry; a counted piece cannot be entered twice.'],

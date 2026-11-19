@@ -476,8 +476,8 @@ function drawWip(){$('#wip').innerHTML=MMDDash.wip(S.m,S.x);document.querySelect
 /* ---------- DASHBOARDS ---------- */
 async function drawDash(days,kind){
   days=days||+store('dd')||30;kind=kind||'rej';store('dd',days);let x=await call('kmr_mmd_data',{p_days:Math.max(days,7)});try{x=MMDDash.mergeErp(S.m,x,await call('kmr_mmd_erp',{p_days:days}),days)}catch(e){}let K={},PLN=null;try{K=await call('kmr_mmd_kpi',{p_days:days})}catch(e){K={}}try{PLN=await call('kmr_mmd_plan',{})}catch(e){PLN=null}
-  $('#dash').innerHTML=`<div class="row"><label class="mut">Period</label><select id="dpD" style="width:auto">${[7,30,60,90].map(d=>`<option value="${d}"${d===days?' selected':''}>Last ${d} days</option>`).join('')}</select><span class="grow"></span><button class="btn o s noprint" onclick="window.print()">Print</button></div>`+MMDDash.dash(S.m,x,days,kind)+MMDDash.extra(S.m,K,days)+MMDDash.plan(S.m,PLN);
-  $('#dpD').onchange=()=>drawDash(+$('#dpD').value,kind);$('#dpK').onchange=()=>drawDash(days,$('#dpK').value);
+  $('#dash').innerHTML=`<div class="row"><label class="mut">Period</label><select id="dpD" style="width:auto">${[7,30,60,90,180].map(d=>`<option value="${d}"${d===days?' selected':''}>Last ${d} days</option>`).join('')}</select><span class="grow"></span><button class="btn o s noprint" onclick="window.print()">Print</button></div>`+MMDDash.dash(S.m,x,days,kind)+MMDDash.kpiViews(S.m,x,days)+MMDDash.extra(S.m,K,days)+MMDDash.plan(S.m,PLN);
+  $('#dpD').onchange=()=>drawDash(+$('#dpD').value,kind);const kvs=$('#kvs');if(kvs){const sh=i=>{kvs.querySelectorAll('[data-kvp]').forEach(d=>d.style.display=d.dataset.kvp==i?'block':'none');kvs.querySelectorAll('[data-kv]').forEach(b=>b.classList.toggle('o',b.dataset.kv!=i))};kvs.querySelectorAll('[data-kv]').forEach(b=>b.onclick=()=>sh(b.dataset.kv));const km=$('#kvM');if(km)km.onchange=()=>kvs.querySelectorAll('.kvmat').forEach(d=>d.style.display=d.dataset.k===km.value?'block':'none')}$('#dpK').onchange=()=>drawDash(days,$('#dpK').value);
 }
 
 /* ---------- 5. REJECTION & REWORK ---------- */
