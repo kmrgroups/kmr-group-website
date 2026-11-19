@@ -73,11 +73,26 @@
   }
   const group = (arr, keyf, valf) => { const o = {}; arr.forEach((a) => { const k = keyf(a) || "—"; o[k] = (o[k] || 0) + valf(a); }); return Object.keys(o).map((k) => ({ l: k, v: o[k] })); };
 
+  /* ERP production history -> the same shape as the app's own entries and loss rows, so every dashboard works from one source.
+     Machine-days that already have app entries are left out on the server. Time a machine neither ran nor logged a reason for is a loss ("not scheduled"). */
+  const PLANNED = /holiday|sunday|no (load|plan|order|schedule|work)|not scheduled|planned|festival|lock ?out/i;
+  function mergeErp(m, x, E, days) {
+    if (!E || !E.prod) return x;
+    const P = plant(m), since = new Date(x.today + "T00:00:00").getTime() - (days - 1) * 864e5; let wd = 0;
+    for (let i = 0; i < days; i++) { const dow = new Date(since + i * 864e5).getDay(); const off = P.off === "Sunday" ? dow === 0 : P.off === "Saturday & Sunday" ? dow === 0 || dow === 6 : P.off === "Friday" ? dow === 5 : false; if (!off) wd++; }
+    const entries = (x.entries || []).slice(), loss = (x.loss || []).slice(), mc = {};
+    const M = (c) => (mc[c] = mc[c] || { op: 0, idle: 0, plan: 0 });
+    E.prod.forEach((r) => { const q = +r[2], sh = +r[4]; M(r[1]).op += +r[5]; entries.push({ id: "erp", kind: "process", status: "ok", machine: r[1], ok_qty: q, rej_qty: +r[3], rew_qty: 0, ct_sec: q ? sh * 3600 / q : 0, entry_at: r[0] + "T12:00:00", src: "erp", part_code: "", rs_no: "ERP history" }); });
+    E.idle.forEach((r) => { const pl = PLANNED.test(r[2]), h = +r[3]; if (pl) M(r[1]).plan += h; else M(r[1]).idle += h; loss.push({ machine_code: r[1], d_code: pl ? "ERP-P" : "ERP", d_name: r[2], minutes: h * 60, loss_date: r[0], status: "ok", src: "erp" }); });
+    Object.keys(mc).forEach((c) => { const a = mc[c], ns = P.H * wd - Math.min(a.plan, P.H * wd) - a.op - a.idle; if (ns > 0.5) loss.push({ machine_code: c, d_code: "ERP", d_name: "NOT SCHEDULED / NO ENTRY", minutes: ns * 60, loss_date: x.today, status: "ok", src: "erp" }); });
+    const lcs = (m.loss_codes || []).concat([{ code: "ERP-P", name: "ERP planned stop", planned: "Yes" }]);
+    return Object.assign({}, x, { entries, loss, erp_rows: E.rows || 0, erp_last: E.last, _lc: lcs });
+  }
   function dash(m, x, days, kind) {
     const P = plant(m), since = new Date(x.today + "T00:00:00").getTime() - (days - 1) * 864e5, inWin = (iso) => new Date(String(iso).slice(0, 10) + "T00:00:00").getTime() >= since;
     // working days in the window (weekly off removed)
     let wd = 0; for (let i = 0; i < days; i++) { const dd = new Date(since + i * 864e5), dow = dd.getDay(); const off = P.off === "Sunday" ? dow === 0 : P.off === "Saturday & Sunday" ? dow === 0 || dow === 6 : P.off === "Friday" ? dow === 5 : false; if (!off) wd++; }
-    const lc = {}; (m.loss_codes || []).forEach((l) => (lc[l.code] = l));
+    const lc = {}; (x._lc || m.loss_codes || []).forEach((l) => (lc[l.code] = l));
     const pe = x.entries.filter((e) => e.status === "ok" && e.kind === "process" && inWin(e.entry_at) && e.machine), loss = x.loss.filter((l) => inWin(l.loss_date));
     const mach = {}; const M = (c) => (mach[c] = mach[c] || { c, ok: 0, rej: 0, rew: 0, std: 0, std_ok: 0, loss: 0, plan: 0 });
     pe.forEach((e) => { const r = M(e.machine); r.ok += +e.ok_qty; r.rej += +e.rej_qty; r.rew += +e.rew_qty; const ct = +e.ct_sec || 0; r.std += (ct * (+e.ok_qty + +e.rej_qty + +e.rew_qty)) / 3600; r.std_ok += (ct * +e.ok_qty) / 3600; });
@@ -95,7 +110,7 @@
     const day = {}; pe.forEach((e) => { const d = String(e.entry_at).slice(0, 10), r = (day[d] = day[d] || { ok: 0, rej: 0, rew: 0 }); r.ok += +e.ok_qty; r.rej += +e.rej_qty; r.rew += +e.rew_qty; });
     const dk = Object.keys(day).sort().slice(-30), mxr = Math.max(0.01, ...dk.map((d) => (day[d].rej + day[d].rew) / Math.max(1, day[d].ok + day[d].rej + day[d].rew)));
     const lossBy = (f) => group(loss, f, (l) => +l.minutes / 60);
-    return `<div class="note">Period: last ${days} days · ${wd} working days × ${N(P.H, 1)} h = ${N(P.H * wd)} h available per machine${P.set ? "" : " (Plant standards not filled in — default hours used)"}. Targets from Operations Master › Plant standards (OEE ${N(tg * 100)}%).</div>
+    return `<div class="note">Period: last ${days} days · ${wd} working days × ${N(P.H, 1)} h = ${N(P.H * wd)} h available per machine${P.set ? "" : " (Plant standards not filled in — default hours used)"}. Targets from Operations Master › Plant standards (OEE ${N(tg * 100)}%).${x.erp_rows ? ` <b>${N(x.erp_rows)} ERP production records</b> (to ${esc(String(x.erp_last || "").slice(0, 10))}) are included with this app's own entries. The ERP has no rejection data, so quality counts only entries made here.` : ""}</div>
     <div class="kpis">${k(pc(TO), "OEE", col(TO, tg), "target " + N(tg * 100) + "%")}${k(pc(TA), "Availability", col(TA, 0.9))}${k(pc(TP), "Performance", col(TP, 0.9))}${k(pc(TQ), "Quality (first pass OK)", col(TQ, 0.97))}${k(pc(T.std_ok && T.op ? T.std_ok / T.op : null), "Production efficiency", "b", "earned hours ÷ operating hours")}${k(pc(T.avail && T.std ? T.std / T.avail : null), "Capacity utilisation", "b", "standard hours ÷ available hours")}${k(pc(tot ? T.rej / tot : null), "Rejection rate", tot && T.rej / tot > 0.02 ? "r" : "g", N(T.rej) + " of " + N(tot) + " pcs")}${k(pc(tot ? T.rew / tot : null), "Rework rate", tot && T.rew / tot > 0.03 ? "a" : "g", N(T.rew) + " pcs")}</div>
     <b>Machine wise</b><div style="overflow-x:auto"><table><thead><tr><th>Machine</th><th class="n">Available h</th><th class="n">Loss h</th><th class="n">Availability</th><th class="n">Performance</th><th class="n">Quality</th><th class="n">OEE</th><th class="n">Efficiency</th><th class="n">Utilisation</th><th class="n">Rej %</th><th class="n">Rew %</th></tr></thead><tbody>${R.map((r) => `<tr><td><b>${esc(r.c)}</b></td><td class="n">${N(r.avail, 0)}</td><td class="n">${N(r.loss, 1)}</td><td class="n">${pc(r.A)}</td><td class="n">${pc(r.Pf)}</td><td class="n">${pc(r.Q)}</td><td class="n"><span class="chip ${col(r.oee, tg)}">${pc(r.oee)}</span></td><td class="n">${pc(r.eff)}</td><td class="n">${pc(r.util)}</td><td class="n">${pc(r.tot ? r.rej / r.tot : null)}</td><td class="n">${pc(r.tot ? r.rew / r.tot : null)}</td></tr>`).join("") || '<tr><td colspan="11" class="mut">No entries in this period.</td></tr>'}</tbody></table></div>
     <p class="note"><b>How it is worked out.</b> Availability = (available hours − unplanned loss hours) ÷ available hours; planned-stop D codes are taken off the available hours. Performance = standard hours of everything made (cycle time from Operations Master × pieces) ÷ operating hours, capped at 100%. Quality = OK ÷ (OK + rejected + rework). OEE = A × P × Q. Efficiency = standard hours of OK pieces ÷ operating hours. Utilisation = standard hours of everything made ÷ available hours. Enter every loss in <i>Loss hours</i> for the figures to be right.</p>
@@ -127,5 +142,5 @@
     <div class="kpis">${k(p(E.machine || 0, E.total || 0), "production entries made from machine counts", "b", (E.machine || 0) + " of " + (E.total || 0) + " entries")}${k(N(T.changes || 0), "tool changes", "a", (T.breakages || 0) + " breakages")}${k(N(Math.round(T.change_min || 0)) + " min", "idle time from tool changes", "a")}${k(T.life_pct != null ? N(T.life_pct, 0) + "%" : "—", "tool life achieved vs standard", "b")}${k(N(T.due || 0), "tools due for change now", (T.due || 0) ? "r" : "g", (T.on_machines || 0) + " on machines")}${k(N(T.low_stock || 0), "tools below safety stock", (T.low_stock || 0) ? "r" : "g", (T.listed || 0) + " in the plan")}${k(N(C.low_stock || 0), "consumables below safety stock", (C.low_stock || 0) ? "r" : "g", (C.listed || 0) + " in the plan")}${k(p(DC.on_time || 0, DC.closed || 0), "outsourced lots back on time", "b", (DC.closed || 0) + " completed")}${k(N(DC.overdue || 0), "challans overdue at suppliers", (DC.overdue || 0) ? "r" : "g", (DC.sent || 0) + " sent in the period")}</div>
     ${tm ? `<div class="card"><h3>Tool changes by machine</h3><table class="lt" style="min-width:0"><thead><tr><th>Machine</th><th class="n">Changes</th><th class="n">Change time (min)</th></tr></thead><tbody>${tm}</tbody></table></div>` : ""}`;
   }
-  window.MMDDash = { wip: wipHtml, dash, extra, ready, plant, stuck: (m, x) => wip(m, x).items.filter((i) => i.st === "stuck").length };
+  window.MMDDash = { mergeErp, wip: wipHtml, dash, extra, ready, plant, stuck: (m, x) => wip(m, x).items.filter((i) => i.st === "stuck").length };
 })();

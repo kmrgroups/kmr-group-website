@@ -228,6 +228,7 @@
   /* ---------- MMD: material movement, OEE, rejection ---------- */
   KMRPA.mmd = { name: "Material Movement (MMD)", code: "mmd", std: "mmd", deps: ["/it/apps/mmd-dash.js"], controls: function () { return [{ id: "days", label: "Period", type: "select", value: 30, options: [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] }]; }, load: async function (call, v) {
     var days_ = +v.days || 30, m = await call("kmr_mmd_load"), x = await call("kmr_mmd_data", { p_days: Math.max(days_, 30) }), D = window.MMDDash, P = D.plant(m), S = std, td = m.today || todayIso();
+    try { x = D.mergeErp(m, x, await call("kmr_mmd_erp", { p_days: days_ }), days_); } catch (e) { }
     var since = Date.parse(td + "T00:00:00") - (days_ - 1) * 864e5, inWin = function (iso) { return Date.parse(String(iso).slice(0, 10) + "T00:00:00") >= since; }, wd = 0;
     for (var i = 0; i < days_; i++) { var dow = new Date(since + i * 864e5).getDay(), off = P.off === "Sunday" ? dow === 0 : P.off === "Saturday & Sunday" ? dow === 0 || dow === 6 : P.off === "Friday" ? dow === 5 : false; if (!off) wd++; }
     var lc = {}; (m.loss_codes || []).forEach(function (l) { lc[l.code] = l; });
