@@ -1,5 +1,6 @@
 import Image from "next/image";
 import EsbeeRfq from "./EsbeeRfq";
+import EsbeeGallery, { type GalleryItem } from "./EsbeeGallery";
 
 // Esbee Precision Industries — corporate website, served on nerigroup.in (see lib/esbee.ts, next.config.js).
 const RED = "#C8102E";
@@ -9,7 +10,7 @@ const PHONE = "+91 99942 69441";
 const PHONE_LINK = "tel:+919994269441";
 const EMAIL = "rajavelu@nerigroup.in";
 
-const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Capabilities", "#capabilities"], ["Products", "#products"], ["Quality", "#quality"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
+const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Capabilities", "#capabilities"], ["Products", "#products"], ["How we work", "#process"], ["Quality", "#quality"], ["Awards", "#awards"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
 
 const STATS: [string, string][] = [["90+", "CNC machines across three owned units"], ["2 × 400 t", "In-house pressure die casting"], ["1998", "Supplying Bosch since"], ["IATF", "16949 automotive quality system"]];
 
@@ -53,6 +54,69 @@ const PARTS: [string, string][] = [["Pump plunger", "plunger"], ["Control sleeve
 
 const AWARDS: [string, string, string][] = [["SEG Automotive", "Overall performance award, 2018", "seg-2018-trophy"], ["Tyco Electronics", "Zero PPM supplier award, 2008", "tyco-2008"], ["Bosch / MICO", "Excellence award, 2003–04", "bosch-plaque"], ["CII–Bosch", "Cluster recognition", "cii-bosch-cluster"]];
 
+
+const AWARD_ITEMS: GalleryItem[] = [
+  { src: "/esbee/awards/seg-2018-trophy.jpg", title: "SEG Automotive", note: "Overall performance award, 2018", w: 532, h: 513 },
+  { src: "/esbee/awards/seg-2018-presentation.jpg", title: "SEG Automotive", note: "Award presentation, 2018", w: 800, h: 453 },
+  { src: "/esbee/awards/seg-2018-certificate.jpg", title: "SEG Automotive", note: "Award certificate, 2018", w: 637, h: 383 },
+  { src: "/esbee/awards/tyco-2008.jpg", title: "Tyco Electronics", note: "Zero PPM supplier award, 2008", w: 800, h: 451 },
+  { src: "/esbee/awards/tyco-green-channel.jpg", title: "Tyco Electronics", note: "Green Channel Supplier certificate of appreciation", w: 1000, h: 753 },
+  { src: "/esbee/awards/mico-bosch-2005.jpg", title: "MICO / Bosch", note: "Excellence through Partnership, August 2005", w: 1400, h: 1054 },
+  { src: "/esbee/awards/bosch-plaque.jpg", title: "MICO / Bosch", note: "Excellence in performance plaque, 2003–04", w: 304, h: 235 },
+  { src: "/esbee/awards/power-partners.jpg", title: "Bosch Power Partners Meet", note: "Supplier recognition event", w: 1400, h: 1054 },
+  { src: "/esbee/awards/info-session-2009.jpg", title: "Bosch partners information session", note: "Bangalore plant, 10 March 2009", w: 1400, h: 1054 },
+  { src: "/esbee/awards/cert-presentation.jpg", title: "Certificate presentation", note: "Bosch supplier programme", w: 1400, h: 1054 },
+  { src: "/esbee/awards/cii-bosch-cluster.jpg", title: "CII – Bosch Vendor Advance Cluster", note: "Participation certificate, Dec 2010 – May 2011", w: 753, h: 1000 },
+  { src: "/esbee/awards/amtex-2003.jpg", title: "AMTEX 2003", note: "Exhibition recognition, Bangalore", w: 1054, h: 1400 },
+  { src: "/esbee/awards/display-1.jpg", title: "Awards display", note: "Customer trophies and plaques", w: 1000, h: 590 },
+  { src: "/esbee/awards/display-2.jpg", title: "Awards and parts display", note: "Trophies with machined and cast components", w: 1000, h: 637 },
+];
+
+const COMMUNITY_ITEMS: GalleryItem[] = [
+  { src: "/esbee/awards/rotary-president.jpg", title: "Rotary Bangalore Vijayanagar", note: "Appreciation as President, Mr. Sunil Baglani", w: 1054, h: 1400 },
+  { src: "/esbee/awards/rotary-gift-a-life.jpg", title: "Rotary Gift-a-Life project", note: "Acknowledgement of contribution, District 3190", w: 1400, h: 1054 },
+  { src: "/esbee/awards/rotary-governor.jpg", title: "Rotary District 3190", note: "Governor's recognition", w: 1400, h: 1054 },
+  { src: "/esbee/awards/rotary-momento.jpg", title: "Rotary Bangalore Vijayanagar", note: "Momento of appreciation", w: 1054, h: 1400 },
+  { src: "/esbee/awards/ifmr-recognition.jpg", title: "IFMR Bangalore", note: "Recognition for a long solo ride, 2011–12", w: 1400, h: 1054 },
+];
+
+const WHY: [string, string][] = [
+  ["Whole chain under one roof", "Die casting, CNC and VMC machining, grinding, deburring, assembly, washing, gauging and dispatch are managed by one team, so the part is controlled from casting to carton."],
+  ["Trusted by Bosch since 1998", "More than two decades of supply to Bosch, with supplier awards from Bosch, SEG Automotive and Tyco Electronics for quality and delivery."],
+  ["Zero-PPM mindset", "Defect rates are tracked in parts per million. Zero-PPM recognitions in 2005 and 2008 reflect how every lot is controlled and inspected."],
+  ["Own plants, own control", "All three manufacturing units are company-owned, with 90+ CNC machines and two 400-tonne pressure die casting machines running under direct supervision."],
+  ["Digital production tracking", "Production, inspection and dispatch data are captured in our own digital systems, so customers receive clear traceability and timely reports."],
+  ["Engineering support", "Our team reviews drawings for manufacturability, suggests fixtures and process routes, and launches new parts through APQP and PPAP."],
+];
+
+const STEPS: [string, string][] = [
+  ["Enquiry and drawing review", "You send the drawing, material, volumes and delivery needs through the quotation form."],
+  ["Feasibility and quotation", "We study tolerances, tooling and process route, then reply with a clear quotation within one working day."],
+  ["Tooling, fixtures and gauges", "Fixtures, cutting tools and gauges are designed and built for repeatable accuracy."],
+  ["APQP and PPAP launch", "Control plan, process flow, FMEA and measurement-system studies are completed, and samples are submitted for approval."],
+  ["Production", "Machining and pressure die casting run on defined parameters with in-process checks at every critical operation."],
+  ["Inspection and traceability", "Final inspection on CMM, projector and gauges, with lot traceability and documented results."],
+  ["Delivery and review", "Customer-specific packing, scheduled dispatch and regular performance reviews with feedback loops."],
+];
+
+const INDUSTRIES: [string, string][] = [
+  ["Automotive fuel systems", "Plungers, sleeves, nozzle nuts, studs and precision turned parts for fuel-injection applications."],
+  ["Automotive electrical", "Aluminium die cast end shields and housings, machined to size, for alternators and starter motors."],
+  ["Hydraulics", "Steel-turned hydraulic components for valve and pump manufacturers."],
+  ["Industrial and electrical", "Connector bodies, bushes, shafts and adapters for industrial and electrical products."],
+];
+
+const MILESTONES: [string, string][] = [
+  ["1998", "Begins supplying Bosch, which remains a core customer today."],
+  ["2003–04", "Excellence in performance award from MICO / Bosch."],
+  ["2005", "Zero-PPM recognition for turned parts; MICO / Bosch “Excellence through Partnership”."],
+  ["2008", "Zero-PPM supplier award from Tyco Electronics."],
+  ["2009", "Second position in the CII – Bosch SME Cluster Quality Circle competition."],
+  ["2010–11", "Completes the CII – Bosch Vendor Advance Cluster programme."],
+  ["2018", "Overall performance award from SEG Automotive."],
+  ["2026", "New manufacturing hangar completed at Bommasandra."],
+];
+
 const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
 );
@@ -62,7 +126,7 @@ export default function EsbeeHome() {
     <div className="text-slate-800">
       {/* top bar */}
       <div style={{ background: NAVY }} className="text-[12.5px] text-white/80">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-5 py-2 sm:px-8">
+        <div className="mx-auto flex max-w-[2000px] flex-wrap items-center justify-between gap-x-6 gap-y-1 px-5 py-2 sm:px-10 lg:px-14 2xl:px-20">
           <span>Precision machined and die cast components · Bengaluru, India</span>
           <span className="flex flex-wrap gap-x-5"><a href={PHONE_LINK} className="hover:text-white">{PHONE}</a><a href={`mailto:${EMAIL}`} className="hover:text-white">{EMAIL}</a></span>
         </div>
@@ -70,7 +134,7 @@ export default function EsbeeHome() {
 
       {/* header */}
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-6 px-5 py-3 sm:px-8">
+        <div className="mx-auto flex max-w-[2000px] items-center justify-between gap-6 px-5 py-3 sm:px-10 lg:px-14 2xl:px-20">
           <a href="#top" aria-label="Esbee Precision Industries"><Image src="/esbee/logo.png" alt="Esbee Precision Industries" width={150} height={73} priority className="h-14 w-auto" /></a>
           <nav className="hidden items-center gap-7 text-[13.5px] font-medium text-slate-700 lg:flex">
             {NAV.slice(0, -1).map(([l, h]) => <a key={h} href={h} className="transition hover:text-[#C8102E]">{l}</a>)}
@@ -92,7 +156,7 @@ export default function EsbeeHome() {
             <circle cx="100" cy="100" r="90" /><circle cx="100" cy="100" r="62" /><polygon points="100,40 152,70 152,130 100,160 48,130 48,70" />
             {[0, 60, 120, 180, 240, 300].map((a) => <circle key={a} cx={100 + 76 * Math.cos((a * Math.PI) / 180)} cy={100 + 76 * Math.sin((a * Math.PI) / 180)} r="9" />)}
           </svg>
-          <div className="mx-auto grid max-w-[1240px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[1.25fr_.75fr] lg:py-28">
+          <div className="mx-auto grid max-w-[2000px] gap-12 px-5 py-20 sm:px-10 lg:px-14 2xl:px-20 lg:grid-cols-[1.25fr_.75fr] lg:py-28">
             <div>
               <p className="mb-5 inline-flex items-center gap-3 text-[11.5px] font-semibold uppercase tracking-[0.26em] text-white/70"><span className="h-px w-9" style={{ background: RED }} />Precision engineering · Bengaluru</p>
               <h1 className="font-display text-4xl font-semibold leading-[1.1] sm:text-5xl lg:text-[3.4rem]">Precision components for the machines that move India.</h1>
@@ -114,7 +178,7 @@ export default function EsbeeHome() {
         </section>
 
         {/* about */}
-        <section id="about" className="mx-auto grid max-w-[1240px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-2">
+        <section id="about" className="mx-auto grid max-w-[2000px] gap-12 px-5 py-20 sm:px-10 lg:px-14 2xl:px-20 lg:grid-cols-2">
           <div>
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>About us</p>
             <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: NAVY }}>A partnership-run manufacturer built on repeatable quality.</h2>
@@ -125,15 +189,26 @@ export default function EsbeeHome() {
           </div>
         </section>
 
+        {/* why */}
+        <section className="mx-auto max-w-[2000px] px-5 py-20 sm:px-10 lg:px-14 2xl:px-20">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Why Esbee</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>A supplier you can plan around.</h2>
+          <div className="mt-12 grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-3">
+            {WHY.map(([t, d], i) => (
+              <div key={t} className="bg-white p-8"><div className="font-display text-3xl font-semibold" style={{ color: RED }}>{String(i + 1).padStart(2, "0")}</div><h3 className="mt-3 text-lg font-semibold" style={{ color: NAVY }}>{t}</h3><p className="mt-2 text-[14.5px] leading-relaxed text-slate-600">{d}</p></div>
+            ))}
+          </div>
+        </section>
+
         {/* leadership */}
         <section id="leadership" className="bg-slate-50 py-20">
-          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Leadership</p>
             <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>The people behind Esbee.</h2>
             <div className="mt-12 grid gap-8 md:grid-cols-3">
               {LEADERS.map(([n, r, f, d]) => (
                 <article key={f} className="overflow-hidden border border-slate-200 bg-white shadow-sm">
-                  <div className="relative aspect-[4/5] bg-slate-100"><Image src={`/esbee/leaders/${f}.jpg`} alt={n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover object-top" /></div>
+                  <div className="relative aspect-[4/3.4] bg-[#0A1F44]"><Image src={`/esbee/leaders/${f}.jpg`} alt={n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-contain" /></div>
                   <div className="border-t-4 p-7" style={{ borderTopColor: RED }}>
                     <h3 className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{n}</h3>
                     <div className="mt-1 text-[12.5px] font-semibold uppercase tracking-wider" style={{ color: RED }}>{r}</div>
@@ -145,9 +220,33 @@ export default function EsbeeHome() {
           </div>
         </section>
 
+        {/* journey */}
+        <section className="py-20 text-white" style={{ background: NAVY }}>
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Our journey</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl">Milestones recognised by our customers.</h2>
+            <ol className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2 lg:grid-cols-4">
+              {MILESTONES.map(([y, t]) => (
+                <li key={y} className="p-7" style={{ background: "#0E2956" }}><div className="font-display text-3xl font-semibold">{y}</div><div className="mt-3 h-0.5 w-10" style={{ background: RED }} /><p className="mt-3 text-[14.5px] leading-relaxed text-white/75">{t}</p></li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        {/* industries */}
+        <section className="mx-auto max-w-[2000px] px-5 py-20 sm:px-10 lg:px-14 2xl:px-20">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Industries we serve</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Applications where precision matters.</h2>
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {INDUSTRIES.map(([t, d]) => (
+              <div key={t} className="border border-slate-200 border-t-4 bg-white p-7 shadow-sm" style={{ borderTopColor: RED }}><h3 className="text-lg font-semibold" style={{ color: NAVY }}>{t}</h3><p className="mt-3 text-[14.5px] leading-relaxed text-slate-600">{d}</p></div>
+            ))}
+          </div>
+        </section>
+
         {/* capabilities */}
         <section id="capabilities" className="bg-slate-50 py-20">
-          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Capabilities</p>
             <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>From casting to finished, gauged component.</h2>
             <div className="mt-12 grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-3">
@@ -163,7 +262,7 @@ export default function EsbeeHome() {
         </section>
 
         {/* products */}
-        <section id="products" className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
+        <section id="products" className="mx-auto max-w-[2000px] px-5 py-20 sm:px-10 lg:px-14 2xl:px-20">
           <div className="grid gap-12 lg:grid-cols-[.8fr_1.2fr]">
             <div>
               <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Products</p>
@@ -182,7 +281,7 @@ export default function EsbeeHome() {
         </section>
 
         {/* machines */}
-        <section id="machines" className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
+        <section id="machines" className="mx-auto max-w-[2000px] px-5 py-20 sm:px-10 lg:px-14 2xl:px-20">
           <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Machines</p>
           <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Equipment on our shop floor.</h2>
           <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">Turning, machining, gear shaping, broaching, grinding, polygon milling, spline and thread rolling, pressure die casting, hydraulic and pneumatic assembly, ECM deburring and gun drilling. Plating and heat treatment are done with approved partners.</p>
@@ -196,7 +295,7 @@ export default function EsbeeHome() {
 
         {/* parts */}
         <section className="bg-slate-50 py-20">
-          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Parts we make</p>
             <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Machined and die cast components.</h2>
             <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
@@ -207,9 +306,22 @@ export default function EsbeeHome() {
           </div>
         </section>
 
+        {/* process */}
+        <section id="process" className="bg-slate-50 py-20">
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>How we work</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>From drawing to delivery in seven steps.</h2>
+            <ol className="mt-12 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+              {STEPS.map(([t, d], i) => (
+                <li key={t} className="relative border border-slate-200 bg-white p-6"><span className="absolute -top-4 left-6 flex h-8 w-8 items-center justify-center text-sm font-bold text-white" style={{ background: RED }}>{i + 1}</span><h3 className="mt-2 text-[16px] font-semibold" style={{ color: NAVY }}>{t}</h3><p className="mt-2 text-[14px] leading-relaxed text-slate-600">{d}</p></li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
         {/* quality */}
         <section id="quality" className="py-20 text-white" style={{ background: NAVY }}>
-          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Quality</p>
             <h2 className="max-w-3xl font-display text-3xl font-semibold leading-tight sm:text-4xl">Quality planned in, not inspected in.</h2>
             <p className="mt-5 max-w-3xl text-[15.5px] leading-relaxed text-white/75">Our quality practices follow the core tools of the automotive quality system, and our customers audit and review our results regularly.</p>
@@ -228,26 +340,23 @@ export default function EsbeeHome() {
                 <figure key={f} className="bg-white"><div className="relative aspect-square"><Image src={`/esbee/quality/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 14vw, 50vw" className="object-contain p-2" /></div><figcaption className="px-2 pb-2 text-center text-[12px] font-medium text-slate-700">{n}</figcaption></figure>
               ))}
             </div>
-            <div className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2"><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">IATF 16949</div><div className="mt-1 text-[13.5px] text-white/70">Automotive quality management system</div></div><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">ISO 14001</div><div className="mt-1 text-[13.5px] text-white/70">Environmental management system</div></div></div>
+            <div className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2"><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">IATF 16949:2016</div><div className="mt-1 text-[13.5px] text-white/70">Automotive quality management system</div></div><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">ISO 14001:2015</div><div className="mt-1 text-[13.5px] text-white/70">Environmental management system</div></div></div>
           </div>
         </section>
 
         {/* awards */}
-        <section className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
-          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Recognition</p>
-          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Awarded by our customers.</h2>
-          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-4">
-            {AWARDS.map(([c, t, f]) => (
-              <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/awards/${f}.jpg`} alt={`${c} — ${t}`} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3"><div className="text-[14px] font-semibold" style={{ color: NAVY }}>{c}</div><div className="text-[12.5px] text-slate-500">{t}</div></figcaption></figure>
-            ))}
-          </div>
-          <div className="mt-5 grid gap-5 md:grid-cols-2">
-            {["display-1", "display-2"].map((f) => <div key={f} className="relative aspect-[16/10] overflow-hidden border border-slate-200 bg-slate-100"><Image src={`/esbee/awards/${f}.jpg`} alt="Awards and recognition display at Esbee Precision Industries" fill sizes="(min-width:768px) 50vw, 100vw" className="object-cover" /></div>)}
-          </div>
+        <section id="awards" className="mx-auto max-w-[2000px] px-5 py-20 sm:px-10 lg:px-14 2xl:px-20">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Awards and recognition</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Appreciated by the customers we serve.</h2>
+          <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">Click any picture to see it in full.</p>
+          <div className="mt-10"><EsbeeGallery items={AWARD_ITEMS} cols="lg:grid-cols-5" /></div>
+          <h3 className="mt-16 font-display text-2xl font-semibold" style={{ color: NAVY }}>Community and leadership recognition</h3>
+          <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-slate-600">Our co-founder, Mr. Sunil Baglani, serves the community through Rotary and other fellowships.</p>
+          <div className="mt-8"><EsbeeGallery items={COMMUNITY_ITEMS} cols="lg:grid-cols-5" /></div>
         </section>
 
         {/* plants */}
-        <section id="plants" className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
+        <section id="plants" className="mx-auto max-w-[2000px] px-5 py-20 sm:px-10 lg:px-14 2xl:px-20">
           <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Our plants</p>
           <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Three owned units across Bengaluru.</h2>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
@@ -266,7 +375,7 @@ export default function EsbeeHome() {
 
         {/* customers */}
         <section id="customers" className="border-y border-slate-200 bg-slate-50 py-16">
-          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+          <div className="mx-auto max-w-[2000px] px-5 sm:px-10 lg:px-14 2xl:px-20">
             <p className="text-center text-[11.5px] font-semibold uppercase tracking-[0.24em] text-slate-500">Trusted by leading manufacturers</p>
             <div className="mt-9 grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
               {CUSTOMERS.map(([n, f, w, h]) => (
@@ -277,7 +386,7 @@ export default function EsbeeHome() {
         </section>
 
         {/* RFQ */}
-        <section id="rfq" className="mx-auto grid max-w-[1240px] gap-12 px-5 py-20 sm:px-8 lg:grid-cols-[.8fr_1.2fr]">
+        <section id="rfq" className="mx-auto grid max-w-[2000px] gap-12 px-5 py-20 sm:px-10 lg:px-14 2xl:px-20 lg:grid-cols-[.8fr_1.2fr]">
           <div>
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Request for quotation</p>
             <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: NAVY }}>Tell us what you need made.</h2>
@@ -294,7 +403,7 @@ export default function EsbeeHome() {
       </main>
 
       <footer className="text-white/70" style={{ background: "#071634" }}>
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-4 px-5 py-8 text-[13px] sm:px-8">
+        <div className="mx-auto flex max-w-[2000px] flex-wrap items-center justify-between gap-4 px-5 py-8 text-[13px] sm:px-10 lg:px-14 2xl:px-20">
           <div className="flex items-center gap-4"><span className="rounded-sm bg-white p-1.5"><Image src="/esbee/emblem.png" alt="" width={36} height={36} className="h-9 w-9" /></span><span>© {new Date().getFullYear()} Esbee Precision Industries. All rights reserved.</span></div>
           <span>No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044 · GSTIN 29AAAFE6725G1ZG</span>
         </div>
