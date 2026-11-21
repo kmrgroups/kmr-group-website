@@ -33,10 +33,10 @@ const QUALITY: [string, string][] = [
   ["Customer complaint handling", "Every complaint is logged, contained and closed with root cause and corrective action, reviewed with the customer."],
 ];
 
-const PLANTS: { n: string; role: string; a: string; img?: string }[] = [
-  { n: "Rajaji Nagar · C-35", img: "rajajinagar-a", role: "Registered office · machining", a: "No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
-  { n: "Rajaji Nagar · C-21", img: "rajajinagar-c21", role: "Machining", a: "C-21, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
-  { n: "Bommasandra", img: "bommasandra-hangar", role: "Pressure die casting · machining · new hangar", a: "Plot No. 51, 4th Phase, Bommasandra Industrial Area, Bengaluru 560099" },
+const PLANTS: { n: string; role: string; a: string; img?: string; bbox: string }[] = [
+  { n: "Rajaji Nagar · C-35", bbox: "77.5360,12.9780,77.5520,12.9940", img: "rajajinagar-a", role: "Registered office · machining", a: "No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
+  { n: "Rajaji Nagar · C-21", bbox: "77.5360,12.9780,77.5520,12.9940", img: "rajajinagar-c21", role: "Machining", a: "C-21, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
+  { n: "Bommasandra", bbox: "77.6780,12.8050,77.7020,12.8250", img: "bommasandra-hangar", role: "Pressure die casting · machining · new hangar", a: "Plot No. 51, 4th Phase, Bommasandra Industrial Area, Bengaluru 560099" },
 ];
 
 const LEADERS: [string, string, string, string][] = [
@@ -366,12 +366,12 @@ export default function EsbeeHome() {
             {PLANTS.map((p) => (
               <div key={p.n} className="border border-slate-200 border-t-4 bg-white shadow-sm" style={{ borderTopColor: RED }}>
                 {p.img && <div className="relative aspect-[16/10]"><Image src={`/esbee/plants/${p.img}.jpg`} alt={p.n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover" /></div>}
-                <iframe title={`Map of ${p.n}`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="h-64 w-full border-0 border-t border-slate-200" src={`https://maps.google.com/maps?q=${encodeURIComponent(p.a)}&hl=en&z=16&output=embed`} />
+                <iframe title={`Map of ${p.n}`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="h-64 w-full border-0 border-t border-slate-200" src={`https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(p.bbox)}&layer=mapnik`} />
                 <div className="p-7">
                   <div className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{p.n}</div>
                   <div className="mt-1 text-[13px] font-semibold uppercase tracking-wider text-slate-500">{p.role}</div>
                   <p className="mt-4 text-[14.5px] leading-relaxed text-slate-600">{p.a}</p>
-                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Esbee Precision Industries, " + p.a)}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-[13px] font-semibold underline" style={{ color: RED }}>Open in Google Maps</a>
+                  <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent("Esbee Precision Industries, " + p.a)}`} target="_blank" rel="noopener noreferrer" className="mt-3 inline-block text-[13px] font-semibold underline" style={{ color: RED }}>Open exact location in Google Maps</a>
                 </div>
               </div>
             ))}
