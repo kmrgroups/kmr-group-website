@@ -43,6 +43,7 @@ const LEADERS: [string, string, string, string][] = [
   ["Mr. Shyam B Baglani", "Founder", "shyam", "Founded Esbee Precision Industries and built it into a Bengaluru manufacturer of precision machined and die cast components. His focus on dependable quality and long customer relationships is the reason Esbee has supplied Bosch since 1998."],
   ["Mr. Sunil Baglani", "Co-Founder", "sunil", "Co-founder of Esbee Precision Industries. Together with the founder he has helped grow the company from a single unit to three company-owned plants, keeping the shop floor, tooling and supply commitments running to customer expectations."],
   ["Mr. Rishab Baglani", "Managing Director", "rishab", "Leads the company as Managing Director, driving quality systems, new-part launches and the digital tracking of production and reports across all three units, so customers get consistent quality and transparent delivery."],
+  ["Mrs. Shanthi Baglani", "Managing Partner", "shanthi", "Managing Partner of Esbee Precision Industries, a partnership firm that owns and runs three plants in Bengaluru. She takes part in the firm's direction and governance, supporting the team in keeping quality, delivery and customer commitments on track."],
 ];
 
 const CUSTOMERS: [string, string, number, number][] = [["Bosch", "bosch", 600, 137], ["Magna", "magna", 600, 130], ["SEG Automotive", "seg", 600, 179], ["Bosch Rexroth", "rexroth", 188, 86], ["Parker", "parker", 200, 87], ["Maini", "maini", 138, 138]];
@@ -206,10 +207,10 @@ export default function EsbeeHome() {
           <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Leadership</p>
             <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>The people behind Esbee.</h2>
-            <div className="mt-12 grid gap-8 md:grid-cols-3">
+            <div className="mt-12 grid gap-8 md:grid-cols-2 xl:grid-cols-4">
               {LEADERS.map(([n, r, f, d]) => (
                 <article key={f} className="overflow-hidden border border-slate-200 bg-white shadow-sm">
-                  <div className="relative aspect-[4/3.4] bg-[#0A1F44]"><Image src={`/esbee/leaders/${f}.jpg`} alt={n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-contain" /></div>
+                  <div className="relative aspect-[4/3.4] bg-[#0A1F44]"><Image src={`/esbee/leaders/${f}.jpg`} alt={n} fill sizes="(min-width:1280px) 25vw, (min-width:768px) 50vw, 100vw" className="object-contain" /></div>
                   <div className="border-t-4 p-7" style={{ borderTopColor: RED }}>
                     <h3 className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{n}</h3>
                     <div className="mt-1 text-[12.5px] font-semibold uppercase tracking-wider" style={{ color: RED }}>{r}</div>
