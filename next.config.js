@@ -27,6 +27,10 @@ const nextConfig = {
     return {
       // "beforeFiles" so these win over any page of the website
       beforeFiles: [
+        // nerigroup.in tab icon = Esbee emblem (the shared KMR icon files would otherwise win)
+        { source: "/favicon.ico", has: [{ type: "host", value: "(www\\.)?nerigroup\\.in" }], destination: "/esbee/favicon.ico" },
+        { source: "/icon.png", has: [{ type: "host", value: "(www\\.)?nerigroup\\.in" }], destination: "/esbee/emblem.png" },
+        { source: "/apple-icon.png", has: [{ type: "host", value: "(www\\.)?nerigroup\\.in" }], destination: "/esbee/emblem.png" },
         // nerigroup.in = Esbee Precision Industries website (app/esbee); the form posts to /api/esbee-rfq
         { source: "/((?!api/|_next/|esbee|favicon|icon|apple-icon|robots|sitemap|manifest).*)", has: [{ type: "host", value: "(www\\.)?nerigroup\\.in" }], destination: "/esbee" },
         // Aurum gold research app, hosted independently and served on the KMR domain.
