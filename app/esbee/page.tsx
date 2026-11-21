@@ -11,7 +11,7 @@ const EMAIL = "rajavelu@nerigroup.in";
 
 const NAV = [["About", "#about"], ["Capabilities", "#capabilities"], ["Products", "#products"], ["Quality", "#quality"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
 
-const STATS: [string, string][] = [["3", "Manufacturing units in Bengaluru"], ["75+", "Machines on the shop floor"], ["5", "Key automotive and industrial customers"], ["GST", "Registered since 2017"]];
+const STATS: [string, string][] = [["3", "Manufacturing units in Bengaluru"], ["400 t", "In-house pressure die casting"], ["IATF", "16949 automotive quality system"], ["2003", "Customer excellence awards since"]];
 
 const CAPS: { t: string; d: string; icon: string }[] = [
   { t: "CNC turning", d: "Shafts, plungers, sleeves, bushings and nuts turned to close tolerances in steel, stainless steel, brass and aluminium.", icon: "M12 3v18M5 7l7-4 7 4M5 17l7 4 7-4M5 7v10M19 7v10" },
@@ -31,13 +31,21 @@ const QUALITY: [string, string][] = [
   ["Customer complaint handling", "Every complaint is logged, contained and closed with root cause and corrective action, reviewed with the customer."],
 ];
 
-const PLANTS: { n: string; role: string; a: string }[] = [
-  { n: "Unit I", role: "Registered office · machining", a: "No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
-  { n: "Unit II", role: "Pressure die casting · machining", a: "Plot No. 51, 4th Phase, Bommasandra Industrial Area, Bengaluru 560099" },
+const PLANTS: { n: string; role: string; a: string; img?: string }[] = [
+  { n: "Unit I", img: "rajajinagar-a", role: "Registered office · machining", a: "No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
+  { n: "Unit II", img: "bommasandra", role: "Pressure die casting · machining", a: "Plot No. 51, 4th Phase, Bommasandra Industrial Area, Bengaluru 560099" },
   { n: "Unit III", role: "Machining", a: "C-21, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
 ];
 
-const CUSTOMERS = ["BOSCH", "SEG AUTOMOTIVE", "ADVIK AUTO", "PARKER", "JK MAINI"];
+const CUSTOMERS: [string, string, number, number][] = [["Bosch", "bosch", 600, 137], ["Magna", "magna", 600, 130], ["SEG Automotive", "seg", 600, 179], ["Bosch Rexroth", "rexroth", 188, 86], ["Parker", "parker", 200, 87], ["Maini", "maini", 138, 138]];
+
+const MACHINES: [string, string][] = [["CNC turn-mill centres", "cnc-turn-mill"], ["Horizontal and vertical machining centres", "hmc-vmc"], ["Multi-spindle automats", "multi-spindle"], ["Deep hole (gun) drilling", "deep-hole-drilling"], ["Centreless grinding", "centreless-grinder"], ["Cylindrical grinding", "cylindrical-grinder"], ["Spline and thread rolling", "spline-roller"], ["400-tonne pressure die casting", "pdc-400t"]];
+
+const QUAL_EQ: [string, string][] = [["Co-ordinate measuring machine", "cmm"], ["Roundness tester", "roundness"], ["Profile projector", "profile-projector"], ["Hardness tester", "hardness"], ["Height gauge", "height-gauge"], ["Surface roughness tester", "surface-tester"], ["Delta Vision measuring system", "delta-vision"]];
+
+const PARTS: [string, string][] = [["Pump plunger", "plunger"], ["Control sleeve", "control-sleeve"], ["Sleeve gear", "sleeve-gear"], ["Bushing", "bushing"], ["Drive shafts", "drive-shafts"], ["Aluminium die casting", "srec-casting"], ["Aluminium die casting", "def-casting"], ["End shield", "end-shield"], ["Rotor", "rotor"], ["Pump housing", "pump-housing"], ["Studs", "ic-studs"], ["Nozzle retaining nut", "nr-nut"]];
+
+const AWARDS: [string, string, string][] = [["SEG Automotive", "Overall performance award, 2018", "seg-2018-trophy"], ["Tyco Electronics", "Zero PPM supplier award, 2008", "tyco-2008"], ["Bosch / MICO", "Excellence award, 2003–04", "bosch-plaque"], ["CII–Bosch", "Cluster recognition", "cii-bosch-cluster"]];
 
 const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
@@ -147,6 +155,31 @@ export default function EsbeeHome() {
           </div>
         </section>
 
+        {/* machines */}
+        <section id="machines" className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Machines</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Equipment on our shop floor.</h2>
+          <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">Turning, machining, gear shaping, broaching, grinding, polygon milling, spline and thread rolling, pressure die casting, hydraulic and pneumatic assembly, ECM deburring and gun drilling. Plating and heat treatment are done with approved partners.</p>
+          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-4">
+            {MACHINES.map(([n, f]) => (
+              <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/machines/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3 text-[13.5px] font-medium" style={{ color: NAVY }}>{n}</figcaption></figure>
+            ))}
+          </div>
+        </section>
+
+        {/* parts */}
+        <section className="bg-slate-50 py-20">
+          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Parts we make</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Machined and die cast components.</h2>
+            <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+              {PARTS.map(([n, f]) => (
+                <figure key={f} className="border border-slate-200 bg-white"><div className="relative aspect-square bg-white"><Image src={`/esbee/parts/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 16vw, 50vw" className="object-contain p-2" /></div><figcaption className="border-t border-slate-100 px-3 py-2 text-[12.5px] font-medium text-slate-600">{n}</figcaption></figure>
+              ))}
+            </div>
+          </div>
+        </section>
+
         {/* quality */}
         <section id="quality" className="py-20 text-white" style={{ background: NAVY }}>
           <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
@@ -162,6 +195,24 @@ export default function EsbeeHome() {
                 </div>
               ))}
             </div>
+            <h3 className="mt-16 text-lg font-semibold">Inspection equipment</h3>
+            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
+              {QUAL_EQ.map(([n, f]) => (
+                <figure key={f} className="bg-white"><div className="relative aspect-square"><Image src={`/esbee/quality/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 14vw, 50vw" className="object-contain p-2" /></div><figcaption className="px-2 pb-2 text-center text-[12px] font-medium text-slate-700">{n}</figcaption></figure>
+              ))}
+            </div>
+            <div className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2"><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">IATF 16949</div><div className="mt-1 text-[13.5px] text-white/70">Automotive quality management system</div></div><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">ISO 14001</div><div className="mt-1 text-[13.5px] text-white/70">Environmental management system</div></div></div>
+          </div>
+        </section>
+
+        {/* awards */}
+        <section className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Recognition</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Awarded by our customers.</h2>
+          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-4">
+            {AWARDS.map(([c, t, f]) => (
+              <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/awards/${f}.jpg`} alt={`${c} — ${t}`} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3"><div className="text-[14px] font-semibold" style={{ color: NAVY }}>{c}</div><div className="text-[12.5px] text-slate-500">{t}</div></figcaption></figure>
+            ))}
           </div>
         </section>
 
@@ -171,10 +222,13 @@ export default function EsbeeHome() {
           <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Three units across Bengaluru.</h2>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {PLANTS.map((p) => (
-              <div key={p.n} className="border border-slate-200 border-t-4 bg-white p-7 shadow-sm" style={{ borderTopColor: RED }}>
-                <div className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{p.n}</div>
-                <div className="mt-1 text-[13px] font-semibold uppercase tracking-wider text-slate-500">{p.role}</div>
-                <p className="mt-4 text-[14.5px] leading-relaxed text-slate-600">{p.a}</p>
+              <div key={p.n} className="border border-slate-200 border-t-4 bg-white shadow-sm" style={{ borderTopColor: RED }}>
+                {p.img && <div className="relative aspect-[16/10]"><Image src={`/esbee/plants/${p.img}.jpg`} alt={p.n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover" /></div>}
+                <div className="p-7">
+                  <div className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{p.n}</div>
+                  <div className="mt-1 text-[13px] font-semibold uppercase tracking-wider text-slate-500">{p.role}</div>
+                  <p className="mt-4 text-[14.5px] leading-relaxed text-slate-600">{p.a}</p>
+                </div>
               </div>
             ))}
           </div>
@@ -184,9 +238,9 @@ export default function EsbeeHome() {
         <section id="customers" className="border-y border-slate-200 bg-slate-50 py-16">
           <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
             <p className="text-center text-[11.5px] font-semibold uppercase tracking-[0.24em] text-slate-500">Trusted by leading manufacturers</p>
-            <div className="mt-9 grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 lg:grid-cols-5">
-              {CUSTOMERS.map((c) => (
-                <div key={c} className="flex h-28 items-center justify-center bg-white px-4 text-center font-display text-lg font-semibold tracking-[0.12em] text-slate-700">{c}</div>
+            <div className="mt-9 grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
+              {CUSTOMERS.map(([n, f, w, h]) => (
+                <div key={f} className="flex h-28 items-center justify-center bg-white p-5"><Image src={`/esbee/logos/${f}.jpg`} alt={n} width={w} height={h} className="max-h-16 w-auto object-contain" /></div>
               ))}
             </div>
           </div>
