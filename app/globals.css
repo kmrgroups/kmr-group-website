@@ -53,3 +53,27 @@ img { max-width: 100%; }
 
 /* legacy class kept for the order page's older markup */
 .plate { position: relative; border: 1px solid #E6DFD1; }
+
+/* Esbee site animations */
+.esb-logo { position: relative; display: inline-block; overflow: hidden; }
+.esb-logo::after { content: ""; position: absolute; top: -20%; bottom: -20%; left: -60%; width: 40%; background: linear-gradient(100deg, transparent, rgba(255,255,255,.85), transparent); transform: skewX(-20deg); animation: esb-shine 4.5s ease-in-out infinite; pointer-events: none; }
+@keyframes esb-shine { 0%, 55% { left: -60%; } 85%, 100% { left: 130%; } }
+.esb-spark { position: absolute; width: 10px; height: 10px; pointer-events: none; background: radial-gradient(circle, #fff 0 20%, rgba(255,214,102,.9) 30%, transparent 70%); clip-path: polygon(50% 0, 62% 38%, 100% 50%, 62% 62%, 50% 100%, 38% 62%, 0 50%, 38% 38%); opacity: 0; animation: esb-twinkle 3s ease-in-out infinite; }
+@keyframes esb-twinkle { 0%, 100% { opacity: 0; transform: scale(.3) rotate(0); } 50% { opacity: 1; transform: scale(1.2) rotate(45deg); } }
+.esb-pulse { position: absolute; top: -4px; left: 0; width: 70px; height: 11px; border-radius: 6px; background: linear-gradient(90deg, transparent, #FF6B81, transparent); animation: esb-run 5s linear infinite; }
+.esb-pulse2 { animation-delay: 2.5s; }
+@keyframes esb-run { from { left: -70px; } to { left: 100%; } }
+.esb-node { animation: esb-ring 3.5s ease-in-out infinite; }
+@keyframes esb-ring { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,107,129,0); } 50% { box-shadow: 0 0 0 7px rgba(255,107,129,.25); } }
+.esb-rise { animation: esb-rise .8s ease both; }
+@keyframes esb-rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+.esb-arrow { background: rgba(255,255,255,.2); overflow: hidden; }
+.esb-arrow span { position: absolute; inset: 0; background: linear-gradient(90deg, transparent, #FF6B81, transparent); background-size: 200% 100%; animation: esb-flow 1.6s linear infinite; }
+@media (max-width: 1023px) { .esb-arrow span { background: linear-gradient(180deg, transparent, #FF6B81, transparent); background-size: 100% 200%; animation-name: esb-flowv; } }
+@keyframes esb-flow { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@keyframes esb-flowv { from { background-position: 0 200%; } to { background-position: 0 -200%; } }
+.esb-glow { animation: esb-ring 3s ease-in-out infinite; }
+.esb-shimmer { position: relative; overflow: hidden; }
+.esb-shimmer::after { content: ""; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255,255,255,.14) 50%, transparent 70%); transform: translateX(-100%); animation: esb-sweep 5s ease-in-out infinite; }
+@keyframes esb-sweep { 0%, 40% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) { .esb-logo::after, .esb-spark, .esb-pulse, .esb-node, .esb-rise, .esb-arrow span, .esb-glow, .esb-shimmer::after { animation: none !important; } .esb-spark { opacity: .8; } }
