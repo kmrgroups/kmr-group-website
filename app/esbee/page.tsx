@@ -9,9 +9,9 @@ const PHONE = "+91 99942 69441";
 const PHONE_LINK = "tel:+919994269441";
 const EMAIL = "rajavelu@nerigroup.in";
 
-const NAV = [["About", "#about"], ["Capabilities", "#capabilities"], ["Products", "#products"], ["Quality", "#quality"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
+const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Capabilities", "#capabilities"], ["Products", "#products"], ["Quality", "#quality"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
 
-const STATS: [string, string][] = [["3", "Manufacturing units in Bengaluru"], ["400 t", "In-house pressure die casting"], ["IATF", "16949 automotive quality system"], ["2003", "Customer excellence awards since"]];
+const STATS: [string, string][] = [["90+", "CNC machines across three owned units"], ["2 × 400 t", "In-house pressure die casting"], ["1998", "Supplying Bosch since"], ["IATF", "16949 automotive quality system"]];
 
 const CAPS: { t: string; d: string; icon: string }[] = [
   { t: "CNC turning", d: "Shafts, plungers, sleeves, bushings and nuts turned to close tolerances in steel, stainless steel, brass and aluminium.", icon: "M12 3v18M5 7l7-4 7 4M5 17l7 4 7-4M5 7v10M19 7v10" },
@@ -32,18 +32,24 @@ const QUALITY: [string, string][] = [
 ];
 
 const PLANTS: { n: string; role: string; a: string; img?: string }[] = [
-  { n: "Unit I", img: "rajajinagar-a", role: "Registered office · machining", a: "No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
-  { n: "Unit II", img: "bommasandra", role: "Pressure die casting · machining", a: "Plot No. 51, 4th Phase, Bommasandra Industrial Area, Bengaluru 560099" },
-  { n: "Unit III", role: "Machining", a: "C-21, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
+  { n: "Rajaji Nagar · C-35", img: "rajajinagar-a", role: "Registered office · machining", a: "No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
+  { n: "Rajaji Nagar · C-21", img: "rajajinagar-c21", role: "Machining", a: "C-21, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044" },
+  { n: "Bommasandra", img: "bommasandra-hangar", role: "Pressure die casting · machining · new hangar", a: "Plot No. 51, 4th Phase, Bommasandra Industrial Area, Bengaluru 560099" },
+];
+
+const LEADERS: [string, string, string, string][] = [
+  ["Mr. Shyam B Baglani", "Founder", "shyam", "Founded Esbee Precision Industries and built it into a Bengaluru manufacturer of precision machined and die cast components. His focus on dependable quality and long customer relationships is the reason Esbee has supplied Bosch since 1998."],
+  ["Mr. Sunil Baglani", "Co-Founder", "sunil", "Co-founder of Esbee Precision Industries. Together with the founder he has helped grow the company from a single unit to three company-owned plants, keeping the shop floor, tooling and supply commitments running to customer expectations."],
+  ["Mr. Rishab Baglani", "Managing Director", "rishab", "Leads the company as Managing Director, driving quality systems, new-part launches and the digital tracking of production and reports across all three units, so customers get consistent quality and transparent delivery."],
 ];
 
 const CUSTOMERS: [string, string, number, number][] = [["Bosch", "bosch", 600, 137], ["Magna", "magna", 600, 130], ["SEG Automotive", "seg", 600, 179], ["Bosch Rexroth", "rexroth", 188, 86], ["Parker", "parker", 200, 87], ["Maini", "maini", 138, 138]];
 
-const MACHINES: [string, string][] = [["CNC turn-mill centres", "cnc-turn-mill"], ["Horizontal and vertical machining centres", "hmc-vmc"], ["Multi-spindle automats", "multi-spindle"], ["Deep hole (gun) drilling", "deep-hole-drilling"], ["Centreless grinding", "centreless-grinder"], ["Cylindrical grinding", "cylindrical-grinder"], ["Spline and thread rolling", "spline-roller"], ["400-tonne pressure die casting", "pdc-400t"]];
+const MACHINES: [string, string][] = [["CNC turn-mill centres", "cnc-turn-mill"], ["Horizontal and vertical machining centres", "hmc-vmc"], ["Multi-spindle automats", "multi-spindle"], ["Deep hole (gun) drilling", "deep-hole-drilling"], ["Centreless grinding", "centreless-grinder"], ["Cylindrical grinding", "cylindrical-grinder"], ["Spline and thread rolling", "spline-roller"], ["Pressure die casting · Bühler, 400 t, parts up to 2.5 kg", "pdc-buhler"], ["Pressure die casting · Suzhou Sanji, 400 t, parts up to 2.5 kg", "pdc-suzhou"]];
 
 const QUAL_EQ: [string, string][] = [["Co-ordinate measuring machine", "cmm"], ["Roundness tester", "roundness"], ["Profile projector", "profile-projector"], ["Hardness tester", "hardness"], ["Height gauge", "height-gauge"], ["Surface roughness tester", "surface-tester"], ["Delta Vision measuring system", "delta-vision"]];
 
-const PARTS: [string, string][] = [["Pump plunger", "plunger"], ["Control sleeve", "control-sleeve"], ["Sleeve gear", "sleeve-gear"], ["Bushing", "bushing"], ["Drive shafts", "drive-shafts"], ["Aluminium die casting", "srec-casting"], ["Aluminium die casting", "def-casting"], ["End shield", "end-shield"], ["Rotor", "rotor"], ["Pump housing", "pump-housing"], ["Studs", "ic-studs"], ["Nozzle retaining nut", "nr-nut"]];
+const PARTS: [string, string][] = [["Pump plunger", "plunger"], ["Control sleeve", "control-sleeve"], ["Sleeve gear", "sleeve-gear"], ["Bushing", "bushing"], ["Drive shafts", "drive-shafts"], ["Aluminium die casting", "srec-casting"], ["Aluminium die casting", "def-casting"], ["End shield", "end-shield"], ["Rotor", "rotor"], ["Pump housing", "pump-housing"], ["Studs", "ic-studs"], ["Nozzle retaining nut", "nr-nut"], ["Precision turned part", "bosch-1"], ["Threaded fitting", "bosch-2"], ["Slotted bush", "bosch-3"]];
 
 const AWARDS: [string, string, string][] = [["SEG Automotive", "Overall performance award, 2018", "seg-2018-trophy"], ["Tyco Electronics", "Zero PPM supplier award, 2008", "tyco-2008"], ["Bosch / MICO", "Excellence award, 2003–04", "bosch-plaque"], ["CII–Bosch", "Cluster recognition", "cii-bosch-cluster"]];
 
@@ -114,8 +120,28 @@ export default function EsbeeHome() {
             <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: NAVY }}>A partnership-run manufacturer built on repeatable quality.</h2>
           </div>
           <div className="space-y-4 text-[15.5px] leading-relaxed text-slate-600">
-            <p>Esbee Precision Industries is a Bengaluru-based partnership firm making precision machined and aluminium pressure die cast components. We supply automotive fuel-system and electrical customers, as well as hydraulic and industrial customers, from three manufacturing units in Rajaji Nagar and Bommasandra.</p>
+            <p>Esbee Precision Industries is a Bengaluru-based partnership firm making precision machined and aluminium pressure die cast components. We supply automotive fuel-system and electrical customers, as well as hydraulic and industrial customers, from three company-owned manufacturing units in Rajaji Nagar and Bommasandra, with Bosch as a core customer since 1998.</p>
             <p>Our strength is the whole chain under one roof: die casting, CNC and VMC machining, washing, gauging, final inspection and dispatch. Production is planned and tracked in our own digital systems, so customers get consistent quality, clear traceability and dependable delivery.</p>
+          </div>
+        </section>
+
+        {/* leadership */}
+        <section id="leadership" className="bg-slate-50 py-20">
+          <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Leadership</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>The people behind Esbee.</h2>
+            <div className="mt-12 grid gap-8 md:grid-cols-3">
+              {LEADERS.map(([n, r, f, d]) => (
+                <article key={f} className="overflow-hidden border border-slate-200 bg-white shadow-sm">
+                  <div className="relative aspect-[4/5] bg-slate-100"><Image src={`/esbee/leaders/${f}.jpg`} alt={n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover object-top" /></div>
+                  <div className="border-t-4 p-7" style={{ borderTopColor: RED }}>
+                    <h3 className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{n}</h3>
+                    <div className="mt-1 text-[12.5px] font-semibold uppercase tracking-wider" style={{ color: RED }}>{r}</div>
+                    <p className="mt-4 text-[14.5px] leading-relaxed text-slate-600">{d}</p>
+                  </div>
+                </article>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -160,7 +186,8 @@ export default function EsbeeHome() {
           <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Machines</p>
           <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Equipment on our shop floor.</h2>
           <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">Turning, machining, gear shaping, broaching, grinding, polygon milling, spline and thread rolling, pressure die casting, hydraulic and pneumatic assembly, ECM deburring and gun drilling. Plating and heat treatment are done with approved partners.</p>
-          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-4">
+          <ul className="mt-6 flex flex-wrap gap-3 text-[13px] font-medium" style={{ color: NAVY }}>{["90+ CNC machines", "10+ multi-spindle automats", "HMC and 8+ VMCs", "2 × 400 t pressure die casting", "2 cylindrical grinders + 1 centreless grinder"].map((t) => <li key={t} className="border border-slate-300 bg-white px-3.5 py-1.5">{t}</li>)}</ul>
+          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-3">
             {MACHINES.map(([n, f]) => (
               <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/machines/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3 text-[13.5px] font-medium" style={{ color: NAVY }}>{n}</figcaption></figure>
             ))}
@@ -172,9 +199,9 @@ export default function EsbeeHome() {
           <div className="mx-auto max-w-[1240px] px-5 sm:px-8">
             <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Parts we make</p>
             <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Machined and die cast components.</h2>
-            <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
               {PARTS.map(([n, f]) => (
-                <figure key={f} className="border border-slate-200 bg-white"><div className="relative aspect-square bg-white"><Image src={`/esbee/parts/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 16vw, 50vw" className="object-contain p-2" /></div><figcaption className="border-t border-slate-100 px-3 py-2 text-[12.5px] font-medium text-slate-600">{n}</figcaption></figure>
+                <figure key={f} className="border border-slate-200 bg-white"><div className="relative aspect-square bg-white"><Image src={`/esbee/parts/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 20vw, 50vw" className="object-contain p-2" /></div><figcaption className="border-t border-slate-100 px-3 py-2 text-[12.5px] font-medium text-slate-600">{n}</figcaption></figure>
               ))}
             </div>
           </div>
@@ -214,12 +241,15 @@ export default function EsbeeHome() {
               <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/awards/${f}.jpg`} alt={`${c} — ${t}`} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3"><div className="text-[14px] font-semibold" style={{ color: NAVY }}>{c}</div><div className="text-[12.5px] text-slate-500">{t}</div></figcaption></figure>
             ))}
           </div>
+          <div className="mt-5 grid gap-5 md:grid-cols-2">
+            {["display-1", "display-2"].map((f) => <div key={f} className="relative aspect-[16/10] overflow-hidden border border-slate-200 bg-slate-100"><Image src={`/esbee/awards/${f}.jpg`} alt="Awards and recognition display at Esbee Precision Industries" fill sizes="(min-width:768px) 50vw, 100vw" className="object-cover" /></div>)}
+          </div>
         </section>
 
         {/* plants */}
         <section id="plants" className="mx-auto max-w-[1240px] px-5 py-20 sm:px-8">
           <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Our plants</p>
-          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Three units across Bengaluru.</h2>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Three owned units across Bengaluru.</h2>
           <div className="mt-12 grid gap-6 md:grid-cols-3">
             {PLANTS.map((p) => (
               <div key={p.n} className="border border-slate-200 border-t-4 bg-white shadow-sm" style={{ borderTopColor: RED }}>
