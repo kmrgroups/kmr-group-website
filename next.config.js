@@ -27,6 +27,8 @@ const nextConfig = {
     return {
       // "beforeFiles" so these win over any page of the website
       beforeFiles: [
+        // nerigroup.in = Esbee Precision Industries website (app/esbee); the form posts to /api/esbee-rfq
+        { source: "/((?!api/|_next/|esbee|favicon|icon|apple-icon|robots|sitemap|manifest).*)", has: [{ type: "host", value: "(www\\.)?nerigroup\\.in" }], destination: "/esbee" },
         // Aurum gold research app, hosted independently and served on the KMR domain.
         { source: "/it/aurum", destination: "https://aurum-gold-signals.vercel.app/it/aurum" },
         { source: "/it/aurum/:path*", destination: "https://aurum-gold-signals.vercel.app/it/aurum/:path*" },

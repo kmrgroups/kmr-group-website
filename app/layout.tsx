@@ -5,8 +5,15 @@ import Footer from "@/components/Footer";
 import { getSite, companyName } from "@/lib/site";
 import OrgJsonLd from "@/components/OrgJsonLd";
 import { Analytics } from "@vercel/analytics/next";
+import { headers } from "next/headers";
+import { isEsbeeHost } from "@/lib/esbee";
 
 export async function generateMetadata(): Promise<Metadata> {
+  // nerigroup.in shows the Esbee Precision Industries website instead of the KMR Group website
+  if (isEsbeeHost((await headers()).get("host"))) {
+    const d = "Esbee Precision Industries — precision CNC machined and pressure die cast components for automotive, hydraulic and electrical customers. Bengaluru, India.";
+    return { metadataBase: new URL("https://nerigroup.in"), title: { default: "Esbee Precision Industries — Precision Machined Components, Bengaluru", template: "%s · Esbee Precision Industries" }, description: d, icons: { icon: "/esbee/emblem.png", apple: "/esbee/emblem.png" }, openGraph: { type: "website", siteName: "Esbee Precision Industries", title: "Esbee Precision Industries", description: d, images: [{ url: "/esbee/logo.png" }] } };
+  }
   const { company: c } = await getSite();
   const name = companyName(c);
   const description = c.short_about || "KMR Group of Companies — online shop, software solutions, training & development, import, export and trading.";
@@ -21,7 +28,19 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export const viewport: Viewport = { themeColor: "#0B1C3A", width: "device-width", initialScale: 1 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  if (isEsbeeHost((await headers()).get("host"))) {
+    return (
+      <html lang="en-IN">
+        <head>
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
+          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
+        </head>
+        <body className="bg-ivory font-body text-ink antialiased">{children}<Analytics /></body>
+      </html>
+    );
+  }
   return (
     <html lang="en-IN">
       <head>
