@@ -366,7 +366,7 @@ export default function EsbeeHome() {
             {PLANTS.map((p) => (
               <div key={p.n} className="border border-slate-200 border-t-4 bg-white shadow-sm" style={{ borderTopColor: RED }}>
                 {p.img && <div className="relative aspect-[16/10]"><Image src={`/esbee/plants/${p.img}.jpg`} alt={p.n} fill sizes="(min-width:768px) 33vw, 100vw" className="object-cover" /></div>}
-                <iframe title={`Map of ${p.n}`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="h-64 w-full border-0 border-t border-slate-200" src={`https://www.google.com/maps?q=${encodeURIComponent("Esbee Precision Industries, " + p.a)}&output=embed`} />
+                <iframe title={`Map of ${p.n}`} loading="lazy" referrerPolicy="no-referrer-when-downgrade" className="h-64 w-full border-0 border-t border-slate-200" src={`https://maps.google.com/maps?q=${encodeURIComponent(p.a)}&hl=en&z=16&output=embed`} />
                 <div className="p-7">
                   <div className="font-display text-2xl font-semibold" style={{ color: NAVY }}>{p.n}</div>
                   <div className="mt-1 text-[13px] font-semibold uppercase tracking-wider text-slate-500">{p.role}</div>
@@ -411,6 +411,7 @@ export default function EsbeeHome() {
         <div className="mx-auto flex max-w-[2400px] flex-wrap items-center justify-between gap-4 px-4 py-8 text-[13px] sm:px-6 lg:px-8 2xl:px-12">
           <div className="flex items-center gap-4"><span className="rounded-sm bg-white p-1.5"><Image src="/esbee/emblem.png" alt="" width={36} height={36} className="h-9 w-9" /></span><span>© {new Date().getFullYear()} Esbee Precision Industries. All rights reserved.</span></div>
           <span>No. C-35, 3rd Main Road, Rajaji Nagar Industrial Estate, Bengaluru 560044 · GSTIN 29AAAFE6725G1ZG</span>
+          <span className="w-full border-t border-white/10 pt-4 text-center">Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener noreferrer" className="font-semibold text-white underline hover:opacity-80">KMR Group of Companies</a></span>
         </div>
       </footer>
     </div>
