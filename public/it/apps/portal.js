@@ -434,6 +434,10 @@
         <label style="display:flex;gap:10px;align-items:center;margin:0 0 6px"><b>This unit: WhatsApp evening report</b>
           <select id="waOn" style="padding:6px 10px"><option value="true" ${(plants.find((p) => p.id === g.this) || {}).on ? "selected" : ""}>On</option><option value="false" ${(plants.find((p) => p.id === g.this) || {}).on ? "" : "selected"}>Off</option></select></label>
         <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Only the people listed below get the report. Unit in-charges are not added automatically; add them here if they should receive it. Units on: ${plants.map((p) => esc(short(p.code)) + (p.on ? " ✔" : " —")).join(" · ")}</p>
+        <h3 style="margin:10px 0 6px">Stage-wise stock: parts to send</h3>
+        <p style="margin:0 0 6px;font-size:13px;color:var(--muted)">Tick the parts whose stage-wise stock should be sent for this unit. Leave all unticked to send every part that has stock.</p>
+        <div id="waWip" style="display:flex;flex-wrap:wrap;gap:6px 16px;max-height:180px;overflow:auto;border:1px solid var(--line);padding:8px;margin-bottom:6px"><span class="msg">Loading parts…</span></div>
+        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px"><button class="btn ghost" id="waWipAll" style="height:32px">All</button><button class="btn ghost" id="waWipNone" style="height:32px">None</button><button class="btn" id="waWipSave" style="height:32px">Save parts</button><span class="msg" id="waWipMsg"></span></div>
         <h3 style="margin:10px 0 6px">People, units and sheets</h3>
         ${g.can_map ? "" : `<p class="msg">Only the company administrators can change this list.</p>`}
         <div><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead><tr>${th("Name", "17%")}${th("Mobile", "13%")}${th(`<span title="Ticked when the person pressed Start on the KMR Telegram bot and shared their number. They then get the report on Telegram (free) instead of WhatsApp.">Telegram</span>`, "8%")}${plants.map((p) => th(esc(short(p.code)) + colAll("u:" + p.id))).join("")}${WA_SHEETS.map((x) => th(`<span title="${esc(x[2])}">${x[1]}</span>` + colAll("s:" + x[0]))).join("")}${th("", "78px")}</tr></thead><tbody id="waRows"></tbody></table></div>
@@ -443,6 +447,21 @@
       </div>`;
     bindBack();
     const dis = g.can_map ? "" : "disabled";
+    sb.rpc("kmr_wa_wip_get", { p_slug: SLUG }).then(({ data: w, error: we }) => {
+      const box = $("#waWip"); if (!box) return;
+      if (we) { box.innerHTML = `<span class="msg">${esc(we.message)}</span>`; return; }
+      const sel = new Set(w.selected || []);
+      box.innerHTML = (w.parts || []).length ? w.parts.map((p) => `<label style="display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap"><input type="checkbox" data-wip="${esc(p.part)}" ${sel.has(p.part) ? "checked" : ""}>${esc(p.part)}${p.name ? " " + esc(p.name) : ""}</label>`).join("") : `<span class="msg">No parts found for this unit yet.</span>`;
+      const all = (on) => document.querySelectorAll("[data-wip]").forEach((e) => (e.checked = on));
+      $("#waWipAll").onclick = () => all(true); $("#waWipNone").onclick = () => all(false);
+      $("#waWipSave").onclick = async () => {
+        const mm = $("#waWipMsg"); mm.className = "msg"; mm.textContent = "Saving…";
+        const parts = [...document.querySelectorAll("[data-wip]")].filter((e) => e.checked).map((e) => e.dataset.wip);
+        const r = await sb.rpc("kmr_wa_wip_save", { p_slug: SLUG, p_parts: parts });
+        if (r.error) { mm.textContent = r.error.message; return; }
+        mm.className = "msg ok"; mm.textContent = parts.length ? `Saved: ${parts.length} part(s).` : "Saved: all parts will be sent.";
+      };
+    });
     const draw = () => {
       $("#waRows").innerHTML = rows.length ? rows.map((r, i) => `<tr style="border-bottom:1px solid var(--line)"><td style="padding:4px 6px"><input data-wn="${i}" value="${esc(r.name)}" style="width:100%;min-width:0;box-sizing:border-box" ${dis}></td><td style="padding:4px 6px"><input data-wp="${i}" value="${esc(r.phone)}" style="width:100%;min-width:0;box-sizing:border-box" inputmode="tel" ${dis}></td><td style="padding:4px 8px;text-align:center">${r.tg ? "✔" : "—"}</td>${plants.map((p) => `<td style="padding:4px 8px;text-align:center"><input type="checkbox" data-wu="${i}:${p.id}" ${r.units.includes(p.id) ? "checked" : ""} ${dis}></td>`).join("")}${WA_SHEETS.map((x) => `<td style="padding:4px 8px;text-align:center"><input type="checkbox" data-ws="${i}:${x[0]}" ${r.sheets.includes(x[0]) ? "checked" : ""} ${dis}></td>`).join("")}<td style="padding:4px 6px"><button class="btn ghost" data-wd="${i}" style="height:32px" ${dis}>Delete</button></td></tr>`).join("") : `<tr><td colspan="${4 + plants.length + WA_SHEETS.length}" style="color:var(--muted);padding:8px">No people yet.</td></tr>`;
       document.querySelectorAll("[data-wn]").forEach((e) => (e.oninput = () => { rows[+e.dataset.wn].name = e.value; }));
