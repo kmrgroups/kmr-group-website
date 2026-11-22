@@ -435,9 +435,16 @@
           <select id="waOn" style="padding:6px 10px"><option value="true" ${(plants.find((p) => p.id === g.this) || {}).on ? "selected" : ""}>On</option><option value="false" ${(plants.find((p) => p.id === g.this) || {}).on ? "" : "selected"}>Off</option></select></label>
         <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Only the people listed below get the report. Unit in-charges are not added automatically; add them here if they should receive it. Units on: ${plants.map((p) => esc(short(p.code)) + (p.on ? " ✔" : " —")).join(" · ")}</p>
         <h3 style="margin:10px 0 6px">Stage-wise stock: parts to send</h3>
-        <p style="margin:0 0 6px;font-size:13px;color:var(--muted)">Tick the parts whose stage-wise stock should be sent for this unit. Leave all unticked to send every part that has stock.</p>
-        <div id="waWip" style="display:flex;flex-wrap:wrap;gap:6px 16px;max-height:180px;overflow:auto;border:1px solid var(--line);padding:8px;margin-bottom:6px"><span class="msg">Loading parts…</span></div>
-        <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px"><button class="btn ghost" id="waWipAll" style="height:32px">All</button><button class="btn ghost" id="waWipNone" style="height:32px">None</button><button class="btn" id="waWipSave" style="height:32px">Save parts</button><span class="msg" id="waWipMsg"></span></div>
+        <p style="margin:0 0 6px;font-size:13px;color:var(--muted)">Pick the parts whose current stage-wise stock (taken from the ERP production history) goes to this unit's Telegram group and people. If no part is picked, no stage-wise stock is sent.</p>
+        <div style="position:relative;max-width:560px;margin-bottom:12px" id="waWipBox">
+          <button type="button" class="btn ghost" id="waWipBtn" style="width:100%;justify-content:space-between;text-align:left">Loading parts…</button>
+          <div id="waWipPanel" style="display:none;position:absolute;z-index:20;left:0;right:0;top:100%;background:#fff;border:1px solid var(--line);box-shadow:0 6px 18px rgba(0,0,0,.15);padding:8px">
+            <input id="waWipQ" placeholder="Search part…" style="width:100%;box-sizing:border-box;margin-bottom:6px">
+            <div style="display:flex;gap:10px;font-size:13px;margin-bottom:6px"><a href="#" id="waWipAll">Select all shown</a><a href="#" id="waWipNone">Clear all shown</a></div>
+            <div id="waWipList" style="max-height:260px;overflow:auto"></div>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button type="button" class="btn" id="waWipSave" style="height:32px">Save parts</button><span class="msg" id="waWipMsg"></span></div>
+          </div>
+        </div>
         <h3 style="margin:10px 0 6px">People, units and sheets</h3>
         ${g.can_map ? "" : `<p class="msg">Only the company administrators can change this list.</p>`}
         <div><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead><tr>${th("Name", "17%")}${th("Mobile", "13%")}${th(`<span title="Ticked when the person pressed Start on the KMR Telegram bot and shared their number. They then get the report on Telegram (free) instead of WhatsApp.">Telegram</span>`, "8%")}${plants.map((p) => th(esc(short(p.code)) + colAll("u:" + p.id))).join("")}${WA_SHEETS.map((x) => th(`<span title="${esc(x[2])}">${x[1]}</span>` + colAll("s:" + x[0]))).join("")}${th("", "78px")}</tr></thead><tbody id="waRows"></tbody></table></div>
@@ -448,18 +455,29 @@
     bindBack();
     const dis = g.can_map ? "" : "disabled";
     sb.rpc("kmr_wa_wip_get", { p_slug: SLUG }).then(({ data: w, error: we }) => {
-      const box = $("#waWip"); if (!box) return;
-      if (we) { box.innerHTML = `<span class="msg">${esc(we.message)}</span>`; return; }
-      const sel = new Set(w.selected || []);
-      box.innerHTML = (w.parts || []).length ? w.parts.map((p) => `<label style="display:flex;gap:6px;align-items:center;font-size:13px;white-space:nowrap"><input type="checkbox" data-wip="${esc(p.part)}" ${sel.has(p.part) ? "checked" : ""}>${esc(p.part)}${p.name ? " " + esc(p.name) : ""}</label>`).join("") : `<span class="msg">No parts found for this unit yet.</span>`;
-      const all = (on) => document.querySelectorAll("[data-wip]").forEach((e) => (e.checked = on));
-      $("#waWipAll").onclick = () => all(true); $("#waWipNone").onclick = () => all(false);
+      const btn = $("#waWipBtn"); if (!btn) return;
+      if (we) { btn.textContent = we.message; return; }
+      const parts = w.parts || [], sel = new Set(w.selected || []), panel = $("#waWipPanel"), list = $("#waWipList");
+      const label = (p) => p.part + (p.name ? " " + p.name : "");
+      const head = () => { btn.textContent = sel.size ? `${sel.size} part(s) selected ▾` : "No part selected — nothing is sent ▾"; };
+      const show = () => {
+        const q = $("#waWipQ").value.trim().toLowerCase();
+        const vis = parts.filter((p) => !q || label(p).toLowerCase().includes(q));
+        list.innerHTML = vis.length ? vis.map((p) => `<label style="display:flex;gap:8px;align-items:center;font-size:13px;padding:3px 0"><input type="checkbox" data-wip="${esc(p.part)}" ${sel.has(p.part) ? "checked" : ""}>${esc(label(p))}</label>`).join("") : `<span class="msg">No part found.</span>`;
+        list.querySelectorAll("[data-wip]").forEach((e) => (e.onchange = () => { if (e.checked) sel.add(e.dataset.wip); else sel.delete(e.dataset.wip); head(); }));
+        return vis;
+      };
+      head(); show();
+      btn.onclick = () => { panel.style.display = panel.style.display === "none" ? "block" : "none"; if (panel.style.display === "block") $("#waWipQ").focus(); };
+      $("#waWipQ").oninput = show;
+      $("#waWipAll").onclick = (e) => { e.preventDefault(); show().forEach((p) => sel.add(p.part)); show(); head(); };
+      $("#waWipNone").onclick = (e) => { e.preventDefault(); show().forEach((p) => sel.delete(p.part)); show(); head(); };
+      document.addEventListener("click", (e) => { if (panel.style.display === "block" && !$("#waWipBox")?.contains(e.target)) panel.style.display = "none"; });
       $("#waWipSave").onclick = async () => {
         const mm = $("#waWipMsg"); mm.className = "msg"; mm.textContent = "Saving…";
-        const parts = [...document.querySelectorAll("[data-wip]")].filter((e) => e.checked).map((e) => e.dataset.wip);
-        const r = await sb.rpc("kmr_wa_wip_save", { p_slug: SLUG, p_parts: parts });
+        const r = await sb.rpc("kmr_wa_wip_save", { p_slug: SLUG, p_parts: [...sel] });
         if (r.error) { mm.textContent = r.error.message; return; }
-        mm.className = "msg ok"; mm.textContent = parts.length ? `Saved: ${parts.length} part(s).` : "Saved: all parts will be sent.";
+        mm.className = "msg ok"; mm.textContent = sel.size ? `Saved: ${sel.size} part(s).` : "Saved: no stage-wise stock will be sent.";
       };
     });
     const draw = () => {
