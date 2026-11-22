@@ -498,7 +498,7 @@
       const msg = $("#waMsg"); msg.className = "msg"; msg.textContent = "Sending test…";
       const r = await sb.rpc("kmr_wa_test", { p_slug: SLUG });
       if (r.error) { msg.textContent = r.error.message; return; }
-      msg.className = "msg ok"; msg.textContent = "Test started. The report pictures arrive in this unit's Telegram group within about a minute (marked TEST).";
+      msg.className = "msg ok"; msg.textContent = "Test started. The report pictures arrive in this unit's Telegram group in about 2 to 3 minutes (marked TEST).";
     };
     $("#waSave").onclick = async () => {
       const msg = $("#waMsg"); msg.className = "msg"; msg.textContent = "Saving…";
