@@ -37,6 +37,8 @@
     ppap: { color: "#B45309", desc: "Assemble the PPAP package and the Part Submission Warrant from the drawings, FMEA and control plans you already have.", demo: "/it/ppap.html?demo=1" },
     cad: { color: "#0369A1", desc: "Draw 2D engineering drawings the AutoCAD way — command line, snaps, layers, dimensions, hatches, blocks, title blocks, DXF in and out, print to PDF, with revision control.", demo: "/it/cad.html?demo=1" },
     mom: { color: "#7C3AED", desc: "Record every meeting by voice or typing, in Indian and international languages; one click turns the text into points; translate them and follow up the actions.", demo: "/it/mom.html?demo=1" },
+    tlp: { color: "#0D9488", desc: "Plan tools from the production plan, watch tool life on every machine and keep a bin card of every tool receipt, issue and amendment.", demo: "/it/tlp.html?demo=1" },
+    csp: { color: "#CA8A04", desc: "Plan consumables from usage rules and production, issue to machines and keep a bin card of every receipt, issue and amendment.", demo: "/it/csp.html?demo=1" },
     mnt: { color: "#EA580C", desc: "Log every breakdown with root cause and action, track MTBF, MTTR and downtime, plan preventive maintenance and print the machine history card.", demo: "/it/mnt.html?demo=1" },
     mmd: { color: "#2563EB", desc: "Issue raw material with QR tags, follow every part machine by machine to finished goods, run supplier DC and GRN, and see rejection, rework and loss hours.", demo: "/it/mmd.html?demo=1" },
     rmp: { color: "#0D9488", desc: "Turn the capacity plan into kilograms of raw material, compare with stock, and plan MOQ-rounded supplier orders with lead times.", demo: "/it/rmp.html?demo=1" },
@@ -51,7 +53,7 @@
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
-  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, bud: 1, ppl: 1, mlp: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1, qms: 1, aud: 1, off: 1, layout: 1, dwm: 1, dcg: 1, inv: 1, connect: 1, pnl: 1, bud: 1 };
+  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, tlp: 1, csp: 1, bud: 1, ppl: 1, mlp: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1, qms: 1, aud: 1, off: 1, layout: 1, dwm: 1, dcg: 1, inv: 1, connect: 1, pnl: 1, bud: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
@@ -137,7 +139,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "dcg", "inv", "pnl", "bud", "ppl", "mlp", "mnt"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "connect", "tsk", "off", "dwm"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "dcg", "inv", "pnl", "bud", "ppl", "mlp", "mnt", "tlp", "csp"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "connect", "tsk", "off", "dwm"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};

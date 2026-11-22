@@ -228,6 +228,19 @@ mmd:[
 ['IATF','8.5.2.1','Identification and traceability (supplemental)','Heat code and mill certificate are recorded when material is issued and carried through every stage entry, rejection and DC / GRN, so a heat can be traced forward to the lots made and a lot back to its heat.'],
 ['ISO','8.1','Operational planning and control','Takt time (available time ÷ demand per day from the Sales Flow plan), bottleneck cycle time, machines needed and throughput time are shown per part, so the plan is checked against what the routes can deliver.'],
 ['IATF','8.5.1.1','Control plan (production planning link)','Cycle times from the routes are compared with takt time and the OEE target; parts above takt are flagged before production starts.']],
+tlp:[
+['ISO','7.1.3','Infrastructure','Tool requirement from the production plan (pieces ÷ tool life) against the tool bin card balance and safety stock; tools below need are flagged to order.'],
+['IATF','8.5.1.5','Total productive maintenance','Tool life used on every machine is monitored from pieces made since fitting; tools due for change are flagged and each change time is booked as loss hours.'],
+['IATF','8.5.1.6','Management of production tooling','Tool stock, issue to machines, return, scrap and every amendment are controlled in one bin card with a running balance, reason and user.'],
+['ISO','7.5.3','Control of documented information','Stock cannot be changed outside the bin card; every line keeps date, quantity, balance, reference and who made it.'],
+['ISO','8.4','Control of externally provided products','Receipts are entered with the goods receipt reference so purchased tools can be traced to the supplier.'],
+['VDA','P6','Process / service - resources','Tool availability and life monitoring support the resources element of the process audit.']],
+csp:[
+['ISO','7.1.3','Infrastructure','Consumable requirement from usage rules and the production plan against the bin card balance and safety stock.'],
+['ISO','7.5.3','Control of documented information','Stock changes only through a receipt, issue, return, scrap or amendment in the bin card, with reason, user and running balance.'],
+['ISO','8.4','Control of externally provided products','Receipts carry the goods receipt reference so each consumable can be traced to its supplier.'],
+['IATF','8.5.1.5','Total productive maintenance','Consumable issue to machines is recorded so usage against the rule is monitored.'],
+['ISO','8.1','Operational planning and control','Quantities to order follow the planned production, safety stock and lead days.']],
 mnt:[
 ['IATF','8.5.1.5','Total productive maintenance','Breakdowns, preventive maintenance plan, MTBF and MTTR are tracked.'],
 ['ISO','7.1.3','Infrastructure','Machine history cards show the condition and upkeep of equipment.'],
