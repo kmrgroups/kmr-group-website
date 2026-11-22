@@ -17,7 +17,7 @@ export async function generateMetadata(): Promise<Metadata> {
   // nerigroup.in shows the Esbee Precision Industries website instead of the KMR Group website
   if (isEsbeeHost((await headers()).get("host"))) {
     const d = "Esbee Precision Industries — precision CNC machined and pressure die cast components for automotive, hydraulic and electrical customers. Bengaluru, India.";
-    return { metadataBase: new URL("https://nerigroup.in"), title: { default: "Esbee Precision Industries — Precision Machined Components, Bengaluru", template: "%s · Esbee Precision Industries" }, description: d, icons: { icon: "/esbee/emblem.png", apple: "/esbee/emblem.png" }, openGraph: { type: "website", siteName: "Esbee Precision Industries", title: "Esbee Precision Industries", description: d, images: [{ url: "/esbee/logo.png" }] } };
+    return { metadataBase: new URL("https://nerigroup.in"), other: { "facebook-domain-verification": "04neylgr4o2k46de0c35hvd7rnyiql" }, title: { default: "Esbee Precision Industries — Precision Machined Components, Bengaluru", template: "%s · Esbee Precision Industries" }, description: d, icons: { icon: "/esbee/emblem.png", apple: "/esbee/emblem.png" }, openGraph: { type: "website", siteName: "Esbee Precision Industries", title: "Esbee Precision Industries", description: d, images: [{ url: "/esbee/logo.png" }] } };
   }
   const { company: c } = await getSite();
   const name = companyName(c);
