@@ -225,6 +225,35 @@
         { title: "Availability by machine (%)", kind: "bar", kpi: "av", labels: an.rows.slice(0, 12).map(function (r) { return r.code; }), series: [{ name: "Availability %", values: an.rows.slice(0, 12).map(function (r) { return r.avail != null ? r.avail * 100 : null; }) }] }] };
   } };
 
+  KMRPA.tlp = { name: "Tool Plan", code: "tlp", std: "tlp", controls: function () { return []; }, load: async function (call) {
+    var D = await call("kmr_stk_load", { p_store: "tool" }), it = D.items || [], low = it.filter(function (i) { return (+i.on_hand || 0) < (+i.min_qty || 0); }), zero = it.filter(function (i) { return (+i.on_hand || 0) <= 0; }), S = std,
+      fits = D.fits || [], due = fits.filter(function (f) { if (f.removed_at) return false; var t = it.filter(function (i) { return i.code === f.tool_code; })[0] || {}; return t.std_life > 0 && f.pcs / t.std_life >= 0.8; }).length,
+      rc = it.reduce(function (a, i) { return a + (+i.received30 || 0); }, 0), us = it.reduce(function (a, i) { return a + (+i.used30 || 0); }, 0), top = it.slice().sort(function (a, b) { return (+b.used30 || 0) - (+a.used30 || 0); }).slice(0, 10);
+    return { period: "Bin card · " + today(), kpis: [
+      { id: "n", name: "Tools in the plan", value: it.length, std: S("ISO 7.1.3", "IATF 8.5.1.5"), why: "Items in the Tool Plan list, each with a bin card." },
+      { id: "low", name: "Items below safety stock", value: low.length, target: 0, amber: 3, dir: "low", std: S("ISO 7.1.3", "ISO 8.1"), why: "Bin card balance is below the safety stock set for the item." },
+      { id: "zero", name: "Items with no stock", value: zero.length, target: 0, amber: 1, dir: "low", std: S("ISO 8.1", "IATF 8.5.1.5"), why: "Balance is nil, so the next issue will be refused." },
+      { id: "rc", name: "Received, last 30 days", value: rc, std: S("ISO 8.4", "ISO 7.5.3"), why: "Receipt lines in the bin card in the last 30 days." },
+      { id: "us", name: "Issued or scrapped, last 30 days", value: us, std: S("ISO 7.5.3", "IATF 8.5.1.5"), why: "Issue and scrap lines in the bin card in the last 30 days." },
+      { id: "due", name: "Tools due for change", value: due, target: 0, amber: 2, dir: "low", std: S("IATF 8.5.1.5", "IATF 8.5.1.6"), why: "Tools on machines that have used 80 % or more of their standard life." }],
+      charts: [{ title: "Issued, last 30 days", kind: "bar", kpi: "us", labels: top.map(function (i) { return i.name || i.code; }), series: [{ name: "Issued", values: top.map(function (i) { return +i.used30 || 0; }) }] },
+        { title: "Balance against safety stock", kind: "bar", kpi: "low", labels: top.map(function (i) { return i.name || i.code; }), series: [{ name: "Balance", values: top.map(function (i) { return +i.on_hand || 0; }) }, { name: "Safety stock", values: top.map(function (i) { return +i.min_qty || 0; }) }] }] };
+  } };
+
+  KMRPA.csp = { name: "Consumables Plan", code: "csp", std: "csp", controls: function () { return []; }, load: async function (call) {
+    var D = await call("kmr_stk_load", { p_store: "consumable" }), it = D.items || [], low = it.filter(function (i) { return (+i.on_hand || 0) < (+i.min_qty || 0); }), zero = it.filter(function (i) { return (+i.on_hand || 0) <= 0; }), S = std,
+      fits = D.fits || [], due = fits.filter(function (f) { if (f.removed_at) return false; var t = it.filter(function (i) { return i.code === f.tool_code; })[0] || {}; return t.std_life > 0 && f.pcs / t.std_life >= 0.8; }).length,
+      rc = it.reduce(function (a, i) { return a + (+i.received30 || 0); }, 0), us = it.reduce(function (a, i) { return a + (+i.used30 || 0); }, 0), top = it.slice().sort(function (a, b) { return (+b.used30 || 0) - (+a.used30 || 0); }).slice(0, 10);
+    return { period: "Bin card · " + today(), kpis: [
+      { id: "n", name: "Consumables in the plan", value: it.length, std: S("ISO 7.1.3", "IATF 8.5.1.5"), why: "Items in the Consumables Plan list, each with a bin card." },
+      { id: "low", name: "Items below safety stock", value: low.length, target: 0, amber: 3, dir: "low", std: S("ISO 7.1.3", "ISO 8.1"), why: "Bin card balance is below the safety stock set for the item." },
+      { id: "zero", name: "Items with no stock", value: zero.length, target: 0, amber: 1, dir: "low", std: S("ISO 8.1", "IATF 8.5.1.5"), why: "Balance is nil, so the next issue will be refused." },
+      { id: "rc", name: "Received, last 30 days", value: rc, std: S("ISO 8.4", "ISO 7.5.3"), why: "Receipt lines in the bin card in the last 30 days." },
+      { id: "us", name: "Issued or scrapped, last 30 days", value: us, std: S("ISO 7.5.3", "IATF 8.5.1.5"), why: "Issue and scrap lines in the bin card in the last 30 days." }],
+      charts: [{ title: "Issued, last 30 days", kind: "bar", kpi: "us", labels: top.map(function (i) { return i.name || i.code; }), series: [{ name: "Issued", values: top.map(function (i) { return +i.used30 || 0; }) }] },
+        { title: "Balance against safety stock", kind: "bar", kpi: "low", labels: top.map(function (i) { return i.name || i.code; }), series: [{ name: "Balance", values: top.map(function (i) { return +i.on_hand || 0; }) }, { name: "Safety stock", values: top.map(function (i) { return +i.min_qty || 0; }) }] }] };
+  } };
+
   /* ---------- MMD: material movement, OEE, rejection ---------- */
   KMRPA.mmd = { name: "Material Movement (MMD)", code: "mmd", std: "mmd", deps: ["/it/apps/mmd-dash.js"], controls: function () { return [{ id: "days", label: "Period", type: "select", value: 30, options: [[7, "Last 7 days"], [30, "Last 30 days"], [90, "Last 90 days"]] }]; }, load: async function (call, v) {
     var days_ = +v.days || 30, m = await call("kmr_mmd_load"), x = await call("kmr_mmd_data", { p_days: Math.max(days_, 30) }), D = window.MMDDash, P = D.plant(m), S = std, td = m.today || todayIso();

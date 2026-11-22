@@ -22,7 +22,7 @@ input,select,textarea,button{font:inherit;color:inherit}.chip.x{background:#ffff
   if(!P){QP.say("This app has no presentation. Open it from the app's Presentation tab.");return}
   if(key==="hrms"){location.replace("/it/hrm.html"+location.search+"#go=pres");return}
   (function(){ // the app's own tabs stay visible; clicking one goes back to that screen
-    const PAGE={sales:"sales",calibration:"calibration",apqp:"apqp",ppap:"ppap",rmp:"rmp",mmd:"mmd",mnt:"mnt",msa:"msa",crm:"crm",d8:"d8",off:"office",aud:"aud",spc:"spc",tsk:"tasks",mom:"mom",cad:"cad",dwm:"dwm"};
+    const PAGE={sales:"sales",calibration:"calibration",apqp:"apqp",ppap:"ppap",rmp:"rmp",mmd:"mmd",mnt:"mnt",tlp:"tlp",csp:"csp",msa:"msa",crm:"crm",d8:"d8",off:"office",aud:"aud",spc:"spc",tsk:"tasks",mom:"mom",cad:"cad",dwm:"dwm"};
     const q=new URLSearchParams(location.search),slug=q.get("co")||"",nav=document.getElementById("ptabs");let saved=null;
     try{saved=JSON.parse(sessionStorage.getItem("kmr_tabs_"+key)||"null")}catch(e){}
     const base=(saved&&saved.url)||("/it/"+(PAGE[key]||key)+".html?kmr=1&co="+encodeURIComponent(slug));
