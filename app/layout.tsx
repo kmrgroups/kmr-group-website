@@ -7,6 +7,11 @@ import OrgJsonLd from "@/components/OrgJsonLd";
 import { Analytics } from "@vercel/analytics/next";
 import { headers } from "next/headers";
 import { isEsbeeHost } from "@/lib/esbee";
+import localFont from "next/font/local";
+
+// Self-hosted fonts for the Esbee site: no late font swap, so the page no longer jumps
+const esbInter = localFont({ src: "./esbee/fonts/inter.woff2", weight: "100 900", display: "swap", adjustFontFallback: "Arial", variable: "--font-body" });
+const esbPlayfair = localFont({ src: "./esbee/fonts/playfair.woff2", weight: "400 900", display: "swap", adjustFontFallback: "Times New Roman", variable: "--font-display" });
 
 export async function generateMetadata(): Promise<Metadata> {
   // nerigroup.in shows the Esbee Precision Industries website instead of the KMR Group website
@@ -32,12 +37,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   if (isEsbeeHost((await headers()).get("host"))) {
     return (
       <html lang="en-IN">
-        <head>
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
-          <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@500;600;700&display=swap" rel="stylesheet" />
-        </head>
-        <body className="bg-ivory font-body text-ink antialiased">{children}<Analytics /></body>
+        <body className={`${esbInter.variable} ${esbPlayfair.variable} bg-ivory font-body text-ink antialiased`}>{children}<Analytics /></body>
       </html>
     );
   }
