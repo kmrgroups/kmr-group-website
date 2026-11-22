@@ -40,12 +40,12 @@ tr.cur td{background:#fef9c3}.sg{display:flex;justify-content:space-between;gap:
 .sc{overflow:auto;max-height:70vh;border:1px solid var(--line);border-radius:10px;margin:6px 0;background:var(--card)}.lt{border-collapse:collapse;width:100%;min-width:0;font-size:13px}.lt th,.lt td{border:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:middle}.lt th{background:var(--bg);position:sticky;top:0;z-index:2;white-space:nowrap}.lt td.n,.lt th.n{text-align:right}h3{margin:16px 0 4px;font-size:15px}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Consumables Plan</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="plan" href="#go=plan">Consumables plan &amp; stock</a><a class="tab" data-t="bin" href="#go=bin">Bin card</a><a class="tab" data-t="list" href="#go=list">Consumables list &amp; usage rules</a></div>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="cp" href="#go=cp">From Control Plan</a><a class="tab" data-t="plan" href="#go=plan">Consumables plan &amp; stock</a><a class="tab" data-t="bin" href="#go=bin">Bin card</a><a class="tab" data-t="list" href="#go=list">Consumables list &amp; usage rules</a></div>
 <main><div class="panel"><div id="msg"></div>
-<section id="std"></section><section id="plan" class="hide"></section><section id="bin" class="hide"></section><section id="list" class="hide"></section></div></main>
+<section id="std"></section><section id="cp" class="hide"></section><section id="plan" class="hide"></section><section id="bin" class="hide"></section><section id="list" class="hide"></section></div></main>
 <script src="/it/kmr-lock.js"></script><script src="/it/apps/qp-core.js"></script><script src="/it/apps/stk.js"></script>
 <script>
-const {$,say}=QP,STORE='consumable',APP='csp',TABS=['std', 'plan', 'bin', 'list'];
+const {$,say}=QP,STORE='consumable',APP='csp',TABS=['std', 'cp', 'plan', 'bin', 'list'];
 const hashGo=()=>{const m=location.hash.match(/go=([a-z]+)/);return m?m[1]:'std'};
 async function route(){
   const go=hashGo();
