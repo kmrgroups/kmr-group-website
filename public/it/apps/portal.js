@@ -449,7 +449,7 @@
         ${g.can_map ? "" : `<p class="msg">Only the company administrators can change this list.</p>`}
         <div><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead><tr>${th("Name", "17%")}${th("Mobile", "13%")}${th(`<span title="Ticked when the person pressed Start on the KMR Telegram bot and shared their number. They then get the report on Telegram (free) instead of WhatsApp.">Telegram</span>`, "8%")}${plants.map((p) => th(esc(short(p.code)) + colAll("u:" + p.id))).join("")}${WA_SHEETS.map((x) => th(`<span title="${esc(x[2])}">${x[1]}</span>` + colAll("s:" + x[0]))).join("")}${th("", "78px")}</tr></thead><tbody id="waRows"></tbody></table></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0"><input id="waN" placeholder="Name" style="width:180px"><input id="waP" placeholder="Mobile (10 digits or with 91)" inputmode="tel" style="width:230px"><button class="btn ghost" id="waAdd" style="height:36px">＋ Add person</button></div>
-        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px"><button class="btn" id="waSave">Save</button><span class="msg" id="waMsg"></span></div>
+        <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:8px"><button class="btn" id="waSave">Save</button><button class="btn ghost" id="waTest" title="Sends the report now to this unit's Telegram group, marked TEST. It does not count as today's report.">Send test notification</button><span class="msg" id="waMsg"></span></div>
         <p style="font-size:13px;color:var(--muted);margin:10px 0 0">Tick the units each person gets (a new person starts with all units and all sheets). Leave all sheets unticked to send every sheet. Change a name or number in its row, or press Delete; then press Save. A 10-digit Indian number gets 91 added. For the free Telegram delivery the person opens the KMR report bot on Telegram, presses Start and shares their phone number; Telegram then shows ✔ here.${g.last_sent_on ? " Last sent: " + esc(String(g.last_sent_on).split("-").reverse().join("-")) + "." : ""}</p>
       </div>`;
     bindBack();
@@ -494,6 +494,12 @@
     const add = () => { const n = $("#waN").value.trim(), p = norm($("#waP").value); if (!n || p.length < 11) { const x = $("#waMsg"); x.className = "msg"; x.textContent = "Type a name and a mobile number first."; return; } rows.push({ name: n, phone: p, units: plants.map((q) => q.id), sheets: [] }); $("#waN").value = ""; $("#waP").value = ""; draw(); };
     $("#waAdd").onclick = add; $("#waP").onkeydown = (e) => { if (e.key === "Enter") { e.preventDefault(); add(); } };
     if (!g.can_map) { $("#waAdd").disabled = true; }
+    $("#waTest").onclick = async () => {
+      const msg = $("#waMsg"); msg.className = "msg"; msg.textContent = "Sending test…";
+      const r = await sb.rpc("kmr_wa_test", { p_slug: SLUG });
+      if (r.error) { msg.textContent = r.error.message; return; }
+      msg.className = "msg ok"; msg.textContent = "Test started. The report pictures arrive in this unit's Telegram group within about a minute (marked TEST).";
+    };
     $("#waSave").onclick = async () => {
       const msg = $("#waMsg"); msg.className = "msg"; msg.textContent = "Saving…";
       const people = g.can_map ? rows.filter((r) => r.name || r.phone).map((r) => ({ name: r.name, phone: norm(r.phone), units: r.units, sheets: r.sheets })) : null;
