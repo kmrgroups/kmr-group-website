@@ -234,12 +234,14 @@ tlp:[
 ['IATF','8.5.1.6','Management of production tooling','Tool stock, issue to machines, return, scrap and every amendment are controlled in one bin card with a running balance, reason and user.'],
 ['ISO','7.5.3','Control of documented information','Stock cannot be changed outside the bin card; every line keeps date, quantity, balance, reference and who made it.'],
 ['ISO','8.4','Control of externally provided products','Receipts are entered with the goods receipt reference so purchased tools can be traced to the supplier.'],
+['IATF','8.5.1.1','Control plan','Tools of every operation are read from the Control Plan in Process Documents and linked to the Operations Master, so the tool plan follows the released control plan.'],
 ['VDA','P6','Process / service - resources','Tool availability and life monitoring support the resources element of the process audit.']],
 csp:[
 ['ISO','7.1.3','Infrastructure','Consumable requirement from usage rules and the production plan against the bin card balance and safety stock.'],
 ['ISO','7.5.3','Control of documented information','Stock changes only through a receipt, issue, return, scrap or amendment in the bin card, with reason, user and running balance.'],
 ['ISO','8.4','Control of externally provided products','Receipts carry the goods receipt reference so each consumable can be traced to its supplier.'],
 ['IATF','8.5.1.5','Total productive maintenance','Consumable issue to machines is recorded so usage against the rule is monitored.'],
+['IATF','8.5.1.1','Control plan','Consumables of every operation are read from the Control Plan in Process Documents and linked to the Operations Master.'],
 ['ISO','8.1','Operational planning and control','Quantities to order follow the planned production, safety stock and lead days.']],
 mnt:[
 ['IATF','8.5.1.5','Total productive maintenance','Breakdowns, preventive maintenance plan, MTBF and MTTR are tracked.'],
