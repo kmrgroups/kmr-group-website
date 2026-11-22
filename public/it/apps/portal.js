@@ -433,7 +433,7 @@
       <div style="width:100%">
         <label style="display:flex;gap:10px;align-items:center;margin:0 0 6px"><b>This unit: WhatsApp evening report</b>
           <select id="waOn" style="padding:6px 10px"><option value="true" ${(plants.find((p) => p.id === g.this) || {}).on ? "selected" : ""}>On</option><option value="false" ${(plants.find((p) => p.id === g.this) || {}).on ? "" : "selected"}>Off</option></select></label>
-        <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Unit in-charges with a mobile number get every sheet automatically${(g.incharges || []).length ? ": " + (g.incharges || []).map((x) => esc(x.name) + (x.phone ? " " + esc(x.phone) : " (no mobile yet)")).join(", ") : "."} Units on: ${plants.map((p) => esc(short(p.code)) + (p.on ? " ✔" : " —")).join(" · ")}</p>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--muted)">Only the people listed below get the report. Unit in-charges are not added automatically; add them here if they should receive it. Units on: ${plants.map((p) => esc(short(p.code)) + (p.on ? " ✔" : " —")).join(" · ")}</p>
         <h3 style="margin:10px 0 6px">People, units and sheets</h3>
         ${g.can_map ? "" : `<p class="msg">Only the company administrators can change this list.</p>`}
         <div><table style="border-collapse:collapse;width:100%;table-layout:fixed"><thead><tr>${th("Name", "17%")}${th("Mobile", "13%")}${plants.map((p) => th(esc(short(p.code)) + colAll("u:" + p.id))).join("")}${WA_SHEETS.map((x) => th(`<span title="${esc(x[2])}">${x[1]}</span>` + colAll("s:" + x[0]))).join("")}${th("", "78px")}</tr></thead><tbody id="waRows"></tbody></table></div>
