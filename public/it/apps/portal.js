@@ -47,6 +47,10 @@
     connect: { color: "#0891B2", desc: "See and control your laptops and PCs from any browser or phone (screen, mouse, keyboard, files, programs), meet online with Teams or Google Meet links, record the meeting and get minutes in your language." },
     dcg: { color: "#D97706", desc: "Make delivery challans (returnable and non-returnable) and Goods Receipt Notes against the challan and the purchase order. Calibration gauges go out on a returnable challan and are calibrated on the GRN." },
     dwm: { color: "#174B80", desc: "The Plant Head\u2019s monthly Daily Work Management sheet: every review planned by day, marked Completed, Missed or Concession, with adherence against the 98% target, review standards and Executive Director reporting.", demo: "/it/dwm.html?demo=1" },
+    ppl: { color: "#6D28D9", desc: "Customer schedule less stock at every stage, plus supermarket quantity, gives the quantity to make at each process and on each machine.", demo: "/it/ppl.html?demo=1" },
+    mlp: { color: "#1D4ED8", desc: "Works back from the customer due date to the first operation using cycle times, shows throughput time and the load on every machine day by day.", demo: "/it/mlp.html?demo=1" },
+    pnl: { color: "#15803D", desc: "Tally-style profit and loss with the cost split (raw material, tooling, consumables, wages and more), pulled from the other KMR apps.", demo: "/it/pnl.html?demo=1" },
+    bud: { color: "#B45309", desc: "Monthly budget against actual for raw material, tooling, consumables, manpower, electricity and more, linked to the other KMR apps.", demo: "/it/bud.html?demo=1" },
     layout: { color: "#7C3AED", desc: "1:1 metric scale factory machine shop and office layout generator — converts line concepts into lean cellular layouts with DXF export.", demo: "/it/layout.html?demo=1" },
   };
   const SOON = [["ppc", "Production Planning & Control (full MES)"], ["qms", "QMS"], ["proc", "Procurement"], ["wms", "Warehouse Management"], ["8d", "8D Problem Solving"], ["audit", "IATF / ISO / VDA 6.3 audits"]];
@@ -139,7 +143,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "dcg", "inv", "pnl", "bud", "ppl", "mlp", "mnt", "tlp", "csp"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "connect", "tsk", "off", "dwm"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "dcg", "inv", "pnl", "bud", "ppl", "mlp", "mnt", "tlp", "csp", "layout"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "connect", "tsk", "off", "dwm"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};
