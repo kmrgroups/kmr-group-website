@@ -11,7 +11,7 @@ const PHONE = "+91 99942 69441";
 const PHONE_LINK = "tel:+919994269441";
 const EMAIL = "rajavelu@nerigroup.in";
 
-const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Capabilities", "#capabilities"], ["Products", "#products"], ["How we work", "#process"], ["Digital", "#digital"], ["Quality", "#quality"], ["Awards", "#awards"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
+const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Capabilities", "#capabilities"], ["Tolerances", "#tolerances"], ["Products", "#products"], ["How we work", "#process"], ["Digital", "#digital"], ["Quality", "#quality"], ["Awards", "#awards"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
 
 const STATS: [string, string][] = [["90+", "CNC machines across three owned units"], ["2 × 400 t", "In-house pressure die casting"], ["1998", "Supplying Bosch since"], ["IATF", "16949 automotive quality system"]];
 
@@ -117,6 +117,28 @@ const MILESTONES: [string, string][] = [
   ["2010–11", "Completes the CII – Bosch Vendor Advance Cluster programme."],
   ["2018", "Overall performance award from SEG Automotive."],
   ["2026", "New manufacturing hangar completed at Bommasandra."],
+];
+
+const TOL_STATS: [string, string][] = [["±0.005 mm", "Tightest size tolerance on selected features"], ["±0.01 mm", "Held on precision bores, diameters and fits"], ["±0.05 to ±0.10 mm", "Typical band on turned and machined dimensions"], ["0.02 mm", "Geometric tolerances such as run-out, position and symmetry"]];
+
+const TOL_ROWS: [string, string, string][] = [
+  ["Precision size, ±0.005 to ±0.01 mm", "Close-fit diameters, bores and thread pitch diameters", "Air gauges, snap gauges, micrometres, CMM"],
+  ["General size, ±0.025 to ±0.10 mm", "Turned lengths, shoulders, steps, grooves, radii", "Profile projector, height gauge, digital dial, vernier"],
+  ["Form and position, from 0.02 mm", "Run-out, concentricity, symmetry, perpendicularity, true position", "CMM, roundness tester, between-centres with dial, position gauge"],
+  ["Angles", "Chamfers, thread flanks, tapers: ±30 minutes to ±1 degree", "Profile projector, setting-master gauges"],
+  ["Surface finish", "Ra and Rz callouts on sealing and sliding faces", "Surface roughness tester"],
+  ["Threads", "Thread ring and plug gauges, GO and NO GO, to customer annexures", "Thread ring, plug and pitch micrometre"],
+];
+
+const MATERIALS: [string, string][] = [
+  ["Free-cutting steels", "EN1A (leaded and non-leaded), C12L14, C1215, C1141"],
+  ["Carbon steels", "EN8, EN8M, EN8D, C-45 / CK45"],
+  ["Alloy and case-hardening steels", "EN19, EN24, EN353, EN32B, 41Cr4, 40Cr, 16MnCr5"],
+  ["Bearing steel", "SAE 52100"],
+  ["Stainless steels", "SS 303, SS 410, SS 430F"],
+  ["Aluminium", "6082-T6 and 2017-T4 bar; aluminium ingot for pressure die casting"],
+  ["Brass and plastics", "Brass CZ121; Delrin (acetal)"],
+  ["Cast iron", "Grey cast iron"],
 ];
 
 const Icon = ({ d }: { d: string }) => (
@@ -260,6 +282,31 @@ export default function EsbeeHome() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* tolerances and materials */}
+        <section id="tolerances" className="mx-auto max-w-[2400px] px-4 py-20 sm:px-6 lg:px-8 2xl:px-12">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Tolerances and materials</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Close tolerances, in the materials your drawing calls for.</h2>
+          <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">The figures below come from the control plans and drawing characteristics we run today across our three units. In our control plans each characteristic lists its gauge, sample size and check frequency.</p>
+          <div className="mt-10 grid grid-cols-2 gap-px bg-slate-200 lg:grid-cols-4">
+            {TOL_STATS.map(([n, l]) => (
+              <div key={l} className="bg-white p-6"><div className="font-display text-2xl font-semibold sm:text-3xl" style={{ color: RED }}>{n}</div><div className="mt-2 text-[13.5px] leading-snug text-slate-600">{l}</div></div>
+            ))}
+          </div>
+          <div className="mt-10 overflow-x-auto border border-slate-200 bg-white">
+            <table className="w-full text-left text-[14px]">
+              <thead style={{ background: NAVY }} className="text-white"><tr><th className="px-5 py-3 font-semibold">Tolerance class</th><th className="px-5 py-3 font-semibold">Typical features</th><th className="px-5 py-3 font-semibold">How we check</th></tr></thead>
+              <tbody>{TOL_ROWS.map(([a, b, c]) => (<tr key={a} className="border-t border-slate-200"><td className="px-5 py-3 font-semibold" style={{ color: NAVY }}>{a}</td><td className="px-5 py-3 text-slate-600">{b}</td><td className="px-5 py-3 text-slate-600">{c}</td></tr>))}</tbody>
+            </table>
+          </div>
+          <h3 className="mt-14 font-display text-2xl font-semibold" style={{ color: NAVY }}>Materials we work with</h3>
+          <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-slate-600">Parts range from about 10 grams to 1 kg in machined components, and up to 2.5 kg in die cast aluminium. Supplier test certificates are verified at incoming inspection.</p>
+          <div className="mt-6 grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
+            {MATERIALS.map(([t, d]) => (
+              <div key={t} className="bg-white p-6"><div className="mb-3 h-0.5 w-8" style={{ background: RED }} /><h4 className="text-[15.5px] font-semibold" style={{ color: NAVY }}>{t}</h4><p className="mt-2 text-[14px] leading-relaxed text-slate-600">{d}</p></div>
+            ))}
           </div>
         </section>
 
