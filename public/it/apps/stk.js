@@ -27,6 +27,22 @@ window.STK=(function(){
   const itemOpt=()=>opt(D.items||[],i=>(i.name||i.code)+' — stock '+N(i.on_hand)+(i.unit?' '+i.unit:''));
   const ok=(m)=>{say(m,1);redraw&&redraw()},er=(e)=>say(e.message);
 
+
+  /* tool requirement: pieces still to make at each operation (Sales Flow schedule − FG − stock at later stages) ÷ tool life x qty per set, against the Tool master */
+  async function need(el){
+    const mo=st('month')||new Date(Date.now()+19800000).toISOString().slice(0,7);
+    el.innerHTML='<p class="note">Calculating…</p>';
+    let P;try{P=await Q.call('kmr_tlp_plan',{p_month:mo})}catch(e){el.innerHTML='';return er(e)}
+    const T=P.tools||[],G=P.gaps||[],buy=T.filter(x=>x.to_buy>0),cost=T.reduce((a,x)=>a+(+x.cost||0),0),nolife=T.filter(x=>x.need==null).length;
+    el.innerHTML=`<div class="row"><label class="lbl" style="margin:0 6px 0 0">Month</label><input type="month" id="nmo" value="${esc(mo)}" style="width:auto"></div>
+    <div class="kpis">${kp(P.parts,'Parts on the schedule','var(--b1)')}${kp(T.length,'Tools needed this month','var(--b1)')}${kp(buy.length,'Tools to buy','var(--a)')}${kp(money(cost),'Cost of tools to buy','var(--g)')}${kp(G.length+nolife,'Gaps in the master','var(--r)')}</div>
+    <p class="note">Tools needed = pieces still to be made at the operation ÷ tool life × quantity per set. The pieces come from the Sales Flow schedule less finished goods and stock already past that operation (Material Movement${P.audit_date?', physical stock audit '+dd(P.audit_date):', no physical stock audit entered yet'}). Tools come from the Control Plan of each part, linked to the Tool master.</p>
+    <h3>1. Tools required</h3><div class="sc"><table class="lt"><thead><tr><th>Tool</th><th class="n">Life (pcs)</th><th class="n">Pieces to make</th><th class="n">Tools needed</th><th class="n">In stock</th><th class="n">Minimum</th><th class="n">To buy</th><th class="n">Rate ₹</th><th class="n">Cost ₹</th><th>Used for (part / operation)</th></tr></thead><tbody>${T.length?T.map(x=>`<tr><td><b>${esc(x.tool)}</b><div class="mut">${esc(x.name||'')}</div></td><td class="n">${x.life>0?N(x.life):'<span class="chip r">Life missing</span>'}</td><td class="n">${N(x.pcs)}</td><td class="n">${x.need==null?'—':N(x.need)}</td><td class="n">${N(x.on_hand)}</td><td class="n">${N(x.min)}</td><td class="n"><b>${x.to_buy==null?'—':N(x.to_buy)}</b></td><td class="n">${x.rate==null?'—':N(x.rate)}</td><td class="n">${x.cost==null?'—':N(x.cost)}</td><td>${esc(x.used_for||'')}</td></tr>`).join(''):'<tr><td colspan="10">Nothing yet — link the Control Plan tools to the Tool master (From Control Plan tab) and enter each tool life.</td></tr>'}</tbody></table></div>
+    <h3>2. Control Plan tools that cannot be planned yet</h3><div class="sc"><table class="lt"><thead><tr><th>Part</th><th>Operation</th><th>Tool in Control Plan</th><th>Life in Control Plan</th><th>What is missing</th></tr></thead><tbody>${G.length?G.map(x=>`<tr><td>${esc(x.part)}</td><td>${esc(x.op)}</td><td>${esc(x.tool_text)}</td><td>${esc(x.life_text||'—')}</td><td><span class="chip r">${esc(x.issue)}</span></td></tr>`).join(''):'<tr><td colspan="5">Every Control Plan tool of the scheduled parts is in the Tool master with a tool life.</td></tr>'}</tbody></table></div>
+    <p class="note">Fix a gap in <a href="#go=cp">From Control Plan</a> (link or add the tool) and set the tool life in <a href="#go=plan">Tool plan &amp; stock</a>.</p>`;
+    $('#nmo').onchange=()=>{st('month',$('#nmo').value);need(el)};
+  }
+
   /* requirement against stock */
   function need(){
     const m=itemOf(),n={};
@@ -123,5 +139,5 @@ window.STK=(function(){
     document.querySelectorAll('[data-cn]').forEach(b=>b.onclick=()=>{const t=T[+b.dataset.cn];if(confirm('Add "'+t.text+'" to '+w.master+' and link it?'))link(t,{new:true})});
     document.querySelectorAll('[data-cr]').forEach(b=>b.onclick=()=>{const t=T[+b.dataset.cr];$('#cpPick').innerHTML=`<div class="frm"><div style="grid-column:span 2"><label>Choose the ${w.one} in ${w.master} for "${esc(t.text)}"</label><div id="cpBox"></div></div></div><div class="row"><button class="btn" id="cpGo">Link</button></div>`;pick($('#cpBox'));$('#cpGo').onclick=()=>{const cd=(document.querySelector('#cpBox .cq')||{}).dataset.code;if(!cd){say('Search and choose the item first.');return}link(t,{code:cd})};$('#cpPick').scrollIntoView({block:'center'})});
   }
-  return {load,plan,bin,list,fit,cp};
+  return {load,plan,bin,list,fit,cp,need};
 })();

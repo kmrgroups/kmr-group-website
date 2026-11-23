@@ -3339,7 +3339,26 @@ async function autoPullSales() {
   const p = ensurePlan(); rows.forEach(r => { const dueOk = r.due && r.due.slice(0, 7) === key; p.parts[r.partNo] = { qty: Math.round(Number(r.qty) || 0), due: dueOk ? r.due : E.iso(state.year, state.month, E.daysInMonth(state.year, state.month)) }; });
   commit(); toast(`Demand for ${rows.length} part${rows.length > 1 ? 's' : ''} loaded from Sales Flow.`);
 }
-function setPeriod(y, m) { state.year = y; state.month = m; commit(); if (window.KMR_PLATFORM && typeof Cloud !== 'undefined' && Cloud.org) loadPull().then(autoPullSales).catch(() => {}); }
+/* Stock at every stage and finished goods come from Material Movement (book stock by stage), so the plan is made on the BALANCE quantity: schedule − FG − stock waiting at later stages.
+   Filled only for a part whose stock tables are still empty; anything typed by the planner is never overwritten. */
+async function autoPullStock() {
+  if (!window.KMR_PLATFORM || !cloud.pull || !Array.isArray(cloud.pull.stock) || !cloud.pull.stock.length) return;
+  const p = ensurePlan(); p.stock = p.stock || {}; let n = 0;
+  const up = x => String(x || '').trim().toUpperCase();
+  cloud.pull.stock.forEach(r => {
+    const ops = state.operations.filter(o => o.partNo === r.partNo); if (!ops.length) return;
+    const cur = p.stock[r.partNo] || {};
+    const typed = (+cur.fg || 0) > 0 || Object.values(cur.wip || {}).some(v => +v > 0);
+    if (typed) return;
+    const wip = {}; let any = false;
+    (r.stages || []).forEach(g => { const o = ops.find(z => up(z.process) === up(g.process)); if (o && +g.book > 0) { wip[o.id] = Math.round(+g.book); any = true; } });
+    const fg = Math.round(+r.fg || 0);
+    if (!any && !fg) return;
+    p.stock[r.partNo] = Object.assign({}, cur, { fg, wip, auto: 'Material Movement' }); n++;
+  });
+  if (n) { if (state.capMode !== 'dynamic') state.capMode = 'dynamic'; commit(); toast(`Stock of ${n} part${n > 1 ? 's' : ''} loaded from Material Movement — capacity is planned on the balance quantity.`); }
+}
+function setPeriod(y, m) { state.year = y; state.month = m; commit(); if (window.KMR_PLATFORM && typeof Cloud !== 'undefined' && Cloud.org) loadPull().then(autoPullSales).then(autoPullStock).catch(() => {}); }
 
 /* ---------- click delegation ---------- */
 document.addEventListener('click', ev => {
@@ -3468,7 +3487,8 @@ async function applyOpsMasters() {
   cloud.ops = m;
   await loadPull();
   applyOpsData();
-  autoPullSales();
+  await autoPullSales();
+  await autoPullStock();
 }
 /* Part · process · machine come from Process Documents › Process plan, cycle times from the Operations Master, the sales quantity from Sales Flow */
 async function loadPull() {
