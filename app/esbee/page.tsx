@@ -130,16 +130,68 @@ const TOL_ROWS: [string, string, string][] = [
   ["Threads", "Thread ring and plug gauges, GO and NO GO, to customer annexures", "Thread ring, plug and pitch micrometre"],
 ];
 
-const MATERIALS: [string, string][] = [
-  ["Free-cutting steels", "EN1A (leaded and non-leaded), C12L14, C1215, C1141"],
-  ["Carbon steels", "EN8, EN8M, EN8D, C-45 / CK45"],
-  ["Alloy and case-hardening steels", "EN19, EN24, EN353, EN32B, 41Cr4, 40Cr, 16MnCr5"],
-  ["Bearing steel", "SAE 52100"],
-  ["Stainless steels", "SS 303, SS 410, SS 430F"],
-  ["Aluminium", "6082-T6 and 2017-T4 bar; aluminium ingot for pressure die casting"],
-  ["Brass and plastics", "Brass CZ121; Delrin (acetal)"],
-  ["Cast iron", "Grey cast iron"],
+const MATERIALS: [string, string, string][] = [
+  ["Free-cutting steels", "EN1A (leaded and non-leaded), C12L14, C1215, C1141", "freecut"],
+  ["Carbon steels", "EN8, EN8M, EN8D, C-45 / CK45", "carbon"],
+  ["Alloy and case-hardening steels", "EN19, EN24, EN353, EN32B, 41Cr4, 40Cr, 16MnCr5", "alloy"],
+  ["Bearing steel", "SAE 52100", "bearing"],
+  ["Stainless steels", "SS 303, SS 410, SS 430F", "stainless"],
+  ["Aluminium", "6082-T6 and 2017-T4 bar; aluminium ingot for pressure die casting", "aluminium"],
+  ["Brass and plastics", "Brass CZ121; Delrin (acetal)", "brass"],
+  ["Cast iron", "Grey cast iron", "castiron"],
 ];
+
+const BAR: Record<string, [string, string, string]> = {
+  freecut: ["#aab3bd", "#6f7983", "#d3d9df"],
+  carbon: ["#8e98a3", "#555f6b", "#bcc4cc"],
+  alloy: ["#7d8a9c", "#46526a", "#aab5c6"],
+  stainless: ["#e3e8ec", "#98a3ad", "#f6f8fa"],
+  aluminium: ["#dfe3e8", "#a2aab4", "#f3f5f7"],
+  brass: ["#e0b852", "#9c7420", "#f3d98a"],
+};
+
+function MatPic({ k }: { k: string }) {
+  const id = `mp-${k}`;
+  if (k === "bearing") {
+    return (
+      <svg viewBox="0 0 240 110" className="h-full w-full" role="img" aria-label="Bearing steel balls and race">
+        <defs><radialGradient id={id} cx="35%" cy="30%" r="75%"><stop offset="0" stopColor="#ffffff" /><stop offset=".45" stopColor="#c3cad2" /><stop offset="1" stopColor="#5d6773" /></radialGradient></defs>
+        {[[60, 62, 26], [112, 50, 30], [168, 66, 24], [140, 84, 16], [88, 90, 14]].map(([x, y, r], i) => <g key={i}><ellipse cx={x + 3} cy={y + r * 0.85} rx={r * 0.9} ry={r * 0.18} fill="#0a1f44" opacity=".15" /><circle cx={x} cy={y} r={r} fill={`url(#${id})`} /></g>)}
+      </svg>
+    );
+  }
+  if (k === "castiron") {
+    return (
+      <svg viewBox="0 0 240 110" className="h-full w-full" role="img" aria-label="Grey cast iron block">
+        <defs><linearGradient id={id} x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#6a6f76" /><stop offset="1" stopColor="#2c2f34" /></linearGradient></defs>
+        <polygon points="40,78 58,38 112,26 176,34 206,62 190,90 120,98 62,92" fill={`url(#${id})`} />
+        <polygon points="58,38 112,26 176,34 150,50 96,52" fill="#8b9097" opacity=".55" />
+        {[[84, 70], [118, 78], [150, 68], [100, 60], [170, 78]].map(([x, y], i) => <circle key={i} cx={x} cy={y} r="1.8" fill="#15171a" opacity=".6" />)}
+      </svg>
+    );
+  }
+  const [a, b, c] = BAR[k];
+  const hex = k === "alloy" || k === "stainless";
+  return (
+    <svg viewBox="0 0 240 110" className="h-full w-full" role="img" aria-label={`${k} bar stock`}>
+      <defs>
+        <linearGradient id={id} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={c} /><stop offset=".35" stopColor={a} /><stop offset="1" stopColor={b} /></linearGradient>
+      </defs>
+      <ellipse cx="124" cy="94" rx="92" ry="5" fill="#0a1f44" opacity=".12" />
+      <rect x="28" y="30" width="170" height="52" fill={`url(#${id})`} />
+      <path d="M28 30 L198 30" stroke="#fff" strokeWidth="1.5" opacity=".6" />
+      {hex ? (
+        <polygon points="198,56 211,33 237,33 250,56 237,79 211,79" transform="translate(-26,0)" fill={c} stroke={b} strokeWidth="1.5" />
+      ) : (
+        <ellipse cx="198" cy="56" rx="13" ry="26" fill={c} stroke={b} strokeWidth="1.5" />
+      )}
+      <ellipse cx="28" cy="56" rx="13" ry="26" fill={b} opacity=".35" />
+      {k === "brass" && <g><rect x="150" y="52" width="82" height="22" rx="11" fill="#f4f4ee" stroke="#cfcfc4" /><ellipse cx="232" cy="63" rx="6" ry="11" fill="#fff" stroke="#cfcfc4" /></g>}
+      {k === "aluminium" && <polygon points="150,92 232,92 222,78 160,78" fill="#c3c9d1" stroke="#98a3ad" />}
+    </svg>
+  );
+}
+
 
 const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
@@ -304,8 +356,8 @@ export default function EsbeeHome() {
           <h3 className="mt-14 font-display text-2xl font-semibold" style={{ color: NAVY }}>Materials we work with</h3>
           <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-slate-600">Parts range from about 10 grams to 1 kg in machined components, and up to 2.5 kg in die cast aluminium. Supplier test certificates are verified at incoming inspection.</p>
           <div className="mt-6 grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-            {MATERIALS.map(([t, d]) => (
-              <div key={t} className="bg-white p-6"><div className="mb-3 h-0.5 w-8" style={{ background: RED }} /><h4 className="text-[15.5px] font-semibold" style={{ color: NAVY }}>{t}</h4><p className="mt-2 text-[14px] leading-relaxed text-slate-600">{d}</p></div>
+            {MATERIALS.map(([t, d, k]) => (
+              <div key={t} className="bg-white p-6"><div className="mb-4 h-28 border border-slate-100 bg-slate-50 p-2"><MatPic k={k} /></div><div className="mb-3 h-0.5 w-8" style={{ background: RED }} /><h4 className="text-[15.5px] font-semibold" style={{ color: NAVY }}>{t}</h4><p className="mt-2 text-[14px] leading-relaxed text-slate-600">{d}</p></div>
             ))}
           </div>
         </section>
