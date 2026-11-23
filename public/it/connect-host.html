@@ -47,10 +47,12 @@ function onData(raw) {
   else if (m.op) ag(m).then((r) => link && link.send(JSON.stringify(Object.assign({ id: m.id }, r)))).catch((e) => link && link.send(JSON.stringify({ id: m.id, error: e.message })));
 }
 function end(why) { if (link) { link.close(); link = null; } held.clear(); sent.clear(); if (viewer) { viewer = null; ag({ op: "session", on: false }).catch(() => { }); } say(why || "Ready — waiting for a viewer", "ok"); }
+/* the same signed-in person opening a new window (or a window that hung) simply takes the session over, like AnyDesk; a different person still gets "busy" */
+const mine = (from) => !!(who[viewer] && who[from] && who[viewer].toLowerCase() === who[from].toLowerCase());
 async function onSig(m) {
-  if (m.t === "viewer") { who[m.from] = m.who; if (link && viewer && viewer !== m.from) { sig.send({ to: m.from, t: "busy" }); return; } sig.send({ to: m.from, t: "host", name }); return; }
+  if (m.t === "viewer") { who[m.from] = m.who; if (link && viewer && viewer !== m.from && !mine(m.from)) { sig.send({ to: m.from, t: "busy" }); return; } sig.send({ to: m.from, t: "host", name }); return; }
   if (m.t === "offer") {
-    if (viewer && viewer !== m.from) { sig.send({ to: m.from, t: "busy" }); return; }
+    if (viewer && viewer !== m.from) { if (!mine(m.from)) { sig.send({ to: m.from, t: "busy" }); return; } end("Taken over by the same user from another window"); }
     if (link) { link.close(); link = null; }
     try { await getScreen(); } catch (e) { say("Screen sharing is not started on this computer.", "bad"); $("go").hidden = false; return; }
     try { info = await ag({ op: "info" }); } catch (e) { say("The KMR Connect helper on this computer does not answer.", "bad"); }
