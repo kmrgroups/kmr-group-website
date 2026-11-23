@@ -162,38 +162,42 @@
   /* ---------- the remote-desktop viewer (the person who works on the other computer) ---------- */
   /* o: { sb, secret, who, video: <video>, onStatus(text, kind), onFiles(msg), onConnected() } */
   function Viewer(o) {
-    let link = null, host = null, hello = null, tries = 0, ctl = null, attempt = 0, guard = null; const waiters = new Map(); let seq = 1;
-    function callDevice() { clearInterval(hello); tries = 0; ask(); hello = setInterval(() => { if (host) return; if (++tries > 12) { clearInterval(hello); o.onStatus("This device did not answer. It may be switched off, asleep or without internet. Check the green dot on the device list.", "bad"); return; } ask(); }, 3500); }
+    let link = null, host = null, hello = null, tries = 0, ctl = null, attempt = 0, guard = null, done = false, was = false; const waiters = new Map(); let seq = 1; const t0 = Date.now();
+    function callDevice() { if (done) return; clearInterval(hello); tries = 0; ask(); hello = setInterval(() => { if (host || done) return; if (++tries > 12) { clearInterval(hello); o.onStatus("This device did not answer. It may be switched off, asleep or without internet. Check the green dot on the device list.", "bad"); return; } ask(); }, 2500); }
     const sig = Sig("cnr-" + o.secret, o.sb, onSig, (s) => {
-      if (s === "ready") { callDevice(); o.onStatus("Calling the device…", "wait"); }
+      if (s === "ready") { if (!link) { callDevice(); o.onStatus("Calling the device…", "wait"); } }
       else if (s === "error") o.onStatus("The platform's realtime service did not answer. Check the internet connection.", "bad");
     });
     const ask = () => sig.send({ t: "viewer", who: o.who });
     function onSig(m) {
+      if (done) return;
       if (m.t === "busy") { o.onStatus("Someone else is already connected to this device.", "bad"); return; }
+      /* the same person opened this device in another window or tab: that window now has it; this one stops and does not fight back */
+      if (m.t === "taken" && m.from === host) { done = true; clearTimeout(guard); clearInterval(hello); try { if (link) link.close(); } catch (e) { /* ignore */ } link = null; ctl = null; o.onStatus("This device is now open in another window. Close this one, or press End session and Connect again here.", "bad"); return; }
       if (m.t === "host" && !host) { host = m.from; clearInterval(hello); start(m); return; }
       if (link && m.from === host) link.signal(m).catch(() => { });
     }
     async function start(h) {
-      o.onStatus("Device found" + (h.name ? ": " + h.name : "") + ". Opening the screen…", "wait");
-      link = Link(sig, host, {
-        dir: "recvonly", channel: "ctl", relayOnly: attempt >= 1,
-        onTrack: (t, st) => { if (t.kind === "video") { o.video.srcObject = st; o.video.play().catch(() => { }); } },
-        onOpen: (dc) => { ctl = dc; o.onStatus("Connected", "ok"); o.onConnected && o.onConnected(h); },
-        onClose: () => o.onStatus("The connection ended.", "bad"),
-        onState: (s) => {
-          if (s === "connected") { attempt = 0; clearTimeout(guard); }
-          if (s === "failed") retry();
-        },
+      o.onStatus((was ? "Reconnecting" : "Device found" + (h.name ? ": " + h.name : "")) + ". Opening the screen…", "wait");
+      const L = link = Link(sig, host, {
+        dir: "recvonly", channel: "ctl", relayOnly: attempt >= 2,
+        onTrack: (t, st) => { if (link !== L) return; if (t.kind === "video") { o.video.srcObject = st; o.video.play().catch(() => { }); } },
+        onOpen: (dc) => { if (link !== L) return; ctl = dc; was = true; attempt = 0; clearTimeout(guard); console.info("KMR Connect: connected in " + ((Date.now() - t0) / 1000).toFixed(1) + " s"); o.onStatus("Connected", "ok"); o.onConnected && o.onConnected(h); },
+        onClose: () => { if (link !== L || done) return; retry("lost"); },
+        onState: (s) => { if (link !== L || done) return; if (s === "failed") retry(); },
         onData: (d) => { try { const m = JSON.parse(d); if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m); waiters.delete(m.id); } else if (o.onEvent) o.onEvent(m); } catch (e) { /* ignore */ } }
       });
-      try { await link.offer(); } catch (e) { o.onStatus("Could not start the link: " + e.message, "bad"); }
-      const mine = link; clearTimeout(guard); guard = setTimeout(() => { if (link === mine && !(ctl && ctl.readyState === "open")) retry(); }, attempt === 0 ? 7000 : 12000);   // do not wait for the slow browser time-out: after 7 s go through the relay server
+      try { await L.offer(); } catch (e) { o.onStatus("Could not start the link: " + e.message, "bad"); }
+      clearTimeout(guard); guard = setTimeout(() => { if (link === L && !(ctl && ctl.readyState === "open")) retry(); }, attempt === 0 ? 6000 : 10000);   // do not wait for the slow browser time-out
     }
-    function retry() {   // try again by itself; from the 2nd try only through the relay server (works through any firewall)
-      clearTimeout(guard);
-      if (attempt < 2) { attempt++; o.onStatus("Opening through the relay server (" + attempt + " of 2)…", "wait"); try { link.close(); } catch (e) { /* ignore */ } link = null; host = null; ctl = null; setTimeout(callDevice, 300); }
-      else o.onStatus("The connection failed. Press Connect again.", "bad");
+    /* try again by itself, like AnyDesk: 1st again (the usual network hiccup), then through the relay server (works through any firewall) */
+    function retry(why) {
+      clearTimeout(guard); if (done) return;
+      const lost = why === "lost"; if (lost) attempt = 0;
+      if (attempt < 3) {
+        attempt++; o.onStatus(lost ? "The connection dropped. Reconnecting…" : attempt >= 2 ? "Opening through the relay server…" : "Trying again…", "wait");
+        const old = link; link = null; host = null; ctl = null; try { if (old) old.close(); } catch (e) { /* ignore */ } setTimeout(callDevice, 200);
+      } else o.onStatus("The connection failed. Press Connect again.", "bad");
     }
     return {
       send(obj) { return link && link.send(JSON.stringify(obj)); },
@@ -206,7 +210,7 @@
         });
       },
       get connected() { return !!ctl && ctl.readyState === "open"; },
-      close() { clearInterval(hello); try { if (link) link.close(); } catch (e) { /* ignore */ } sig.close(); }
+      close() { done = true; clearInterval(hello); clearTimeout(guard); try { if (link) link.close(); } catch (e) { /* ignore */ } link = null; sig.close(); }
     };
   }
 
