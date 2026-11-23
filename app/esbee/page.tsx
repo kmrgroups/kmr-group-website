@@ -130,15 +130,15 @@ const TOL_ROWS: [string, string, string][] = [
   ["Threads", "Thread ring and plug gauges, GO and NO GO, to customer annexures", "Thread ring, plug and pitch micrometre"],
 ];
 
-const MATERIALS: [string, string][] = [
-  ["Free-cutting steels", "EN1A (leaded and non-leaded), C12L14, C1215, C1141"],
-  ["Carbon steels", "EN8, EN8M, EN8D, C-45 / CK45"],
-  ["Alloy and case-hardening steels", "EN19, EN24, EN353, EN32B, 41Cr4, 40Cr, 16MnCr5"],
-  ["Bearing steel", "SAE 52100"],
-  ["Stainless steels", "SS 303, SS 410, SS 430F"],
-  ["Aluminium", "6082-T6 and 2017-T4 bar; aluminium ingot for pressure die casting"],
-  ["Brass and plastics", "Brass CZ121; Delrin (acetal)"],
-  ["Cast iron", "Grey cast iron"],
+const MATERIALS: [string, string, string][] = [
+  ["Free-cutting steels", "free-cutting", "EN1A (leaded and non-leaded), C12L14, C1215, C1141"],
+  ["Carbon steels", "carbon", "EN8, EN8M, EN8D, C-45 / CK45"],
+  ["Alloy and case-hardening steels", "alloy", "EN19, EN24, EN353, EN32B, 41Cr4, 40Cr, 16MnCr5"],
+  ["Bearing steel", "bearing", "SAE 52100"],
+  ["Stainless steels", "stainless", "SS 303, SS 410, SS 430F"],
+  ["Aluminium", "aluminium", "6082-T6 and 2017-T4 bar; aluminium ingot for pressure die casting"],
+  ["Brass and plastics", "brass-plastics", "Brass CZ121; Delrin (acetal)"],
+  ["Cast iron", "cast-iron", "Grey cast iron"],
 ];
 
 const Icon = ({ d }: { d: string }) => (
@@ -304,8 +304,8 @@ export default function EsbeeHome() {
           <h3 className="mt-14 font-display text-2xl font-semibold" style={{ color: NAVY }}>Materials we work with</h3>
           <p className="mt-2 max-w-3xl text-[15px] leading-relaxed text-slate-600">Parts range from about 10 grams to 1 kg in machined components, and up to 2.5 kg in die cast aluminium. Supplier test certificates are verified at incoming inspection.</p>
           <div className="mt-6 grid gap-px bg-slate-200 sm:grid-cols-2 lg:grid-cols-4">
-            {MATERIALS.map(([t, d]) => (
-              <div key={t} className="bg-white p-6"><div className="mb-3 h-0.5 w-8" style={{ background: RED }} /><h4 className="text-[15.5px] font-semibold" style={{ color: NAVY }}>{t}</h4><p className="mt-2 text-[14px] leading-relaxed text-slate-600">{d}</p></div>
+            {MATERIALS.map(([t, f, d]) => (
+              <div key={t} className="bg-white p-6"><div className="relative mb-4 aspect-[400/260] overflow-hidden bg-slate-100"><Image src={`/esbee/materials/${f}.svg`} alt={t} fill unoptimized sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><div className="mb-3 h-0.5 w-8" style={{ background: RED }} /><h4 className="text-[15.5px] font-semibold" style={{ color: NAVY }}>{t}</h4><p className="mt-2 text-[14px] leading-relaxed text-slate-600">{d}</p></div>
             ))}
           </div>
         </section>
