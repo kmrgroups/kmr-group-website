@@ -33,7 +33,7 @@
   /* o.tracks: tracks to send ({audio, video} or arrays); o.dir: "sendrecv" | "recvonly" | "sendonly"; o.channel: name of a data channel to open (offering side) */
   function Link(sig, remote, o) {
     o = o || {};
-    const pc = new RTCPeerConnection({ iceServers: ICE }), pend = []; let dc = null, closed = false;
+    const pc = new RTCPeerConnection(o.relayOnly ? { iceServers: ICE, iceTransportPolicy: "relay" } : { iceServers: ICE }), pend = []; let dc = null, closed = false;
     const stream = new MediaStream();
     pc.onicecandidate = (e) => { if (e.candidate) sig.send({ to: remote, t: "ice", d: e.candidate }); };
     pc.ontrack = (e) => { stream.addTrack(e.track); if (o.onTrack) o.onTrack(e.track, stream); };
@@ -162,9 +162,10 @@
   /* ---------- the remote-desktop viewer (the person who works on the other computer) ---------- */
   /* o: { sb, secret, who, video: <video>, onStatus(text, kind), onFiles(msg), onConnected() } */
   function Viewer(o) {
-    let link = null, host = null, hello = null, tries = 0, ctl = null; const waiters = new Map(); let seq = 1;
+    let link = null, host = null, hello = null, tries = 0, ctl = null, attempt = 0; const waiters = new Map(); let seq = 1;
+    function callDevice() { clearInterval(hello); tries = 0; ask(); hello = setInterval(() => { if (host) return; if (++tries > 12) { clearInterval(hello); o.onStatus("This device did not answer. It may be switched off, asleep or without internet. Check the green dot on the device list.", "bad"); return; } ask(); }, 3500); }
     const sig = Sig("cnr-" + o.secret, o.sb, onSig, (s) => {
-      if (s === "ready") { ask(); hello = setInterval(() => { if (host) return; if (++tries > 12) { clearInterval(hello); o.onStatus("This device did not answer. It may be switched off, asleep or without internet. Check the green dot on the device list.", "bad"); return; } ask(); }, 3500); o.onStatus("Calling the device…", "wait"); }
+      if (s === "ready") { callDevice(); o.onStatus("Calling the device…", "wait"); }
       else if (s === "error") o.onStatus("The platform's realtime service did not answer. Check the internet connection.", "bad");
     });
     const ask = () => sig.send({ t: "viewer", who: o.who });
@@ -176,11 +177,18 @@
     async function start(h) {
       o.onStatus("Device found" + (h.name ? ": " + h.name : "") + ". Opening the screen…", "wait");
       link = Link(sig, host, {
-        dir: "recvonly", channel: "ctl",
+        dir: "recvonly", channel: "ctl", relayOnly: attempt >= 2,
         onTrack: (t, st) => { if (t.kind === "video") { o.video.srcObject = st; o.video.play().catch(() => { }); } },
         onOpen: (dc) => { ctl = dc; o.onStatus("Connected", "ok"); o.onConnected && o.onConnected(h); },
         onClose: () => o.onStatus("The connection ended.", "bad"),
-        onState: (s) => { if (s === "failed") o.onStatus("The connection failed. Press Connect again.", "bad"); },
+        onState: (s) => {
+          if (s === "connected") attempt = 0;
+          if (s !== "failed") return;
+          if (attempt < 2) {   // try again by itself; from the second retry only through the relay server (works through any firewall)
+            attempt++; o.onStatus("The link did not open, trying again (" + attempt + " of 2)…", "wait");
+            try { link.close(); } catch (e) { /* ignore */ } link = null; host = null; setTimeout(callDevice, 1500);
+          } else o.onStatus("The connection failed. Press Connect again.", "bad");
+        },
         onData: (d) => { try { const m = JSON.parse(d); if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m); waiters.delete(m.id); } else if (o.onEvent) o.onEvent(m); } catch (e) { /* ignore */ } }
       });
       try { await link.offer(); } catch (e) { o.onStatus("Could not start the link: " + e.message, "bad"); }
