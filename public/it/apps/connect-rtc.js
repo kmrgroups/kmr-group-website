@@ -6,7 +6,9 @@
   "use strict";
   const CFG = window.COMPANY_CONFIG || {};
   /* free public STUN servers find the way between two computers; a company TURN server (optional, company-config.js "turn") is used when a network blocks direct video */
-  const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }].concat(CFG.turn || []);
+  /* STUN finds the direct path; the free TURN relay is the safety net when the two computers sit behind different routers / company firewalls (the usual reason a link "fails"). */
+  const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] },
+    { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }].concat(CFG.turn || []);
   const rid = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
   /* ---------- signalling: one named channel, small JSON notes ---------- */
