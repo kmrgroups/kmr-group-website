@@ -162,7 +162,7 @@
   /* ---------- the remote-desktop viewer (the person who works on the other computer) ---------- */
   /* o: { sb, secret, who, video: <video>, onStatus(text, kind), onFiles(msg), onConnected() } */
   function Viewer(o) {
-    let link = null, host = null, hello = null, tries = 0, ctl = null, attempt = 0; const waiters = new Map(); let seq = 1;
+    let link = null, host = null, hello = null, tries = 0, ctl = null, attempt = 0, guard = null; const waiters = new Map(); let seq = 1;
     function callDevice() { clearInterval(hello); tries = 0; ask(); hello = setInterval(() => { if (host) return; if (++tries > 12) { clearInterval(hello); o.onStatus("This device did not answer. It may be switched off, asleep or without internet. Check the green dot on the device list.", "bad"); return; } ask(); }, 3500); }
     const sig = Sig("cnr-" + o.secret, o.sb, onSig, (s) => {
       if (s === "ready") { callDevice(); o.onStatus("Calling the device…", "wait"); }
@@ -177,21 +177,23 @@
     async function start(h) {
       o.onStatus("Device found" + (h.name ? ": " + h.name : "") + ". Opening the screen…", "wait");
       link = Link(sig, host, {
-        dir: "recvonly", channel: "ctl", relayOnly: attempt >= 2,
+        dir: "recvonly", channel: "ctl", relayOnly: attempt >= 1,
         onTrack: (t, st) => { if (t.kind === "video") { o.video.srcObject = st; o.video.play().catch(() => { }); } },
         onOpen: (dc) => { ctl = dc; o.onStatus("Connected", "ok"); o.onConnected && o.onConnected(h); },
         onClose: () => o.onStatus("The connection ended.", "bad"),
         onState: (s) => {
-          if (s === "connected") attempt = 0;
-          if (s !== "failed") return;
-          if (attempt < 2) {   // try again by itself; from the second retry only through the relay server (works through any firewall)
-            attempt++; o.onStatus("The link did not open, trying again (" + attempt + " of 2)…", "wait");
-            try { link.close(); } catch (e) { /* ignore */ } link = null; host = null; setTimeout(callDevice, 1500);
-          } else o.onStatus("The connection failed. Press Connect again.", "bad");
+          if (s === "connected") { attempt = 0; clearTimeout(guard); }
+          if (s === "failed") retry();
         },
         onData: (d) => { try { const m = JSON.parse(d); if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m); waiters.delete(m.id); } else if (o.onEvent) o.onEvent(m); } catch (e) { /* ignore */ } }
       });
       try { await link.offer(); } catch (e) { o.onStatus("Could not start the link: " + e.message, "bad"); }
+      const mine = link; clearTimeout(guard); guard = setTimeout(() => { if (link === mine && !(ctl && ctl.readyState === "open")) retry(); }, attempt === 0 ? 7000 : 12000);   // do not wait for the slow browser time-out: after 7 s go through the relay server
+    }
+    function retry() {   // try again by itself; from the 2nd try only through the relay server (works through any firewall)
+      clearTimeout(guard);
+      if (attempt < 2) { attempt++; o.onStatus("Opening through the relay server (" + attempt + " of 2)…", "wait"); try { link.close(); } catch (e) { /* ignore */ } link = null; host = null; ctl = null; setTimeout(callDevice, 300); }
+      else o.onStatus("The connection failed. Press Connect again.", "bad");
     }
     return {
       send(obj) { return link && link.send(JSON.stringify(obj)); },
