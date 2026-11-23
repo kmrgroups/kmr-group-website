@@ -190,6 +190,7 @@ rmp:[
 ['IATF','8.4.2.4','Supplier monitoring','Order status and on-time receipt are visible per supplier.'],
 ['IATF','8.5.4.1','Preservation (stock rotation)','Stock and orders are tracked so older stock is used first.'],
 ['IATF','6.1.2.3','Contingency plans','Shortage against demand is shown early so action can be planned.'],
+['ISO','8.4.1 / 8.4.2','Type and extent of control (purchase approval)','Orders are proposed automatically from the Sales Flow schedule, the balance after stock at every stage and the BOM; the planner reviews quantity and supplier and approves before one purchase order mail per supplier is sent.'],
 ['ISO','7.1.1 / 8.1','Resources and operational planning','Monthly plan pulls the Sales Flow schedule, adds stock and WIP entered by the plant, and gives the material budget with GST.'],
 ['IATF','8.4.2.1','Type and extent of control','Weekly planned vs received quantity and value show supply against the budget.'],
 ['ISO','8.1 / 8.4.3','Operational planning; information for external providers','The weekly planned inward quantity is filled automatically from the monthly delivery schedules released to suppliers in the GRN app (tagged From schedule); a quantity typed by the planner is never overwritten.'],
@@ -477,6 +478,7 @@ cad:[
 ['VDA','P3','Process development - work holding and datums','Each turning and sawing sheet shows how the part is held (jaws, vice, length stop), the axial datum B and the program zero, so set-up and first-piece checks use the same reference as the Control Plan.'],
 ['MSA','Gage selection','Gauge for each characteristic','The characteristic table of each sheet lists the gauge from the SOP next to the limits, so the measuring method is chosen for the tolerance shown.']],
 capacity:[
+['ISO','8.1','Operational planning and control','Stock at every stage and finished goods are loaded from Material Movement, so machine load is planned on the balance quantity (schedule less stock), not on the full schedule.'],
 ['ISO','9.3.2','Management review inputs','The Presentation tab shows utilisation, overloaded machines, late operations and takt failures against targets, with action plans and status.'],
 ['IATF','7.1.3.1','Plant, facility and equipment planning','Machine capacity is planned against demand.'],
 ['IATF','8.2.3.1.3','Organizational manufacturing feasibility','Load against capacity shows whether the demand can be met.'],

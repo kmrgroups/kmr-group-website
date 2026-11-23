@@ -33,12 +33,12 @@ tr.done td:nth-child(3) b{color:var(--mut);text-decoration:line-through}tr.na{op
 .sup{border:1px solid var(--line);border-radius:12px;margin:0 0 14px;overflow:hidden}.sup>h3{margin:0;padding:10px 12px;background:var(--bg);font-size:15px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.sup>h3 .grow{flex:1}
 .rmp-sc{overflow:auto;max-height:72vh;border:1px solid var(--line);border-radius:10px;background:var(--card);margin:6px 0}.rmp-sc::-webkit-scrollbar{height:14px;width:14px}.rmp-sc::-webkit-scrollbar-thumb{background:#94a3b8;border-radius:8px;border:3px solid #eef1f6}.rmp-sc thead th{position:sticky;top:0;z-index:3;background:#EEF2F8}.rmp-sc table{margin:0}.bars{display:flex;flex-direction:column;gap:3px}.bars i{display:block;height:7px;border-radius:4px;min-width:2px}.sum{display:flex;gap:18px;flex-wrap:wrap;padding:2px 14px 12px}.sum span{color:var(--mut)}.sum b{color:var(--ink)}</style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Raw Material Planning</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a><a class="tab" data-t="month" href="#go=month">Raw material plan (qty, cost)</a><a class="tab" data-t="ws" href="#go=ws">Work sheet</a><a class="tab" data-t="inward" href="#go=inward">Actual inward (qty, cost)</a><a class="tab" data-t="req" href="#go=req">Requirement</a><a class="tab" data-t="plan" href="#go=plan">Purchase plan</a><a class="tab" data-t="orders" href="#go=orders">Orders</a><a class="tab" data-t="master" href="#go=master">Materials &amp; BOM</a><a class="tab" data-t="start" href="#go=start">Parts to start</a></div>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a><a class="tab" data-t="month" href="#go=month">Raw material plan (qty, cost)</a><a class="tab" data-t="ws" href="#go=ws">Work sheet</a><a class="tab" data-t="inward" href="#go=inward">Actual inward (qty, cost)</a><a class="tab" data-t="req" href="#go=req">Requirement</a><a class="tab" data-t="po" href="#go=po">PO approval</a><a class="tab" data-t="plan" href="#go=plan">Purchase plan</a><a class="tab" data-t="orders" href="#go=orders">Orders</a><a class="tab" data-t="master" href="#go=master">Materials &amp; BOM</a><a class="tab" data-t="start" href="#go=start">Parts to start</a></div>
 <main><div class="panel"><div id="msg"></div>
 <div class="row noprint"><label class="mut">Month</label><input type="month" id="mon" style="width:auto"><span id="src"></span><span class="grow"></span><span class="mut" id="stamp"></span></div>
-<section id="std"></section><section id="month" class="hide"></section><section id="inward" class="hide"></section><section id="ws" class="hide"></section><section id="dash" class="hide"></section><section id="req" class="hide"></section><section id="plan" class="hide"></section><section id="orders" class="hide"></section><section id="master" class="hide"></section><section id="start" class="hide"></section></div></main>
+<section id="std"></section><section id="month" class="hide"></section><section id="inward" class="hide"></section><section id="ws" class="hide"></section><section id="dash" class="hide"></section><section id="req" class="hide"></section><section id="po" class="hide"></section><section id="plan" class="hide"></section><section id="orders" class="hide"></section><section id="master" class="hide"></section><section id="start" class="hide"></section></div></main>
 <div class="modal" id="m"><div class="in" id="mb"></div></div>
-<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{plan:"rmp.purchase-plan-moq-lead-times",orders:"rmp.supplier-orders-receipts"},names:{"rmp.purchase-plan-moq-lead-times":"Purchase plan, MOQ & lead times","rmp.supplier-orders-receipts":"Supplier orders & receipts"}};</script><script src="/it/apps/qp-core.js"></script>
+<script src="/it/kmr-lock.js"></script><script>window.QP_LOCKS={map:{plan:"rmp.purchase-plan-moq-lead-times",po:"rmp.supplier-orders-receipts",orders:"rmp.supplier-orders-receipts"},names:{"rmp.purchase-plan-moq-lead-times":"Purchase plan, MOQ & lead times","rmp.supplier-orders-receipts":"Supplier orders & receipts"}};</script><script src="/it/apps/qp-core.js"></script>
 <script src="/it/apps/rmp-calc.js"></script><script src="/it/apps/rmp-month.js"></script><script>if(new URLSearchParams(location.search).has("demo")){document.write('<script src="/it/apps/rmp-demo.js"><\/script>')}</script>
 <script>
 const {$,esc,iso,today,fmt,say,call}=QP;
@@ -68,10 +68,10 @@ async function route(){
   let go=hashGo();
   if(window.KMRLock&&KMRLock.locked(go)){KMRLock.dialog(go);go='std';history.replaceState(null,'',location.pathname+location.search+'#go=std')}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
-  ['std','dash','month','ws','inward','req','plan','orders','master','start'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  ['std','dash','month','ws','inward','req','po','plan','orders','master','start'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
   if(go==='std'){KMRStd.draw($('#std'),'rmp');return}
   if(go==='month'||go==='inward'||go==='dash'||go==='ws'){try{S.mm=go;await drawMonth()}catch(e){say(e.message)}return}
-  try{await load();({req:drawReq,plan:drawPlan,orders:drawOrders,master:drawMaster,start:drawStart})[go]()}catch(e){say(e.message)}
+  try{await load();({req:drawReq,po:drawPo,plan:drawPlan,orders:drawOrders,master:drawMaster,start:drawStart})[go]()}catch(e){say(e.message)}
 }
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});
 window.addEventListener('hashchange',route);
@@ -217,6 +217,45 @@ function drawReq(){
   ${L.length?`<table><thead><tr><th>Material</th><th class="num">Needed (kg)</th><th class="num">In stock</th><th class="num">On order</th><th class="num">Short (kg)</th><th>Needed by</th><th>Parts</th></tr></thead><tbody>${L.map(x=>`<tr><td><b>${esc(x.code)}</b><div class="mut">${esc(matName(x.code))}</div></td><td class="num">${kg(x.gross)}</td><td class="num">${kg(x.onHand)}</td><td class="num">${kg(x.covered)}</td><td class="num">${x.short>0?`<span class="chip r">${kg(x.short)}</span>`:'<span class="chip g">covered</span>'}</td><td>${fmt(x.needBy)}</td><td class="mut">${x.parts.map(p=>esc(p.part)+' '+kg(p.kg)).join(' · ')}</td></tr>`).join('')}</tbody></table>`
   :'<p class="note">No parts to start for this month. Publish the plan from the Capacity Planner, or type the parts to start under “Parts to start”.</p>'}
   <p class="note">Needed kg = parts to start × kg per part (part weight, or the bill of material) × (1 + loss %). Stock and on-order come from “Materials &amp; BOM” and “Orders”.</p>`;
+}
+
+/* ---------- PO approval: schedule -> balance (stage stock + FG) -> raw material -> proposed PO -> planner approves -> ONE mail per supplier ---------- */
+async function drawPo(refresh){
+  const el=$('#po');el.innerHTML='<p class="mut">Calculating from the Sales Flow schedule…</p>';
+  let P;try{P=await call('kmr_rmp_plan',{p_month:S.month,p_refresh:!!refresh})}catch(e){el.innerHTML='';return say(e.message)}
+  S.po=P;const mat={};P.materials.forEach(m=>mat[m.code]=m);
+  const ord=P.orders.filter(o=>o.status==='planned'),sent=P.orders.filter(o=>o.status==='ordered');
+  const sup=(c)=>P.all_suppliers.find(x=>x.code===c)||P.suppliers.find(x=>x.code===c);
+  const supOpts=(cur)=>'<option value="">— choose —</option>'+P.all_suppliers.concat(P.all_suppliers.some(x=>x.code===cur)||!cur?[]:[{code:cur,name:cur}]).map(x=>`<option value="${esc(x.code)}"${x.code===cur?' selected':''}>${esc(x.code)}</option>`).join('');
+  const by={};ord.forEach(o=>(by[o.supplier_code||'']=by[o.supplier_code||'']||[]).push(o));
+  const val=ord.reduce((a,o)=>a+(+o.qty_kg||0)*(+o.rate||0),0),ed=P.can_edit;
+  const parts=P.parts||[],nsched=parts.reduce((a,x)=>a+x.sched,0),nbal=parts.reduce((a,x)=>a+x.balance,0);
+  const hdr=`<div class="kpis"><div class="kpi"><b>${parts.length}</b><span>Parts on the schedule</span></div><div class="kpi"><b>${qn(nbal)}</b><span>Balance pcs (schedule − despatched)</span></div><div class="kpi"><b>${ord.length}</b><span>Orders waiting for approval</span></div><div class="kpi" style="--c:var(--g)"><b>${inr(val)}</b><span>Value waiting</span></div></div>
+  <p class="note"><b>How it works:</b> when Sales Flow changes the customer schedule, the balance is worked out for every stage — schedule − despatched − finished goods − stock waiting at the later stages (from Material Movement${P.audit_date?', last physical stock audit '+fmt(P.audit_date):', no physical stock audit entered yet'}). The raw material for that balance (per BOM) less stock and open orders becomes a <b>proposed order</b> below. Change the quantity or supplier if you wish, then approve — one mail per supplier goes out with all their materials in one table.</p>
+  <div class="row noprint">${ed?'<button class="btn o" id="porf">Recalculate from Sales Flow</button>':''}${ed&&ord.length?'<button class="btn" id="poall">Approve all &amp; mail suppliers</button>':''}</div>`;
+  const grp=Object.keys(by).sort().map(c=>{const rows=by[c],s=sup(c)||{},em=(P.suppliers.find(x=>x.code===c)||{}).email||'';
+    const tot=rows.reduce((a,o)=>a+(+o.qty_kg||0)*(+o.rate||0),0);
+    return `<div class="sup"><h3><span class="grow">${esc(c?(s.name&&s.name!==c?s.name+' ('+c+')':c):'No supplier chosen')}</span><span class="mut">${rows.length} material(s) · ${inr(tot)}</span></h3>
+    <div class="row" style="padding:8px 12px">${c?`<label class="mut">Supplier e-mail</label><input data-em="${esc(c)}" type="email" value="${esc(em)}" placeholder="supplier@company.com" style="min-width:260px"${ed?'':' disabled'}>`:'<span class="mut">Choose a supplier in each row below.</span>'}${ed&&c?`<button class="btn" data-ap="${esc(c)}">Approve &amp; mail this supplier</button>`:''}</div>
+    <div class="rmp-sc"><table><thead><tr><th>Material</th><th class="num">Needed (kg)</th><th class="num">In stock</th><th class="num">On order</th><th class="num">Calculated</th><th class="num">Order qty (kg)</th><th class="num">Rate ₹</th><th class="num">Value ₹</th><th>Supplier</th><th>Deliver by</th></tr></thead><tbody>${rows.map(o=>{const m=mat[o.material_code]||{};
+      return `<tr><td><b>${esc(o.material_code)}</b><div class="mut">${esc(m.used_by||'')}</div></td><td class="num">${qn(m.need)}</td><td class="num">${qn(m.on_hand)}</td><td class="num">${qn(m.on_order)}</td><td class="num">${qn(o.calc_kg)}</td>
+      <td class="num"><input type="number" min="0" step="any" value="${o.qty_kg}" data-po="${o.id}" data-f="qty_kg" style="width:100px"${ed?'':' disabled'}></td><td class="num">${o.rate==null?'—':qn(o.rate)}</td><td class="num">${inr((+o.qty_kg||0)*(+o.rate||0))}</td>
+      <td><select data-po="${o.id}" data-f="supplier_code"${ed?'':' disabled'}>${supOpts(o.supplier_code)}</select></td><td><input type="date" value="${o.due_date||''}" data-po="${o.id}" data-f="due_date"${ed?'':' disabled'}></td></tr>`}).join('')}</tbody></table></div></div>`}).join('')
+    ||'<p class="note">No proposed orders — the schedule is covered by stock and orders already placed, or no BOM is set for the scheduled parts.</p>';
+  const done=sent.length?`<h3 style="margin:18px 0 6px">Approved orders</h3><div class="rmp-sc"><table><thead><tr><th>PO no.</th><th>Material</th><th>Supplier</th><th class="num">Qty (kg)</th><th>Mail</th><th></th></tr></thead><tbody>${sent.map(o=>`<tr><td>${esc(o.po_no||'')}</td><td>${esc(o.material_code)}</td><td>${esc(o.supplier_code||'')}</td><td class="num">${qn(o.qty_kg)}</td><td>${o.mailed_at?`<span class="chip g">Mailed ${fmt(o.mailed_at)}</span> <span class="mut">${esc(o.mailed_to||'')}</span>`:'<span class="chip a">Not mailed</span>'}</td><td>${ed&&!o.mailed_at?`<button class="btn o" data-re="${o.id}">Mail now</button>`:''}</td></tr>`).join('')}</tbody></table></div>`:'';
+  el.innerHTML=hdr+grp+done;
+  const mail=async(ids,label)=>{try{say('Approving and mailing…',1);const t=(await QP.sb.auth.getSession()).data.session.access_token;
+    const r=await fetch('/it/console/api/rmp/po-mail',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+t},body:JSON.stringify({slug:QP.slug,ids})});const j=await r.json().catch(()=>({}));
+    if(!r.ok||!j.ok)throw new Error(j.error||'Could not approve.');
+    const ms=(j.sent||[]).map(x=>x.supplier+' ('+x.items+')').join(', '),sk=(j.skipped||[]).map(x=>x.supplier+': '+x.reason).join('; ');
+    say((ms?'Mailed '+ms+'. ':'')+(sk?'Not mailed — '+sk+'.':''),!sk);await drawPo(false)}catch(e){say(e.message)}};
+  if($('#porf'))$('#porf').onclick=()=>drawPo(true);
+  if($('#poall'))$('#poall').onclick=()=>{if(confirm('Approve all '+ord.length+' orders and mail every supplier that has an e-mail address?'))mail(ord.map(o=>o.id))};
+  el.querySelectorAll('[data-ap]').forEach(b=>b.onclick=()=>{const c=b.dataset.ap;if(confirm('Approve '+(by[c]||[]).length+' order(s) and mail '+c+'?'))mail((by[c]||[]).map(o=>o.id))});
+  el.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>mail([b.dataset.re]));
+  el.querySelectorAll('[data-em]').forEach(i=>i.onchange=async()=>{try{await call('kmr_rmp_supplier_email',{p_code:i.dataset.em,p_email:i.value});say('E-mail saved.',1);await drawPo(false)}catch(e){say(e.message)}});
+  el.querySelectorAll('[data-po]').forEach(i=>i.onchange=async()=>{const o=ord.find(x=>x.id===i.dataset.po);if(!o)return;const p={id:o.id,material_code:o.material_code,supplier_code:o.supplier_code||'',qty_kg:o.qty_kg,rate:o.rate==null?'':o.rate,due_date:o.due_date||'',order_date:'',po_no:o.po_no||'',notes:o.notes||'',month:S.month};
+    p[i.dataset.f]=i.value;if(i.dataset.f==='qty_kg'&&!(+i.value>0))return say('Enter the quantity in kg.');try{await call('kmr_rmp_order_save',{p});await drawPo(false)}catch(e){say(e.message)}});
 }
 
 /* ---------- 2. purchase plan (MOQ, lead time, safety, order-by, value) ---------- */
