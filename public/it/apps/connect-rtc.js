@@ -7,8 +7,10 @@
   const CFG = window.COMPANY_CONFIG || {};
   /* free public STUN servers find the way between two computers; a company TURN server (optional, company-config.js "turn") is used when a network blocks direct video */
   /* STUN finds the direct path; the free TURN relay is the safety net when the two computers sit behind different routers / company firewalls (the usual reason a link "fails"). */
-  const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] },
-    { urls: ["turn:openrelay.metered.ca:80", "turn:openrelay.metered.ca:443", "turn:openrelay.metered.ca:443?transport=tcp", "turns:openrelay.metered.ca:443?transport=tcp"], username: "openrelayproject", credential: "openrelayproject" }].concat(CFG.turn || []);
+  /* STUN finds the direct path between the two computers. The old free public relay (openrelay) no longer answers, so it is not used.
+     A company relay server (TURN) can be added in company-config.js as "turn" for networks that block direct links. */
+  const ICE = [{ urls: ["stun:stun.l.google.com:19302", "stun:stun1.l.google.com:19302", "stun:stun.cloudflare.com:3478"] }].concat(CFG.turn || []);
+  const HAS_RELAY = !!(CFG.turn && [].concat(CFG.turn).length);
   const rid = () => Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, "0")).join("");
 
   /* ---------- signalling: one named channel, small JSON notes ---------- */
@@ -180,7 +182,7 @@
     async function start(h) {
       o.onStatus((was ? "Reconnecting" : "Device found" + (h.name ? ": " + h.name : "")) + ". Opening the screen…", "wait");
       const L = link = Link(sig, host, {
-        dir: "recvonly", channel: "ctl", relayOnly: attempt >= 2,
+        dir: "recvonly", channel: "ctl", relayOnly: HAS_RELAY && attempt >= 3,
         onTrack: (t, st) => { if (link !== L) return; if (t.kind === "video") { o.video.srcObject = st; o.video.play().catch(() => { }); } },
         onOpen: (dc) => { if (link !== L) return; ctl = dc; was = true; attempt = 0; clearTimeout(guard); console.info("KMR Connect: connected in " + ((Date.now() - t0) / 1000).toFixed(1) + " s"); o.onStatus("Connected", "ok"); o.onConnected && o.onConnected(h); },
         onClose: () => { if (link !== L || done) return; retry("lost"); },
@@ -188,16 +190,17 @@
         onData: (d) => { try { const m = JSON.parse(d); if (m.id && waiters.has(m.id)) { waiters.get(m.id)(m); waiters.delete(m.id); } else if (o.onEvent) o.onEvent(m); } catch (e) { /* ignore */ } }
       });
       try { await L.offer(); } catch (e) { o.onStatus("Could not start the link: " + e.message, "bad"); }
-      clearTimeout(guard); guard = setTimeout(() => { if (link === L && !(ctl && ctl.readyState === "open")) retry(); }, attempt === 0 ? 6000 : 10000);   // do not wait for the slow browser time-out
+      let more = true; const check = () => { if (link !== L || (ctl && ctl.readyState === "open")) return; if (more && /connecting|connected/.test(L.pc.connectionState)) { more = false; guard = setTimeout(check, 7000); return; } retry(); };
+      clearTimeout(guard); guard = setTimeout(check, 8000);   // a link that is still being checked gets 7 s more, a dead one is retried at once   // do not wait for the slow browser time-out
     }
     /* try again by itself, like AnyDesk: 1st again (the usual network hiccup), then through the relay server (works through any firewall) */
     function retry(why) {
       clearTimeout(guard); if (done) return;
       const lost = why === "lost"; if (lost) attempt = 0;
       if (attempt < 3) {
-        attempt++; o.onStatus(lost ? "The connection dropped. Reconnecting…" : attempt >= 2 ? "Opening through the relay server…" : "Trying again…", "wait");
+        attempt++; o.onStatus(lost ? "The connection dropped. Reconnecting…" : HAS_RELAY && attempt >= 3 ? "Opening through the relay server…" : "Trying again (" + attempt + " of 3)…", "wait");
         const old = link; link = null; host = null; ctl = null; try { if (old) old.close(); } catch (e) { /* ignore */ } setTimeout(callDevice, 200);
-      } else o.onStatus("The connection failed. Press Connect again.", "bad");
+      } else o.onStatus("The connection failed. Check that both computers have internet, then press Connect again.", "bad");
     }
     return {
       send(obj) { return link && link.send(JSON.stringify(obj)); },
