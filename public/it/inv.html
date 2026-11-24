@@ -59,7 +59,7 @@ tr.done td:nth-child(3) b{color:var(--mut);text-decoration:line-through}tr.na{op
 <script src="/it/apps/qp-core.js"></script><script src="/it/apps/kmr-mobile.js"></script><script src="/it/apps/kmr-select.js"></script>
 <script>
 const {$,esc,fmt,say,call}=QP;
-const S={fl:{c:[],s:[],t:[],u:[]},d:null,m:null,e:null,view:null,go:null,months:6,sel:{}};
+const S={fl:{c:[],s:[],t:[],u:[]},d:null,m:null,e:null,view:null,go:null,months:2,sel:{},at:0};
 const td=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
 const inr=(v)=>'₹'+Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
 const n2=(v)=>Number(v||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -94,7 +94,7 @@ function calc(e){const st=sett().state_code||'';const bst=((e.buyer_gstin||'').t
   const tp=Number(e.tcs_pct)||0,tcs=Math.round((T+C+Sg+I)*tp)/100,raw=T+C+Sg+I+tcs,tot=Math.round(raw);
   return {ls,taxable:T,cgst:C,sgst:Sg,igst:I,tcs,ro:tot-raw,total:tot,intra}}
 
-async function load(){S.d=await call('kmr_inv_load',{p_months:S.months});if(!S.m&&!S.mBusy){S.mBusy=true;call('kmr_inv_masters',{}).then(r=>{S.m=r}).catch(()=>{S.m={customers:[],parts:[],rates:[]}}).finally(()=>{S.mBusy=false})}}
+async function load(force){if(!force&&S.d&&S.dm===S.months&&Date.now()-S.at<60000)return;S.d=await call('kmr_inv_load',{p_months:S.months});S.dm=S.months;S.at=Date.now();if(!S.m&&!S.mBusy){S.mBusy=true;call('kmr_inv_masters',{}).then(r=>{S.m=r}).catch(()=>{S.m={customers:[],parts:[],rates:[]}}).finally(()=>{S.mBusy=false})}}
 async function route(){const go=hashGo();if(go!==S.go){S.view=null;S.e=null;S.go=go}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
   ['std','dash','inv','gov','sr','tally','set'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
@@ -102,7 +102,7 @@ async function route(){const go=hashGo();if(go!==S.go){S.view=null;S.e=null;S.go
   if(go==='sr'){try{await srLoad();drawSr()}catch(e){say(e.message)}return}
   try{await load();paint()}catch(e){say(e.message)}}
 function paint(){({dash:drawDash,inv:drawInv,gov:drawGov,tally:drawTally,set:drawSet}[hashGo()]||(()=>{}))()}
-const reload=async()=>{await load();paint()};
+const reload=async()=>{await load(true);paint()};
 document.addEventListener('click',e=>{const a=e.target.closest('a[href^="#go="]');if(!a||e.button!==0||e.metaKey||e.ctrlKey||e.shiftKey||e.altKey)return;e.preventDefault();history.replaceState(null,'',location.pathname+location.search+a.getAttribute('href'));route()});
 window.addEventListener('hashchange',route);
 
@@ -120,7 +120,7 @@ function drawDash(){const fy=fyStart(),I=issued().filter(i=>i.inv_date>=fy);cons
   $('#dash').innerHTML=imp+`<div class="kp"><div><b>${I.length}</b><span>Invoices this financial year</span></div><div style="--c:#16a34a"><b>${inr(sum('taxable'))}</b><span>Taxable value</span></div><div style="--c:#7c3aed"><b>${inr(I.reduce((s,i)=>s+sg(i),0))}</b><span>GST charged</span></div><div style="--c:#0891b2"><b>${inr(sum('total'))}</b><span>Invoice value</span></div>
     <div style="--c:#d97706"><b>${invs().filter(i=>i.status==='draft').length}</b><span>Drafts to issue</span></div><div style="--c:#dc2626"><b>${needE.length}</b><span>Waiting for IRN (e-invoice)</span></div><div style="--c:#64748b"><b>${needT.length}</b><span>Not yet sent to Tally</span></div></div>
     <div class="box"><h3>Month-wise invoice value</h3>${ks.length?ks.map(k=>`<div style="display:flex;gap:8px;align-items:center;margin:3px 0"><span style="width:70px">${k}</span><i style="display:block;height:12px;border-radius:4px;background:linear-gradient(90deg,#0891b2,#7c3aed);width:${Math.max(2,mon[k]/mx*100)}%"></i><span>${inr(mon[k])}</span></div>`).join(''):'<p class="mut">No issued invoices in this financial year yet.</p>'}</div>
-    ${(S.d.older||0)?`<p class="mut">Older invoices (${S.d.older}) are saved. <button class="btn o sm" data-a="more">Show last 36 months</button></p>`:''}`}
+    ${(S.d.older||0)?`<p class="mut">Older invoices (${S.d.older}) are saved. <button class="btn o sm" data-a="more">Show older (last 36 months)</button></p>`:''}`}
 
 /* ---------- Invoices ---------- */
 function newInv(){const s=sett();return {id:null,inv_date:td(),doc_type:'INV',supply_type:'B2B',reverse_charge:false,buyer_code:'',buyer_name:'',buyer_gstin:'',buyer_addr:'',buyer_loc:'',buyer_pin:'',buyer_state:'',po_no:'',po_date:'',dc_no:'',dc_date:'',vehicle_no:'',mode:'Road',transporter:'',transporter_id:'',distance_km:'',delivery_terms:'',pay_days:30,remarks:'',tcs_pct:0,lines:[blank()]}}
@@ -260,24 +260,24 @@ document.addEventListener('click',async e=>{const b=e.target.closest('[data-a]')
   else if(a==='edit'){const i=byId(S.view);S.e=JSON.parse(JSON.stringify(i));S.e.lines=(S.e.lines||[]).map(l=>({...l}));S.view=null;['po_date','dc_date'].forEach(k=>{if(!S.e[k])S.e[k]=''});drawInv()}
   else if(a==='addl'){S.e.lines.push(blank());drawLines()}
   else if(a==='dell'){S.e.lines.splice(+b.dataset.i,1);if(!S.e.lines.length)S.e.lines.push(blank());drawLines()}
-  else if(a==='save'){const id=await saveDraft();say('Draft saved.','ok');S.e=null;await load();S.view=id;drawInv()}
-  else if(a==='saveissue'){const id=await saveDraft();const no=await call('kmr_inv_issue',{p_id:id});say('Issued as '+no,'ok');S.e=null;await load();S.view=id;drawInv()}
-  else if(a==='issue'){if(!await yes('Issue this invoice? It gets its number now and cannot be changed after that.'))return;const no=await call('kmr_inv_issue',{p_id:S.view});say('Issued as '+no,'ok');await load();drawInv()}
-  else if(a==='del'){if(!await yes('Delete this draft?'))return;await call('kmr_inv_delete',{p_id:S.e.id});S.e=null;await load();drawInv()}
-  else if(a==='cancel'){const r=await ask('Reason for cancelling this invoice');if(!r)return;await call('kmr_inv_cancel',{p_id:S.view,p_reason:r});say('Invoice cancelled. Cancel the IRN on the e-invoice portal within 24 hours if one was made.','ok');await load();drawInv()}
+  else if(a==='save'){const id=await saveDraft();say('Draft saved.','ok');S.e=null;await load(true);S.view=id;drawInv()}
+  else if(a==='saveissue'){const id=await saveDraft();const no=await call('kmr_inv_issue',{p_id:id});say('Issued as '+no,'ok');S.e=null;await load(true);S.view=id;drawInv()}
+  else if(a==='issue'){if(!await yes('Issue this invoice? It gets its number now and cannot be changed after that.'))return;const no=await call('kmr_inv_issue',{p_id:S.view});say('Issued as '+no,'ok');await load(true);drawInv()}
+  else if(a==='del'){if(!await yes('Delete this draft?'))return;await call('kmr_inv_delete',{p_id:S.e.id});S.e=null;await load(true);drawInv()}
+  else if(a==='cancel'){const r=await ask('Reason for cancelling this invoice');if(!r)return;await call('kmr_inv_cancel',{p_id:S.view,p_reason:r});say('Invoice cancelled. Cancel the IRN on the e-invoice portal within 24 hours if one was made.','ok');await load(true);drawInv()}
   else if(a==='print'){S.pr=1;printInv(byId(S.view))}
   else if(a==='csv')csv();
   else if(a==='erp-go'){const f=($('#erpf')||{files:[]}).files[0];if(!f)return say('Choose the ERP file first.');const out=$('#erpp');out.textContent='Reading '+f.name+'…';let txt;if(/\.gz$/i.test(f.name)){if(!window.DecompressionStream)return say('Please use a current Chrome or Edge to open .gz files.');txt=await new Response(f.stream().pipeThrough(new DecompressionStream('gzip'))).text()}else txt=await f.text();
     const A=(JSON.parse(txt).invoices||[]).map(v=>{const pd=String(v.pay_days==null?'':v.pay_days);if(pd!==''&&!/^\d+$/.test(pd)){v.remarks=(v.remarks?v.remarks+'. ':'')+'Payment: '+pd;v.pay_days=''}return v});let n=0,i=0;for(;i<A.length;i+=100){const r=await call('kmr_inv_import',{p:{invoices:A.slice(i,i+100)}});n+=r.invoices||0;out.textContent='Importing… '+Math.min(i+100,A.length)+' of '+A.length+' ('+Math.round(Math.min(i+100,A.length)*100/A.length)+'%)'}
-    out.textContent='';say('Import finished: '+n+' invoices added; '+(A.length-n)+' were already here.','ok');await load();paint()}
-  else if(a==='more'){S.months=36;await load();paint()}
+    out.textContent='';say('Import finished: '+n+' invoices added; '+(A.length-n)+' were already here.','ok');await load(true);paint()}
+  else if(a==='more'){S.months=36;await load(true);paint()}
   else if(a==='einvcsv'){const L=picked('e').map(byId).filter(Boolean);if(!L.length)return say('Tick at least one invoice.');dl('e-invoice_'+td()+'.csv',einvCsv(L),'text/csv')}
   else if(a==='einv'){const L=picked('e').map(byId).filter(Boolean);if(!L.length)return say('Tick at least one invoice.');dl('E-invoice_'+td()+'.json',JSON.stringify(L.map(einvJson),null,1))}
   else if(a==='ewb'){const L=picked('w').map(byId).filter(Boolean);if(!L.length)return say('Tick at least one invoice.');const bad=L.filter(i=>!i.vehicle_no&&!i.transporter_id);if(bad.length&&!await yes(bad.length+' invoice(s) have no vehicle number or transporter ID. Download anyway?'))return;dl('EWB_'+td()+'.json',JSON.stringify({version:'1.0.0621',billLists:L.map(ewbJson)},null,1))}
-  else if(a==='govsave'){const g=S.gv||{},ids=Object.keys(g);if(!ids.length)return say('Nothing changed.');for(const id of ids)await call('kmr_inv_gov_save',{p_id:id,p:g[id]});S.gv={};say('Saved.','ok');await load();paint()}
+  else if(a==='govsave'){const g=S.gv||{},ids=Object.keys(g);if(!ids.length)return say('Nothing changed.');for(const id of ids)await call('kmr_inv_gov_save',{p_id:id,p:g[id]});S.gv={};say('Saved.','ok');await load(true);paint()}
   else if(a==='tsel'){S.sel.t={};issued().filter(i=>!i.tally_at).forEach(i=>S.sel.t[i.id]=true);drawTally()}
-  else if(a==='tally'){const L=picked('t').map(byId).filter(Boolean);if(!L.length)return say('Tick at least one invoice.');dl('Tally_sales_'+td()+'.xml',tallyXml(L),'application/xml');if(canEdit()&&await yes('Mark these '+L.length+' invoices as sent to Tally?')){await call('kmr_inv_tally_mark',{p_ids:L.map(i=>i.id)});await load();paint()}}
-  else if(a==='sset'){await call('kmr_inv_settings_save',{p:{...sett(),...(S.sv||{})}});S.sv={};say('Settings saved.','ok');await load();paint()}
+  else if(a==='tally'){const L=picked('t').map(byId).filter(Boolean);if(!L.length)return say('Tick at least one invoice.');dl('Tally_sales_'+td()+'.xml',tallyXml(L),'application/xml');if(canEdit()&&await yes('Mark these '+L.length+' invoices as sent to Tally?')){await call('kmr_inv_tally_mark',{p_ids:L.map(i=>i.id)});await load(true);paint()}}
+  else if(a==='sset'){await call('kmr_inv_settings_save',{p:{...sett(),...(S.sv||{})}});S.sv={};say('Settings saved.','ok');await load(true);paint()}
  }catch(err){say(err.message)}});
 
 (async()=>{try{await QP.init('inv','kmr_inv_context');if(!QP.ctx)return;await route()}catch(e){say(e.message)}})();
