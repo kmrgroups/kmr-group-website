@@ -23,6 +23,16 @@ input.big{font-size:28px;font-weight:700;text-align:right}
 .mut{color:var(--mut)}h2{font-size:15px;margin:0 0 6px}
 .lst{max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;margin-top:6px}.it{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:48px;padding:8px 12px;border:0;border-bottom:1px solid var(--line);background:var(--card);text-align:left;font-size:16px;cursor:pointer}.it:last-child{border:0}.it.on{background:#e0f2fe;color:#0c4a6e;font-weight:700}.it small{color:var(--mut);white-space:nowrap}.pick{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#e0f2fe;color:#0c4a6e;border-radius:10px;padding:10px 12px;margin-top:6px;font-weight:700}.pick button{border:0;background:none;color:#0369a1;font-weight:700;font-size:15px}
 .dsk{display:block;text-align:center;margin-top:6px;font-size:13px}a{color:var(--b1)}
+.dsk{margin-bottom:70px}
+header{padding:6px 12px}.clogo{width:32px;height:32px}main{padding-top:8px}.card{padding:10px;margin-bottom:8px}
+label{margin:6px 0 2px;font-size:12px}input{padding:10px}input.big{font-size:24px;padding:8px 12px}.seg button{padding:10px 8px;font-size:16px}
+.lst{max-height:24vh;max-height:24dvh;min-height:96px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:8px;align-items:end}
+.dt{display:flex;gap:6px;align-items:center}.dt .dv{flex:1;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--bg);font-weight:600}.dt button{border:1px solid var(--b1);color:var(--b1);background:none;border-radius:10px;padding:9px 10px;font-weight:700;white-space:nowrap}
+details.more{margin-top:6px}details.more summary{font-size:13px;color:var(--b1);font-weight:600;padding:4px 0;cursor:pointer}
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:5;padding:8px max(12px,env(safe-area-inset-right)) calc(8px + env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));background:var(--bg);border-top:1px solid var(--line)}.savebar[hidden]{display:none}
+.savebar .save{margin:0;padding:13px;max-width:536px;display:block;margin-inline:auto}
+body{padding-bottom:84px}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Raw material stock</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span id="role" style="font-size:12px;opacity:.8"></span></header>
 <main><div id="msg"></div>
@@ -30,6 +40,7 @@ input.big{font-size:28px;font-weight:700;text-align:right}
 <div class="card"><h2>Today’s entries</h2><div id="today" class="mut">Loading…</div></div>
 <a class="dsk" id="dsk" href="#">Open the full month screen (computer)</a>
 </main>
+<div class="savebar" id="sb" hidden><button type="button" class="save" id="go">Save received</button></div>
 <script src="/it/apps/qp-core.js"></script><script src="/it/apps/kmr-mobile.js"></script>
 <script>
 const {$,esc,iso,say,call}=QP;
@@ -39,6 +50,8 @@ const ist=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
 async function load(){const r=await call('kmr_rm_mats',{});S.mats=r.materials||[];S.can=r.can_edit;S.unit=r.unit;$('#co').textContent=(r.unit||'').replace('‑','-')+' · Raw material in / out';draw();await today()}
 function cur(){return S.mats.find(m=>m.code===S.mat)}
 let built=false;
+function setDate(v,unlocked){$('#dt').value=v;$('#dt').hidden=!unlocked;$('#dv').hidden=unlocked;$('#dchg').hidden=unlocked;$('#dv').textContent=v===ist()?'Today · '+v.split('-').reverse().join('-'):v.split('-').reverse().join('-')}
+function resetForm(){S.mat='';S.q='';const f=$('#f');if(f)f.value='';$('#qty').value='';$('#ref').value='';$('#rem').value='';const dm=document.querySelector('details.more');if(dm)dm.open=false;setDate(ist(),false);window.scrollTo({top:0})}
 function draw(){
   if(!S.can){$('#form').innerHTML='<p class="mut">You can view stock but not enter it. Ask your administrator for editor access.</p>';return}
   if(!built){built=true;
@@ -46,11 +59,11 @@ function draw(){
     <label>Material</label><div id="pick" class="pick" hidden></div>
     <div id="srch"><input id="f" type="search" placeholder="Type to search material…" autocomplete="off" autocapitalize="off" enterkeyhint="search"><div class="lst" id="lst"></div></div>
     <div class="bal" id="bal" hidden></div>
-    <label id="lq">Quantity (kg)</label><input id="qty" class="big" type="number" inputmode="decimal" min="0" step="any" placeholder="0">
-    <label>Date</label><input id="dt" type="date" value="${ist()}" max="${ist()}">
+    <div class="two"><div><label id="lq">Quantity (kg)</label><input id="qty" class="big" type="number" inputmode="decimal" min="0" step="any" placeholder="0"></div>
+    <div><label>Date</label><div class="dt"><div class="dv" id="dv"></div><button type="button" id="dchg">Change</button><input id="dt" type="date" max="${ist()}" hidden></div></div></div>
+    <details class="more"><summary>More details (optional)</summary>
     <label id="lr">GRN / challan / invoice no. (optional)</label><input id="ref" maxlength="60" autocomplete="off">
-    <label>Remarks (optional)</label><input id="rem" maxlength="200" autocomplete="off">
-    <button type="button" class="save" id="go">Save received</button>`}
+    <label>Remarks (optional)</label><input id="rem" maxlength="200" autocomplete="off"></details>`;$('#sb').hidden=false;setDate(ist(),false)}
   list();state()}
 function filtered(){const q=S.q.trim().toLowerCase();return S.mats.filter(x=>!q||x.code.toLowerCase().includes(q)||(x.spec||'').toLowerCase().includes(q))}
 function list(){$('#lst').innerHTML=filtered().map(x=>`<button type="button" class="it ${x.code===S.mat?'on':''}" data-m="${esc(x.code)}"><span>${esc(x.code)}</span><small>${n(x.balance)} ${esc(x.unit)}</small></button>`).join('')||'<div class="mut" style="padding:12px">No material found.</div>'}
@@ -64,10 +77,11 @@ async function today(){const t=ist(),rows=await call('kmr_rm_txns',{p_from:t,p_t
 document.addEventListener('click',async e=>{
   const k=e.target.closest('[data-k]');if(k){S.kind=k.dataset.k;state();return}
   const mm=e.target.closest('[data-m]');if(mm){S.mat=mm.dataset.m;S.q='';const f=$('#f');if(f)f.value='';state();$('#qty').focus({preventScroll:true});return}
+  if(e.target.id==='dchg'){if(await KMRDlg.yes('Change the date? Entries are normally made for today.'))setDate($('#dt').value,true);return}
   if(e.target.closest('[data-chg]')){S.mat='';state();list();return}
   const d=e.target.closest('[data-del]');if(d){if(!await KMRDlg.yes('Delete this entry? The balance will change back.'))return;try{await call('kmr_rm_delete',{p_id:d.dataset.del});say('Deleted.',true);await load()}catch(x){say(x.message)}return}
   if(e.target.id==='go'){const q=Number($('#qty').value);if(!S.mat)return say('Choose the material first.');if(!(q>0))return say('Type the quantity.');e.target.disabled=true;
-    try{await call('kmr_rm_save',{p:{material_code:S.mat,kind:S.kind,qty:q,txn_date:$('#dt').value,ref:$('#ref').value,remarks:$('#rem').value}});say(`Saved: ${S.kind==='in'?'received':'issued'} ${n(q)} of ${S.mat}.`,true);S.mat='';S.q='';$('#qty').value='';$('#ref').value='';$('#rem').value='';await load()}catch(x){say(x.message)}e.target.disabled=false}});
+    try{await call('kmr_rm_save',{p:{material_code:S.mat,kind:S.kind,qty:q,txn_date:$('#dt').value,ref:$('#ref').value,remarks:$('#rem').value}});say(`Saved: ${S.kind==='in'?'received':'issued'} ${n(q)} of ${S.mat}.`,true);resetForm();await load()}catch(x){say(x.message)}e.target.disabled=false}});
 document.addEventListener('input',e=>{if(e.target.id==='f'){S.q=e.target.value;list()}});
 $('#dsk').addEventListener('click',e=>{e.preventDefault();location.href='/it/rmp.html?co='+encodeURIComponent(QP.slug)+'#go=stock'});
 (async()=>{try{await QP.init('rmp');if(!QP.ctx)return;await load()}catch(e){say(e.message)}})();
