@@ -1,0 +1,32 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/apps/standards.js"></script><script src="/it/company-config.js"></script>
+<title>KMR CCTV · KMR Apps</title>
+<style>
+:root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--a:#f59e0b;--r:#dc2626}
+@media(prefers-color-scheme:dark){:root{--bg:#0b1020;--card:#141a2e;--ink:#e8ecf8;--mut:#93a0bd;--line:#26304d}}
+*{box-sizing:border-box}body{margin:0;font:14px/1.45 system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:70px}
+.clogo{width:40px;height:40px;border-radius:10px;background:#fff;display:grid;place-items:center;overflow:hidden;color:#130a3a;font-weight:800;font-size:14px;flex:none}.clogo img{max-width:34px;max-height:34px;object-fit:contain}
+header{display:flex;gap:12px;align-items:center;padding:12px 18px;background:#0c1a3a;color:#fff;flex-wrap:wrap}header h1{font-size:17px;margin:0}header small{opacity:.7;display:block}
+.tabs{display:flex;gap:4px;padding:10px 14px 0;flex-wrap:wrap}.tab{text-decoration:none;display:inline-block;padding:9px 14px;font-weight:600;color:var(--mut);border-radius:10px 10px 0 0;white-space:nowrap}.tab.on{background:var(--card);color:var(--b1);border:1px solid var(--line);border-bottom-color:var(--card)}
+main{padding:0 14px}.panel{background:var(--card);border:1px solid var(--line);border-radius:0 12px 12px 12px;padding:16px;overflow-x:auto}
+input,select,textarea,button{font:inherit;color:inherit}input,select,textarea{padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--card);width:100%;min-width:0}
+.btn{border:0;border-radius:9px;padding:9px 16px;font-weight:700;color:#fff;background:linear-gradient(90deg,var(--b1),var(--b2));cursor:pointer;text-decoration:none;display:inline-block}.btn.o{background:none;color:var(--b1);border:1px solid var(--b1)}.btn.d{background:var(--r)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.grow{flex:1;min-width:140px}
+table{width:100%;border-collapse:collapse;min-width:560px}th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left}th{font-size:11px;text-transform:uppercase;color:var(--mut);position:sticky;top:0;background:var(--card)}
+.chip{display:inline-block;padding:2px 9px;border-radius:99px;font-size:11px;font-weight:700;color:#fff;background:var(--c,#94a3b8)}.g{--c:var(--g)}.r{--c:var(--r)}.x{--c:#94a3b8}
+.hide{display:none}.mut{color:var(--mut)}.msg{padding:9px 12px;border-radius:10px;margin-bottom:10px;background:#fee2e2;color:#991b1b}.msg.ok{background:#dcfce7;color:#166534}
+.guide{background:#f1f7fb;border-left:4px solid var(--b1);padding:8px 12px;border-radius:8px;margin:6px 0 12px;color:#334155}
+.empty{background:#f8fafc;border:1px dashed #cbd5e1;border-radius:12px;padding:18px;text-align:center;color:#475569;line-height:1.7}
+.vgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px}
+.vt{position:relative;background:#0b1020;border-radius:12px;overflow:hidden;aspect-ratio:16/9;cursor:pointer}.vt img,.vt video{width:100%;height:100%;object-fit:contain;background:#000;display:block}
+.vt b{position:absolute;left:8px;bottom:8px;background:#000a;color:#fff;padding:2px 8px;border-radius:8px;font-size:12px}.vt i{position:absolute;right:8px;top:8px;width:10px;height:10px;border-radius:50%;background:#94a3b8}.vt i.on{background:#22c55e}
+.vt .off{position:absolute;inset:0;display:none;place-items:center;color:#cbd5e1;font-size:12px;text-align:center;padding:8px}.vt.bad .off{display:grid}
+.big{position:fixed;inset:0;z-index:50;background:#05070d;color:#fff;display:flex;flex-direction:column}.big .bar2{display:flex;gap:8px;align-items:center;padding:8px 12px;background:#0c1a3a}.big video{flex:1;min-height:0;width:100%;background:#000;object-fit:contain}
+.frm{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}.lbl{font-size:12px;color:var(--mut);font-weight:600;display:block;margin-bottom:2px}
+pre.out{background:#0b1020;color:#cbd5e1;padding:10px;border-radius:8px;white-space:pre-wrap;word-break:break-word;max-height:320px;overflow:auto;font-size:12px}
+.back{position:fixed;left:12px;bottom:12px;z-index:6;background:linear-gradient(90deg,var(--b1),var(--b2));color:#fff;border-radius:99px;padding:10px 16px;font-weight:700;font-size:13px;text-decoration:none}
+</style></head><body>
+<header><span class="clogo" id="clogo" hidden></span><div><h1>KMR CCTV</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="live" href="#go=live">Live view</a><a class="tab" data-t="cams" href="#go=cams">Cameras</a><a class="tab" data-t="setup" href="#go=setup">Connect this unit</a><a class="tab" data-t="log" href="#go=log">View log</a></div>
+<main><div class="panel"><div id="msg"></div>
+<section id="std"></section><section id="live" class="hide"></section><section id="cams" class="hide"></section><section id="setup" class="hide"></section><section id="log" class="hide"></section></div></main>
+<script src="/it/apps/qp-core.js"></script><script src="/it/apps/cctv-app.js?v=20261125a"></script><script src="/it/apps/back.js"></script></body></html>
