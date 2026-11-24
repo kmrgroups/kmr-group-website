@@ -54,8 +54,8 @@ tr.done td:nth-child(3) b{color:var(--mut);text-decoration:line-through}tr.na{op
 .docv .big2{font-size:12px;font-weight:700;margin:4px 0}
 </style></head><body>
 <header><span class="clogo" id="clogo" hidden></span><div><h1>Sales Invoicing</h1><small id="co">Loading…</small></div><div style="flex:1"></div><span class="chip x" id="role"></span></header>
-<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a><a class="tab" data-t="inv" href="#go=inv">Invoices</a><a class="tab" data-t="gov" href="#go=gov">E-invoice &amp; e-way bill</a><a class="tab" data-t="tally" href="#go=tally">Tally export</a><a class="tab" data-t="set" href="#go=set">Settings</a></div>
-<main><div class="panel"><div id="msg"></div><section id="std"></section><section id="dash" class="hide"></section><section id="inv" class="hide"></section><section id="gov" class="hide"></section><section id="tally" class="hide"></section><section id="set" class="hide"></section></div></main>
+<div class="tabs"><a class="tab on" data-t="std" href="#go=std">Standards alignment</a><a class="tab" data-t="dash" href="#go=dash">Dashboard</a><a class="tab" data-t="inv" href="#go=inv">Invoices</a><a class="tab" data-t="gov" href="#go=gov">E-invoice &amp; e-way bill</a><a class="tab" data-t="sr" href="#go=sr">Sales report</a><a class="tab" data-t="tally" href="#go=tally">Tally export</a><a class="tab" data-t="set" href="#go=set">Settings</a></div>
+<main><div class="panel"><div id="msg"></div><section id="std"></section><section id="dash" class="hide"></section><section id="inv" class="hide"></section><section id="gov" class="hide"></section><section id="sr" class="hide"></section><section id="tally" class="hide"></section><section id="set" class="hide"></section></div></main>
 <script src="/it/apps/qp-core.js"></script><script src="/it/apps/kmr-mobile.js"></script><script src="/it/apps/kmr-select.js"></script>
 <script>
 const {$,esc,fmt,say,call}=QP;
@@ -97,8 +97,9 @@ function calc(e){const st=sett().state_code||'';const bst=((e.buyer_gstin||'').t
 async function load(){S.d=await call('kmr_inv_load',{p_months:S.months});if(!S.m&&!S.mBusy){S.mBusy=true;call('kmr_inv_masters',{}).then(r=>{S.m=r}).catch(()=>{S.m={customers:[],parts:[],rates:[]}}).finally(()=>{S.mBusy=false})}}
 async function route(){const go=hashGo();if(go!==S.go){S.view=null;S.e=null;S.go=go}
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.t===go));
-  ['std','dash','inv','gov','tally','set'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
+  ['std','dash','inv','gov','sr','tally','set'].forEach(s=>$('#'+s).classList.toggle('hide',s!==go));
   if(go==='std'){KMRStd.draw($('#std'),'inv');return}
+  if(go==='sr'){try{await srLoad();drawSr()}catch(e){say(e.message)}return}
   try{await load();paint()}catch(e){say(e.message)}}
 function paint(){({dash:drawDash,inv:drawInv,gov:drawGov,tally:drawTally,set:drawSet}[hashGo()]||(()=>{}))()}
 const reload=async()=>{await load();paint()};
@@ -227,10 +228,33 @@ function drawSet(){const s=sett(),ro=isAdmin()?'':'disabled',f=(k,l,t)=>`<div><l
   ${isAdmin()?'<div class="row"><button class="btn" data-a="sset">Save settings</button></div>':'<p class="mut">Only an administrator can change the settings.</p>'}`}
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.s){S.sv=S.sv||{};S.sv[t.dataset.s]=t.value}});
 
+
+/* ---------- Sales report: Product wise sales report of one day (same layout as the ERP report), chosen recipients, daily 7:30 pm Telegram picture ---------- */
+async function srLoad(day){S.sr=await call('kmr_inv_sr_get',{p_day:day||(S.sr&&S.sr.day)||td()})}
+function drawSr(){const r=S.sr,ad=isAdmin(),rows=r.rows||[],g=new Map();rows.forEach(x=>{const k=x.buyer||'—';if(!g.has(k))g.set(k,[]);g.get(k).push(x)});
+  const sum=(a)=>a.reduce((t,x)=>({q:t.q+Number(x.qty),n:t.n+Number(x.net),c:t.c+Number(x.cgst),s:t.s+Number(x.sgst),i:t.i+Number(x.igst)}),{q:0,n:0,c:0,s:0,i:0}),gr=(t)=>t.n+t.c+t.s+t.i,T=sum(rows);
+  const tr=(c,t,b)=>`<tr style="${b||''}">${c}<td class="num">${n3(t.q)}</td><td class="num">${n2(t.n)}</td><td class="num">${n2(t.c)}</td><td class="num">${n2(t.s)}</td><td class="num">${n2(t.i)}</td><td class="num">${n2(gr(t))}</td></tr>`;
+  let body='';g.forEach((a,k)=>{body+=`<tr><td colspan="9" style="background:var(--bg);font-weight:700">Customer: ${esc(k)}</td></tr>`+a.map(x=>tr(`<td>${esc(x.part)}</td><td>${esc(x.name||'')}</td><td>${esc(x.hsn||'')}</td>`,{q:+x.qty,n:+x.net,c:+x.cgst,s:+x.sgst,i:+x.igst})).join('')+tr('<td colspan="3" style="text-align:right"><b>Customer total</b></td>',sum(a),'font-weight:700;background:#fef9c3;color:#000')});
+  const sel=new Set(r.selected||[]);
+  $('#sr').innerHTML=`<div class="row"><div><label class="mut">Invoice date</label><input type="date" id="srd" value="${esc(String(r.day).slice(0,10))}"></div><div class="grow"></div><button class="btn" data-a="srsample">Send sample now</button></div>
+  <h3 style="margin:6px 0">${esc((r.unit||'').replace('‑','-'))} · Product wise sales report · ${dmy(r.day)}</h3>
+  <div class="kp"><div style="--c:#0891b2"><span class="mut">Net sales</span><b>${n2(T.n)}</b></div><div><span class="mut">CGST</span><b>${n2(T.c)}</b></div><div><span class="mut">SGST</span><b>${n2(T.s)}</b></div><div><span class="mut">IGST</span><b>${n2(T.i)}</b></div><div style="--c:#16a34a"><span class="mut">Gross sales</span><b>${n2(gr(T))}</b></div></div>
+  ${rows.length?`<div class="sc"><table class="lt"><thead><tr><th>Part No</th><th>Part Name</th><th>HSN/SAC</th><th class="num">Qty</th><th class="num">Net Sales</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Gross Sales</th></tr></thead><tbody>${body}</tbody></table></div>`:'<p class="mut">No invoice issued on this date.</p>'}
+  <div class="box"><h3>Daily 7:30 pm Telegram picture</h3>
+  <p class="note">Every day at 7:30 pm the report above (that day's issued invoices) goes out as a clear picture on Telegram to the people ticked here and to this unit's sales group.</p>
+  <label class="seg" style="display:inline-flex;margin-bottom:8px"><input type="checkbox" id="sren" ${r.enabled?'checked':''} ${ad?'':'disabled'} style="width:auto"> Send automatically every day at 7:30 pm</label>
+  <div class="dg">${(r.people||[]).map(p=>`<label style="display:flex;gap:8px;align-items:center;color:var(--ink)"><input type="checkbox" class="srp" value="${esc(p.phone)}" ${sel.has(p.phone)?'checked':''} ${ad?'':'disabled'} style="width:auto"> ${esc(p.name)} ${p.linked?'<span class="cp cg">Telegram linked</span>':'<span class="cp ca">Not linked yet</span>'}</label>`).join('')||'<span class="mut">No people in the report list yet.</span>'}</div>
+  <p class="note">A person gets it only after opening <b>@Esbeereportsbot</b> on Telegram, pressing Start and sharing the phone number.</p>
+  <p class="note"><b>Telegram group:</b> ${r.group?`linked (${esc(r.group.title||'group')})`:'not linked. Create a group, add @Esbeereportsbot, then type <b>/sales '+esc(((r.unit||'').match(/\d/)||['1'])[0])+'</b> in the group.'}</p>
+  ${ad?'<div class="row"><button class="btn" data-a="srsave">Save recipients</button></div>':'<p class="mut">Only an administrator can change who gets it.</p>'}</div>`;
+  $('#srd').onchange=async e=>{try{await srLoad(e.target.value);drawSr()}catch(x){say(x.message)}}}
+
 /* ---------- actions ---------- */
 document.addEventListener('click',async e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a;
  try{
   if(a==='new'){S.e=newInv();drawInv()}
+  else if(a==='srsave'){await call('kmr_inv_sr_save',{p:{enabled:$('#sren').checked,phones:[...document.querySelectorAll('.srp:checked')].map(x=>x.value)}});say('Saved. The 7:30 pm report will go to the ticked people.','ok');await srLoad();drawSr()}
+  else if(a==='srsample'){b.disabled=true;try{const ss=await QP.sb.auth.getSession(),tk=ss&&ss.data&&ss.data.session&&ss.data.session.access_token;const r=await fetch('/it/console/api/sales/report-send',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+(tk||'')},body:JSON.stringify({slug:QP.slug,day:$('#srd').value})});const j=await r.json().catch(()=>({}));if(!r.ok||!j.ok)throw new Error(j.error||'The sample could not be sent.');say('Sample sent to '+j.sent+' Telegram chat'+(j.sent===1?'':'s')+(j.skipped?' ('+j.skipped+' not linked yet)':'')+'.','ok')}catch(x){say(x.message)}b.disabled=false}
   else if(a==='open'){S.view=b.dataset.id;drawInv()}
   else if(a==='psearch'){const x=$('#pf').value,y=$('#pt').value;if(!x&&!y)return say('Choose a From date, a To date, or both.');if(x&&y&&x>y)return say('The From date is after the To date.');const r=await call('kmr_inv_find',{p_from:x||null,p_to:y||null,p_q:null});S.range={a:x,b:y};S.found=r.invoices;S.foundTotal=r.total;S.q='';drawInv()}
   else if(a==='pclear'){S.found=null;S.range=null;drawInv()}
