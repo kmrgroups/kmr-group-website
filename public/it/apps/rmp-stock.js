@@ -56,15 +56,27 @@
       const op = t.closest("[data-op]");
       if (op && S.d.can_edit) {
         if (op.querySelector("input")) return;
-        const was = Number(op.dataset.v); op.innerHTML = `<input type="text" inputmode="decimal" autocomplete="off" value="${was}" style="width:96px;text-align:right;font:inherit;padding:4px 6px">`;
-        const inp = op.firstChild; inp.focus(); inp.select(); let done = false;
+        const was = Number(op.dataset.v), tr0 = op.closest("tr");
+        op.style.height = op.offsetHeight + "px"; op.style.padding = "0 4px"; op.style.verticalAlign = "middle";
+        op.innerHTML = `<input type="text" inputmode="decimal" autocomplete="off" value="${was}" style="display:block;width:100%;min-width:70px;height:26px;box-sizing:border-box;margin:0;padding:0 4px;text-align:right;font:inherit;border:1px solid #0891b2;border-radius:4px">`;
+        const inp = op.firstChild; inp.focus({ preventScroll: true }); inp.select(); let done = false;
+        const put = (v) => { op.textContent = n(v); op.dataset.v = v; op.style.height = ""; op.style.padding = ""; };
         const fin = async (save) => {
           if (done) return; done = true;
           const v = Number(String(inp.value).replace(/,/g, ""));
-          if (save && inp.value !== "" && v !== was) { try { await call("kmr_rm_set_opening", { p_material: op.dataset.op, p_month: S.month, p_qty: v }); say("Opening stock saved.", true); } catch (e) { say(e.message); } }
-          await draw(S.el, S.month);
+          if (!save || inp.value === "" || v === was || !(v >= 0)) { put(was); return; }
+          try {
+            await call("kmr_rm_set_opening", { p_material: op.dataset.op, p_month: S.month, p_qty: v });
+            S.d = await call("kmr_rm_month", { p_month: S.month });
+            const m = S.d.materials.find((x) => x.code === op.dataset.op);
+            if (m) {
+              const ti = m.days.reduce((a, x) => a + Number(x.in), 0), to = m.days.reduce((a, x) => a + Number(x.out), 0), c = tr0.cells;
+              put(Number(m.opening)); c[c.length - 2].textContent = n(Number(m.opening) + ti - to); c[c.length - 1].textContent = n(m.current);
+            } else put(v);
+            say("Opening stock saved.", true);
+          } catch (e) { put(was); say(e.message); }
         };
-        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") fin(true); else if (e.key === "Escape") fin(false); });
+        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); fin(true); } else if (e.key === "Escape") fin(false); });
         inp.addEventListener("blur", () => fin(true));
         return;
       }
