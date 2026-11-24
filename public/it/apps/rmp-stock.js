@@ -55,12 +55,12 @@
     try {
       const op = t.closest("[data-op]");
       if (op && S.d.can_edit) {
-        if (op.querySelector("input")) return;
+        if (op.querySelector("input")) { const b = t.closest("[data-ops]"); if (b && op._fin) op._fin(b.dataset.ops === "save"); return; }
         const was = Number(op.dataset.v), tr0 = op.closest("tr");
-        op.style.height = op.offsetHeight + "px"; op.style.padding = "0 4px"; op.style.verticalAlign = "middle";
-        op.innerHTML = `<input type="text" inputmode="decimal" autocomplete="off" value="${was}" style="display:block;width:100%;min-width:70px;height:26px;box-sizing:border-box;margin:0;padding:0 4px;text-align:right;font:inherit;border:1px solid #0891b2;border-radius:4px">`;
-        const inp = op.firstChild; inp.focus({ preventScroll: true }); inp.select(); let done = false;
-        const put = (v) => { op.textContent = n(v); op.dataset.v = v; op.style.height = ""; op.style.padding = ""; };
+        op.style.position = "relative"; op.style.height = op.offsetHeight + "px"; op.style.padding = "0 4px"; op.style.verticalAlign = "middle";
+        op.innerHTML = `<input type="text" inputmode="decimal" autocomplete="off" value="${was}" style="display:block;width:100%;min-width:70px;height:26px;box-sizing:border-box;margin:0;padding:0 4px;text-align:right;font:inherit;border:1px solid #0891b2;border-radius:4px"><span style="position:absolute;right:0;top:100%;z-index:30;display:flex;gap:4px;padding:5px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.2)"><button type="button" class="btn sm" data-ops="save" style="padding:2px 8px;background:#16a34a;color:#fff;border:0;border-radius:5px;font-weight:700">Save</button><button type="button" class="btn o sm" data-ops="cancel" style="padding:2px 8px">Cancel</button></span>`;
+        const inp = op.querySelector("input"); inp.focus({ preventScroll: true }); inp.select(); let done = false;
+        const put = (v) => { op.textContent = n(v); op.dataset.v = v; op.style.height = ""; op.style.padding = ""; op.style.position = ""; };
         const fin = async (save) => {
           if (done) return; done = true;
           const v = Number(String(inp.value).replace(/,/g, ""));
@@ -77,7 +77,7 @@
           } catch (e) { put(was); say(e.message); }
         };
         inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); fin(true); } else if (e.key === "Escape") fin(false); });
-        inp.addEventListener("blur", () => fin(true));
+        op._fin = fin;
         return;
       }
       const tr = t.closest("tr[data-mat]");
