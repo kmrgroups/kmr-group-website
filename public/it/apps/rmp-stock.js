@@ -24,10 +24,10 @@
       return { m, by, ti, to, cl };
     });
     const cell = (x) => !x ? '<td class="num mut">·</td>' : `<td class="num" style="line-height:1.15">${Number(x.in) ? `<span style="color:#16a34a">+${n(x.in)}</span>` : ""}${Number(x.in) && Number(x.out) ? "<br>" : ""}${Number(x.out) ? `<span style="color:#dc2626">−${n(x.out)}</span>` : ""}</td>`;
-    S.el.innerHTML = `<div class="row noprint"><h3 style="margin:0">${esc((d.unit || "").replace("‑", "-"))} · Raw material stock · ${esc(S.month)}</h3><span class="grow"></span><a class="btn o sm" href="/it/rmstock.html?co=${encodeURIComponent(QP.slug)}" target="_blank">Mobile entry screen</a></div>
-    <p class="note">Quantities are typed on the mobile screen (or here). Green = received, red = issued. Click an Opening figure to type the opening stock straight in the table (Enter to save). Click a material name to see, edit or delete its entries. Closing = opening + received − issued; the current balance feeds the planning screens and the evening report.</p>
+    S.el.innerHTML = `<div class="row noprint"><h3 style="margin:0">${esc((d.unit || "").replace("‑", "-"))} · Raw material stock · ${esc(S.month)}</h3><span class="grow"></span>${can ? '<button type="button" class="btn sm" id="rmsaveall" style="background:#16a34a;color:#fff;border:0;font-weight:700">Save opening stock</button> ' : ""}<a class="btn o sm" href="/it/rmstock.html?co=${encodeURIComponent(QP.slug)}" target="_blank">Mobile entry screen</a></div>
+    <p class="note">Quantities are typed on the mobile screen (or here). Green = received, red = issued. Type the opening stock straight in the Opening column; it saves when you leave the box or press Enter, and the Save opening stock button saves everything at once. Click a material name to see, edit or delete its entries. Closing = opening + received − issued; the current balance feeds the planning screens and the evening report.</p>
     <div class="rmp-sc"><table class="lt"><thead><tr><th style="position:sticky;left:0;z-index:4;background:#EEF2F8">Part</th><th>Material spec</th><th>Unit</th><th class="num">Opening</th>${days.map((x) => `<th class="num" style="min-width:58px">${x.slice(8)}</th>`).join("")}<th class="num">Received</th><th class="num">Issued</th><th class="num">Closing</th><th class="num">Current balance</th></tr></thead><tbody>
-    ${rows.length ? rows.map((r) => `<tr data-mat="${esc(r.m.code)}" style="cursor:pointer;${S.sel === r.m.code ? "background:#e0f2fe;color:#000" : ""}"><td style="position:sticky;left:0;background:${S.sel === r.m.code ? "#e0f2fe" : "var(--card)"};font-weight:700">${esc(r.m.code)}</td><td>${esc(r.m.spec || "")}</td><td>${esc(r.m.unit)}</td><td class="num" ${can ? `data-op="${esc(r.m.code)}" data-v="${Number(r.m.opening)}" title="Click to edit the opening stock" style="cursor:text;text-decoration:underline dotted;color:#0e7490;font-weight:700"` : ""}>${n(r.m.opening)}</td>${days.map((x) => cell(r.by[x])).join("")}<td class="num" style="color:#16a34a">${n(r.ti)}</td><td class="num" style="color:#dc2626">${n(r.to)}</td><td class="num"><b>${n(r.cl)}</b></td><td class="num"><b>${n(r.m.current)}</b></td></tr>`).join("") : `<tr><td colspan="${days.length + 7}" class="mut">No materials yet. Add them in Materials &amp; BOM first.</td></tr>`}
+    ${rows.length ? rows.map((r) => `<tr data-mat="${esc(r.m.code)}" style="cursor:pointer;${S.sel === r.m.code ? "background:#e0f2fe;color:#000" : ""}"><td style="position:sticky;left:0;background:${S.sel === r.m.code ? "#e0f2fe" : "var(--card)"};font-weight:700">${esc(r.m.code)}</td><td>${esc(r.m.spec || "")}</td><td>${esc(r.m.unit)}</td><td class="num" data-op="${esc(r.m.code)}" data-v="${Number(r.m.opening)}">${can ? `<input class="opin" type="text" inputmode="decimal" autocomplete="off" value="${n(r.m.opening)}" title="Type the opening stock; it saves when you leave the box or press Enter" style="width:92px;height:26px;box-sizing:border-box;margin:0;padding:0 6px;text-align:right;font:inherit;font-weight:700;color:#0e7490;border:1px solid #cbd5e1;border-radius:6px;background:#f8fafc"><span style="display:none">${n(r.m.opening)}</span>` : n(r.m.opening)}</td>${days.map((x) => cell(r.by[x])).join("")}<td class="num" style="color:#16a34a">${n(r.ti)}</td><td class="num" style="color:#dc2626">${n(r.to)}</td><td class="num"><b>${n(r.cl)}</b></td><td class="num"><b>${n(r.m.current)}</b></td></tr>`).join("") : `<tr><td colspan="${days.length + 7}" class="mut">No materials yet. Add them in Materials &amp; BOM first.</td></tr>`}
     </tbody></table></div><div id="rmdet"></div>`;
     await detail();
   }
@@ -53,33 +53,7 @@
   document.addEventListener("click", async (ev) => {
     const t = ev.target; if (!$("#rmdet")) return;
     try {
-      const op = t.closest("[data-op]");
-      if (op && S.d.can_edit) {
-        if (op.querySelector("input")) { const b = t.closest("[data-ops]"); if (b && op._fin) op._fin(b.dataset.ops === "save"); return; }
-        const was = Number(op.dataset.v), tr0 = op.closest("tr");
-        op.style.position = "relative"; op.style.height = op.offsetHeight + "px"; op.style.padding = "0 4px"; op.style.verticalAlign = "middle";
-        op.innerHTML = `<input type="text" inputmode="decimal" autocomplete="off" value="${was}" style="display:block;width:100%;min-width:70px;height:26px;box-sizing:border-box;margin:0;padding:0 4px;text-align:right;font:inherit;border:1px solid #0891b2;border-radius:4px"><span style="position:absolute;right:0;top:100%;z-index:30;display:flex;gap:4px;padding:5px;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.2)"><button type="button" class="btn sm" data-ops="save" style="padding:2px 8px;background:#16a34a;color:#fff;border:0;border-radius:5px;font-weight:700">Save</button><button type="button" class="btn o sm" data-ops="cancel" style="padding:2px 8px">Cancel</button></span>`;
-        const inp = op.querySelector("input"); inp.focus({ preventScroll: true }); inp.select(); let done = false;
-        const put = (v) => { op.textContent = n(v); op.dataset.v = v; op.style.height = ""; op.style.padding = ""; op.style.position = ""; };
-        const fin = async (save) => {
-          if (done) return; done = true;
-          const v = Number(String(inp.value).replace(/,/g, ""));
-          if (!save || inp.value === "" || v === was || !(v >= 0)) { put(was); return; }
-          try {
-            await call("kmr_rm_set_opening", { p_material: op.dataset.op, p_month: S.month, p_qty: v });
-            S.d = await call("kmr_rm_month", { p_month: S.month });
-            const m = S.d.materials.find((x) => x.code === op.dataset.op);
-            if (m) {
-              const ti = m.days.reduce((a, x) => a + Number(x.in), 0), to = m.days.reduce((a, x) => a + Number(x.out), 0), c = tr0.cells;
-              put(Number(m.opening)); c[c.length - 2].textContent = n(Number(m.opening) + ti - to); c[c.length - 1].textContent = n(m.current);
-            } else put(v);
-            say("Opening stock saved.", true);
-          } catch (e) { put(was); say(e.message); }
-        };
-        inp.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); fin(true); } else if (e.key === "Escape") fin(false); });
-        op._fin = fin;
-        return;
-      }
+      if (t.classList && t.classList.contains("opin")) return;
       const tr = t.closest("tr[data-mat]");
       if (tr && !t.closest("button")) { S.sel = tr.dataset.mat; S.edit = null; await paint(); return; }
       const re = t.closest("[data-re]"); if (re) { const all = await call("kmr_rm_txns", { p_from: "2000-01-01", p_to: ist(), p_material: S.sel }); S.edit = all.find((x) => x.id === re.dataset.re) || null; await detail(); $("#rmf") && $("#rmf").scrollIntoView({ block: "nearest" }); return; }
@@ -90,6 +64,33 @@
       await call("kmr_rm_save", { p: { id: S.edit ? S.edit.id : null, material_code: S.sel, kind: $("#rk").value, qty: q, txn_date: $("#rd").value, ref: $("#rr").value, remarks: $("#rm").value } });
       S.edit = null; say("Saved.", true); await draw(S.el, S.month);
     } catch (e) { say(e.message); }
+  });
+
+  const num = (v) => Number(String(v).replace(/,/g, ""));
+  async function saveOpening(inp) {
+    const td = inp.closest("[data-op]"), was = Number(td.dataset.v), v = num(inp.value);
+    if (inp.value.trim() === "" || !(v >= 0)) { inp.value = n(was); return false; }
+    if (v === was) { inp.value = n(was); return false; }
+    try {
+      await call("kmr_rm_set_opening", { p_material: td.dataset.op, p_month: S.month, p_qty: v });
+      S.d = await call("kmr_rm_month", { p_month: S.month });
+      const m = S.d.materials.find((x) => x.code === td.dataset.op), c = td.parentElement.cells;
+      if (m) {
+        const ti = m.days.reduce((a, x) => a + Number(x.in), 0), to = m.days.reduce((a, x) => a + Number(x.out), 0), o = Number(m.opening);
+        td.dataset.v = o; inp.value = n(o); inp.nextElementSibling.textContent = n(o); c[c.length - 2].textContent = n(o + ti - to); c[c.length - 1].textContent = n(m.current);
+      }
+      inp.style.background = "#dcfce7"; setTimeout(() => { inp.style.background = "#f8fafc"; }, 1200);
+      return true;
+    } catch (e) { inp.value = n(was); say(e.message); return false; }
+  }
+  document.addEventListener("focusin", (ev) => { if (ev.target.classList && ev.target.classList.contains("opin")) ev.target.select(); });
+  document.addEventListener("keydown", (ev) => { const t = ev.target; if (t.classList && t.classList.contains("opin")) { if (ev.key === "Enter") { ev.preventDefault(); t.blur(); } else if (ev.key === "Escape") { t.value = n(t.closest("[data-op]").dataset.v); t.blur(); } } });
+  document.addEventListener("change", async (ev) => { if (ev.target.classList && ev.target.classList.contains("opin")) { if (await saveOpening(ev.target)) say("Opening stock saved.", true); } });
+  document.addEventListener("click", async (ev) => {
+    const b = ev.target.closest("#rmsaveall"); if (!b) return;
+    let k = 0, bad = 0;
+    for (const inp of document.querySelectorAll("input.opin")) { const td = inp.closest("[data-op]"); if (num(inp.value) !== Number(td.dataset.v)) { if (await saveOpening(inp)) k++; else bad++; } }
+    say(k ? `Saved opening stock for ${k} material${k > 1 ? "s" : ""}.` : bad ? "Some entries could not be saved." : "All opening stock is already saved.", !bad);
   });
   window.RMStock = { draw };
 })();
