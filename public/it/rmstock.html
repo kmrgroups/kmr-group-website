@@ -23,7 +23,7 @@ input.big{font-size:28px;font-weight:700;text-align:right}
 .mut{color:var(--mut)}h2{font-size:15px;margin:0 0 6px}
 .lst{max-height:240px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;border:1px solid var(--line);border-radius:10px;margin-top:6px}.it{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;min-height:48px;padding:8px 12px;border:0;border-bottom:1px solid var(--line);background:var(--card);text-align:left;font-size:16px;cursor:pointer}.it:last-child{border:0}.it.on{background:#e0f2fe;color:#0c4a6e;font-weight:700}.it small{color:var(--mut);white-space:nowrap}.pick{display:flex;justify-content:space-between;align-items:center;gap:8px;background:#e0f2fe;color:#0c4a6e;border-radius:10px;padding:10px 12px;margin-top:6px;font-weight:700}.pick button{border:0;background:none;color:#0369a1;font-weight:700;font-size:15px}
 .dsk{display:block;text-align:center;margin-top:6px;font-size:13px}a{color:var(--b1)}
-.dsk{margin-bottom:70px}
+.dsk{margin-bottom:70px}[hidden]{display:none!important}.dt .dv{font-size:15px;white-space:nowrap;padding:10px}.dt button{padding:9px 8px;font-size:14px}.two{grid-template-columns:1fr 1.1fr}
 header{padding:6px 12px}.clogo{width:32px;height:32px}main{padding-top:8px}.card{padding:10px;margin-bottom:8px}
 label{margin:6px 0 2px;font-size:12px}input{padding:10px}input.big{font-size:24px;padding:8px 12px}.seg button{padding:10px 8px;font-size:16px}
 .lst{max-height:24vh;max-height:24dvh;min-height:96px}
@@ -50,7 +50,7 @@ const ist=()=>new Date(Date.now()+19800000).toISOString().slice(0,10);
 async function load(){const r=await call('kmr_rm_mats',{});S.mats=r.materials||[];S.can=r.can_edit;S.unit=r.unit;$('#co').textContent=(r.unit||'').replace('‑','-')+' · Raw material in / out';draw();await today()}
 function cur(){return S.mats.find(m=>m.code===S.mat)}
 let built=false;
-function setDate(v,unlocked){$('#dt').value=v;$('#dt').hidden=!unlocked;$('#dv').hidden=unlocked;$('#dchg').hidden=unlocked;$('#dv').textContent=v===ist()?'Today · '+v.split('-').reverse().join('-'):v.split('-').reverse().join('-')}
+function setDate(v,unlocked){$('#dt').value=v;$('#dt').hidden=!unlocked;$('#dv').hidden=unlocked;$('#dchg').hidden=unlocked;$('#dv').textContent=v===ist()?'Today':v.split('-').reverse().join('-')}
 function resetForm(){S.mat='';S.q='';const f=$('#f');if(f)f.value='';$('#qty').value='';$('#ref').value='';$('#rem').value='';const dm=document.querySelector('details.more');if(dm)dm.open=false;setDate(ist(),false);window.scrollTo({top:0})}
 function draw(){
   if(!S.can){$('#form').innerHTML='<p class="mut">You can view stock but not enter it. Ask your administrator for editor access.</p>';return}
