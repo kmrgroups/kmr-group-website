@@ -137,7 +137,7 @@
     }
     let path = r.app_path;
     try { const back = sessionStorage.getItem("kmr-return-" + code); sessionStorage.removeItem("kmr-return-" + code);
-      if (back && back.split(/[?#]/)[0] === r.app_path.split("?")[0]) path = back; } catch (e) {}
+      if (back && (back.split(/[?#]/)[0] === r.app_path.split("?")[0] || (code === "rmp" && back.split(/[?#]/)[0] === "/it/rmstock.html"))) path = back; } catch (e) {}
     let tail = ""; const hi = path.indexOf("#"); if (hi >= 0) { tail = path.slice(hi); path = path.slice(0, hi); }   // the screen (#go=…) stays at the end
     path = path.replace(/([?&])co=[^&]*&?/, "$1").replace(/[?&]$/, "");
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
