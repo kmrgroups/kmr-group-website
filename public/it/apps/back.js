@@ -54,13 +54,14 @@
   const kmrPlants = () => { try { const pp = JSON.parse(localStorage.getItem("kmr-portal") || "null"); return pp && Array.isArray(pp.plants) ? pp.plants : []; } catch (e) { return []; } };
   const plantSelect = () => {
     const pl = kmrPlants(), cur = new URLSearchParams(location.search).get("co") || (portal && portal.slug);
-    const sel = document.createElement("select"); sel.title = "Plant: switch to another unit on this same screen"; sel.className = "kmr-plantsel"; sel.style.cssText = "font:600 12px 'Segoe UI',Arial;border:1px solid #E3E8EF;border-radius:8px;padding:2px 6px;max-width:100%;cursor:pointer";
+    const sel = document.createElement("select"); sel.title = "Plant: switch to another unit on this same screen"; sel.className = "kmr-plantsel"; sel.style.cssText = "font:600 12px 'Segoe UI',Arial;border:1px solid #E3E8EF;border-radius:8px;padding:3px 8px;max-width:100%;cursor:pointer;color:#0f172a;background:#fff";
     sel.innerHTML = pl.map((x) => '<option value="' + encodeURIComponent(x.slug) + '"' + (x.slug === cur ? " selected" : "") + ">Plant: " + String(x.main ? "Main" : x.code).replace(/[<>&"]/g, "") + " · " + String(x.name).split(" – ").pop().replace(/[<>&"]/g, "") + "</option>").join("");
     sel.onchange = () => {
       const to = pl.find((x) => encodeURIComponent(x.slug) === sel.value); if (!to) return;
       try { const old = JSON.parse(localStorage.getItem("kmr-portal") || "{}"); localStorage.setItem("kmr-portal", JSON.stringify({ ...old, slug: to.slug, name: to.name })); } catch (e) {}
       const u = new URL(location.href); u.searchParams.set("co", to.slug); u.hash = location.hash; location.href = u.toString();   // same screen, other unit
     };
+    Array.from(sel.options).forEach((o) => { o.style.color = "#0f172a"; o.style.background = "#fff"; });   // readable in the dark title bar too
     return sel;
   };
   document.addEventListener("DOMContentLoaded", function () {
