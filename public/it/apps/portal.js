@@ -375,6 +375,10 @@
     ["telegram", "sales", "Product wise sales report", "Day's invoices part by part with tax (picture)", "19:30", [1, 2, 3, 4, 5, 6, 7]],
     ["whatsapp", "evening", "Evening unit report", "Same pictures, for people who have not linked Telegram", "19:30", [1, 2, 3, 4, 5, 6, 7]]];
   const NT_CH = { mail: ["Mail", "Sent to e-mail addresses."], telegram: ["Telegram", "Sent as pictures to people who linked Telegram and to the unit's Telegram group."], whatsapp: ["WhatsApp", "Sent as pictures to mobile numbers of people who have not linked Telegram."] };
+  const NT_PARTS = {
+    digest: DG_SECTIONS.map((x) => [x[0], x[2].split(" (")[0]]),
+    finance: [["sales", "Sales value"], ["receivables", "Receivables (money to collect)"], ["payables", "Payables (money to pay)"], ["expenses", "Expenses against budget"], ["pnl", "Profit and loss"], ["cash", "Cash movement"]],
+    evening: [["customer", "Customer-wise schedule"], ["slug", "Material for forging slug"], ["rm", "Raw material stock"], ["wip", "Stage-wise stock (work in progress)"]] };
   const NT_DAYS = [[1, "Mon"], [2, "Tue"], [3, "Wed"], [4, "Thu"], [5, "Fri"], [6, "Sat"], [7, "Sun"]];
   async function notifView() {
     setView("notif");
@@ -384,23 +388,26 @@
     if (error) { m.querySelector(".msg").textContent = /does not exist|Could not find/i.test(error.message) ? "This needs the latest KMR database update. Please contact KMR support." : error.message; return; }
     const rules = g.rules || [], find = (c, r) => rules.find((x) => x.channel === c && x.report === r);
     const people = (c) => c === "mail" ? g.mail_people || [] : c === "telegram" ? [...(g.group ? [{ key: "group", name: "Unit Telegram group", sub: g.group }] : []), ...(g.phone_people || []).filter((x) => x.tg).map((x) => ({ ...x, sub: x.sub + " · Telegram linked" }))] : (g.phone_people || []).filter((x) => !x.tg);
+    const partsHtml = (r, c, rule) => { const L = NT_PARTS[r]; if (!L) return `<div class="nt-pt"><small>One picture, product wise.</small></div>`; const pk = rule ? rule.parts || [] : [];
+      return `<details class="nt-pt"><summary>What it carries: <span class="nt-ps">${pk.length ? pk.length + " of " + L.length + " chosen" : "everything"}</span></summary><div class="nt-list"><small>Tick only the data to send. Tick none to send everything.</small>${L.map(([k, n]) => `<label><input type="checkbox" class="nt-pp" value="${k}" ${pk.includes(k) ? "checked" : ""}> ${esc(n)}</label>`).join("")}</div></details>`; };
     const row = ([c, r, title, about, t0, d0]) => {
       const rule = find(c, r), on = rule ? rule.enabled : true, fq = rule ? rule.freq : (d0.length === 7 ? "daily" : "weekly"), days = rule ? rule.weekdays : d0, md = rule ? rule.month_day : 1, tm = rule ? rule.send_time : t0, picked = rule ? rule.recipients : [], pp = people(c);
       const sum = !picked.length ? `Everyone set up (${pp.length})` : `${picked.length} chosen`;
       return `<div class="nt-row" data-c="${c}" data-r="${r}">
         <label class="nt-on" title="Send this report"><input type="checkbox" class="nt-en" ${on ? "checked" : ""}><span>${on ? "On" : "Off"}</span></label>
-        <div class="nt-name"><b>${esc(title)}</b>${rule ? "" : ' <span class="nt-std">standard</span>'}<small>${esc(about)}</small></div>
+        <div class="nt-name"><b>${esc(title)}</b>${rule ? "" : ' <span class="nt-std">standard</span>'}<small>${esc(about)}</small>${partsHtml(r, c, rule)}</div>
         <div class="nt-to"><details><summary>${esc(sum)}</summary><div class="nt-list"><small>Tick none to send to everyone set up for this unit.</small>
           ${pp.length ? pp.map((x) => `<label><input type="checkbox" class="nt-p" value="${esc(x.key)}" ${picked.includes(x.key) ? "checked" : ""}> ${esc(x.name)} <small>${esc(x.sub)}</small></label>`).join("") : `<small>Nobody with a ${c === "mail" ? "mail address" : "mobile number"} yet. Add people under Users &amp; access.</small>`}</div></details></div>
         <div class="nt-fq"><select class="nt-freq"><option value="daily" ${fq === "daily" ? "selected" : ""}>Every day</option><option value="weekly" ${fq === "weekly" ? "selected" : ""}>Chosen days</option><option value="monthly" ${fq === "monthly" ? "selected" : ""}>Once a month</option></select>
           <div class="nt-days" ${fq === "weekly" ? "" : "hidden"}>${NT_DAYS.map(([n, d]) => `<label><input type="checkbox" class="nt-d" value="${n}" ${days.includes(n) ? "checked" : ""}><span>${d}</span></label>`).join("")}</div>
           <div class="nt-md" ${fq === "monthly" ? "" : "hidden"}>on day <input type="number" class="nt-mdv" min="1" max="28" value="${esc(md)}"></div></div>
-        <div class="nt-tm"><input type="time" class="nt-time" value="${esc(tm)}" step="900"></div></div>`;
+        <div class="nt-tm"><input type="time" class="nt-time" value="${esc(tm)}" step="900"></div>
+        <div class="nt-sm"><button class="btn ghost nt-send" type="button">✉ Send sample</button>${c === "telegram" && g.group ? `<select class="nt-target" title="Where the sample goes"><option value="me">to me</option><option value="group">to the unit group</option></select>` : ""}<small class="nt-res"></small></div></div>`;
     };
-    const sect = (c) => `<h3 class="nt-h">${NT_CH[c][0]} <small>${NT_CH[c][1]}</small></h3><div class="nt-head"><span>Send</span><span>Report</span><span>Who gets it</span><span>How often</span><span>Time (India)</span></div>${NT_ROWS.filter((x) => x[0] === c).map(row).join("")}`;
+    const sect = (c) => `<h3 class="nt-h">${NT_CH[c][0]} <small>${NT_CH[c][1]}</small></h3><div class="nt-head"><span>Send</span><span>Report</span><span>Who gets it</span><span>How often</span><span>Time (India)</span><span>Sample</span></div>${NT_ROWS.filter((x) => x[0] === c).map(row).join("")}`;
     m.innerHTML = adminHead(T0, S0) + `<style>
-      .nt{max-width:1100px} .nt-h{margin:22px 0 6px;font-size:18px} .nt-h small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
-      .nt-head,.nt-row{display:grid;grid-template-columns:70px minmax(180px,1.6fr) minmax(170px,1.3fr) minmax(200px,1.5fr) 110px;gap:12px;align-items:start;padding:10px 12px}
+      .nt{max-width:1280px} .nt-h{margin:22px 0 6px;font-size:18px} .nt-h small{font-weight:400;color:var(--muted);font-size:13px;margin-left:6px}
+      .nt-head,.nt-row{display:grid;grid-template-columns:70px minmax(180px,1.6fr) minmax(170px,1.3fr) minmax(200px,1.5fr) 110px 150px;gap:12px;align-items:start;padding:10px 12px}
       .nt-head{position:sticky;top:0;z-index:3;background:var(--bg,#fff);border-bottom:2px solid var(--line,#d9dee7);font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
       .nt-row{border-bottom:1px solid var(--line,#e5e9f0)} .nt-name small{display:block;color:var(--muted);font-size:12.5px;margin-top:2px}
       .nt-std{font-size:11px;background:#eef2f7;color:#53627a;border-radius:6px;padding:1px 6px;margin-left:4px}
@@ -409,19 +416,34 @@
       .nt-fq select,.nt-tm input,.nt-mdv{padding:6px 8px;border:1px solid var(--line,#d9dee7);border-radius:8px;font:inherit;max-width:100%} .nt-mdv{width:64px}
       .nt-days{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px} .nt-days label{display:inline-flex}.nt-days input{position:absolute;opacity:0;pointer-events:none}
       .nt-days span{border:1px solid var(--line,#cfd6e2);border-radius:7px;padding:3px 7px;font-size:12.5px;cursor:pointer} .nt-days input:checked+span{background:#0E7490;border-color:#0E7490;color:#fff}
-      .nt-md{margin-top:6px;font-size:14px}.nt-days[hidden],.nt-md[hidden]{display:none} .nt-bar{position:sticky;bottom:0;background:var(--bg,#fff);padding:12px 0;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line,#e5e9f0);margin-top:14px}
-      @media(max-width:820px){.nt-head{display:none}.nt-row{grid-template-columns:1fr 1fr;gap:8px}.nt-name{grid-column:1/-1;order:-1}.nt-on{order:0}.nt-to,.nt-fq{grid-column:1/-1}}
+      .nt-md{margin-top:6px;font-size:14px}.nt-pt{margin-top:6px}.nt-pt summary{cursor:pointer;font-size:13px;color:#0E7490}.nt-sm{display:grid;gap:6px}.nt-sm .btn{height:34px;padding:0 10px;font-size:13px}.nt-sm select{padding:5px 6px;border:1px solid var(--line,#d9dee7);border-radius:8px;font:inherit;font-size:13px}.nt-res{font-size:12.5px;line-height:1.35}.nt-res.ok{color:#1E7B4A}.nt-res.bad{color:#B3261E}.nt-days[hidden],.nt-md[hidden]{display:none} .nt-bar{position:sticky;bottom:0;background:var(--bg,#fff);padding:12px 0;display:flex;gap:12px;align-items:center;border-top:1px solid var(--line,#e5e9f0);margin-top:14px}
+      @media(max-width:820px){.nt-head{display:none}.nt-row{grid-template-columns:1fr 1fr;gap:8px}.nt-name{grid-column:1/-1;order:-1}.nt-on{order:0}.nt-to,.nt-fq,.nt-sm{grid-column:1/-1}}
     </style><div class="nt">${["mail", "telegram", "whatsapp"].map(sect).join("")}
       <p style="font-size:13px;color:var(--muted);margin:14px 0 0">A report goes out within 30 minutes after the time chosen. Until you save, reports keep going out at their usual times to everyone set up. The Product wise sales report is sent on Telegram only. What each report contains is set under Daily management mail, Finance mail and WhatsApp evening report.</p>
       <div class="nt-bar"><button class="btn" id="ntSave">Save notification settings</button><span class="msg" id="ntMsg"></span></div></div>`;
     bindBack();
     m.querySelectorAll(".nt-en").forEach((c) => (c.onchange = () => (c.nextElementSibling.textContent = c.checked ? "On" : "Off")));
     m.querySelectorAll(".nt-p").forEach((c) => (c.onchange = () => { const row = c.closest(".nt-row"), n = row.querySelectorAll(".nt-p:checked").length; row.querySelector("summary").textContent = n ? `${n} chosen` : `Everyone set up (${row.querySelectorAll(".nt-p").length})`; }));
+    m.querySelectorAll(".nt-pp").forEach((c) => (c.onchange = () => { const row = c.closest(".nt-row"), n = row.querySelectorAll(".nt-pp:checked").length, t = row.querySelectorAll(".nt-pp").length; row.querySelector(".nt-ps").textContent = n ? `${n} of ${t} chosen` : "everything"; }));
+    m.querySelectorAll(".nt-send").forEach((b) => (b.onclick = async () => {
+      const r = b.closest(".nt-row"), res = r.querySelector(".nt-res"), c = r.dataset.c, rp = r.dataset.r, parts = [...r.querySelectorAll(".nt-pp:checked")].map((x) => x.value);
+      b.disabled = true; res.className = "nt-res"; res.textContent = "Sending sample…";
+      try {
+        const ss = await sb.auth.getSession(), tk = ss && ss.data && ss.data.session && ss.data.session.access_token, tg = r.querySelector(".nt-target");
+        const url = c === "mail" ? (rp === "digest" ? "/it/console/api/digest/test" : "/it/console/api/finance/test") : "/it/console/api/notif/sample";
+        const body = c === "mail" ? { slug: SLUG, parts } : { slug: SLUG, report: rp, channel: c, parts, target: tg ? tg.value : "me" };
+        const x = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (tk || "") }, body: JSON.stringify(body) });
+        const j = await x.json().catch(() => ({}));
+        if (!x.ok || !j.ok) throw new Error(j.error || "The sample could not be sent.");
+        res.className = "nt-res ok"; res.textContent = c === "mail" ? `Sample mail sent to ${j.to}.` : `Sample sent to ${j.to} (${j.sent} picture${j.sent === 1 ? "" : "s"}).`;
+      } catch (e) { res.className = "nt-res bad"; res.textContent = e.message; }
+      b.disabled = false;
+    }));
     m.querySelectorAll(".nt-freq").forEach((s) => (s.onchange = () => { const r = s.closest(".nt-row"); r.querySelector(".nt-days").hidden = s.value !== "weekly"; r.querySelector(".nt-md").hidden = s.value !== "monthly"; }));
     $("#ntSave").onclick = async () => {
       const msg = $("#ntMsg"); msg.className = "msg"; msg.textContent = "Saving…";
       const out = [...m.querySelectorAll(".nt-row")].map((r) => ({ report: r.dataset.r, channel: r.dataset.c, enabled: r.querySelector(".nt-en").checked, freq: r.querySelector(".nt-freq").value,
-        weekdays: [...r.querySelectorAll(".nt-d:checked")].map((x) => +x.value), month_day: +r.querySelector(".nt-mdv").value || 1, send_time: r.querySelector(".nt-time").value, recipients: [...r.querySelectorAll(".nt-p:checked")].map((x) => x.value) }));
+        weekdays: [...r.querySelectorAll(".nt-d:checked")].map((x) => +x.value), month_day: +r.querySelector(".nt-mdv").value || 1, send_time: r.querySelector(".nt-time").value, recipients: [...r.querySelectorAll(".nt-p:checked")].map((x) => x.value), parts: [...r.querySelectorAll(".nt-pp:checked")].map((x) => x.value) }));
       const r = await sb.rpc("kmr_notif_save", { p_slug: SLUG, p: { rules: out } });
       if (r.error) { msg.textContent = r.error.message; return; }
       msg.className = "msg ok"; msg.textContent = "Saved. Reports now go out as set here.";
