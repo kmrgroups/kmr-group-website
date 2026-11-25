@@ -85,4 +85,13 @@ document.addEventListener('click',async e=>{
 document.addEventListener('input',e=>{if(e.target.id==='f'){S.q=e.target.value;list()}});
 $('#dsk').addEventListener('click',e=>{e.preventDefault();location.href='/it/rmp.html?co='+encodeURIComponent(QP.slug)+'#go=stock'});
 (async()=>{try{await QP.init('rmp');if(!QP.ctx)return;await load()}catch(e){say(e.message)}})();
-</script></body></html>
+</script><script>
+/* unit dropdown (only for people with access to more than one unit): same screen, other unit */
+(function(){try{var pp=JSON.parse(localStorage.getItem("kmr-portal")||"null"),pl=pp&&Array.isArray(pp.plants)?pp.plants:[];if(pl.length<2)return;
+var cur=new URLSearchParams(location.search).get("co")||pp.slug,sel=document.createElement("select");sel.title="Plant: switch to another unit on this same screen";
+sel.style.cssText="font:600 12px system-ui;border:1px solid #cbd5e1;border-radius:8px;padding:3px 6px;max-width:46vw;color:#0f172a;background:#fff";
+sel.innerHTML=pl.map(function(x){var e=function(t){return String(t).replace(/[<>&"]/g,"")};return '<option value="'+encodeURIComponent(x.slug)+'"'+(x.slug===cur?" selected":"")+">"+e(x.main?"Main":x.code)+" · "+e(String(x.name).split(" – ").pop())+"</option>"}).join("");
+sel.onchange=function(){var to=pl.find(function(x){return encodeURIComponent(x.slug)===sel.value});if(!to)return;pp.slug=to.slug;pp.name=to.name;try{localStorage.setItem("kmr-portal",JSON.stringify(pp))}catch(e){}var u=new URL(location.href);u.searchParams.set("co",to.slug);u.hash=location.hash;location.href=u.toString()};
+document.addEventListener("DOMContentLoaded",function(){var h=document.querySelector("header"),r=document.getElementById("role");if(h)h.insertBefore(sel,r)})}catch(e){}})();
+</script>
+</body></html>
