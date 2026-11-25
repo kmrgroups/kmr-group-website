@@ -1,4 +1,5 @@
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover"><script src="/it/apps/sso.js"></script><script src="/it/apps/kmr-ui.js"></script><script src="/it/company-config.js"></script>
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="RM Stock"><meta name="theme-color" content="#0c1a3a">
 <title>Raw Material Stock (mobile) · KMR Apps</title>
 <style>
 :root{--bg:#f4f6fb;--card:#fff;--ink:#0f172a;--mut:#64748b;--line:#e5e9f2;--b1:#0891b2;--b2:#7c3aed;--g:#16a34a;--r:#dc2626;--a:#f59e0b}
@@ -85,13 +86,4 @@ document.addEventListener('click',async e=>{
 document.addEventListener('input',e=>{if(e.target.id==='f'){S.q=e.target.value;list()}});
 $('#dsk').addEventListener('click',e=>{e.preventDefault();location.href='/it/rmp.html?co='+encodeURIComponent(QP.slug)+'#go=stock'});
 (async()=>{try{await QP.init('rmp');if(!QP.ctx)return;await load()}catch(e){say(e.message)}})();
-</script><script>
-/* unit dropdown (only for people with access to more than one unit): same screen, other unit */
-(function(){try{var pp=JSON.parse(localStorage.getItem("kmr-portal")||"null"),pl=pp&&Array.isArray(pp.plants)?pp.plants:[];if(pl.length<2)return;
-var cur=new URLSearchParams(location.search).get("co")||pp.slug,sel=document.createElement("select");sel.title="Plant: switch to another unit on this same screen";
-sel.style.cssText="font:600 12px system-ui;border:1px solid #cbd5e1;border-radius:8px;padding:3px 6px;max-width:46vw;color:#0f172a;background:#fff";
-sel.innerHTML=pl.map(function(x){var e=function(t){return String(t).replace(/[<>&"]/g,"")};return '<option value="'+encodeURIComponent(x.slug)+'"'+(x.slug===cur?" selected":"")+">"+e(x.main?"Main":x.code)+" · "+e(String(x.name).split(" – ").pop())+"</option>"}).join("");
-sel.onchange=function(){var to=pl.find(function(x){return encodeURIComponent(x.slug)===sel.value});if(!to)return;pp.slug=to.slug;pp.name=to.name;try{localStorage.setItem("kmr-portal",JSON.stringify(pp))}catch(e){}var u=new URL(location.href);u.searchParams.set("co",to.slug);u.hash=location.hash;location.href=u.toString()};
-document.addEventListener("DOMContentLoaded",function(){var h=document.querySelector("header"),r=document.getElementById("role");if(h)h.insertBefore(sel,r)})}catch(e){}})();
-</script>
-</body></html>
+</script></body></html>
