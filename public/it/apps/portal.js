@@ -45,6 +45,7 @@
     rmp: { color: "#0D9488", desc: "Turn the capacity plan into kilograms of raw material, compare with stock, and plan MOQ-rounded supplier orders with lead times.", demo: "/it/rmp.html?demo=1" },
     calib: { color: "#6366F1", desc: "Instrument register, calibration due control, gauge history, MSA and out-of-tolerance cases.", demo: "/it/calibration.html?demo=1" },
     inv: { color: "#0D9488", desc: "Make the GST tax invoice from the Operations Master, then get the e-invoice and e-way bill files for the government portals and the sales vouchers for Tally." },
+    announce: { color: "#DC2626", desc: "Your shop floor hears the hourly report call, break start and end, shift closing and emergency announcements on time, in Hindi, Kannada, English, Assamese, Bengali, Odia and Nepali, in a male or female voice or your own recording." },
     cctv: { color: "#0E7490", desc: "Watch the CCTV cameras of every unit live from your phone or computer, anywhere and anytime, with a log of who watched which camera." },
     connect: { color: "#0891B2", desc: "See and control your laptops and PCs from any browser or phone (screen, mouse, keyboard, files, programs), meet online with Teams or Google Meet links, record the meeting and get minutes in your language." },
     dcg: { color: "#D97706", desc: "Make delivery challans (returnable and non-returnable) and Goods Receipt Notes against the challan and the purchase order. Calibration gauges go out on a returnable challan and are calibrated on the GRN." },
@@ -59,7 +60,7 @@
   let brand = { name: "KMR Apps", logo_url: null }, rows = [], user = null, stats = {}, isAdmin = false, view = "home", ops = null, media = {}, plants = [], THEME = "";
 
   /** top of an app card: the app photo set in Website CMS (or the built-in illustration) — never a video: videos are for the public website only */
-  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, tlp: 1, csp: 1, bud: 1, ppl: 1, mlp: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1, qms: 1, aud: 1, off: 1, layout: 1, dwm: 1, dcg: 1, inv: 1, connect: 1, cctv: 1, pnl: 1, bud: 1 };
+  const ART = { hrms: 1, balloon: 1, pd: 1, capacity: 1, sales: 1, calib: 1, apqp: 1, ppap: 1, rmp: 1, mmd: 1, mnt: 1, tlp: 1, csp: 1, bud: 1, ppl: 1, mlp: 1, mom: 1, cad: 1, tsk: 1, msa: 1, spc: 1, crm: 1, d8: 1, qms: 1, aud: 1, off: 1, layout: 1, dwm: 1, dcg: 1, inv: 1, connect: 1, cctv: 1, announce: 1, pnl: 1, bud: 1 };
   const safeUrl = (u) => (/^(https:\/\/|\/)/.test(u || "") ? String(u).replace(/["<>]/g, "") : "");
   function mediaHtml(r) {
     const m = media[r.product_code] || {}, img = safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : "");
@@ -145,7 +146,7 @@
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
-  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "dcg", "inv", "pnl", "bud", "ppl", "mlp", "mnt", "tlp", "csp", "layout"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "connect", "cctv", "tsk", "off", "dwm"]]];
+  const GROUPS = [["Quality & engineering", "#7C3AED", ["cad", "balloon", "pd", "apqp", "ppap", "calib", "msa", "spc", "d8", "aud", "qms"]], ["Planning & production", "#10B981", ["capacity", "sales", "crm", "rmp", "mmd", "dcg", "inv", "pnl", "bud", "ppl", "mlp", "mnt", "announce", "tlp", "csp", "layout"]], ["People & meetings", "#0EA5E9", ["hrms", "mom", "connect", "cctv", "tsk", "off", "dwm"]]];
   function imgOf(r) { const m = media[r.product_code] || {}; return safeUrl(m.img) || (ART[r.product_code] ? `/img/kmr/app-${r.product_code}.svg` : ""); }
   function tile(r, locked) {
     const m = META[r.product_code] || {}, im = imgOf(r), st = stats[r.product_code] || {};

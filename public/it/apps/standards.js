@@ -417,6 +417,15 @@ mom:[
 ['F4','Recommended actions','Responsibility and target completion date (FMEA 4th ed.)','FMEA review meeting actions have responsibility and target date.'],
 ['VF','Step 6','Optimization (AIAG-VDA FMEA)','FMEA and Control Plan review meetings record optimisation actions with responsible person and target date.'],
 ['VDA','P2','Project management','Project review meetings are minuted with decisions, owners and dates.']],
+announce:[
+['ISO','7.3','Awareness','The shop floor is reminded on time of the hourly report, safety equipment and shift timings, so people know what is expected of them at that moment.'],
+['ISO','7.4','Communication','What is announced, when, to whom and in which language is set in one schedule: Hindi, Kannada, English, Assamese, Bengali, Odia and Nepali, in a male or female voice or the person\'s own recording.'],
+['ISO','7.1.4','Environment for the operation of processes','Break start and end, safety equipment (PPE) and cleaning reminders support a safe and orderly working environment.'],
+['ISO','8.5.1','Control of production and service provision','The hourly call to write the production count supports monitoring and recording at the right time, hour after hour, so the hourly report is not missed.'],
+['ISO','7.5.3','Control of documented information','Every announcement played (time, name, result, problem) and every change or delete of the schedule, messages and recordings (who, when, why) is kept in a log that cannot be edited.'],
+['IATF','6.1.2.3','Contingency plans','The emergency button stops all other sound and speaks the emergency message with a siren, in the chosen languages, within a second; an all-clear message is available.'],
+['IATF','7.3.2','Employee motivation and empowerment','People are asked clearly and in their own language to record their own hourly count and to look after their machine and work area before the shift ends.'],
+['IATF','7.5.3.2.1','Record retention','The played log and the change log are stored with date and time for each entry; deleting anything needs two confirmations and a written reason.']],
 cctv:[
 ['ISO','7.1.3','Infrastructure','Cameras of every unit can be watched live from the office or a phone, so the people responsible for the plant, stores and gates can see what is happening without travelling.'],
 ['ISO','7.5.3','Control of documented information - access','Only signed-in users with the KMR CCTV role of that unit can see its cameras; every opening of a camera is written to the view log with the person, camera, date and time.'],
