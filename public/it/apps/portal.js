@@ -9,7 +9,8 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
   const m = location.pathname.match(/\/it\/app\/([a-z0-9-]{2,61})/i) || location.search.match(/[?&]c=([a-z0-9-]{2,61})/i);
   const SLUG = m && !/^(undefined|null)$/i.test(m[1]) ? m[1].toLowerCase() : "";
-  const OPEN = (location.search.match(/[?&]open=([a-z0-9-]+)/i) || [])[1] || "";   // a tool sent the person here to sign in
+  const OPEN = (location.search.match(/[?&]open=([a-z0-9-]+)/i) || [])[1] || "";
+  const RET = (() => { try { const v = decodeURIComponent((location.search.match(/[?&]ret=([^&]+)/) || [])[1] || ""); return /^\/it\/[a-z0-9_.-]+\.html([?#][^\s<>"]*)?$/i.test(v) ? v : ""; } catch (e) { return ""; } })();   // the screen the person asked for, kept through the sign-in   // a tool sent the person here to sign in
   const HASH = location.hash.replace(/^#/, "");                                      // the screen this address points at (#ops, #users …)
   /* Every menu item is a real link, so right-click › Open in new tab / new window works and opens that exact screen.
      A normal left click still switches screen in place (no reload); ctrl / ⌘ / shift / middle-click follow the link. */
@@ -137,7 +138,7 @@
       r.has_access = true;
     }
     let path = r.app_path;
-    try { const back = sessionStorage.getItem("kmr-return-" + code); sessionStorage.removeItem("kmr-return-" + code);
+    try { const back = sessionStorage.getItem("kmr-return-" + code) || (code === OPEN ? RET : ""); sessionStorage.removeItem("kmr-return-" + code);
       if (back && (back.split(/[?#]/)[0] === r.app_path.split("?")[0] || (code === "rmp" && back.split(/[?#]/)[0] === "/it/rmstock.html"))) path = back; } catch (e) {}
     let tail = ""; const hi = path.indexOf("#"); if (hi >= 0) { tail = path.slice(hi); path = path.slice(0, hi); }   // the screen (#go=…) stays at the end
     path = path.replace(/([?&])co=[^&]*&?/, "$1").replace(/[?&]$/, "");
@@ -690,7 +691,7 @@
   }
 
   function plantPickView(pl) {
-    const open = OPEN ? "?open=" + encodeURIComponent(OPEN) : "";
+    const open = OPEN ? "?open=" + encodeURIComponent(OPEN) + (RET ? "&ret=" + encodeURIComponent(RET) : "") : "";
     $("#root").innerHTML = `<div class="split" style="grid-template-columns:1fr"><section class="panel" style="border:0"><div class="form">
       <div class="co" style="margin-bottom:14px">${logo(brand)}<div>${esc(brand.name)}<small>${esc(user.email)}</small></div></div>
       <h1>Choose your plant</h1><p class="sub">Each plant has its own apps and data.</p>
@@ -705,7 +706,7 @@
     if (!session) return loginView();
     if (!SLUG) {   // signed in at the general address: go to this person's own company page
       const { data } = await sb.rpc("kmr_my_portals");
-      if (data && data.length === 1) { location.replace(`/it/app/${data[0].slug}${OPEN ? "?open=" + OPEN : ""}`); return; }
+      if (data && data.length === 1) { location.replace(`/it/app/${data[0].slug}${OPEN ? "?open=" + OPEN + (RET ? "&ret=" + encodeURIComponent(RET) : "") : ""}`); return; }
       if (data && data.length > 1) { $("#root").innerHTML = `<div class="split" style="grid-template-columns:1fr"><section class="panel" style="border:0"><div class="form"><h1>Choose your company</h1><p class="sub">Your login belongs to more than one company.</p>${data.map((d) => `<p><a class="btn block" href="/it/app/${esc(d.slug)}${OPEN ? "?open=" + esc(OPEN) : ""}">${esc(d.name)}</a></p>`).join("")}</div></section></div>`; return; }
       await sb.auth.signOut(); return loginView("This login is not linked to any company's KMR Apps. Please use the link and login sent to you by KMR.");
     }
@@ -715,7 +716,7 @@
       const pr = await sb.rpc("kmr_plants", { p_slug: SLUG });
       const pl = !pr.error && Array.isArray(pr.data) ? pr.data : [];
       if (pl.length && pl[0].at_parent && HASH !== "plants") {
-        if (pl.length === 1 && !pl[0].is_all) { location.replace(`/it/app/${encodeURIComponent(pl[0].slug)}${OPEN ? "?open=" + encodeURIComponent(OPEN) : ""}`); return; }
+        if (pl.length === 1 && !pl[0].is_all) { location.replace(`/it/app/${encodeURIComponent(pl[0].slug)}${OPEN ? "?open=" + encodeURIComponent(OPEN) + (RET ? "&ret=" + encodeURIComponent(RET) : "") : ""}`); return; }
         return plantPickView(pl);
       }
       if (pl.length && pl[0].at_parent && HASH === "plants") { location.replace(`/it/app/${encodeURIComponent(pl[0].slug)}#plants`); return; }

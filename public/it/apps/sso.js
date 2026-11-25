@@ -9,8 +9,10 @@
   function portal() { var p = null; try { p = JSON.parse(localStorage.getItem("kmr-portal") || "null"); } catch (e) {} return p; }
   function portalUrl() { var p = portal(), co = (q.match(/[?&]co=([a-z0-9-]{2,61})/i) || [])[1], s = (p && p.slug) || co;
     // come back to this exact screen after signing in (e.g. a gauge opened from its QR label)
-    try { sessionStorage.setItem("kmr-return-" + tool, location.pathname + location.search.replace(/([?&])(kmr|demo|direct)=1(&|$)/g, "$1").replace(/[?&]$/, "") + location.hash); } catch (e) {}
-    return (s ? "/it/app/" + encodeURIComponent(s) : "/it/apps.html") + "?open=" + tool; }
+    var ret = location.pathname + location.search.replace(/([?&])(kmr|demo|direct)=1(&|$)/g, "$1").replace(/[?&]$/, "") + location.hash;
+    try { sessionStorage.setItem("kmr-return-" + tool, ret); } catch (e) {}
+    // the address itself also carries the screen to come back to, so it still works when the sign-in opens in another tab or window
+    return (s ? "/it/app/" + encodeURIComponent(s) : "/it/apps.html") + "?open=" + tool + "&ret=" + encodeURIComponent(ret); }
   function hasSession() {
     for (var i = 0; i < localStorage.length; i++) {
       var k = localStorage.key(i);
