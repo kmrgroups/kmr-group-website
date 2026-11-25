@@ -36,9 +36,26 @@ function itemsToDims(items){ const f=n=>Math.round(n*1e4)/1e4, out=[];
     d.desc=kind==="dia"?"Diameter Ø"+nom:kind==="ra"?"Surface finish "+(i.text||""):kind==="thr"?"Thread "+(i.text||""):kind==="gdt"?"GD&T "+(i.text||""):kind==="ang"?"Angle "+nom:"Dimension "+nom;
     if(kind==="thr"||kind==="gdt") d.tol=i.text||""; out.push(d); });
   return out; }
+
+/* AI reading (Claude, through the KMR server): the sheet is sent as a picture; returns the same shape as the Balloon route. */
+async function sheetJpeg(file){
+  if(/^image\//.test(file.type)){ const u=URL.createObjectURL(file); try{ const im=await new Promise((r,j)=>{const i=new Image();i.onload=()=>r(i);i.onerror=j;i.src=u;}); const k=Math.min(1,2600/Math.max(im.width,im.height)), c=document.createElement("canvas"); c.width=im.width*k; c.height=im.height*k; c.getContext("2d").drawImage(im,0,0,c.width,c.height); return c.toDataURL("image/jpeg",.85).split(",")[1]; } finally{ URL.revokeObjectURL(u); } }
+  if(!window.pdfjsLib) await load(PDFJS); pdfjsLib.GlobalWorkerOptions.workerSrc=WORKER;
+  const pdf=await pdfjsLib.getDocument({data:await file.arrayBuffer()}).promise, pg=await pdf.getPage(1), v0=pg.getViewport({scale:1}), sc=Math.min(3,2600/Math.max(v0.width,v0.height)), v=pg.getViewport({scale:sc}), c=document.createElement("canvas"); c.width=v.width; c.height=v.height;
+  await pg.render({canvasContext:c.getContext("2d"),viewport:v}).promise; return c.toDataURL("image/jpeg",.85).split(",")[1]; }
+async function viaAI(file,kind){
+  const sb=window.QP&&QP.sb; if(!sb) throw new Error("not_signed_in");
+  const { data:{ session } }=await sb.auth.getSession(); if(!session) throw new Error("not_signed_in");
+  const r=await fetch("/api/ppap-read",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+session.access_token},body:JSON.stringify({kind,mime:"image/jpeg",data:await sheetJpeg(file),hint:file.name})});
+  const j=await r.json().catch(()=>({})); if(!r.ok||!j.result) throw new Error(j.error||"AI reading failed");
+  return j.result; }
+function aiDims(chars){ const f=n=>Math.round(n*1e4)/1e4, num=v=>(typeof v==="number"&&isFinite(v)); return (chars||[]).filter(c=>c&&c.desc).map(c=>{ const kind=["dia","lin","ra","thr","ang","gdt"].includes(c.kind)?c.kind:"lin", nom=num(c.nom)?c.nom:"", up=num(c.tolUpper)?c.tolUpper:null, lo=num(c.tolLower)?c.tolLower:null;
+  const tol=up==null&&lo==null?(c.text||""):(up!=null&&lo!=null&&Math.abs(up)===Math.abs(lo)?"±"+Math.abs(up):(up>0?"+":"")+(up==null?0:up)+"/"+(lo>0?"+":"")+(lo==null?0:lo));
+  return {kind,nom,tol:kind==="thr"||kind==="gdt"?(c.text||tol):tol,lsl:(nom!==""&&lo!=null)?f(nom+lo):"",usl:kind==="ra"?(up==null?(nom===""?"":nom):up):(nom!==""&&up!=null?f(nom+up):""),cls:/^(KC|SC|CC)$/i.test(c.cls||"")?c.cls.toUpperCase():"-",method:c.method||"",op:String(c.op||"").replace(/\D/g,""),desc:String(c.desc).slice(0,80)+(kind==="dia"&&nom!==""&&!/[Ø⌀]/.test(c.desc)?" Ø"+nom:"")}; }); }
 const clean=s=>String(s||"").replace(/\s+/g," ").trim();
 function after(L,labels,stop){ // value following a title-block label, same line or the next item
   for(let i=0;i<L.length;i++){ for(const lb of labels){ const m=L[i].match(new RegExp("(?:^|\\s)"+lb+"\\s*[:.\\-–]?\\s*(.*)$","i")); if(m){ let v=clean(m[1]); if(v&&!(stop&&stop.test(v))) return v; if(L[i+1]&&!(stop&&stop.test(L[i+1]))) return clean(L[i+1]); } } } return ""; }
+let D_AIFAIL="";
 const NUM="(\\d+(?:\\.\\d+)?)";
 /* dimensions with tolerance found in the drawing text */
 function dims(L){
@@ -57,7 +74,9 @@ function dims(L){
   return out; }
 function describe(d,i,all){ const n=all.filter(x=>x.kind===d.kind).indexOf(d)+1;
   return d.kind==="dia"?"Diameter Ø"+d.nom+(n>1?" ("+n+")":""):d.kind==="ra"?"Surface finish Ra "+d.nom:d.kind==="thr"?"Thread "+d.tol:"Dimension "+d.nom+(n>1?" ("+n+")":""); }
-async function readCustomer(file,say){
+async function readCustomer(file,say,mode){
+  if(mode!=="ocr"){ try{ say&&say("Reading "+file.name+" with AI…"); const a=await viaAI(file,"customer"), h=a.header||{}, g={}; ["partNo","supplierPartNo","partName","drawingNo","rev","customer","material","weight"].forEach(k=>{ if(h[k]) g[k]=String(h[k]); });
+      return {header:g,dims:aiDims(a.characteristics),lineCount:1,lines:[],viaAI:true}; }catch(e){ if(mode==="ai") throw e; D_AIFAIL=e.message; } }
   let L=[], bal=null; try{ L=lines(await pdfText(file)); }catch(e){}
   if(L.length<12){ bal=await viaBalloon(file,say); L=lines([{items:bal.words}]); }
   const all=L.join(" | "), g={};
@@ -71,7 +90,9 @@ async function readCustomer(file,say){
   let ds; if(bal){ ds=itemsToDims(bal.items); Object.keys(bal.header||{}).forEach(k=>{ if(bal.header[k]&&["partNo","partName","drawingNo","rev","customer","material"].includes(k)) g[k]=bal.header[k]; }); if(!g.rev&&bal.header.rev) g.rev=bal.header.rev; }
   else { ds=dims(L); ds.forEach((d,i)=>d.desc=describe(d,i,ds)); }
   return {header:g,dims:ds,lineCount:L.length||1,lines:L,viaOcr:!!bal}; }
-async function readProcess(file,say){
+async function readProcess(file,say,mode){
+  if(mode!=="ocr"&&!D_AIFAIL){ try{ say&&say("Reading "+file.name+" with AI…"); const a=await viaAI(file,"process"), o=a.operation||{}, nm=file.name.replace(/\.[^.]+$/,""), fno=(nm.match(/OP[\s_\-]*(\d+)/i)||[])[1]||"", no=String(o.opNo||fno||"").replace(/\D/g,"");
+      return {lines:[],no:no?String(+no):"",name:String(o.opName||("Operation "+no)).slice(0,80),machine:String(o.machine||"").slice(0,60),fixture:o.fixture||"",dims:aiDims(a.characteristics).map(d=>(d.op=d.op||no,d)),file:file.name,header:a.header||{},viaAI:true}; }catch(e){ if(mode==="ai") throw e; D_AIFAIL=e.message; } }
   const nm=file.name.replace(/\.[^.]+$/,""); let opNo=(nm.match(/OP[\s_\-]*(\d+)/i)||[])[1]||"";
   let L=[], bal=null; try{ L=lines(await pdfText(file)); }catch(e){}
   if(L.length<12){ bal=await viaBalloon(file,say); L=lines([{items:bal.words}]); }
@@ -84,27 +105,31 @@ async function readProcess(file,say){
   if(!name) name=mach&&!/^(manual|na|n\/a)$/i.test(mach)?mach+" operation":"Operation "+opNo;
   let ds; if(bal) ds=itemsToDims(bal.items); else { ds=dims(L); ds.forEach((d,i)=>d.desc=describe(d,i,ds)); }
   return {lines:L,no:opNo?String(+opNo):"",name:clean(name).slice(0,80),machine:clean(mach).replace(/^(na|n\/a)$/i,""),dims:ds,file:file.name}; }
-async function analyze({customer,process,say}){
+async function analyze({customer,process,say,mode,report}){
+  D_AIFAIL="";
   const D={header:{},chars:[],ops:[],notes:[]};
-  if(customer){ const c=await readCustomer(customer,say); D.header=c.header;
+  if(report){ const h=report.header||{}, g={}; ["partNo","partName","drawingNo","rev","customer","material"].forEach(k=>{ if(h[k]) g[k]=String(h[k]); }); const dm=itemsToDims(report.items||[]); dm.forEach(d=>{ if(!d.method) d.method=""; }); customer=null; var _rep={header:g,dims:dm,lineCount:1,lines:[],viaReport:true}; }
+  if(customer||_rep){ const c=_rep||await readCustomer(customer,say,mode); D.header=c.header;
     const meth=d=>d.method||(d.kind==="ra"?"Surface roughness tester":d.kind==="thr"?"Thread plug gauge":d.kind==="dia"?"Digital vernier / bore gauge":"Digital vernier caliper");
-    c.dims.forEach((d,i)=>D.chars.push({no:String(i+1),desc:d.desc,nom:d.nom,tol:d.tol,lsl:d.lsl,usl:d.usl,cls:d.cls||"-",method:meth(d),kind:d.kind}));
-    D.customerLines=c.lines;
+    c.dims.forEach((d,i)=>D.chars.push({no:String(i+1),desc:d.desc,nom:d.nom,tol:d.tol,lsl:d.lsl,usl:d.usl,cls:d.cls||"-",method:meth(d),kind:d.kind,op:d.op||""}));
+    D.customerLines=c.lines; D.source=c.viaAI?"AI":c.viaReport?"Balloon report":c.viaOcr?"OCR":"PDF text";
     if(!c.lineCount) D.notes.push("The customer drawing has no readable text (scanned image). Open it in Balloon Inspector to read the dimensions, then add them here."); else if(!c.dims.length) D.notes.push("No dimensions with tolerances were found in the customer drawing. Add the characteristics below."); }
-  const ops=[]; for(const f of (process||[])) ops.push(await readProcess(f,say));
+  const ops=[]; for(const f of (process||[])) ops.push(await readProcess(f,say,mode));
+  ops.forEach(o=>{ const h=o.header||{}; ["partNo","supplierPartNo","partName","material","rev","customer"].forEach(k=>{ if(h[k]&&!D.header[k]) D.header[k]=String(h[k]); }); delete o.header; });
   const pl=ops.flatMap(o=>o.lines||[]).join(" | "), H=D.header, fill=(k,v)=>{ if(v&&!H[k]) H[k]=clean(v); };
   const cpn=(pl+" "+(D.customerLines||[]).join(" ")).match(/\b(NX\d{6}|[A-Z]{2}\d{7})\b/); if(cpn&&H.partNo!==cpn[1]){ const dn=H.partNo; H.partNo=cpn[1]; if(dn&&!H.supplierPartNo) H.supplierPartNo=dn; }
   fill("supplierPartNo",(pl.match(/Deno\s*Part\s*No\.?:?\s*([A-Z]{1,3}-?[A-Z]{0,3}-?[A-Z0-9]{3,6})/i)||[])[1]);
   const pn=(pl.match(/Part\s*\\?\w{2,4}\s*:\s*([A-Z][A-Z ]{5,28}[A-Z])\b/)||[])[1]; if(pn&&(!H.partName||H.partName.length<5||!/[A-Z]{3}/.test(H.partName))) H.partName=clean(pn.replace(/\s+(Operation|Work|Cus).*$/i,"")).replace(/\b(\w)(\w*)/g,(m,a,b)=>a+b.toLowerCase());
   fill("material",(pl.match(/\b(SAE\s*\d{3,4}|EN\s*\d{1,2}|10C4|C\d{2}\b)/i)||[])[1]);
   fill("rev",(pl.match(/Cus\s*Rev\s*\\?\w{0,2}:?\s*([0-9]{1,2}\s?[a-zA-Z]?)\b/)||[])[1]);
-  if(customer){ const base=customer.name.replace(/\.[^.]+$/,""); if(!H.drawingNo||H.drawingNo===base||H.drawingNo.includes(base)) H.drawingNo=H.partNo||""; }
+  if(customer&&customer.name){ const base=customer.name.replace(/\.[^.]+$/,""); if(!H.drawingNo||H.drawingNo===base||H.drawingNo.includes(base)) H.drawingNo=H.partNo||""; }
   if(H.rev&&!/^[A-Za-z]?\d{1,2}\s?[a-zA-Z]?$/.test(H.rev)) H.rev="";
   ops.sort((a,b)=>(+a.no||999)-(+b.no||999)); D.ops=ops.map(o=>({no:o.no,name:o.name,machine:o.machine,file:o.file,dims:o.dims,lines:o.lines}));
   /* a dimension in a process drawing that is not on the customer drawing is added as a process characteristic */
-  D.ops.forEach(o=>{ o.dims.forEach(d=>{ if(!D.chars.some(c=>c.nom===d.nom&&c.lsl===d.lsl&&c.usl===d.usl&&c.kind===d.kind)){ if(!customer) D.chars.push({no:String(D.chars.length+1),desc:d.desc,nom:d.nom,tol:d.tol,lsl:d.lsl,usl:d.usl,cls:"-",method:"Digital vernier caliper",kind:d.kind,op:o.no}); } }); });
+  D.ops.forEach(o=>{ o.dims.forEach(d=>{ if(!D.chars.some(c=>c.nom===d.nom&&c.lsl===d.lsl&&c.usl===d.usl&&c.kind===d.kind)){ if(!customer&&!report) D.chars.push({no:String(D.chars.length+1),desc:d.desc,nom:d.nom,tol:d.tol,lsl:d.lsl,usl:d.usl,cls:"-",method:"Digital vernier caliper",kind:d.kind,op:o.no}); } }); });
   D.chars.forEach(c=>{ if(!c.op){ const o=D.ops.find(o=>o.dims.some(d=>d.nom===c.nom&&d.lsl===c.lsl&&d.usl===c.usl&&d.kind===c.kind)); c.op=o?o.no:""; } });
   D.ops.forEach(o=>{ delete o.dims; });
+  if(D_AIFAIL) D.notes.unshift(D_AIFAIL==='not_configured'?'AI reading is not switched on yet on this server, so the free reader was used (less accurate).':D_AIFAIL==='not_signed_in'?'Sign in to use AI reading; the free reader was used (less accurate).':'AI reading was not available ('+D_AIFAIL+'); the free reader was used (less accurate).');
   D.chars.forEach((c,i)=>c.no=String(i+1));
   return D; }
 window.PPAPAnalyze={analyze};
