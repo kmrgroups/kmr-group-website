@@ -371,9 +371,9 @@
   const NT_ROWS = [
     ["mail", "digest", "Daily management report", "KPIs and dashboards of all apps", "08:20", [1, 2, 3, 4, 5, 6]],
     ["mail", "finance", "Finance report", "Sales, receivables, payables, cash (Profit & Loss admins only)", "09:00", [1, 2, 3, 4, 5, 6]],
-    ["telegram", "evening", "Evening unit report", "Customer schedule, raw material stock, work in progress (pictures)", "19:30", [1, 2, 3, 4, 5, 6, 7]],
-    ["telegram", "sales", "Product wise sales report", "Day's invoices part by part with tax (picture)", "19:30", [1, 2, 3, 4, 5, 6, 7]],
-    ["whatsapp", "evening", "Evening unit report", "Same pictures, for people who have not linked Telegram", "19:30", [1, 2, 3, 4, 5, 6, 7]]];
+    ["telegram", "evening", "Evening unit report", "Customer schedule, raw material stock, work in progress (pictures)", "09:30", [1, 2, 3, 4, 5, 6, 7]],
+    ["telegram", "sales", "Product wise sales report", "Day's invoices part by part with tax (picture)", "09:30", [1, 2, 3, 4, 5, 6, 7]],
+    ["whatsapp", "evening", "Evening unit report", "Same pictures, for people who have not linked Telegram", "09:30", [1, 2, 3, 4, 5, 6, 7]]];
   const NT_CH = { mail: ["Mail", "Sent to e-mail addresses."], telegram: ["Telegram", "Sent as pictures to people who linked Telegram and to the unit's Telegram group."], whatsapp: ["WhatsApp", "Sent as pictures to mobile numbers of people who have not linked Telegram."] };
   const NT_PARTS = {
     digest: DG_SECTIONS.map((x) => [x[0], x[2].split(" (")[0]]),
@@ -508,11 +508,11 @@
     };
   }
 
-  // ---- WhatsApp evening report (7:30 pm): switch on / off, and for every person which units and which sheets they receive (company administrators map; unit administrators switch their unit) ----
+  // ---- WhatsApp evening report: switch on / off, and for every person which units and which sheets they receive (company administrators map; unit administrators switch their unit) ----
   const WA_SHEETS = [["dispatch", "Dispatch", "Sales value, invoices & dispatch status"], ["customer", "Customer", "Customer-wise schedule"], ["slug", "Slug", "Forging slug stock"], ["rm", "RM", "Daily raw material stock"], ["wip", "WIP", "Stage-wise stock"]];
   async function waView() {
     setView("wa");
-    const m = mainEl(), T0 = "WhatsApp evening report", S0 = "Every day at 7:30 pm the unit's sales value (plan, done, pending), today's invoices, dispatch status, customer-wise schedule, raw material / forging slug stock and stage-wise stock go on WhatsApp as clear pictures, one message per sheet. Choose who receives which unit and which sheets.";
+    const m = mainEl(), T0 = "WhatsApp evening report", S0 = "At the time set in Notification settings the unit's sales value (plan, done, pending), today's invoices, dispatch status, customer-wise schedule, raw material / forging slug stock and stage-wise stock go on WhatsApp as clear pictures, one message per sheet. Choose who receives which unit and which sheets.";
     m.innerHTML = adminHead(T0, S0) + `<p class="msg">Loading…</p>`; bindBack();
     const { data: g, error } = await sb.rpc("kmr_wa_get", { p_slug: SLUG });
     if (error) { m.querySelector(".msg").textContent = error.message; return; }

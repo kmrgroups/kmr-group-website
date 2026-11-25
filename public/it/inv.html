@@ -229,7 +229,7 @@ function drawSet(){const s=sett(),ro=isAdmin()?'':'disabled',f=(k,l,t)=>`<div><l
 document.addEventListener('input',e=>{const t=e.target;if(t.dataset.s){S.sv=S.sv||{};S.sv[t.dataset.s]=t.value}});
 
 
-/* ---------- Sales report: Product wise sales report of one day (same layout as the ERP report), chosen recipients, daily 7:30 pm Telegram picture ---------- */
+/* ---------- Sales report: Product wise sales report of one day (same layout as the ERP report), chosen recipients, daily Telegram picture ---------- */
 async function srLoad(day){S.sr=await call('kmr_inv_sr_get',{p_day:day||(S.sr&&S.sr.day)||td()})}
 function drawSr(){const r=S.sr,ad=isAdmin(),rows=r.rows||[],g=new Map();rows.forEach(x=>{const k=x.buyer||'—';if(!g.has(k))g.set(k,[]);g.get(k).push(x)});
   const sum=(a)=>a.reduce((t,x)=>({q:t.q+Number(x.qty),n:t.n+Number(x.net),c:t.c+Number(x.cgst),s:t.s+Number(x.sgst),i:t.i+Number(x.igst)}),{q:0,n:0,c:0,s:0,i:0}),gr=(t)=>t.n+t.c+t.s+t.i,T=sum(rows);
@@ -239,9 +239,9 @@ function drawSr(){const r=S.sr,ad=isAdmin(),rows=r.rows||[],g=new Map();rows.for
   <h3 style="margin:6px 0">${esc((r.unit||'').replace('‑','-'))} · Product wise sales report · ${dmy(r.day)}</h3>
   <div class="kp"><div style="--c:#0891b2"><span class="mut">Net sales</span><b>${n2(T.n)}</b></div><div><span class="mut">CGST</span><b>${n2(T.c)}</b></div><div><span class="mut">SGST</span><b>${n2(T.s)}</b></div><div><span class="mut">IGST</span><b>${n2(T.i)}</b></div><div style="--c:#16a34a"><span class="mut">Gross sales</span><b>${n2(gr(T))}</b></div></div>
   ${rows.length?`<div class="sc"><table class="lt"><thead><tr><th>Part No</th><th>Part Name</th><th>HSN/SAC</th><th class="num">Qty</th><th class="num">Net Sales</th><th class="num">CGST</th><th class="num">SGST</th><th class="num">IGST</th><th class="num">Gross Sales</th></tr></thead><tbody>${body}</tbody></table></div>`:'<p class="mut">No invoice issued on this date.</p>'}
-  <div class="box"><h3>Daily 7:30 pm Telegram picture</h3>
-  <p class="note">Every day at 7:30 pm the report above (that day's issued invoices) goes out as a clear picture on Telegram to the sales group (everyone in that group receives it).</p>
-  <label class="seg" style="display:inline-flex;margin-bottom:8px"><input type="checkbox" id="sren" ${r.enabled?'checked':''} ${ad?'':'disabled'} style="width:auto"> Send automatically every day at 7:30 pm</label>
+  <div class="box"><h3>Daily Telegram picture</h3>
+  <p class="note">At the time set in Notification settings the report above (that day's issued invoices) goes out as a clear picture on Telegram to the sales group (everyone in that group receives it).</p>
+  <label class="seg" style="display:inline-flex;margin-bottom:8px"><input type="checkbox" id="sren" ${r.enabled?'checked':''} ${ad?'':'disabled'} style="width:auto"> Send automatically at the time set in Notification settings</label>
   <p class="note"><b>Telegram group:</b> ${r.group?`linked (${esc(r.group.title||'group')})`:'not linked. Add @Esbeereportsbot to the sales group, then an administrator who has linked the bot types <b>/sales</b> in the group (one group for all units).'}</p>
   ${ad?'<div class="row"><button class="btn" data-a="srsave">Save</button></div>':'<p class="mut">Only an administrator can change this.</p>'}</div>`;
   $('#srd').onchange=async e=>{try{await srLoad(e.target.value);drawSr()}catch(x){say(x.message)}}}
