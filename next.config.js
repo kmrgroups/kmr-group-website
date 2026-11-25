@@ -51,6 +51,9 @@ const nextConfig = {
     return [
       { source: "/it/hrm", destination: "/it/hrm.html", permanent: false },
       { source: "/it/console.html", destination: "/it/console", permanent: false },
+      // people type /login: take them to the sign-in of the KMR apps
+      { source: "/login", destination: "/it/apps.html", permanent: false },
+      { source: "/signin", destination: "/it/apps.html", permanent: false },
       // older addresses of the website
       { source: "/verticals", destination: "/businesses", permanent: true },
       { source: "/products", destination: "/shop", permanent: true },
