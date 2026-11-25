@@ -71,8 +71,7 @@
       const back = portal && portal.slug ? '<a class="kmr-back" href="/it/app/' + encodeURIComponent(portal.slug) + '">← ' + (portal.name ? String(portal.name).replace(/[<>&]/g, "") + " · " : "") + 'KMR Apps</a>' : "";
       f.innerHTML = '<span class="kmr-slot">' + back + '</span><span>Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></span><span class="kmr-slot" style="justify-content:flex-end" id="kmrPlant"></span>';
       document.body.append(f);
-      // Plant switcher (customers with more than one plant): same app, same screen, another plant's data
-      if (kmrPlants().length > 1) f.querySelector("#kmrPlant").append(plantSelect());
+      // the plant dropdown lives in the title bar (one only); the footer keeps the plain plant name
     }
     /* The plant / unit being worked in, shown in the title bar of every app (same text as the plant switcher in the footer) */
     (function plantInTitle(again) {
@@ -94,6 +93,7 @@
       document.head.append(css2);
       const put = () => {
         const h = document.querySelector("header"); if (!h) return;
+        if (window.__kmrOwnPlant) { h.querySelectorAll(".kmr-plant").forEach((x) => x.remove()); return; }   // the screen has its own plant dropdown
         let c = h.querySelector(".kmr-plant");
         if (!c) { c = document.createElement("span"); c.className = "kmr-plant"; c.id = "kmrPlantChip"; let an = h.querySelector("h1,h2,.title,.brand"); while (an && an.parentElement !== h) an = an.parentElement; if (an) h.insertBefore(c, an.nextSibling); else h.insertBefore(c, h.children[1] || null); }
         if (pl.length > 1 && sp.get("scope") !== "all") { if (!c.querySelector("select")) { c.textContent = ""; c.append(plantSelect()); c.title = esc(tip); } return; }

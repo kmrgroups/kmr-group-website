@@ -982,17 +982,18 @@ document.addEventListener('change', e => {
 let PLANTS0 = [];
 function plantPicker() {
   if (PLANTS0.length < 2) return;
-  const sel = document.createElement('select'); sel.title = 'Plant'; sel.style.cssText = 'padding:5px 8px;border-radius:8px;font-weight:600';
+  const sel = document.createElement('select'); sel.title = 'Plant: switch to another unit on this same screen'; sel.className = 'kmr-own'; sel.style.cssText = 'padding:5px 8px;border-radius:8px;font-weight:600;color:#0f172a;background:#fff';
   const opts = PLANTS0.map(x => `<option value="${esc(x.slug)}" ${!ALL && x.slug === slug ? 'selected' : ''}>${esc(x.is_main ? 'Main' : x.plant_code)} · ${esc(String(x.name).split(' – ').pop())}</option>`);
   opts.push(`<option value="__all" ${ALL ? 'selected' : ''}>All plants · summary</option>`);
   sel.innerHTML = opts.join('');
   sel.onchange = () => {
-    const u = new URL(location.href); u.hash = '';
+    const u = new URL(location.href); u.hash = (sel.value === '__all') ? '' : location.hash;   // another unit opens on the same screen
     if (sel.value === '__all') { u.searchParams.set('scope', 'all'); } else { u.searchParams.delete('scope'); u.searchParams.set('co', sel.value); }
     try { const pp = JSON.parse(localStorage.getItem('kmr-portal') || 'null'); const to = PLANTS0.find(x => x.slug === sel.value); if (pp && to) { pp.slug = to.slug; pp.name = to.name; localStorage.setItem('kmr-portal', JSON.stringify(pp)); } } catch (e) {}
     location.href = u.toString();
   };
   document.querySelector('header .sp').after(sel);
+  window.__kmrOwnPlant = 1; document.querySelectorAll('.kmr-plant').forEach(x => x.remove());   // this screen has its own plant dropdown: show only one
 }
 
 /* ======== start ======== */
