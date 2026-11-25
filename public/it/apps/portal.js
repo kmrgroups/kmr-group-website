@@ -402,7 +402,7 @@
           <div class="nt-days" ${fq === "weekly" ? "" : "hidden"}>${NT_DAYS.map(([n, d]) => `<label><input type="checkbox" class="nt-d" value="${n}" ${days.includes(n) ? "checked" : ""}><span>${d}</span></label>`).join("")}</div>
           <div class="nt-md" ${fq === "monthly" ? "" : "hidden"}>on day <input type="number" class="nt-mdv" min="1" max="28" value="${esc(md)}"></div></div>
         <div class="nt-tm"><input type="time" class="nt-time" value="${esc(tm)}" step="900"></div>
-        <div class="nt-sm"><button class="btn ghost nt-send" type="button">✉ Send sample</button>${c === "telegram" && g.group ? `<select class="nt-target" title="Where the sample goes"><option value="me">to me</option><option value="group">to the unit group</option></select>` : ""}<small class="nt-res"></small></div></div>`;
+        <div class="nt-sm"><button class="btn ghost nt-send" type="button">✉ Send sample</button>${c !== "mail" && pp.length ? `<select class="nt-target" title="Who receives the sample">${[...pp].sort((a, b) => (a.key === "group") - (b.key === "group")).map((x) => `<option value="${esc(x.key)}">to ${esc(x.name)}</option>`).join("")}</select>` : ""}<small class="nt-res"></small></div></div>`;
     };
     const sect = (c) => `<h3 class="nt-h">${NT_CH[c][0]} <small>${NT_CH[c][1]}</small></h3><div class="nt-head"><span>Send</span><span>Report</span><span>Who gets it</span><span>How often</span><span>Time (India)</span><span>Sample</span></div>${NT_ROWS.filter((x) => x[0] === c).map(row).join("")}`;
     m.innerHTML = adminHead(T0, S0) + `<style>
@@ -431,7 +431,7 @@
       try {
         const ss = await sb.auth.getSession(), tk = ss && ss.data && ss.data.session && ss.data.session.access_token, tg = r.querySelector(".nt-target");
         const url = c === "mail" ? (rp === "digest" ? "/it/console/api/digest/test" : "/it/console/api/finance/test") : "/it/console/api/notif/sample";
-        const body = c === "mail" ? { slug: SLUG, parts } : { slug: SLUG, report: rp, channel: c, parts, target: tg ? tg.value : "me" };
+        const body = c === "mail" ? { slug: SLUG, parts } : { slug: SLUG, report: rp, channel: c, parts, target: tg ? tg.value : "" };
         const x = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", Authorization: "Bearer " + (tk || "") }, body: JSON.stringify(body) });
         const j = await x.json().catch(() => ({}));
         if (!x.ok || !j.ok) throw new Error(j.error || "The sample could not be sent.");
