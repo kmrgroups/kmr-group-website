@@ -56,7 +56,17 @@
       if (!slug) throw new Error("Open this app from your company’s KMR Apps page.");
     }
     ctx = ctxFn ? await call(ctxFn, {}) : await call("kmr_qp_context", { p_code: code });
-    if (!ctx) throw new Error("You do not have access to this app, or the subscription is not active.");
+    if (!ctx) {
+      // signed in, but this account has no access here: say who is signed in and let the person switch account (no dead end)
+      if (!DEMO && sb) { let em = ""; try { em = (((await sb.auth.getSession()).data || {}).session || {}).user.email || ""; } catch (e) { /* ignore */ }
+        const v = document.createElement("div");
+        v.setAttribute("style", "position:fixed;inset:0;z-index:9500;display:grid;place-items:center;background:rgba(10,7,32,.72);padding:18px;font:15px/1.5 Segoe UI,Arial,sans-serif");
+        v.innerHTML = '<div style="background:#fff;border-radius:16px;max-width:420px;width:100%;padding:22px;color:#16233A"><h3 style="margin:0 0 8px;font-size:20px">No access with this account</h3><p style="margin:0 0 6px">You are signed in as <b>' + String(em).replace(/[<>&]/g, "") + '</b>.</p><p style="margin:0 0 16px;color:#4b5a73">This account cannot open this screen for this unit. Sign in with the account that has access.</p><button id="qpsw" style="width:100%;border:0;border-radius:12px;padding:13px;font:700 15px inherit;color:#fff;background:#0E7490;cursor:pointer;margin-bottom:10px">Sign in with another account</button><a href="/it/apps.html" style="display:block;text-align:center;padding:10px;color:#0E7490;font-weight:600">Open my KMR apps</a></div>';
+        document.body.append(v);
+        document.getElementById("qpsw").onclick = function () { if (window.KMR_SSO) KMR_SSO.toPortal(null, { signin: true }); else { for (let i = localStorage.length - 1; i >= 0; i--) { const k = localStorage.key(i); if (/^sb-.+-auth-token$/.test(k)) localStorage.removeItem(k); } location.href = "/it/apps.html?open=" + code; } };
+        return null; }
+      throw new Error("You do not have access to this app, or the subscription is not active.");
+    }
     canEdit = ["admin", "editor"].includes(ctx.role);
     $("#co").textContent = ctx.company; $("#role").textContent = ctx.role; showBrand();
     if (window.KMRLock && window.QP_LOCKS && !DEMO) await KMRLock.init(sb, slug, code, QP_LOCKS.map, QP_LOCKS.names);
