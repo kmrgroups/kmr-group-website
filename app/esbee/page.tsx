@@ -11,7 +11,7 @@ const PHONE = "+91 99942 69441";
 const PHONE_LINK = "tel:+919994269441";
 const EMAIL = "rajavelu@nerigroup.in";
 
-const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Capabilities", "#capabilities"], ["Tolerances", "#tolerances"], ["Products", "#products"], ["How we work", "#process"], ["Digital", "#digital"], ["Quality", "#quality"], ["Awards", "#awards"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
+const NAV = [["About", "#about"], ["Leadership", "#leadership"], ["Parts", "#parts"], ["Products", "#products"], ["Machines", "#machines"], ["Inspection", "#inspection"], ["Quality", "#quality"], ["Capabilities", "#capabilities"], ["Tolerances", "#tolerances"], ["How we work", "#process"], ["Digital", "#digital"], ["Awards", "#awards"], ["Plants", "#plants"], ["Customers", "#customers"], ["Contact", "#rfq"]];
 
 const STATS: [string, string][] = [["90+", "CNC machines across three owned units"], ["2 × 400 t", "In-house pressure die casting"], ["1998", "Supplying Bosch since"], ["IATF", "16949 automotive quality system"]];
 
@@ -40,19 +40,20 @@ const PLANTS: { n: string; role: string; a: string; img?: string; bbox: string }
 ];
 
 const LEADERS: [string, string, string, string][] = [
-  ["Mr. Shyam B Baglani", "Founder", "shyam", "Founded Esbee Precision Industries and built it into a Bengaluru manufacturer of precision machined and die cast components. His focus on dependable quality and long customer relationships is the reason Esbee has supplied Bosch since 1998."],
-  ["Mr. Sunil Baglani", "Co-Founder", "sunil", "Co-founder of Esbee Precision Industries. Together with the founder he has helped grow the company from a single unit to three company-owned plants, keeping the shop floor, tooling and supply commitments running to customer expectations."],
+  ["Mr. Shyam B Baglani (late)", "Founder", "shyam", "A veteran designer at HMT, he founded Esbee Precision Industries and built it into a Bengaluru manufacturer of precision turned and machined components. His focus on dependable quality and long customer relationships is the reason Esbee has supplied Bosch since 1998."],
+  ["Mr. Sunil Baglani", "Co-Founder", "sunil", "Co-founder of Esbee Precision Industries. He established the die casting division and, together with the founder, helped grow the company from a single unit to three company-owned plants, keeping the shop floor, tooling and supply commitments running to customer expectations."],
   ["Mr. Rishab Baglani", "Managing Director", "rishab", "Leads the company as Managing Director, driving quality systems, new-part launches and the digital tracking of production and reports across all three units, so customers get consistent quality and transparent delivery."],
   ["Mrs. Shanthi Baglani", "Managing Partner", "shanthi", "Managing Partner of Esbee Precision Industries, a partnership firm that owns and runs three plants in Bengaluru. She takes part in the firm's direction and governance, supporting the team in keeping quality, delivery and customer commitments on track."],
 ];
 
 const CUSTOMERS: [string, string, number, number][] = [["Bosch", "bosch", 600, 137], ["Magna", "magna", 600, 130], ["SEG Automotive", "seg", 600, 179], ["Bosch Rexroth", "rexroth", 188, 86], ["Parker", "parker", 200, 87], ["Maini", "maini", 138, 138]];
+const EXTRA_CUSTOMERS = ["ADVIK"];
 
 const MACHINES: [string, string][] = [["CNC turn-mill centres", "cnc-turn-mill"], ["Horizontal and vertical machining centres", "hmc-vmc"], ["Multi-spindle automats", "multi-spindle"], ["Deep hole (gun) drilling", "deep-hole-drilling"], ["Centreless grinding", "centreless-grinder"], ["Cylindrical grinding", "cylindrical-grinder"], ["Spline and thread rolling", "spline-roller"], ["Pressure die casting · Bühler, 400 t, parts up to 2.5 kg", "pdc-buhler"], ["Pressure die casting · Suzhou Sanji, 400 t, parts up to 2.5 kg", "pdc-suzhou"]];
 
 const QUAL_EQ: [string, string][] = [["Co-ordinate measuring machine", "cmm"], ["Roundness tester", "roundness"], ["Profile projector", "profile-projector"], ["Hardness tester", "hardness"], ["Height gauge", "height-gauge"], ["Surface roughness tester", "surface-tester"], ["Delta Vision measuring system", "delta-vision"]];
 
-const PARTS: [string, string][] = [["Pump plunger", "plunger"], ["Control sleeve", "control-sleeve"], ["Sleeve gear", "sleeve-gear"], ["Bushing", "bushing"], ["Drive shafts", "drive-shafts"], ["Aluminium die casting", "srec-casting"], ["Aluminium die casting", "def-casting"], ["End shield", "end-shield"], ["Rotor", "rotor"], ["Pump housing", "pump-housing"], ["Studs", "ic-studs"], ["Nozzle retaining nut", "nr-nut"], ["Precision turned part", "bosch-1"], ["Threaded fitting", "bosch-2"], ["Slotted bush", "bosch-3"]];
+const PARTS: [string, string][] = [["Pump plunger", "plunger"], ["Control sleeve", "control-sleeve"], ["Sleeve gear", "sleeve-gear"], ["Bushing", "bushing"], ["Drive shafts", "drive-shafts"], ["Slip ring end cover (SRE), aluminium die cast", "srec-casting"], ["Drive end frame (DEF), aluminium die cast", "def-casting"], ["End shield", "end-shield"], ["Rotor", "rotor"], ["Pump housing", "pump-housing"], ["Studs", "ic-studs"], ["Nozzle retaining nut", "nr-nut"], ["Precision turned part", "bosch-1"], ["Threaded fitting", "bosch-2"], ["Slotted bush", "bosch-3"]];
 
 const AWARDS: [string, string, string][] = [["SEG Automotive", "Overall performance award, 2018", "seg-2018-trophy"], ["Tyco Electronics", "Zero PPM supplier award, 2008", "tyco-2008"], ["Bosch / MICO", "Excellence award, 2003–04", "bosch-plaque"], ["CII–Bosch", "Cluster recognition", "cii-bosch-cluster"]];
 
@@ -208,7 +209,7 @@ export default function EsbeeHome() {
             <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: NAVY }}>A partnership-run manufacturer built on repeatable quality.</h2>
           </div>
           <div className="space-y-4 text-[15.5px] leading-relaxed text-slate-600">
-            <p>Esbee Precision Industries is a Bengaluru-based partnership firm making precision machined and aluminium pressure die cast components. We supply automotive fuel-system and electrical customers, as well as hydraulic and industrial customers, from three company-owned manufacturing units in Rajaji Nagar and Bommasandra, with Bosch as a core customer since 1998.</p>
+            <p>Esbee Precision Industries is a Bengaluru-based partnership firm manufacturing steel turned precision components, and die casting and machining of aluminium pressure die cast components. We supply automotive fuel-system and electrical customers, as well as hydraulic and industrial customers, from three company-owned manufacturing units in Rajaji Nagar and Bommasandra, with Bosch as a core customer since 1998.</p>
             <p>Our strength is the whole chain under one roof: die casting, CNC and VMC machining, washing, gauging, final inspection and dispatch. Production is planned and tracked in our own digital systems, so customers get consistent quality, clear traceability and dependable delivery.</p>
           </div>
         </section>
@@ -244,16 +245,16 @@ export default function EsbeeHome() {
           </div>
         </section>
 
-        {/* journey */}
-        <section className="py-20 text-white" style={{ background: NAVY }}>
+        {/* parts */}
+        <section id="parts" className="bg-slate-50 py-20">
           <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
-            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Our journey</p>
-            <h2 className="font-display text-3xl font-semibold sm:text-4xl">Milestones recognised by our customers.</h2>
-            <ol className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2 lg:grid-cols-4">
-              {MILESTONES.map(([y, t]) => (
-                <li key={y} className="p-7" style={{ background: "#0E2956" }}><div className="font-display text-3xl font-semibold">{y}</div><div className="mt-3 h-0.5 w-10" style={{ background: RED }} /><p className="mt-3 text-[14.5px] leading-relaxed text-white/75">{t}</p></li>
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Parts we make</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Machined and die cast components.</h2>
+            <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
+              {PARTS.map(([n, f]) => (
+                <figure key={f} className="border border-slate-200 bg-white"><div className="relative aspect-square bg-white"><Image src={`/esbee/parts/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 20vw, 50vw" className="object-contain p-2" /></div><figcaption className="border-t border-slate-100 px-3 py-2 text-[12.5px] font-medium text-slate-600">{n}</figcaption></figure>
               ))}
-            </ol>
+            </div>
           </div>
         </section>
 
@@ -265,6 +266,83 @@ export default function EsbeeHome() {
             {INDUSTRIES.map(([t, d]) => (
               <div key={t} className="border border-slate-200 border-t-4 bg-white p-7 shadow-sm" style={{ borderTopColor: RED }}><h3 className="text-lg font-semibold" style={{ color: NAVY }}>{t}</h3><p className="mt-3 text-[14.5px] leading-relaxed text-slate-600">{d}</p></div>
             ))}
+          </div>
+        </section>
+
+        {/* products */}
+        <section id="products" className="mx-auto max-w-[2400px] px-4 py-20 sm:px-6 lg:px-8 2xl:px-12">
+          <div className="grid gap-12 lg:grid-cols-[.8fr_1.2fr]">
+            <div>
+              <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Products</p>
+              <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: NAVY }}>Components we make every day.</h2>
+              <p className="mt-5 text-[15.5px] leading-relaxed text-slate-600">Built to customer drawings. If your part is not listed, send us the drawing — we will tell you honestly whether and how we can make it.</p>
+              <a href="#rfq" className="mt-7 inline-block rounded-sm px-6 py-3 text-sm font-semibold text-white" style={{ background: RED }}>Send a drawing</a>
+            </div>
+            <ul className="grid gap-px bg-slate-200 sm:grid-cols-2">
+              {PRODUCTS.map((p) => (
+                <li key={p} className="flex items-center gap-4 bg-white px-6 py-5 text-[15px] font-medium" style={{ color: NAVY }}>
+                  <span className="h-2.5 w-2.5 shrink-0" style={{ background: RED }} />{p}
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+
+        {/* machines */}
+        <section id="machines" className="mx-auto max-w-[2400px] px-4 py-20 sm:px-6 lg:px-8 2xl:px-12">
+          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Machines</p>
+          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Equipment on our shop floor.</h2>
+          <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">Turning, machining, gear shaping, broaching, grinding, polygon milling, spline and thread rolling, pressure die casting, hydraulic and pneumatic assembly, ECM deburring and gun drilling. Plating and heat treatment are done with approved partners.</p>
+          <ul className="mt-6 flex flex-wrap gap-3 text-[13px] font-medium" style={{ color: NAVY }}>{["90+ CNC machines", "10+ multi-spindle automats", "HMC and 8+ VMCs", "2 × 400 t pressure die casting", "2 cylindrical grinders + 1 centreless grinder"].map((t) => <li key={t} className="border border-slate-300 bg-white px-3.5 py-1.5">{t}</li>)}</ul>
+          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-3">
+            {MACHINES.map(([n, f]) => (
+              <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/machines/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3 text-[13.5px] font-medium" style={{ color: NAVY }}>{n}</figcaption></figure>
+            ))}
+          </div>
+        </section>
+
+        {/* inspection equipment */}
+        <section id="inspection" className="py-20 text-white" style={{ background: NAVY }}>
+          <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Inspection</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl">Inspection equipment.</h2>
+            <div className="mt-10 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
+              {QUAL_EQ.map(([n, f]) => (
+                <figure key={f} className="bg-white"><div className="relative aspect-square"><Image src={`/esbee/quality/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 14vw, 50vw" className="object-contain p-2" /></div><figcaption className="px-2 pb-2 text-center text-[12px] font-medium text-slate-700">{n}</figcaption></figure>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        {/* quality */}
+        <section id="quality" className="py-20 text-white" style={{ background: NAVY }}>
+          <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Quality</p>
+            <h2 className="max-w-3xl font-display text-3xl font-semibold leading-tight sm:text-4xl">Quality planned in, not inspected in.</h2>
+            <p className="mt-5 max-w-3xl text-[15.5px] leading-relaxed text-white/75">Our quality practices follow the core tools of the automotive quality system, and our customers audit and review our results regularly.</p>
+            <div className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2">
+              {QUALITY.map(([t, d]) => (
+                <div key={t} className="p-8" style={{ background: "#0E2956" }}>
+                  <div className="mb-3 h-0.5 w-10" style={{ background: RED }} />
+                  <h3 className="text-lg font-semibold">{t}</h3>
+                  <p className="mt-2 text-[14.5px] leading-relaxed text-white/70">{d}</p>
+                </div>
+              ))}
+            </div>
+            <div className="mt-16 grid gap-px bg-white/15 sm:grid-cols-2"><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">IATF 16949:2016</div><div className="mt-1 text-[13.5px] text-white/70">Automotive quality management system</div></div><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">ISO 14001:2015</div><div className="mt-1 text-[13.5px] text-white/70">Environmental management system</div></div></div>
+          </div>
+        </section>
+
+        {/* journey */}
+        <section className="py-20 text-white" style={{ background: NAVY }}>
+          <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
+            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Our journey</p>
+            <h2 className="font-display text-3xl font-semibold sm:text-4xl">Milestones recognised by our customers.</h2>
+            <ol className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2 lg:grid-cols-4">
+              {MILESTONES.map(([y, t]) => (
+                <li key={y} className="p-7" style={{ background: "#0E2956" }}><div className="font-display text-3xl font-semibold">{y}</div><div className="mt-3 h-0.5 w-10" style={{ background: RED }} /><p className="mt-3 text-[14.5px] leading-relaxed text-white/75">{t}</p></li>
+              ))}
+            </ol>
           </div>
         </section>
 
@@ -310,51 +388,6 @@ export default function EsbeeHome() {
           </div>
         </section>
 
-        {/* products */}
-        <section id="products" className="mx-auto max-w-[2400px] px-4 py-20 sm:px-6 lg:px-8 2xl:px-12">
-          <div className="grid gap-12 lg:grid-cols-[.8fr_1.2fr]">
-            <div>
-              <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Products</p>
-              <h2 className="font-display text-3xl font-semibold leading-tight sm:text-4xl" style={{ color: NAVY }}>Components we make every day.</h2>
-              <p className="mt-5 text-[15.5px] leading-relaxed text-slate-600">Built to customer drawings. If your part is not listed, send us the drawing — we will tell you honestly whether and how we can make it.</p>
-              <a href="#rfq" className="mt-7 inline-block rounded-sm px-6 py-3 text-sm font-semibold text-white" style={{ background: RED }}>Send a drawing</a>
-            </div>
-            <ul className="grid gap-px bg-slate-200 sm:grid-cols-2">
-              {PRODUCTS.map((p) => (
-                <li key={p} className="flex items-center gap-4 bg-white px-6 py-5 text-[15px] font-medium" style={{ color: NAVY }}>
-                  <span className="h-2.5 w-2.5 shrink-0" style={{ background: RED }} />{p}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </section>
-
-        {/* machines */}
-        <section id="machines" className="mx-auto max-w-[2400px] px-4 py-20 sm:px-6 lg:px-8 2xl:px-12">
-          <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Machines</p>
-          <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Equipment on our shop floor.</h2>
-          <p className="mt-4 max-w-3xl text-[15.5px] leading-relaxed text-slate-600">Turning, machining, gear shaping, broaching, grinding, polygon milling, spline and thread rolling, pressure die casting, hydraulic and pneumatic assembly, ECM deburring and gun drilling. Plating and heat treatment are done with approved partners.</p>
-          <ul className="mt-6 flex flex-wrap gap-3 text-[13px] font-medium" style={{ color: NAVY }}>{["90+ CNC machines", "10+ multi-spindle automats", "HMC and 8+ VMCs", "2 × 400 t pressure die casting", "2 cylindrical grinders + 1 centreless grinder"].map((t) => <li key={t} className="border border-slate-300 bg-white px-3.5 py-1.5">{t}</li>)}</ul>
-          <div className="mt-10 grid grid-cols-2 gap-5 lg:grid-cols-3">
-            {MACHINES.map(([n, f]) => (
-              <figure key={f} className="overflow-hidden border border-slate-200 bg-white"><div className="relative aspect-[4/3] bg-slate-100"><Image src={`/esbee/machines/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 25vw, 50vw" className="object-cover" /></div><figcaption className="px-4 py-3 text-[13.5px] font-medium" style={{ color: NAVY }}>{n}</figcaption></figure>
-            ))}
-          </div>
-        </section>
-
-        {/* parts */}
-        <section className="bg-slate-50 py-20">
-          <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
-            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em]" style={{ color: RED }}>Parts we make</p>
-            <h2 className="font-display text-3xl font-semibold sm:text-4xl" style={{ color: NAVY }}>Machined and die cast components.</h2>
-            <div className="mt-10 grid grid-cols-2 gap-5 sm:grid-cols-3 lg:grid-cols-5">
-              {PARTS.map(([n, f]) => (
-                <figure key={f} className="border border-slate-200 bg-white"><div className="relative aspect-square bg-white"><Image src={`/esbee/parts/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 20vw, 50vw" className="object-contain p-2" /></div><figcaption className="border-t border-slate-100 px-3 py-2 text-[12.5px] font-medium text-slate-600">{n}</figcaption></figure>
-              ))}
-            </div>
-          </div>
-        </section>
-
         {/* process */}
         <section id="process" className="bg-slate-50 py-20">
           <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
@@ -369,31 +402,6 @@ export default function EsbeeHome() {
         </section>
 
         <EsbeeDigital />
-
-        {/* quality */}
-        <section id="quality" className="py-20 text-white" style={{ background: NAVY }}>
-          <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
-            <p className="mb-3 text-[11.5px] font-semibold uppercase tracking-[0.24em] text-white/60">Quality</p>
-            <h2 className="max-w-3xl font-display text-3xl font-semibold leading-tight sm:text-4xl">Quality planned in, not inspected in.</h2>
-            <p className="mt-5 max-w-3xl text-[15.5px] leading-relaxed text-white/75">Our quality practices follow the core tools of the automotive quality system, and our customers audit and review our results regularly.</p>
-            <div className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2">
-              {QUALITY.map(([t, d]) => (
-                <div key={t} className="p-8" style={{ background: "#0E2956" }}>
-                  <div className="mb-3 h-0.5 w-10" style={{ background: RED }} />
-                  <h3 className="text-lg font-semibold">{t}</h3>
-                  <p className="mt-2 text-[14.5px] leading-relaxed text-white/70">{d}</p>
-                </div>
-              ))}
-            </div>
-            <h3 className="mt-16 text-lg font-semibold">Inspection equipment</h3>
-            <div className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
-              {QUAL_EQ.map(([n, f]) => (
-                <figure key={f} className="bg-white"><div className="relative aspect-square"><Image src={`/esbee/quality/${f}.jpg`} alt={n} fill sizes="(min-width:1024px) 14vw, 50vw" className="object-contain p-2" /></div><figcaption className="px-2 pb-2 text-center text-[12px] font-medium text-slate-700">{n}</figcaption></figure>
-              ))}
-            </div>
-            <div className="mt-12 grid gap-px bg-white/15 sm:grid-cols-2"><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">IATF 16949:2016</div><div className="mt-1 text-[13.5px] text-white/70">Automotive quality management system</div></div><div className="p-6" style={{ background: "#0E2956" }}><div className="font-display text-2xl font-semibold">ISO 14001:2015</div><div className="mt-1 text-[13.5px] text-white/70">Environmental management system</div></div></div>
-          </div>
-        </section>
 
         {/* awards */}
         <section id="awards" className="mx-auto max-w-[2400px] px-4 py-20 sm:px-6 lg:px-8 2xl:px-12">
@@ -430,9 +438,12 @@ export default function EsbeeHome() {
         <section id="customers" className="border-y border-slate-200 bg-slate-50 py-16">
           <div className="mx-auto max-w-[2400px] px-4 sm:px-6 lg:px-8 2xl:px-12">
             <p className="text-center text-[11.5px] font-semibold uppercase tracking-[0.24em] text-slate-500">Trusted by leading manufacturers</p>
-            <div className="mt-9 grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="mt-9 grid grid-cols-2 gap-px bg-slate-200 sm:grid-cols-3 lg:grid-cols-7">
               {CUSTOMERS.map(([n, f, w, h]) => (
                 <div key={f} className="flex h-28 items-center justify-center bg-white p-5"><Image src={`/esbee/logos/${f}.jpg`} alt={n} width={w} height={h} className="max-h-16 w-auto object-contain" /></div>
+              ))}
+              {EXTRA_CUSTOMERS.map((n) => (
+                <div key={n} className="flex h-28 items-center justify-center bg-white p-5 font-display text-2xl font-bold tracking-[0.12em]" style={{ color: NAVY }}>{n}</div>
               ))}
             </div>
           </div>
