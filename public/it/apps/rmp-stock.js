@@ -12,8 +12,15 @@
     S.el = el; S.month = month;
     S.d = await call("kmr_rm_month", { p_month: month });
     if (S.sel && !S.d.materials.some((m) => m.code === S.sel)) S.sel = null;
-    await paint();
+    await paint(); syncOpen();
   }
+
+  /* the browser can put back an old value in a typed box after a page refresh (it remembers what the box held last time): the saved opening stock always wins */
+  function syncOpen() {
+    const put = () => document.querySelectorAll("td[data-op] input.opin").forEach((i) => { if (document.activeElement === i) return; const v = Number(i.closest("td").dataset.v); if (num(i.value) !== v) i.value = n(v); });
+    put(); [150, 600, 1500, 3500].forEach((ms) => setTimeout(put, ms));
+  }
+  window.addEventListener("pageshow", (e) => { if (e.persisted && S.el && S.month) draw(S.el, S.month).catch(() => {}); });
 
   async function paint() {
     const d = S.d, [y, mo] = S.month.split("-").map(Number), nd = new Date(y, mo, 0).getDate(), days = Array.from({ length: nd }, (_, i) => `${S.month}-${String(i + 1).padStart(2, "0")}`);
