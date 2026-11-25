@@ -50,6 +50,19 @@
   const loginId = () => { try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (/^sb-.+-auth-token$/.test(k)) { const v = JSON.parse(localStorage.getItem(k)); const u = v && (v.user || (v.currentSession && v.currentSession.user)); if (u && u.email) return u.email; } } } catch (e) {} return ""; };
   const showLogin = () => { const el = document.getElementById("role"); if (!el || demo) return; const em = loginId(); if (!em || !el.textContent.trim() || el.textContent === em) return; el.title = "Role: " + el.textContent.trim(); el.textContent = em; el.style.textTransform = "none"; };
   document.addEventListener("DOMContentLoaded", () => { showLogin(); new MutationObserver(showLogin).observe(document.body, { childList: true, subtree: true, characterData: true }); });
+  /* plant list saved by the KMR Apps page; the switcher keeps the screen the person is on (the part after # in the address) */
+  const kmrPlants = () => { try { const pp = JSON.parse(localStorage.getItem("kmr-portal") || "null"); return pp && Array.isArray(pp.plants) ? pp.plants : []; } catch (e) { return []; } };
+  const plantSelect = () => {
+    const pl = kmrPlants(), cur = new URLSearchParams(location.search).get("co") || (portal && portal.slug);
+    const sel = document.createElement("select"); sel.title = "Plant: switch to another unit on this same screen"; sel.className = "kmr-plantsel"; sel.style.cssText = "font:600 12px 'Segoe UI',Arial;border:1px solid #E3E8EF;border-radius:8px;padding:2px 6px;max-width:100%;cursor:pointer";
+    sel.innerHTML = pl.map((x) => '<option value="' + encodeURIComponent(x.slug) + '"' + (x.slug === cur ? " selected" : "") + ">Plant: " + String(x.main ? "Main" : x.code).replace(/[<>&"]/g, "") + " · " + String(x.name).split(" – ").pop().replace(/[<>&"]/g, "") + "</option>").join("");
+    sel.onchange = () => {
+      const to = pl.find((x) => encodeURIComponent(x.slug) === sel.value); if (!to) return;
+      try { const old = JSON.parse(localStorage.getItem("kmr-portal") || "{}"); localStorage.setItem("kmr-portal", JSON.stringify({ ...old, slug: to.slug, name: to.name })); } catch (e) {}
+      const u = new URL(location.href); u.searchParams.set("co", to.slug); u.hash = location.hash; location.href = u.toString();   // same screen, other unit
+    };
+    return sel;
+  };
   document.addEventListener("DOMContentLoaded", function () {
     // the standard KMR footer on every tool
     if (!document.querySelector(".kmr-foot")) {
@@ -57,19 +70,8 @@
       const back = portal && portal.slug ? '<a class="kmr-back" href="/it/app/' + encodeURIComponent(portal.slug) + '">← ' + (portal.name ? String(portal.name).replace(/[<>&]/g, "") + " · " : "") + 'KMR Apps</a>' : "";
       f.innerHTML = '<span class="kmr-slot">' + back + '</span><span>Powered By : <a href="https://www.kmr-groups.com" target="_blank" rel="noopener">KMR Group of Companies</a></span><span class="kmr-slot" style="justify-content:flex-end" id="kmrPlant"></span>';
       document.body.append(f);
-      // Plant switcher (customers with more than one plant): same app, another plant's data
-      const pl = portal && Array.isArray(portal.plants) ? portal.plants : [];
-      if (pl.length > 1) {
-        const cur = new URLSearchParams(location.search).get("co") || portal.slug;
-        const sel = document.createElement("select"); sel.title = "Plant"; sel.style.cssText = "font:600 12px 'Segoe UI',Arial;border:1px solid #E3E8EF;border-radius:8px;padding:2px 6px;max-width:100%";
-        sel.innerHTML = pl.map((x) => '<option value="' + encodeURIComponent(x.slug) + '"' + (x.slug === cur ? " selected" : "") + ">Plant: " + String(x.main ? "Main" : x.code).replace(/[<>&"]/g, "") + " · " + String(x.name).split(" – ").pop().replace(/[<>&"]/g, "") + "</option>").join("");
-        sel.onchange = () => {
-          const to = pl.find((x) => encodeURIComponent(x.slug) === sel.value);
-          try { portal.slug = to.slug; portal.name = to.name; localStorage.setItem("kmr-portal", JSON.stringify(portal)); } catch (e) {}
-          const u = new URL(location.href); u.searchParams.set("co", to.slug); u.hash = ""; location.href = u.toString();
-        };
-        f.querySelector("#kmrPlant").append(sel);
-      }
+      // Plant switcher (customers with more than one plant): same app, same screen, another plant's data
+      if (kmrPlants().length > 1) f.querySelector("#kmrPlant").append(plantSelect());
     }
     /* The plant / unit being worked in, shown in the title bar of every app (same text as the plant switcher in the footer) */
     (function plantInTitle(again) {
@@ -93,6 +95,7 @@
         const h = document.querySelector("header"); if (!h) return;
         let c = h.querySelector(".kmr-plant");
         if (!c) { c = document.createElement("span"); c.className = "kmr-plant"; c.id = "kmrPlantChip"; let an = h.querySelector("h1,h2,.title,.brand"); while (an && an.parentElement !== h) an = an.parentElement; if (an) h.insertBefore(c, an.nextSibling); else h.insertBefore(c, h.children[1] || null); }
+        if (pl.length > 1 && sp.get("scope") !== "all") { if (!c.querySelector("select")) { c.textContent = ""; c.append(plantSelect()); c.title = esc(tip); } return; }
         const t = "Plant: " + esc(label); if (c.textContent !== t) { c.textContent = t; c.title = esc(tip); }
       };
       put();
