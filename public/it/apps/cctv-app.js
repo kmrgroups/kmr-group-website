@@ -66,13 +66,13 @@
   }
 
   /* ---------- connect this unit ---------- */
-  const TPL = { hik: (u, p, ip, n) => `rtsp://${u}:${p}@${ip}:554/Streaming/Channels/${n}02`, dahua: (u, p, ip, n) => `rtsp://${u}:${p}@${ip}:554/cam/realmonitor?channel=${n}&subtype=1`, cpp: (u, p, ip, n) => `rtsp://${u}:${p}@${ip}:554/cam/realmonitor?channel=${n}&subtype=1` };
+  const TPL = { hik: (u, p, ip, n, q) => `rtsp://${u}:${p}@${ip}:554/Streaming/Channels/${n}0${q}`, dahua: (u, p, ip, n, q) => `rtsp://${u}:${p}@${ip}:554/cam/realmonitor?channel=${n}&subtype=${q === "1" ? 0 : 1}`, cpp: (u, p, ip, n, q) => `rtsp://${u}:${p}@${ip}:554/cam/realmonitor?channel=${n}&subtype=${q === "1" ? 0 : 1}` };
   function drawSetup() {
     const el = $("#setup"), has = !!S.d.base_url;
     el.innerHTML = `<div class="guide">One time per unit. Do these 3 steps on the always-on PC at the unit (the one on the same network as the recorder). Your camera passwords stay in the file on that PC. They are never saved in KMR.</div>
     <h3>Step 1 · Make the set-up file</h3>
     <div class="frm"><div><span class="lbl">Recorder / camera brand</span><select id="sb"><option value="hik">Hikvision (and Hik-OEM)</option><option value="dahua">Dahua</option><option value="cpp">CP Plus</option></select></div>
-    <div><span class="lbl">Recorder IP address</span><input id="si" placeholder="192.168.1.64"></div><div><span class="lbl">Recorder user name</span><input id="su" placeholder="admin"></div><div><span class="lbl">Recorder password</span><input id="sp" type="password" autocomplete="off"></div><div><span class="lbl">Number of cameras</span><input id="sn" type="number" min="1" max="64" value="4"></div></div>
+    <div><span class="lbl">Recorder IP address</span><input id="si" placeholder="192.168.1.64"></div><div><span class="lbl">Recorder user name</span><input id="su" placeholder="admin"></div><div><span class="lbl">Recorder password</span><input id="sp" type="password" autocomplete="off"></div><div><span class="lbl">Number of cameras</span><input id="sn" type="number" min="1" max="64" value="4"></div><div><span class="lbl">Picture quality</span><select id="sq"><option value="1">Clear (main stream)</option><option value="2">Light (sub stream, for slow internet)</option></select></div></div>
     <div class="row" style="margin-top:10px"><button class="btn" id="sg">Make file</button><button class="btn o" id="sd" disabled>Download go2rtc.yaml</button></div>
     <pre class="out" id="so" style="display:none"></pre>
     <h3>Step 2 · Install and start the relay on the unit PC</h3>
@@ -86,7 +86,7 @@
       const n = Math.max(1, Math.min(64, +V("sn") || 1)), u = encodeURIComponent(V("su")), p = encodeURIComponent(V("sp")), ip = V("si").trim();
       if (!ip || !V("su")) { say("Enter the recorder IP address and user name."); return; }
       const lines = ["# KMR CCTV relay - made " + new Date().toLocaleString("en-IN"), "api:", "  listen: \"127.0.0.1:1984\"", "  base_path: \"/" + S.d.path_secret + "\"", "  origin: \"*\"", "streams:"];
-      for (let i = 1; i <= n; i++) lines.push("  cam" + i + ": " + TPL[V("sb")](u, p, ip, i));
+      for (let i = 1; i <= n; i++) lines.push("  cam" + i + ": " + TPL[V("sb")](u, p, ip, i, V("sq") || "1"));
       cfg = lines.join("\n") + "\n"; so.style.display = "block"; so.textContent = cfg.replace(/:[^:@\/]*@/g, ":••••@"); dl.disabled = false;
       say("File ready. Camera codes are cam1 to cam" + n + ". Add them in Cameras with these codes.", true);
     };
