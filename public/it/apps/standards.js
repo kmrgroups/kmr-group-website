@@ -432,7 +432,7 @@ cctv:[
 ['IATF','6.1.2.1','Risk analysis','Live view of gates, stores and shop floor supports the risk controls for theft, fire and unauthorised entry; cameras can be hidden or removed from the list at any time.'],
 ['IATF','6.1.2.3','Contingency plans','If the unit PC, internet or relay is down, the Live view shows which camera is not reachable and the Connect screen shows the relay status, so action can be taken.'],
 ['IATF','7.1.3.1','Plant, facility and equipment planning','The unit relay PC and tunnel are set up once from the Connect screen; the secret key can be changed at any time and the set-up file is made again.'],
-['ISO','7.1.4','Environment for the operation of processes','Shop-floor cameras help check the working environment (housekeeping, material in the right place) from a distance.'],
+['ISO','7.1.4','Environment for the operation of processes','Shop-floor cameras help check the working environment (housekeeping, material in the right place) from a distance; every camera carries its location name (not a number), and all cameras can be shown together on one big monitor with a fixed picture shape and zoom into any camera.'],
 ['ISO','8.5.4','Preservation','Store and despatch area cameras help check that material and finished goods are kept safe.']],
 connect:[
 ['ISO','7.1.3','Infrastructure','Paired laptops and PCs can be supported from a browser or phone, so the people who run the plant and the office have working computers without travel; each device shows whether it is online.'],
