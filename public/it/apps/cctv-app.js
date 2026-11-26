@@ -12,7 +12,7 @@
   const done = (r) => { S.d = r; return r; };
   async function load() { done(await call("kmr_cctv_load")); }
 
-  function stopAll() { clearInterval(S.t); S.t = 0; if (S.hls) { S.hls.destroy(); S.hls = null; } }
+  function stopAll() { clearInterval(S.t); S.t = 0; if (S.stop) { S.stop(); S.stop = null; } if (S.hls) { S.hls.destroy(); S.hls = null; } }
   async function route() {
     stopAll(); const go = hashGo();
     document.querySelectorAll(".tab").forEach((t) => t.classList.toggle("on", t.dataset.t === go));
@@ -23,25 +23,99 @@
   window.addEventListener("hashchange", route);
 
   /* ---------- live view ---------- */
+  const PK = "kmr_cctv_prefs", P = { cols: "auto", fit: "contain", every: 8 };
+  try { Object.assign(P, JSON.parse(localStorage.getItem(PK) || "{}")); } catch (e) { /* storage may be blocked */ }
+  const savePrefs = () => { try { localStorage.setItem(PK, JSON.stringify(P)); } catch (e) { /* ignore */ } };
+  if (!document.getElementById("cctv-x")) {
+    const st = document.createElement("style"); st.id = "cctv-x";
+    st.textContent = `.vtool{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px}.vtool .lbl{display:block;font-size:12px;color:#475569;margin-bottom:2px}.vtool select{padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1}
+.vt img{object-fit:var(--fit,contain)}.vt b{max-width:90%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wall{position:fixed;inset:0;z-index:60;background:#000;display:grid;gap:2px;padding:2px}.wall .vt{border-radius:0;aspect-ratio:auto;width:100%;height:100%}.wall .vt b{font-size:clamp(12px,1.4vw,22px)}.wall .wx{position:fixed;top:6px;right:8px;z-index:61;opacity:.35}.wall .wx:hover{opacity:1}
+.big .stage{flex:1;min-height:0;position:relative;overflow:hidden;background:#000;touch-action:none}.big .stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:var(--fit,contain);transform-origin:0 0}.big .bar2{flex-wrap:wrap}`;
+    document.head.appendChild(st);
+  }
+  const label = (c) => esc(c.name);
+  const tileHtml = (c) => `<div class="vt" data-id="${c.id}" data-s="${esc(c.stream)}"><img alt="${label(c)}"><i></i><b>${label(c)}</b><div class="off">Camera not reachable.<br>Check the unit PC and internet.</div></div>`;
+  /* Pictures are loaded two at a time and swapped only when ready, so the screen never blinks and the unit PC is not overloaded. */
+  function frames(root) {
+    let stop = false;
+    const one = (t) => new Promise((res) => {
+      const im = t.querySelector("img"), dot = t.querySelector("i"), n = new Image();
+      n.onload = () => { im.src = n.src; t.classList.remove("bad"); dot.classList.add("on"); res(); };
+      n.onerror = () => { t.classList.add("bad"); dot.classList.remove("on"); res(); };
+      n.src = url("frame.jpeg", t.dataset.s) + "&t=" + Date.now();
+    });
+    (async () => {
+      while (!stop) {
+        const ts = [...root.querySelectorAll(".vt")], t0 = Date.now(); let k = 0;
+        const lane = async () => { while (k < ts.length && !stop) await one(ts[k++]); };
+        await Promise.all([lane(), lane()]);
+        await new Promise((r) => setTimeout(r, Math.max(1000, P.every * 1000 - (Date.now() - t0))));
+      }
+    })();
+    return () => { stop = true; };
+  }
   function drawLive() {
     const cams = S.d.cams.filter((c) => c.active), el = $("#live");
     if (!base()) { el.innerHTML = `<div class="empty">This unit is not connected yet.<br>Open <b>Connect this unit</b> and follow the 3 steps (about 30 minutes, one time).</div>`; return; }
     if (!cams.length) { el.innerHTML = `<div class="empty">No cameras added yet. Open <b>Cameras</b> and add them.</div>`; return; }
-    el.innerHTML = `<div class="guide">Tap a camera to watch it live in full screen. Pictures refresh every few seconds here to save mobile data.</div><div class="vgrid">${cams.map((c) => `<div class="vt" data-id="${c.id}" data-s="${esc(c.stream)}"><img alt="${esc(c.name)}"><i></i><b>${esc(c.name)}${c.area ? " · " + esc(c.area) : ""}</b><div class="off">Camera not reachable.<br>Check the unit PC and internet.</div></div>`).join("")}</div>`;
-    const tick = () => el.querySelectorAll(".vt").forEach((t) => {
-      const im = t.querySelector("img"), dot = t.querySelector("i"); im.onload = () => { t.classList.remove("bad"); dot.classList.add("on"); }; im.onerror = () => { t.classList.add("bad"); dot.classList.remove("on"); };
-      im.src = url("frame.jpeg", t.dataset.s) + "&t=" + Date.now();
-    });
-    tick(); S.t = setInterval(tick, 4000);
-    el.querySelectorAll(".vt").forEach((t) => (t.onclick = () => full(S.d.cams.find((c) => c.id === t.dataset.id))));
+    const opt = (v, t, cur) => `<option value="${v}"${String(cur) === String(v) ? " selected" : ""}>${t}</option>`;
+    el.innerHTML = `<div class="vtool">
+      <div><span class="lbl">Cameras in one row</span><select id="lc">${opt("auto", "Auto", P.cols)}${[1, 2, 3, 4, 5, 6].map((n) => opt(n, n, P.cols)).join("")}</select></div>
+      <div><span class="lbl">Picture</span><select id="lf">${opt("contain", "Fit whole picture", P.fit)}${opt("cover", "Fill the box (crops edges)", P.fit)}</select></div>
+      <div><span class="lbl">Refresh</span><select id="lr">${opt(4, "Every 4 seconds", P.every)}${opt(8, "Every 8 seconds", P.every)}${opt(15, "Every 15 seconds", P.every)}${opt(30, "Every 30 seconds", P.every)}</select></div>
+      <div><button class="btn" id="lw">Show all on one screen</button></div></div>
+      <div class="guide">Tap a camera to watch it live and zoom. <b>Show all on one screen</b> fills the whole monitor with every camera (press Esc to come back).</div>
+      <div class="vgrid" id="vg">${cams.map(tileHtml).join("")}</div>`;
+    const g = $("#vg"), apply = () => { g.style.setProperty("--fit", P.fit); g.style.gridTemplateColumns = P.cols === "auto" ? "" : `repeat(${P.cols},1fr)`; };
+    apply();
+    $("#lc").onchange = (e) => { P.cols = e.target.value; savePrefs(); apply(); };
+    $("#lf").onchange = (e) => { P.fit = e.target.value; savePrefs(); apply(); };
+    $("#lr").onchange = (e) => { P.every = +e.target.value; savePrefs(); };
+    S.stop = frames(el);
+    g.querySelectorAll(".vt").forEach((t) => (t.onclick = () => full(S.d.cams.find((c) => c.id === t.dataset.id))));
+    $("#lw").onclick = () => wall(cams);
+  }
+  function wall(cams) {
+    const w = document.createElement("div"); w.className = "wall"; w.style.setProperty("--fit", P.fit);
+    const n = cams.length, W = innerWidth, H = innerHeight; let best = 1, bestA = 0;
+    for (let c = 1; c <= n; c++) { const r = Math.ceil(n / c), tw = W / c, th = H / r, a = Math.min(tw, th * 16 / 9) * Math.min(tw * 9 / 16, th) * n; if (a > bestA) { bestA = a; best = c; } }
+    w.style.gridTemplateColumns = `repeat(${best},1fr)`; w.style.gridTemplateRows = `repeat(${Math.ceil(n / best)},1fr)`;
+    w.innerHTML = cams.map(tileHtml).join("") + `<button class="btn o wx" id="wx">✕ Close</button>`;
+    document.body.appendChild(w);
+    const stopF = frames(w);
+    const close = () => { stopF(); document.removeEventListener("keydown", k); document.removeEventListener("fullscreenchange", fc); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); w.remove(); };
+    const k = (e) => { if (e.key === "Escape") close(); }, fc = () => { if (!document.fullscreenElement) close(); };
+    document.addEventListener("keydown", k); w.querySelector("#wx").onclick = close;
+    w.querySelectorAll(".vt").forEach((t) => (t.onclick = () => { close(); full(S.d.cams.find((c) => c.id === t.dataset.id)); }));
+    if (w.requestFullscreen) w.requestFullscreen().then(() => document.addEventListener("fullscreenchange", fc)).catch(() => {});
   }
   async function full(c) {
     try { await call("kmr_cctv_log", { p_cam: c.id, p_kind: "view" }); } catch (e) { /* log failure must not stop viewing */ }
-    const b = document.createElement("div"); b.className = "big";
-    b.innerHTML = `<div class="bar2"><button class="btn o" id="bx">← Back</button><b>${esc(c.name)}</b><span class="mut" id="bs" style="margin-left:auto">Connecting…</span></div><video id="bv" autoplay muted playsinline controls></video>`;
-    document.body.appendChild(b); const v = b.querySelector("#bv"), st = b.querySelector("#bs"), src = url("stream.m3u8", c.stream); let h = null;
-    const close = () => { if (h) h.destroy(); v.pause(); v.removeAttribute("src"); b.remove(); document.removeEventListener("keydown", esc2); };
-    const esc2 = (e) => { if (e.key === "Escape") close(); };
+    const b = document.createElement("div"); b.className = "big"; b.style.setProperty("--fit", P.fit);
+    b.innerHTML = `<div class="bar2"><button class="btn o" id="bx">← Back</button><b>${esc(c.name)}</b><span class="mut" id="bs">Connecting…</span>
+      <span style="margin-left:auto;display:flex;gap:6px;align-items:center"><button class="btn o" id="zm">−</button><span id="zp" style="min-width:44px;text-align:center">100%</span><button class="btn o" id="zpl">+</button><button class="btn o" id="zr">Reset</button><button class="btn o" id="zf">${P.fit === "cover" ? "Show whole picture" : "Fill screen"}</button><button class="btn o" id="zfs">Full screen</button></span></div>
+      <div class="stage" id="stg"><video id="bv" autoplay muted playsinline></video></div>`;
+    document.body.appendChild(b); const v = b.querySelector("#bv"), st = b.querySelector("#bs"), stg = b.querySelector("#stg"), zp = b.querySelector("#zp"), src = url("stream.m3u8", c.stream); let h = null;
+    let z = 1, x = 0, y = 0;
+    const paint = () => { const W = stg.clientWidth, H = stg.clientHeight; x = Math.min(0, Math.max(W - W * z, x)); y = Math.min(0, Math.max(H - H * z, y)); v.style.transform = `translate(${x}px,${y}px) scale(${z})`; zp.textContent = Math.round(z * 100) + "%"; };
+    const zoomAt = (nz, cx, cy) => { nz = Math.min(8, Math.max(1, nz)); x = cx - ((cx - x) / z) * nz; y = cy - ((cy - y) / z) * nz; z = nz; paint(); };
+    const mid = () => [stg.clientWidth / 2, stg.clientHeight / 2];
+    b.querySelector("#zpl").onclick = () => zoomAt(z * 1.5, ...mid()); b.querySelector("#zm").onclick = () => zoomAt(z / 1.5, ...mid()); b.querySelector("#zr").onclick = () => { z = 1; x = 0; y = 0; paint(); };
+    b.querySelector("#zf").onclick = (e) => { P.fit = P.fit === "cover" ? "contain" : "cover"; savePrefs(); b.style.setProperty("--fit", P.fit); e.target.textContent = P.fit === "cover" ? "Show whole picture" : "Fill screen"; };
+    b.querySelector("#zfs").onclick = () => { if (document.fullscreenElement) document.exitFullscreen(); else if (b.requestFullscreen) b.requestFullscreen().catch(() => {}); };
+    stg.addEventListener("wheel", (e) => { e.preventDefault(); const r = stg.getBoundingClientRect(); zoomAt(z * (e.deltaY < 0 ? 1.2 : 1 / 1.2), e.clientX - r.left, e.clientY - r.top); }, { passive: false });
+    stg.addEventListener("dblclick", (e) => { const r = stg.getBoundingClientRect(); if (z > 1) { z = 1; x = 0; y = 0; paint(); } else zoomAt(2.5, e.clientX - r.left, e.clientY - r.top); });
+    const pts = new Map(); let pd = 0;
+    stg.addEventListener("pointerdown", (e) => { stg.setPointerCapture(e.pointerId); pts.set(e.pointerId, [e.clientX, e.clientY]); pd = 0; });
+    stg.addEventListener("pointermove", (e) => {
+      if (!pts.has(e.pointerId)) return; const o = pts.get(e.pointerId);
+      if (pts.size === 2) { const [a, c2] = [...pts.values()]; const d0 = Math.hypot(a[0] - c2[0], a[1] - c2[1]); pts.set(e.pointerId, [e.clientX, e.clientY]); const [a1, c1] = [...pts.values()]; const d1 = Math.hypot(a1[0] - c1[0], a1[1] - c1[1]); if (d0 > 0) { const r = stg.getBoundingClientRect(); zoomAt(z * d1 / d0, (a1[0] + c1[0]) / 2 - r.left, (a1[1] + c1[1]) / 2 - r.top); } return; }
+      if (z > 1) { x += e.clientX - o[0]; y += e.clientY - o[1]; paint(); } pts.set(e.pointerId, [e.clientX, e.clientY]);
+    });
+    const up = (e) => pts.delete(e.pointerId); stg.addEventListener("pointerup", up); stg.addEventListener("pointercancel", up);
+    const close = () => { if (h) h.destroy(); v.pause(); v.removeAttribute("src"); if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); b.remove(); document.removeEventListener("keydown", esc2); };
+    const esc2 = (e) => { if (e.key === "Escape" && !document.fullscreenElement) close(); };
     document.addEventListener("keydown", esc2); b.querySelector("#bx").onclick = close;
     v.addEventListener("playing", () => (st.textContent = "Live")); v.addEventListener("error", () => (st.textContent = "Cannot play. Check the unit connection."));
     if (v.canPlayType("application/vnd.apple.mpegurl")) { v.src = src; v.play().catch(() => {}); return; }
@@ -56,13 +130,23 @@
   /* ---------- cameras ---------- */
   function drawCams() {
     const el = $("#cams"), rows = S.d.cams;
-    el.innerHTML = `<div class="guide">Add each camera once. The <b>camera code</b> is the short name used in the set-up file (for example gate1). The code must match the one in <b>Connect this unit</b>.</div>
-    ${ed() ? `<div class="frm" style="margin-bottom:10px"><div><span class="lbl">Camera name</span><input id="cn" placeholder="Main gate"></div><div><span class="lbl">Area</span><input id="ca" placeholder="Entrance"></div><div><span class="lbl">Camera code</span><input id="cs" placeholder="gate1"></div><div style="align-self:end"><button class="btn" id="cadd">Add camera</button></div></div>` : ""}
-    ${rows.length ? `<table><thead><tr><th>S.No</th><th>Camera</th><th>Area</th><th>Code</th><th>Show</th><th></th></tr></thead><tbody>${rows.map((c, i) => `<tr><td>${i + 1}</td><td>${esc(c.name)}</td><td>${esc(c.area || "")}</td><td>${esc(c.stream)}</td><td>${c.active ? "Yes" : "Hidden"}</td><td>${ed() ? `<button class="btn o" data-h="${c.id}">${c.active ? "Hide" : "Show"}</button> <button class="btn d" data-x="${c.id}">Delete</button>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No cameras yet.</div>`}`;
+    el.innerHTML = `<div class="guide">Type the <b>location name</b> of each camera (for example Gate, Press shop, Store). The Live screen shows this name instead of the camera number. The <b>camera code</b> (cam1, cam2…) is used by the unit PC and must not be changed.</div>
+    ${ed() ? `<div class="frm" style="margin-bottom:10px"><div><span class="lbl">Location name</span><input id="cn" placeholder="Main gate"></div><div><span class="lbl">Area</span><input id="ca" placeholder="Entrance"></div><div><span class="lbl">Camera code</span><input id="cs" placeholder="gate1"></div><div style="align-self:end"><button class="btn" id="cadd">Add camera</button></div></div>` : ""}
+    ${rows.length ? `${ed() ? `<div style="margin-bottom:8px"><button class="btn" id="csv">Save all names</button></div>` : ""}<table><thead><tr><th>S.No</th><th>Location name</th><th>Area</th><th>Code</th><th>Show</th><th></th></tr></thead><tbody>${rows.map((c, i) => `<tr><td>${i + 1}</td><td>${ed() ? `<input data-n="${c.id}" value="${esc(c.name)}" style="width:100%">` : esc(c.name)}</td><td>${ed() ? `<input data-a="${c.id}" value="${esc(c.area || "")}" style="width:100%">` : esc(c.area || "")}</td><td>${esc(c.stream)}</td><td>${c.active ? "Yes" : "Hidden"}</td><td>${ed() ? `<button class="btn o" data-h="${c.id}">${c.active ? "Hide" : "Show"}</button> <button class="btn d" data-x="${c.id}">Delete</button>` : ""}</td></tr>`).join("")}</tbody></table>` : `<div class="empty">No cameras yet.</div>`}`;
     const act = async (fn) => { try { done(await fn()); say("Saved.", true); drawCams(); } catch (e) { say(e.message); } };
     if ($("#cadd")) $("#cadd").onclick = () => act(() => call("kmr_cctv_cam_save", { p_id: null, p_name: V("cn"), p_area: V("ca"), p_stream: V("cs"), p_active: true }));
+    if ($("#csv")) $("#csv").onclick = async () => {
+      try {
+        for (const c of rows) {
+          const n = el.querySelector(`[data-n="${c.id}"]`), a = el.querySelector(`[data-a="${c.id}"]`), nn = (n.value || "").trim(), aa = (a.value || "").trim();
+          if (!nn) { say("A location name cannot be empty."); return; }
+          if (nn !== c.name || aa !== (c.area || "")) done(await call("kmr_cctv_cam_save", { p_id: c.id, p_name: nn, p_area: aa, p_stream: c.stream, p_active: c.active }));
+        }
+        say("Saved.", true); drawCams();
+      } catch (e) { say(e.message); }
+    };
     el.querySelectorAll("[data-h]").forEach((b) => (b.onclick = () => { const c = rows.find((x) => x.id === b.dataset.h); act(() => call("kmr_cctv_cam_save", { p_id: c.id, p_name: c.name, p_area: c.area, p_stream: c.stream, p_active: !c.active })); }));
-    el.querySelectorAll("[data-x]").forEach((b) => (b.onclick = () => { if (confirm("Delete this camera from the list?")) act(() => call("kmr_cctv_cam_del", { p_id: b.dataset.x })); }));
+    el.querySelectorAll("[data-x]").forEach((b) => (b.onclick = () => { if (confirm("Delete this camera from the list?") && confirm("Are you sure? This removes the camera and its view history link.")) act(() => call("kmr_cctv_cam_del", { p_id: b.dataset.x })); }));
   }
 
   /* ---------- connect this unit ---------- */
