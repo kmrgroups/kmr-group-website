@@ -28,7 +28,7 @@
   const savePrefs = () => { try { localStorage.setItem(PK, JSON.stringify(P)); } catch (e) { /* ignore */ } };
   if (!document.getElementById("cctv-x")) {
     const st = document.createElement("style"); st.id = "cctv-x";
-    st.textContent = `.vtool{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px}.vtool .lbl{display:block;font-size:12px;color:#475569;margin-bottom:2px}.vtool select{padding:6px 8px;border-radius:8px;border:1px solid #cbd5e1}
+    st.textContent = `.vtool{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px}.vtool .lbl{display:block;font-size:12px;color:#475569;margin-bottom:4px}.seg{display:flex;flex-wrap:wrap;gap:6px}.seg button{min-width:44px;min-height:40px;padding:6px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font-size:14px;cursor:pointer;touch-action:manipulation}.seg button.on{background:#0b3a8f;border-color:#0b3a8f;color:#fff;font-weight:600}
 .vt img{object-fit:var(--fit,contain)}.vt b{max-width:90%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wall{position:fixed;inset:0;z-index:60;background:#000;display:grid;gap:2px;padding:2px}.wall .vt{border-radius:0;aspect-ratio:auto;width:100%;height:100%}.wall .vt b{font-size:clamp(12px,1.4vw,22px)}.wall .wx{position:fixed;top:6px;right:8px;z-index:61;opacity:.35}.wall .wx:hover{opacity:1}
 .big .stage{flex:1;min-height:0;position:relative;overflow:hidden;background:#000;touch-action:none}.big .stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:var(--fit,contain);transform-origin:0 0}.big .bar2{flex-wrap:wrap}`;
@@ -59,19 +59,18 @@
     const cams = S.d.cams.filter((c) => c.active), el = $("#live");
     if (!base()) { el.innerHTML = `<div class="empty">This unit is not connected yet.<br>Open <b>Connect this unit</b> and follow the 3 steps (about 30 minutes, one time).</div>`; return; }
     if (!cams.length) { el.innerHTML = `<div class="empty">No cameras added yet. Open <b>Cameras</b> and add them.</div>`; return; }
-    const opt = (v, t, cur) => `<option value="${v}"${String(cur) === String(v) ? " selected" : ""}>${t}</option>`;
+    const seg = (id, items, cur) => `<div class="seg" id="${id}">${items.map(([v, t]) => `<button type="button" data-v="${v}" class="${String(cur) === String(v) ? "on" : ""}">${t}</button>`).join("")}</div>`;
     el.innerHTML = `<div class="vtool">
-      <div><span class="lbl">Cameras in one row</span><select id="lc">${opt("auto", "Auto", P.cols)}${[1, 2, 3, 4, 5, 6].map((n) => opt(n, n, P.cols)).join("")}</select></div>
-      <div><span class="lbl">Picture</span><select id="lf">${opt("contain", "Fit whole picture", P.fit)}${opt("cover", "Fill the box (crops edges)", P.fit)}</select></div>
-      <div><span class="lbl">Refresh</span><select id="lr">${opt(4, "Every 4 seconds", P.every)}${opt(8, "Every 8 seconds", P.every)}${opt(15, "Every 15 seconds", P.every)}${opt(30, "Every 30 seconds", P.every)}</select></div>
+      <div><span class="lbl">Cameras in one row</span>${seg("lc", [["auto", "Auto"], ...[1, 2, 3, 4, 5, 6].map((n) => [n, n])], P.cols)}</div>
+      <div><span class="lbl">Picture</span>${seg("lf", [["contain", "Fit whole picture"], ["cover", "Fill the box"]], P.fit)}</div>
+      <div><span class="lbl">Refresh</span>${seg("lr", [[4, "4 seconds"], [8, "8 seconds"], [15, "15 seconds"], [30, "30 seconds"]], P.every)}</div>
       <div><button class="btn" id="lw">Show all on one screen</button></div></div>
       <div class="guide">Tap a camera to watch it live and zoom. <b>Show all on one screen</b> fills the whole monitor with every camera (press Esc to come back).</div>
       <div class="vgrid" id="vg">${cams.map(tileHtml).join("")}</div>`;
     const g = $("#vg"), apply = () => { g.style.setProperty("--fit", P.fit); g.style.gridTemplateColumns = P.cols === "auto" ? "" : `repeat(${P.cols},1fr)`; };
     apply();
-    $("#lc").onchange = (e) => { P.cols = e.target.value; savePrefs(); apply(); };
-    $("#lf").onchange = (e) => { P.fit = e.target.value; savePrefs(); apply(); };
-    $("#lr").onchange = (e) => { P.every = +e.target.value; savePrefs(); };
+    const pick = (id, fn) => { const box = $("#" + id); box.onclick = (e) => { const bt = e.target.closest("button"); if (!bt) return; box.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === bt)); fn(bt.dataset.v); savePrefs(); }; };
+    pick("lc", (v) => { P.cols = v; apply(); }); pick("lf", (v) => { P.fit = v; apply(); }); pick("lr", (v) => { P.every = +v; });
     S.stop = frames(el);
     g.querySelectorAll(".vt").forEach((t) => (t.onclick = () => full(S.d.cams.find((c) => c.id === t.dataset.id))));
     $("#lw").onclick = () => wall(cams);
