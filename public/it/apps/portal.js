@@ -143,6 +143,7 @@
       if (back && (back.split(/[?#]/)[0] === r.app_path.split("?")[0] || (code === "rmp" && back.split(/[?#]/)[0] === "/it/rmstock.html"))) path = back; } catch (e) {}
     let tail = ""; const hi = path.indexOf("#"); if (hi >= 0) { tail = path.slice(hi); path = path.slice(0, hi); }   // the screen (#go=…) stays at the end
     path = path.replace(/([?&])co=[^&]*&?/, "$1").replace(/[?&]$/, "");
+    if (DEV) { try { await Promise.race([sb.rpc("kmr_staff_log_app", { p_slug: SLUG, p_product: code }), new Promise((x) => setTimeout(x, 700))]); } catch (e) {} }   // KMR staff opening a customer app is written to the Console Activity log
     location.href = path + (path.includes("?") ? "&" : "?") + "kmr=1" + (SLUG ? "&co=" + encodeURIComponent(SLUG) : "") + tail;
   }
 
