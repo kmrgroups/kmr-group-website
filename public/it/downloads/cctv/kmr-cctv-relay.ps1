@@ -1,10 +1,14 @@
 # KMR CCTV relay watchdog (Windows Server 2012 R2 and newer, PowerShell 4+). Runs hidden at start-up (scheduled task "KMR CCTV Relay").
+# Protected by kmr-cctv-protect.ps1: stopping, changing or re-installing it needs the password; a guard task undoes it otherwise.
 # Keeps go2rtc and the Cloudflare tunnel running, checks the PUBLIC tunnel address every minute (not only the local process),
 # restarts the tunnel when the address stops answering, and reports the address + a heartbeat to KMR every 5 minutes.
 $ErrorActionPreference = "Continue"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 $D = Split-Path -Parent $MyInvocation.MyCommand.Path
 $LOG = Join-Path $D "kmr-cctv-relay.log"; $CFLOG = Join-Path $D "cloudflared.log"
+$FLAG = Join-Path $D "stopped.flag"   # written by kmr-cctv-protect.ps1 -Stop (with the password)
+$os = Get-WmiObject Win32_OperatingSystem
+if (Test-Path $FLAG) { if ((Get-Item $FLAG).LastWriteTime -gt $os.ConvertToDateTime($os.LastBootUpTime)) { exit 0 } else { Remove-Item $FLAG -Force } }   # a restart starts it again
 $SB = "https://dehlcusptkzfhqvpfyjh.supabase.co/rest/v1/rpc/kmr_cctv_relay_report"; $KEY = "sb_publishable_ukWZLiTOXfUZsNAyn5BM7Q_YjSFcUus"
 function Log($m) { $l = (Get-Date -Format "yyyy-MM-dd HH:mm:ss") + "  " + $m; Add-Content -Path $LOG -Value $l; if ((Get-Item $LOG).Length -gt 2MB) { Move-Item $LOG ($LOG + ".old") -Force } }
 $yaml = Get-Content (Join-Path $D "go2rtc.yaml") -Raw
@@ -32,6 +36,7 @@ function Report($u, $note) {
 Log "watchdog started"
 $URL = $null; $fails = 0; $lastRep = [datetime]::MinValue; $started = Get-Date
 while ($true) {
+  if (Test-Path $FLAG) { Log "stopped with the password"; Get-WmiObject Win32_Process | Where-Object { $_.Name -match "^(go2rtc|cloudflared)\.exe$" } | ForEach-Object { $_.Terminate() | Out-Null }; exit 0 }
   if (-not (Ok "http://127.0.0.1:1984/$SECRET/api/streams")) { Log "go2rtc not answering - restarting"; StartGo }
   if (-not $URL -or -not (Procs $CF)) { $URL = StartCf; $fails = 0; $started = Get-Date; if ($URL) { Log "address $URL"; Start-Sleep 20; Report $URL "tunnel (re)started" | Out-Null; $lastRep = Get-Date } else { Log "tunnel gave no address - retry in 30 s"; Start-Sleep 30; continue } }
   if (Ok "$URL/$SECRET/api/streams") { $fails = 0 }
