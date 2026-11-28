@@ -31,7 +31,7 @@
     st.textContent = `.vtool{display:flex;flex-wrap:wrap;gap:10px;align-items:end;margin-bottom:10px}.vtool .lbl{display:block;font-size:12px;color:#475569;margin-bottom:4px}.seg{display:flex;flex-wrap:wrap;gap:6px}.seg button{min-width:44px;min-height:40px;padding:6px 12px;border-radius:10px;border:1px solid #cbd5e1;background:#fff;color:#0f172a;font-size:14px;cursor:pointer;touch-action:manipulation}.seg button.on{background:#0b3a8f;border-color:#0b3a8f;color:#fff;font-weight:600}
 .vt img,.vt video{object-fit:var(--fit,contain)}.vt b{max-width:90%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .wall{position:fixed;inset:0;z-index:60;background:#000;display:grid;gap:2px;padding:2px}.wall .vt{border-radius:0;aspect-ratio:auto;width:100%;height:100%}.wall .vt b{font-size:clamp(12px,1.4vw,22px)}.wall .wx{position:fixed;top:6px;right:8px;z-index:61;opacity:.35}.wall .wx:hover{opacity:1}
-.big .stage{flex:1;min-height:0;position:relative;overflow:hidden;background:#000;touch-action:none}.big .stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:var(--fit,contain);transform-origin:0 0}.big .bar2{flex-wrap:wrap}`;
+.big .stage{flex:1;min-height:0;position:relative;overflow:hidden;background:#000;touch-action:none}.big .stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:var(--fit,contain);transform-origin:0 0}.big .bar2{flex-wrap:wrap}.rs{padding:8px 12px;border-radius:10px;margin:0 0 10px;font-weight:600;font-size:13px}.rs.ok{background:#dcfce7;color:#166534}.rs.bad{background:#fee2e2;color:#991b1b}`;
     document.head.appendChild(st);
   }
   const label = (c) => esc(c.name);
@@ -78,6 +78,24 @@
     })();
     return () => { dead = true; hs.forEach((h) => { try { h.destroy(); } catch (e) { /* ignore */ } }); root.querySelectorAll("video").forEach((v) => { v.pause(); v.removeAttribute("src"); }); };
   }
+  /* Relay watch (every 20 s while Live view is open): checks the unit relay once instead of 16 failing tiles, shows one clear status line,
+     and when the unit server reports a new tunnel address the screen switches to it by itself (no refresh needed). */
+  async function relayUp() { try { const r = await fetch(base() + "/api/streams", { cache: "no-store" }); return r.ok; } catch (e) { return false; } }
+  function watchRelay() {
+    let downSince = null;
+    const tick = async () => {
+      const box = $("#rs"); if (!box) return;
+      let st = null; try { st = await call("kmr_cctv_relay_status"); } catch (e) { /* keep last */ }
+      if (st && st.base_url && st.base_url !== S.d.base_url) { S.d.base_url = st.base_url; stopAll(); drawLive(); return; }
+      const up = await relayUp(); if (!$("#rs")) return;
+      if (up) { downSince = null; box.className = "rs ok"; box.innerHTML = `● Unit relay online${st && st.last_seen ? ` · last report ${dt(st.last_seen)}` : ""}`; return; }
+      downSince = downSince || new Date();
+      box.className = "rs bad";
+      box.innerHTML = `● The unit camera relay is not answering (checked ${dt(downSince)}). The unit server sends a new address when it reconnects; this screen switches to it by itself.${st && st.last_seen ? ` Last report from the unit: ${dt(st.last_seen)}.` : ""}`;
+      document.querySelectorAll("#vg .vt").forEach((t) => { t.classList.add("bad"); const o = t.querySelector(".off"); if (o) o.innerHTML = "Waiting for the unit relay…"; });
+    };
+    tick(); S.t = setInterval(tick, 20000);
+  }
   const startTiles = (root) => (P.mode === "live" ? liveTiles(root) : frames(root));
   function drawLive() {
     const cams = S.d.cams.filter((c) => c.active), el = $("#live");
@@ -91,12 +109,13 @@
       <div><span class="lbl">Picture refresh</span>${seg("lr", [[4, "4 seconds"], [8, "8 seconds"], [15, "15 seconds"], [30, "30 seconds"]], P.every)}</div>
       <div><button class="btn" id="lw">Show all on one screen</button></div></div>
       <div class="guide">${P.mode === "live" ? "Live video plays in every tile with the light stream. " : ""}Tap a camera to watch it live and zoom. <b>Show all on one screen</b> fills the whole monitor with every camera (press Esc to come back).</div>
-      <div class="vgrid" id="vg">${cams.map(tileHtml).join("")}</div>`;
+      <div id="rs" class="rs"></div><div class="vgrid" id="vg">${cams.map(tileHtml).join("")}</div>`;
     const g = $("#vg"), apply = () => { g.style.setProperty("--fit", P.fit); g.style.gridTemplateColumns = P.cols === "auto" ? "" : `repeat(${P.cols},1fr)`; };
     apply();
     const pick = (id, fn) => { const box = $("#" + id); box.onclick = (e) => { const bt = e.target.closest("button"); if (!bt) return; box.querySelectorAll("button").forEach((x) => x.classList.toggle("on", x === bt)); fn(bt.dataset.v); savePrefs(); }; };
     pick("lc", (v) => { P.cols = v; apply(); }); pick("lf", (v) => { P.fit = v; apply(); }); pick("lr", (v) => { P.every = +v; }); pick("lm", (v) => { P.mode = v; savePrefs(); stopAll(); drawLive(); });
     S.stop = startTiles(el);
+    watchRelay();
     g.querySelectorAll(".vt").forEach((t) => (t.onclick = () => full(S.d.cams.find((c) => c.id === t.dataset.id))));
     $("#lw").onclick = () => wall(cams);
   }
@@ -185,6 +204,8 @@
     <pre class="out" id="so" style="display:none"></pre>
     <h3>Step 2 · Install and start the relay on the unit PC</h3>
     <p>Download <b>go2rtc</b> for Windows from <a href="https://github.com/AlexxIT/go2rtc/releases" target="_blank" rel="noopener">github.com/AlexxIT/go2rtc/releases</a> (file go2rtc_win64.zip). Unzip it, put the downloaded <b>go2rtc.yaml</b> next to go2rtc.exe, then double-click go2rtc.exe. Add it to Windows start-up so it runs after a power cut.</p>
+    <h3>Keep it running by itself (recommended)</h3>
+    <p>Put <a href="/it/downloads/cctv/kmr-cctv-relay.ps1" download>kmr-cctv-relay.ps1</a> and <a href="/it/downloads/cctv/install-kmr-cctv-relay.cmd" download>install-kmr-cctv-relay.cmd</a> in the same folder as go2rtc.exe, go2rtc.yaml and cloudflared.exe, then double-click the install file once. It runs hidden, starts after every restart, checks the internet address every minute, reconnects by itself and sends the new address here automatically (no Step 3 needed).</p>
     <h3>Step 3 · Open the secure tunnel and save its address here</h3>
     <p>Install the free <b>Cloudflare Tunnel</b> (cloudflared) on the same PC and point a tunnel address to <code>http://localhost:1984</code>. It needs no router change. Paste the https address it gives you below.</p>
     ${adm() ? `<div class="row"><input class="grow" id="bu" placeholder="https://cctv-unit1.yourdomain.com" value="${esc(S.d.base_url)}"><button class="btn" id="bsv">Save address</button>${has ? `<button class="btn o" id="brt">Change secret key</button>` : ""}</div>` : `<div class="lock mut">Only the administrator can save the tunnel address.</div>`}
