@@ -218,6 +218,11 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 STATE = os.path.join(HERE, "kmr_bridge_state.json")
 LOGF = os.path.join(HERE, "kmr_bridge.log")
 FLAG = os.path.join(HERE, "stopped.flag")
+STATUSF = os.path.join(HERE, "status.json")
+SENDNOW = os.path.join(HERE, "sendnow.flag")
+REPULL = os.path.join(HERE, "repull.flag")
+SERVICE_TASK = NAME + " service"
+GUARD_TASK = NAME + " guard"
 VERIFY = {0: "password", 1: "finger", 2: "card", 3: "password", 4: "card", 15: "face", 25: "palm"}
 DIRECTION = {0: "in", 1: "out", 4: "in", 5: "out"}
 NL = chr(10)
@@ -422,6 +427,10 @@ def worker(icon=None):
     while True:
         try:
             cycle()
+            try:
+                json.dump({"ok": STATUS["ok"], "text": STATUS["text"]}, open(STATUSF, "w"))
+            except Exception:
+                pass
             if icon:
                 icon_update(icon)
         except Exception as e:
@@ -609,12 +618,259 @@ def run_tray():
         pystray.MenuItem("Change close password", change_pw),
         pystray.MenuItem("Open log", open_log),
         pystray.MenuItem("Show bridge file location", show_location),
+        pystray.MenuItem("Start with the PC + protection (administrator)...", lambda icon, item: threading.Thread(target=offer_install, daemon=True).start()),
         pystray.MenuItem("Quit", quit_it))
     icon = pystray.Icon(NAME, make_image(True), NAME + ": starting", menu)
     threading.Thread(target=worker, args=(icon,), daemon=True).start()
     if "pw2_hash" not in load_state():
         threading.Thread(target=set_password, daemon=True).start()   # first run: ask for the close password
+    elif os.name == "nt" and not load_state().get("install_offered"):
+        save_state(install_offered=True)
+        threading.Thread(target=offer_install, daemon=True).start()   # once: offer start-with-the-PC and protection
     icon.run()
+
+# ---------------------------------------------------------------- service mode: no window, started by a Windows task when the PC starts
+def pyw_exe():
+    exe = sys.executable
+    if exe.lower().endswith("python.exe"):
+        exe = exe[:-10] + "pythonw.exe"
+    return exe
+
+def boot_time():
+    import ctypes
+    k = ctypes.windll.kernel32
+    k.GetTickCount64.restype = ctypes.c_ulonglong
+    return time.time() - k.GetTickCount64() / 1000.0
+
+def service_task_exists():
+    if os.name != "nt":
+        return False
+    try:
+        return subprocess.run(["schtasks", "/Query", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN).returncode == 0
+    except Exception:
+        return False
+
+def service_running():
+    s = socket.socket()
+    try:
+        s.bind(("127.0.0.1", lock_port()))
+        s.close()
+        return False
+    except OSError:
+        return True
+
+def flag_poller():
+    """the status icon talks to the service through small files: stop, send now, re-pull"""
+    while True:
+        try:
+            if os.path.exists(FLAG):
+                log("Bridge stopped with the close password")
+                os._exit(0)
+            if os.path.exists(REPULL):
+                v = open(REPULL, encoding="utf-8").read().strip()
+                os.remove(REPULL)
+                datetime.date.fromisoformat(v)
+                PULL["since"] = v
+                log("Re-pull requested from " + v)
+                WAKE.set()
+            if os.path.exists(SENDNOW):
+                os.remove(SENDNOW)
+                WAKE.set()
+        except Exception:
+            pass
+        time.sleep(5)
+
+def run_status_tray():
+    """status icon only: the punches are sent by the service, also when nobody is signed in"""
+    import pystray
+    def state():
+        if os.path.exists(FLAG):
+            return False, "Stopped (with the password)"
+        if not service_running():
+            return False, "Not running - starting it again..."
+        try:
+            j = json.load(open(STATUSF))
+            return bool(j.get("ok")), str(j.get("text"))
+        except Exception:
+            return True, "Running"
+    def refresh(icon):
+        while True:
+            ok, text = state()
+            if not ok and not os.path.exists(FLAG) and not service_running():
+                subprocess.run(["schtasks", "/Run", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN)
+            try:
+                icon.icon = make_image(ok)
+                icon.title = (NAME + ": " + text)[:120]
+                icon.update_menu()
+            except Exception:
+                pass
+            time.sleep(15)
+    def send_now(icon, item):
+        open(SENDNOW, "w").write("1")
+    def repull(icon, item):
+        default = datetime.date.today().replace(day=1).isoformat()
+        v = ask("ask", "Re-pull and re-send all punches from which date? (YYYY-MM-DD)", default).strip()
+        if not v:
+            return
+        try:
+            datetime.date.fromisoformat(v)
+        except ValueError:
+            ask("info", "That is not a valid date. Use YYYY-MM-DD, for example " + default)
+            return
+        open(REPULL, "w", encoding="utf-8").write(v)
+    def change_pw(icon, item):
+        if "pw2_hash" in load_state() and not check_password("Changing the password."):
+            return
+        set_password()
+    def open_log(icon, item):
+        try:
+            os.startfile(LOGF)
+        except Exception:
+            pass
+    def show_location(icon, item):
+        try:
+            subprocess.Popen(["explorer.exe", "/select," + os.path.abspath(__file__)])
+        except Exception:
+            pass
+    def stop_it(icon, item):
+        if check_password("Stopping the KMR bridge means punches will not reach the HRM."):
+            open(FLAG, "w").write(datetime.datetime.now().isoformat())
+            subprocess.run(["schtasks", "/End", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN)
+    def start_it(icon, item):
+        try:
+            os.remove(FLAG)
+        except OSError:
+            pass
+        subprocess.run(["schtasks", "/Run", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN)
+    def close_icon(icon, item):
+        if check_password("Closing the status icon (the bridge keeps running)."):
+            icon.stop()
+    menu = pystray.Menu(
+        pystray.MenuItem(lambda item: state()[1], None, enabled=False),
+        pystray.MenuItem("Send now", send_now, default=True),
+        pystray.MenuItem("Re-pull data from a date...", repull),
+        pystray.MenuItem("Open log", open_log),
+        pystray.MenuItem("Show bridge file location", show_location),
+        pystray.MenuItem("Start bridge", start_it),
+        pystray.MenuItem("Stop bridge (password)", stop_it),
+        pystray.MenuItem("Change close password", change_pw),
+        pystray.MenuItem("Close this icon (password)", close_icon))
+    icon = pystray.Icon(NAME, make_image(True), NAME, menu)
+    threading.Thread(target=refresh, args=(icon,), daemon=True).start()
+    icon.run()
+
+# ---------------------------------------------------------------- start with the PC + protection (set up once, as administrator)
+GUARD_PS = r'''# KMR attendance bridge guard. Runs every minute as SYSTEM.
+#  - puts the approved bridge file back if it was changed or replaced without the password (a re-install without the password is undone)
+#  - switches the bridge service back on if it was disabled or ended without the password
+#  guard.ps1 -Approve   asks the close password and approves the bridge file as it is now
+param([switch]$Approve)
+$here = Split-Path -Parent $MyInvocation.MyCommand.Path
+$dir = ((Get-Content (Join-Path $here 'bridge-folder.txt')) | Out-String).Trim()
+$file = Join-Path $dir (((Get-Content (Join-Path $here 'file-name.txt')) | Out-String).Trim())
+$task = ((Get-Content (Join-Path $here 'task-name.txt')) | Out-String).Trim()
+$copy = Join-Path $here 'bridge.approved'
+$man = Join-Path $here 'approved.txt'
+function Note($m) { Add-Content (Join-Path $here 'guard.log') ((Get-Date).ToString('yyyy-MM-dd HH:mm:ss') + ' ' + $m) }
+function Test-AttPassword($why) {
+  Add-Type -AssemblyName System.Windows.Forms, System.Drawing
+  $st = Get-Content (Join-Path $dir 'kmr_bridge_state.json') -Raw | ConvertFrom-Json
+  if (-not $st.pw2_hash) { [void][Windows.Forms.MessageBox]::Show('No close password is set yet.'); return $false }
+  $f = New-Object Windows.Forms.Form; $f.Text = 'KMR attendance bridge'; $f.Size = New-Object Drawing.Size(480, 180); $f.StartPosition = 'CenterScreen'; $f.TopMost = $true
+  $l = New-Object Windows.Forms.Label; $l.Text = $why + ' Enter the close password.'; $l.SetBounds(15, 12, 440, 35)
+  $t = New-Object Windows.Forms.TextBox; $t.UseSystemPasswordChar = $true; $t.SetBounds(15, 52, 430, 25)
+  $b = New-Object Windows.Forms.Button; $b.Text = 'OK'; $b.SetBounds(345, 92, 100, 30); $b.DialogResult = 'OK'; $f.AcceptButton = $b; $f.Controls.AddRange(@($l, $t, $b))
+  if ($f.ShowDialog() -ne 'OK') { return $false }
+  $h = -join ((New-Object Security.Cryptography.SHA256Managed).ComputeHash([Text.Encoding]::UTF8.GetBytes($st.pw2_salt + $t.Text)) | ForEach-Object { $_.ToString('x2') })
+  if ($h -eq $st.pw2_hash) { return $true }
+  [void][Windows.Forms.MessageBox]::Show('Wrong password.'); $false
+}
+function Approve-Now {
+  Copy-Item $file $copy -Force
+  $i = Get-Item $file
+  Set-Content $man ($i.Length.ToString() + '|' + $i.LastWriteTimeUtc.Ticks + '|' + (Get-FileHash $file -Algorithm SHA256).Hash)
+  Note 'Bridge file approved'
+}
+if ($MyInvocation.InvocationName -eq '.') { return }
+if ($Approve) { if (Test-AttPassword 'Approving the bridge file as it is now.') { Approve-Now; [void][Windows.Forms.MessageBox]::Show('Approved.') }; exit 0 }
+if ((Test-Path $man) -and (Test-Path $copy)) {
+  $p = ((Get-Content $man) | Out-String).Trim().Split('|'); $bad = $false
+  if (-not (Test-Path $file)) { $bad = $true }
+  else { $i = Get-Item $file; if ($i.Length -ne [int64]$p[0] -or $i.LastWriteTimeUtc.Ticks -ne [int64]$p[1]) { $bad = ((Get-FileHash $file -Algorithm SHA256).Hash -ne $p[2]) } }
+  if ($bad) {
+    Copy-Item $copy $file -Force; (Get-Item $file).LastWriteTimeUtc = (New-Object DateTime ([int64]$p[1]), ([DateTimeKind]::Utc))
+    Note 'Put back the bridge file (it was changed or replaced without the password)'
+  }
+}
+$flag = Join-Path $dir 'stopped.flag'
+$os = Get-WmiObject Win32_OperatingSystem
+if ((Test-Path $flag) -and (Get-Item $flag).LastWriteTime -gt $os.ConvertToDateTime($os.LastBootUpTime)) { exit 0 }
+$t = Get-ScheduledTask -TaskName $task -ErrorAction SilentlyContinue
+if (-not $t) { Note 'The bridge service task was DELETED. Use the tray menu: Start with the PC + protection.'; exit 1 }
+if (-not $t.Settings.Enabled) { Enable-ScheduledTask -TaskName $task | Out-Null; Note 'The bridge service task had been disabled without the password: enabled again.' }
+if ("$((Get-ScheduledTask -TaskName $task).State)" -ne 'Running') { Start-ScheduledTask -TaskName $task; Note 'The bridge was not running: started again.' }
+'''
+
+def install_protection():
+    """runs as administrator (--install): a Windows task starts the bridge when the PC starts, as this user, with nobody signed in
+    (no Windows password is stored), and a guard task (SYSTEM, every minute) undoes a stop, disable or re-install made without the password"""
+    if "pw2_hash" in load_state():
+        if not check_password("Setting up start-with-the-PC and protection."):
+            return False
+    elif not set_password():
+        return False
+    user = os.environ.get("USERDOMAIN", "") + chr(92) + os.environ.get("USERNAME", "")
+    esc = lambda s: s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace(chr(34), "&quot;")
+    xml = ('<?xml version="1.0" encoding="UTF-16"?><Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">'
+           '<Triggers><BootTrigger><Delay>PT1M</Delay></BootTrigger><TimeTrigger><Repetition><Interval>PT5M</Interval></Repetition><StartBoundary>2026-01-01T00:00:00</StartBoundary></TimeTrigger></Triggers>'
+           '<Principals><Principal id="Author"><UserId>' + esc(user) + '</UserId><LogonType>S4U</LogonType><RunLevel>LeastPrivilege</RunLevel></Principal></Principals>'
+           '<Settings><MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy><DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries><StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>'
+           '<StartWhenAvailable>true</StartWhenAvailable><ExecutionTimeLimit>PT0S</ExecutionTimeLimit><RestartOnFailure><Interval>PT1M</Interval><Count>10</Count></RestartOnFailure></Settings>'
+           '<Actions Context="Author"><Exec><Command>' + esc(pyw_exe()) + '</Command><Arguments>' + esc(chr(34) + os.path.abspath(__file__) + chr(34) + " --service") + '</Arguments><WorkingDirectory>' + esc(HERE) + '</WorkingDirectory></Exec></Actions></Task>')
+    fd, xf = tempfile.mkstemp(suffix=".xml")
+    os.close(fd)
+    open(xf, "w", encoding="utf-16").write(xml)
+    r = subprocess.run(["schtasks", "/Create", "/XML", xf, "/TN", SERVICE_TASK, "/F"], capture_output=True, text=True, creationflags=NOWIN)
+    os.remove(xf)
+    if r.returncode != 0:
+        ask("info", "Windows did not create the start-with-the-PC task: " + (r.stdout or r.stderr or "").strip()[:200])
+        return False
+    gdir = os.path.join(os.environ.get("ProgramFiles", "C:" + chr(92) + "Program Files"), "KMR", "AttendanceGuard", "".join(c if c.isalnum() else "_" for c in NAME))
+    os.makedirs(gdir, exist_ok=True)
+    open(os.path.join(gdir, "guard.ps1"), "w", encoding="utf-8").write(GUARD_PS)
+    open(os.path.join(gdir, "bridge-folder.txt"), "w").write(HERE)
+    open(os.path.join(gdir, "file-name.txt"), "w").write(os.path.basename(__file__))
+    open(os.path.join(gdir, "task-name.txt"), "w").write(SERVICE_TASK)
+    gps = os.path.join(gdir, "guard.ps1")
+    subprocess.run(["schtasks", "/Create", "/TN", GUARD_TASK, "/TR", "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File " + chr(34) + gps + chr(34),
+                    "/SC", "MINUTE", "/MO", "1", "/RU", "SYSTEM", "/RL", "HIGHEST", "/F"], capture_output=True, creationflags=NOWIN)
+    subprocess.run(["powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", ". '" + gps + "'; Approve-Now"], capture_output=True, creationflags=NOWIN)
+    log("Start with the PC and protection set up (tasks: " + SERVICE_TASK + ", " + GUARD_TASK + ")")
+    return True
+
+def offer_install():
+    """asks Windows for administrator rights once, sets up the service, then hands over from this window-less copy to the service"""
+    import ctypes
+    if ask("ask", "Start this bridge with the PC (also with nobody signed in) and protect it with the password? Type yes and press OK. Windows asks for administrator rights.", "yes").strip().lower() != "yes":
+        return
+    rc = ctypes.windll.shell32.ShellExecuteW(None, "runas", pyw_exe(), chr(34) + os.path.abspath(__file__) + chr(34) + " --install", HERE, 1)
+    if rc <= 32:
+        return
+    for _ in range(120):
+        time.sleep(5)
+        if service_task_exists():
+            break
+    else:
+        return
+    with RUN_LOCK:
+        try:
+            globals()["lock"].close()
+        except Exception:
+            pass
+        subprocess.run(["schtasks", "/Run", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN)
+        subprocess.Popen([pyw_exe(), os.path.abspath(__file__)], creationflags=NOWIN | 0x00000008 | 0x00000200, close_fds=True, cwd=HERE)
+        os._exit(0)
+
 
 # ---------------------------------------------------------------- entry
 def lock_port():
@@ -625,7 +881,52 @@ if __name__ == "__main__":
         i = sys.argv.index("--dialog")
         dialog_main(sys.argv[i + 1], sys.argv[i + 2], sys.argv[i + 3], sys.argv[i + 4] if len(sys.argv) > 4 + i else "")
         sys.exit(0)
+    if "--install" in sys.argv:
+        ok = install_protection()
+        ask("info", "Done: the bridge now starts with the PC and is protected." if ok else "Not set up. Nothing was changed.")
+        sys.exit(0)
+    if "--service" in sys.argv:
+        if os.path.exists(FLAG) and os.path.getmtime(FLAG) > boot_time():
+            sys.exit(0)                                   # stopped with the password since this PC started
+        lock = socket.socket()
+        try:
+            lock.bind(("127.0.0.1", lock_port()))
+        except OSError:
+            sys.exit(0)                                   # already running
+        try:
+            os.remove(FLAG)
+        except OSError:
+            pass
+        try:
+            for _m, _p in PKGS:
+                need(_m, _p)
+        except Exception as e:
+            log("Could not install what is needed: " + str(e))
+        log("Bridge started (service, no window)")
+        threading.Thread(target=flag_poller, daemon=True).start()
+        worker()
+        sys.exit(0)
+    if service_task_exists() and not any(a in sys.argv for a in ("--once", "--console", "--pull", "--watchdog")):
+        tlock = socket.socket()
+        try:
+            tlock.bind(("127.0.0.1", lock_port() + 1))
+        except OSError:
+            sys.exit(0)                                   # the status icon is already shown
+        if not os.path.exists(FLAG) and not service_running():
+            subprocess.run(["schtasks", "/Run", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN)
+        try:
+            need("PIL", "pillow"); need("pystray", "pystray")
+            run_status_tray()
+        except Exception as e:
+            log("No status icon: " + str(e))
+        sys.exit(0)
     if "--watchdog" in sys.argv:
+        if os.path.exists(FLAG):
+            sys.exit(0)                                   # stopped on purpose with the password
+        if service_task_exists():
+            if not service_running():
+                subprocess.run(["schtasks", "/Run", "/TN", SERVICE_TASK], capture_output=True, creationflags=NOWIN)
+            sys.exit(0)
         if os.path.exists(FLAG):
             sys.exit(0)                                   # stopped on purpose with the password
         s = socket.socket()
